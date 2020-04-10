@@ -1,0 +1,77 @@
+/*
+ * Copyright (C) 2015-2020 IoT.bzh Company
+ * Author: José Bollo <jose.bollo@iot.bzh>
+ *
+ * $RP_BEGIN_LICENSE$
+ * Commercial License Usage
+ *  Licensees holding valid commercial IoT.bzh licenses may use this file in
+ *  accordance with the commercial license agreement provided with the
+ *  Software or, alternatively, in accordance with the terms contained in
+ *  a written agreement between you and The IoT.bzh Company. For licensing terms
+ *  and conditions see https://www.iot.bzh/terms-conditions. For further
+ *  information use the contact form at https://www.iot.bzh/contact.
+ * 
+ * GNU General Public License Usage
+ *  Alternatively, this file may be used under the terms of the GNU General
+ *  Public license version 3. This license is as published by the Free Software
+ *  Foundation and appearing in the file LICENSE.GPLv3 included in the packaging
+ *  of this file. Please review the following information to ensure the GNU
+ *  General Public License requirements will be met
+ *  https://www.gnu.org/licenses/gpl-3.0.html.
+ * $RP_END_LICENSE$
+ */
+
+#pragma once
+
+#if !defined(_GNU_SOURCE)
+#  define _GNU_SOURCE
+#endif
+
+#define INTRINSIC_BINDING_DIR  "@INTRINSIC_BINDING_DIR@"
+#define MONITORING_INSTALL_DIR "@MONITORING_INSTALL_DIR@"
+
+#cmakedefine01 LIBAFB_DEVEL
+#cmakedefine01 WITH_SIG_MONITOR_DUMPSTACK
+#cmakedefine01 WITH_SIG_MONITOR_SIGNALS
+#cmakedefine01 WITH_SIG_MONITOR_FOR_CALL
+#cmakedefine01 WITH_SIG_MONITOR_TIMERS
+#cmakedefine01 WITH_AFB_HOOK
+#cmakedefine01 WITH_AFB_TRACE
+#cmakedefine01 WITH_DBUS_TRANSPARENCY
+#cmakedefine01 WITH_SUPERVISION
+#cmakedefine01 WITH_DYNAMIC_BINDING
+#cmakedefine01 WITH_REPLY_JOB
+#cmakedefine01 WITH_SYSTEMD
+#cmakedefine01 WITH_LIBMICROHTTPD
+#cmakedefine01 WITH_MONITORING
+#cmakedefine01 WITH_ENVIRONMENT
+#cmakedefine01 WITH_AFB_DEBUG
+#cmakedefine01 WITH_CALL_PERSONALITY
+#cmakedefine01 WITH_AFB_CALL_SYNC
+#cmakedefine01 WITH_FNMATCH
+#cmakedefine01 WITH_L4VSOCK
+#cmakedefine01 WITH_LIBUUID
+#cmakedefine01 WITH_EPOLL
+#cmakedefine01 WITH_EVENTFD
+#cmakedefine01 WITH_FDEV_SYSTEMD
+#cmakedefine01 WITH_FDEV_EPOLL
+#cmakedefine01 WITH_FDEV_POLL
+#cmakedefine01 WITH_FDEV_SELECT
+#cmakedefine01 WITH_CLOCK_GETTIME
+#cmakedefine01 WITH_RANDOM_R
+#cmakedefine01 WITH_OPENAT
+#cmakedefine01 WITH_DIRENT
+#cmakedefine01 WITH_SYS_UIO
+#cmakedefine01 WITH_LOCALE_FOLDER
+#cmakedefine01 WITH_LOCALE_SEARCH_NODE
+#cmakedefine01 WITH_REALPATH
+#cmakedefine01 WITH_CRED
+#cmakedefine01 WITH_UNIX_SOCKET
+#cmakedefine01 WITH_THREAD_LOCAL
+
+
+#if WITH_LIBMICROHTTPD
+/* Always add INFER_EXTENSION (more details in afb-hreq.c) */
+#  define INFER_EXTENSION 1
+#  cmakedefine01 HAVE_LIBMAGIC
+#endif

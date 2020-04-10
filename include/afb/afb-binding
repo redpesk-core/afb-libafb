@@ -1,0 +1,9 @@
+/*
+ * Copyright (C) 2015-2020 IoT.bzh Company
+ * Author: José Bollo <jose.bollo@iot.bzh>
+ *
+ * SPDX-License-Identifier: LGPL-3.0-only
+ */
+#pragma once
+#include <afb/c++/binding-wrap.hpp>
+#include <afb/c++/binding-object.hpp>
