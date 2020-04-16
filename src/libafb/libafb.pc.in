@@ -22,12 +22,12 @@
 ## $RP_END_LICENSE$
 ##
 
-Name: libafbwsc
-Description: Client library for communicating with websocket
-Version: @LIBAFBWSC_VERSION@
+Name: afb-libafb
+Description: Client library for communicating
+Version: @LIBAFB_VERSION@
 URL: @PROJECT_URL@
 
-Requires: json-c libsystemd
+Requires: @LIBAFBDEPS@
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
-Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbwsc
+Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafb @LIBAFBLIBS@
 

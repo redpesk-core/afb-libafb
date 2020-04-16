@@ -20,7 +20,7 @@
  *  https://www.gnu.org/licenses/gpl-3.0.html.
  * $RP_END_LICENSE$
  */
-#include "afb-config.h"
+#include "libafb-config.h"
 
 #if WITH_LIBMICROHTTPD
 

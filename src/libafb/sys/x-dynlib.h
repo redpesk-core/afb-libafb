@@ -26,7 +26,7 @@
 #include <dlfcn.h>
 #include <stdlib.h>
 
-#include "sys/x-errno.h"
+#include "../sys/x-errno.h"
 
 typedef struct { void *handle; } x_dynlib_t;
 

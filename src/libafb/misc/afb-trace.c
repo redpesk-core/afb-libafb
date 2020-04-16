@@ -21,7 +21,7 @@
  * $RP_END_LICENSE$
  */
 
-#include "afb-config.h"
+#include "libafb-config.h"
 
 #if WITH_AFB_HOOK && WITH_AFB_TRACE
 

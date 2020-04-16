@@ -21,7 +21,7 @@
  * $RP_END_LICENSE$
  */
 
-#include "afb-config.h"
+#include "libafb-config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,9 +33,8 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#include <afb/afb-binding-v1.h>
-#include <afb/afb-binding-v2.h>
 #include <afb/afb-binding-v3.h>
+#include <afb/afb-event-x1.h>
 #include <afb/afb-req-x2.h>
 
 #include "sys/x-errno.h"

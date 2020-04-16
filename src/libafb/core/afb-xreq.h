@@ -26,7 +26,7 @@
 #include <stdarg.h>
 #include <afb/afb-req-x1-itf.h>
 #include <afb/afb-req-x2-itf.h>
-#include "core/afb-context.h"
+#include "../core/afb-context.h"
 
 struct json_object;
 struct afb_evt_listener;

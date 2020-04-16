@@ -25,7 +25,7 @@
 
 #if WITH_LIBMICROHTTPD
 
-#include "core/afb-xreq.h"
+#include "../core/afb-xreq.h"
 
 struct json_object;
 struct json_tokener;

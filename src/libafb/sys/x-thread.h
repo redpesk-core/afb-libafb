@@ -24,7 +24,7 @@
 #pragma once
 
 #include <pthread.h>
-#include "sys/x-errno.h"
+#include "../sys/x-errno.h"
 
 #define x_thread_t	pthread_t
 

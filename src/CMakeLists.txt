@@ -53,7 +53,7 @@ SET(link_libraries
 
 ############################################################################
 
-configure_file(afb-config.h.in afb-config.h @ONLY)
+configure_file(libafb-config.h.in libafb-config.h @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 ############################################################################

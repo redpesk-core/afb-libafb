@@ -21,7 +21,7 @@
  * $RP_END_LICENSE$
  */
 
-#include "afb-config.h"
+#include "libafb-config.h"
 
 #if WITH_AFB_HOOK  /***********************************************************/
 
@@ -37,7 +37,6 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#include <afb/afb-req-x1.h>
 #include <afb/afb-event-x2.h>
 
 #include "core/afb-context.h"

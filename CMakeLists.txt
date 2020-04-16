@@ -26,10 +26,13 @@ cmake_minimum_required(VERSION 3.0)
 
 project(afb-libafb C)
 
-set(PROJECT_NAME "AFB library")
+set(PROJECT_NAME "afb-libafb")
 set(PROJECT_PRETTY_NAME "Application Framework Binder core library")
 set(PROJECT_DESCRIPTION "Core library for implementing Application framework Binder")
-set(PROJECT_VERSION "1.2")
+set(PROJECT_VERSION 1.2)
+set(PROJECT_VERSION_MAJOR 1)
+set(PROJECT_VERSION_MINOR 2)
+set(PROJECT_VERSION_PATCH 0)
 set(PROJECT_URL "https://github.com/redpesk/afb-libafb")
 
 set(LIBAFB_VERSION "1.2")
@@ -60,7 +63,6 @@ option(WITH_SIG_MONITOR_FOR_CALL  "Activate monitoring of calls"           ON)
 option(WITH_SIG_MONITOR_TIMERS    "Activate monitoring of call expiration" ON)
 option(WITH_AFB_TRACE             "Include monitoring trace"               ON)
 option(WITH_SUPERVISION           "Activates installation of supervision"  OFF)
-option(WITH_MONITORING            "Activates installation of monitoring"   OFF)
 option(WITH_DBUS_TRANSPARENCY     "Allows API transparency over DBUS"      OFF)
 option(WITH_DYNAMIC_BINDING       "Allow to load dynamic bindings (shared libraries)" ON)
 option(WITH_LIBMICROHTTPD         "Activates HTTP server through LIBMICROHTTPD" ON)
@@ -97,14 +99,6 @@ option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
 
 ###########################################################################
 
-set(UNITDIR_SYSTEM         ${CMAKE_INSTALL_LIBDIR}/systemd/system CACHE STRING "Path to systemd system unit files")
-set(INTRINSIC_BINDING_DIR  ${CMAKE_INSTALL_FULL_LIBDIR}/afb CACHE STRING "Path to install intrinsic bindings")
-set(DATADIR                ${CMAKE_INSTALL_FULL_DATADIR}/af-binder CACHE STRING "Path to datadir")
-set(SAMPLE_INSTALL_DIR     ${DATADIR}/samples CACHE STRING "Path to install samples")
-set(MONITORING_INSTALL_DIR ${DATADIR}/monitoring CACHE STRING "Path to install monitoring")
-
-###########################################################################
-
 link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
 
 add_compile_options(-Wall -Wextra -Wconversion)
@@ -134,15 +128,10 @@ set(CMAKE_C_FLAGS_CCOV         "-g -O1 --coverage")
 
 ###########################################################################
 
-if(NOT WITH_LIBMICROHTTPD)
-	set(WITH_MONITORING OFF)
-endif()
-
-###########################################################################
-
 include(FindThreads)
 find_package(Threads)
 
+PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding)
 PKG_CHECK_MODULES(json-c REQUIRED json-c)
 
 if(WITH_LIBMICROHTTPD)
@@ -159,6 +148,8 @@ if(WITH_LIBMICROHTTPD)
 			set(HAVE_LIBMAGIC 0)
 		endif()
 	endif()
+else()
+	set(WITH_LIBMAGIC OFF)
 endif(WITH_LIBMICROHTTPD)
 
 if(NOT WITHOUT_CYNAGORA)
@@ -191,5 +182,4 @@ endif()
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
 
 add_subdirectory(src)
-add_subdirectory(include)
 

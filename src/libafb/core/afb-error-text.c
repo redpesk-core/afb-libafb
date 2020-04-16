@@ -21,7 +21,7 @@
  * $RP_END_LICENSE$
  */
 
-#include "afb-config.h"
+#include "libafb-config.h"
 #include "afb-error-text.h"
 
 const char afb_error_text_aborted[]            = "aborted";

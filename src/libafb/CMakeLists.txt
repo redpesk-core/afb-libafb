@@ -32,10 +32,115 @@ file(GLOB LIBAFBSRCS
 	wsapi/*.c
 	wsj1/*.c
 )
-
-add_library(libafb STATIC ${LIBAFBSRCS})
-set_property(TARGET libafb PROPERTY OUTPUT_NAME afb)
-
-
 set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
+###########################################################################
+
+add_library(libafb OBJECT ${LIBAFBSRCS})
 target_include_directories(libafb PUBLIC ${LIBAFB_SOURCE_DIR})
+
+###########################################################################
+
+add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
+set_target_properties(libafbsta PROPERTIES
+	OUTPUT_NAME afb
+	VERSION ${LIBAFB_VERSION}
+)
+INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+###########################################################################
+# install pkgconfig file
+
+set(LIBAFBLIBS)
+set(LIBAFBDEPS json-c)
+set(LIBAFBSO_LDFLAGS ${json-c_LDFLAGS})
+if (WITH_SYSTEMD)
+	set(LIBAFBDEPS "${LIBAFBDEPS} libsystemd")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} ${libsystemd_LDFLAGS}")
+endif()
+if (NOT WITHOUT_CYNAGORA)
+	set(LIBAFBDEPS "${LIBAFBDEPS} cynagora")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} ${cynagora_LDFLAGS}")
+endif()
+if(WITH_LIBUUID)
+	set(LIBAFBDEPS "${LIBAFBDEPS} uuid")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} ${libuuid_LDFLAGS}")
+endif()
+if(WITH_LIBMICROHTTPD)
+	set(LIBAFBDEPS "${LIBAFBDEPS} libmicrohttpd")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} ${libmicrohttpd_LDFLAGS}")
+endif()
+if(WITH_DYNAMIC_BINDING)
+	set(LIBAFBLIBS "${LIBAFBLIBS} -ldl")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} -ldl")
+endif()
+if(WITH_LIBMAGIC)
+	set(LIBAFBLIBS "${LIBAFBLIBS} -lmagic")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} -lmagic")
+endif()
+if(WITH_SIG_MONITOR_TIMERS)
+	set(LIBAFBLIBS "${LIBAFBLIBS} -lrt")
+	set(LIBAFBSO_LDFLAGS "${LIBAFBSO_LDFLAGS} -lrt")
+endif()
+
+###########################################################################
+
+add_library(libafbso SHARED  $<TARGET_OBJECTS:libafb>)
+set_target_properties(libafbso PROPERTIES
+	OUTPUT_NAME afb
+	VERSION ${LIBAFB_VERSION}
+	SOVERSION ${LIBAFB_SOVERSION}
+)
+TARGET_LINK_LIBRARIES(libafbso
+	${LIBAFBSO_LDFLAGS}
+	-lpthread
+	-Wl,--as-needed
+	-Wl,--gc-sections
+)
+INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+# install header files
+INSTALL(DIRECTORY
+		core
+		utils
+		sys
+		http
+		apis
+		misc
+		wsapi
+		wsj1
+	DESTINATION
+		${CMAKE_INSTALL_INCLUDEDIR}/libafb
+	FILES_MATCHING PATTERN
+		*/*.h
+)
+
+INSTALL(FILES
+		${CMAKE_CURRENT_BINARY_DIR}/../libafb-config.h
+	DESTINATION
+		${CMAKE_INSTALL_INCLUDEDIR}/libafb
+)
+
+# install pkgconfig file
+set(LIBAFBEXTRADEP)
+if (WITH_SYSTEMD)
+	set(LIBAFBEXTRADEP "${LIBAFBEXTRADEP} libsystemd")
+endif()
+if (NOT WITHOUT_CYNAGORA)
+	set(LIBAFBEXTRADEP "${LIBAFBEXTRADEP} cynagora")
+endif()
+if(WITH_LIBUUID)
+	set(LIBAFBEXTRADEP "${LIBAFBEXTRADEP} uuid")
+endif()
+if(WITH_LIBMICROHTTPD)
+	set(LIBAFBEXTRADEP "${LIBAFBEXTRADEP} libmicrohttpd")
+endif()
+
+
+CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
+INSTALL(FILES
+		${CMAKE_CURRENT_BINARY_DIR}/libafb.pc
+	DESTINATION
+		${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)
+

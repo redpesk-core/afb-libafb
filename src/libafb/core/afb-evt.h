@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "utils/uuid.h"
+#include "../utils/uuid.h"
 
 struct afb_event_x1;
 struct afb_event_x2;

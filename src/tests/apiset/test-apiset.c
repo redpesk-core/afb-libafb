@@ -9,7 +9,7 @@
 # define ck_assert_ptr_nonnull(X)   ck_assert_ptr_ne(X, NULL)
 #endif
 
-#include "afb-config.h"
+#include "libafb-config.h"
 #include "core/afb-apiset.h"
 #include "sys/x-errno.h"
 

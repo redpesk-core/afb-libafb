@@ -1,15 +1,17 @@
 #/bin/bash
 
 h="$(dirname $0)"
-f=false
+force=false
 arch=
 bd=
-eval set -- $(getopt -o a:b:f -l arch:,buildir:,force -- "$@") || exit
+: ${PREFIX:=}
+eval set -- $(getopt -o a:b:fp: -l arch:,buildir:,force,prefix: -- "$@") || exit
 while :; do
 	case "$1" in
 	-a|--arch) arch="$2"; shift;;
 	-b|--buildir) bd="$2"; shift;;
 	-f|--force) force=true;;
+	-p|--prefix) PREFIX="$2"; shift;;
 	--) shift; break;;
 	esac
 	shift
@@ -24,10 +26,11 @@ esac
 
 mkdir -p "$h/$bd" || exit
 cd "$h/$bd" || exit
-$force && rm -r * 2>/dev/null || rm CMakeCache.txt 2>/dev/null
 
+$force && { rm -r * 2>/dev/null || rm CMakeCache.txt 2>/dev/null; }
+test -f CMakeCache.txt -a -f Makefile || \
 cmake \
-	-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX:=$HOME/.local} \
+	-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX:=${PREFIX:=$HOME/.local}} \
 	-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:=Debug} \
 	-DLIBAFB_DEVEL=${LIBAFB_DEVEL:=OFF} \
 	-DWITH_SYSTEMD=${WITH_SYSTEMD:=ON} \
@@ -39,7 +42,6 @@ cmake \
 	-DWITH_SIG_MONITOR_TIMERS=${WITH_SIG_MONITOR_TIMERS:=ON} \
 	-DWITH_AFB_TRACE=${WITH_AFB_TRACE:=ON} \
 	-DWITH_SUPERVISION=${WITH_SUPERVISION:=ON} \
-	-DWITH_MONITORING=${WITH_MONITORING:=ON} \
 	-DWITH_DBUS_TRANSPARENCY=${WITH_DBUS_TRANSPARENCY:=ON} \
 	-DWITH_DYNAMIC_BINDING=${WITH_DYNAMIC_BINDING:=ON} \
 	-DWITH_LIBMICROHTTPD=${WITH_LIBMICROHTTPD:=ON} \

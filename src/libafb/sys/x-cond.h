@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "sys/x-mutex.h"
+#include "../sys/x-mutex.h"
 
 #include <pthread.h>
 
