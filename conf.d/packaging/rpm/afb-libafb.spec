@@ -4,7 +4,7 @@
 
 Name:           afb-libafb
 Version:        1.2
-Release:        0
+Release:        2%{?dist}
 License:        GPLv3
 Summary:        afb-libafb
 Group:          Development/Libraries/C and C++
@@ -15,8 +15,8 @@ BuildRequires:  make
 BuildRequires:  cmake
 BuildRequires:  pkgconfig(libsystemd) >= 222
 BuildRequires:  pkgconfig(json-c)
-BuildRequires:  afb-binding
-BuildRequires:  cynagora
+BuildRequires:  pkgconfig(afb-binding)
+BuildRequires:  pkgconfig(cynagora)
 BuildRequires:  file-devel
 BuildRequires:  gcc-c++
 
@@ -35,7 +35,7 @@ Application Framework Binder core library
 Group:          Development/Libraries/C and C++
 Requires:       %{name} = %{version}
 Provides:       pkgconfig(%{name}) = %{version}
-Summary:        AGL afb-libafb-devel
+Summary:        afb-libafb-devel
 
 %description devel
 Development files for application Framework Binder core library
