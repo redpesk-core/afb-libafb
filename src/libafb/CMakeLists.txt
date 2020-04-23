@@ -43,7 +43,7 @@ target_include_directories(libafb PUBLIC ${LIBAFB_SOURCE_DIR})
 
 add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
 set_target_properties(libafbsta PROPERTIES
-	OUTPUT_NAME afb
+	OUTPUT_NAME afb-static
 	VERSION ${LIBAFB_VERSION}
 )
 INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
@@ -140,6 +140,12 @@ endif()
 CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
 INSTALL(FILES
 		${CMAKE_CURRENT_BINARY_DIR}/libafb.pc
+	DESTINATION
+		${CMAKE_INSTALL_LIBDIR}/pkgconfig
+)
+CONFIGURE_FILE(libafb.pc.in libafb-static.pc @ONLY)
+INSTALL(FILES
+		${CMAKE_CURRENT_BINARY_DIR}/libafb-static.pc
 	DESTINATION
 		${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
