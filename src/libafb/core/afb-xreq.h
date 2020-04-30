@@ -24,7 +24,6 @@
 #pragma once
 
 #include <stdarg.h>
-#include <afb/afb-req-x1-itf.h>
 #include <afb/afb-req-x2-itf.h>
 #include "../core/afb-context.h"
 
@@ -123,21 +122,6 @@ extern const char *afb_xreq_raw(struct afb_xreq *xreq, size_t *size);
 extern int afb_xreq_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event);
 extern int afb_xreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event);
 
-extern void afb_xreq_legacy_subcall(
-		struct afb_xreq *xreq,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *),
-		void *cb_closure);
-extern void afb_xreq_unhooked_legacy_subcall(
-		struct afb_xreq *xreq,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *),
-		void *cb_closure);
-
 extern void afb_xreq_subcall(
 		struct afb_xreq *xreq,
 		const char *api,
@@ -154,19 +138,6 @@ extern void afb_xreq_unhooked_subcall(
 		int flags,
 		void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_req_x2 *),
 		void *closure);
-
-extern int afb_xreq_unhooked_legacy_subcall_sync(
-		struct afb_xreq *xreq,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result);
-extern int afb_xreq_legacy_subcall_sync(
-		struct afb_xreq *xreq,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result);
 
 /* initialisation and processing of xreq */
 extern void afb_xreq_init(struct afb_xreq *xreq, const struct afb_xreq_query_itf *queryitf);
@@ -193,4 +164,3 @@ static inline struct afb_xreq *xreq_from_req_x2(struct afb_req_x2 *req)
 {
 	return CONTAINER_OF(struct afb_xreq, request, req);
 }
-

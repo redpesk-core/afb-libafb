@@ -29,7 +29,6 @@
 
 #include <json-c/json.h>
 #include <afb/afb-event-x2-itf.h>
-#include <afb/afb-event-x1.h>
 
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"

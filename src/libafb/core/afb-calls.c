@@ -44,10 +44,10 @@
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 
-#define CALLFLAGS            (afb_req_x2_subcall_api_session|afb_req_x2_subcall_catch_events)
+#define CALLFLAGS            (afb_req_subcall_api_session|afb_req_subcall_catch_events)
 
 #if WITH_LEGACY_CALLS
-#define LEGACY_SUBCALLFLAGS  (afb_req_x2_subcall_pass_events|afb_req_x2_subcall_on_behalf)
+#define LEGACY_SUBCALLFLAGS  (afb_req_subcall_pass_events|afb_req_subcall_on_behalf)
 #endif
 
 /************************************************************************/
@@ -265,9 +265,9 @@ static int callreq_subscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *even
 	int rc = 0, rc2;
 	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
 
-	if (callreq->flags & afb_req_x2_subcall_pass_events)
+	if (callreq->flags & afb_req_subcall_pass_events)
 		rc = afb_xreq_subscribe(callreq->xreq.caller, event);
-	if (callreq->flags & afb_req_x2_subcall_catch_events) {
+	if (callreq->flags & afb_req_subcall_catch_events) {
 		rc2 = afb_export_subscribe(callreq->export, event);
 		if (rc2 < 0)
 			rc = rc2;
@@ -280,9 +280,9 @@ static int callreq_unsubscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *ev
 	int rc = 0, rc2;
 	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
 
-	if (callreq->flags & afb_req_x2_subcall_pass_events)
+	if (callreq->flags & afb_req_subcall_pass_events)
 		rc = afb_xreq_unsubscribe(callreq->xreq.caller, event);
-	if (callreq->flags & afb_req_x2_subcall_catch_events) {
+	if (callreq->flags & afb_req_subcall_catch_events) {
 		rc2 = afb_export_unsubscribe(callreq->export, event);
 		if (rc2 < 0)
 			rc = rc2;
@@ -331,11 +331,11 @@ static struct callreq *callreq_create(
 		if (!caller)
 			afb_export_context_init(export, &callreq->xreq.context);
 		else {
-			if (flags & afb_req_x2_subcall_api_session)
+			if (flags & afb_req_subcall_api_session)
 				afb_export_context_init(export, &callreq->xreq.context);
 			else
 				afb_context_subinit(&callreq->xreq.context, &caller->context);
-			if (flags & afb_req_x2_subcall_on_behalf)
+			if (flags & afb_req_subcall_on_behalf)
 				afb_context_on_behalf_other_context(&callreq->xreq.context, &caller->context);
 			callreq->xreq.caller = caller;
 			afb_xreq_unhooked_addref(caller);

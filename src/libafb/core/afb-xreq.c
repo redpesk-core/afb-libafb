@@ -34,7 +34,6 @@
 #endif
 
 #include <afb/afb-binding-v3.h>
-#include <afb/afb-event-x1.h>
 #include <afb/afb-req-x2.h>
 
 #include "sys/x-errno.h"
@@ -306,7 +305,7 @@ static int xreq_subscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_eve
 
 static int xreq_legacy_subscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
 {
-	return xreq_subscribe_event_x2_cb(closure, afb_event_x1_to_event_x2(event));
+	return xreq_subscribe_event_x2_cb(closure, event.closure);
 }
 
 int afb_xreq_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
@@ -329,7 +328,7 @@ static int xreq_unsubscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_e
 
 static int xreq_legacy_unsubscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
 {
-	return xreq_unsubscribe_event_x2_cb(closure, afb_event_x1_to_event_x2(event));
+	return xreq_unsubscribe_event_x2_cb(closure, event.closure);
 }
 
 int afb_xreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
@@ -737,7 +736,7 @@ static int xreq_hooked_subscribe_event_x2_cb(struct afb_req_x2 *closure, struct 
 
 static int xreq_hooked_legacy_subscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
 {
-	return xreq_hooked_subscribe_event_x2_cb(closure, afb_event_x1_to_event_x2(event));
+	return xreq_hooked_subscribe_event_x2_cb(closure, event.closure);
 }
 
 static int xreq_hooked_unsubscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_event_x2 *event)
@@ -749,7 +748,7 @@ static int xreq_hooked_unsubscribe_event_x2_cb(struct afb_req_x2 *closure, struc
 
 static int xreq_hooked_legacy_unsubscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
 {
-	return xreq_hooked_unsubscribe_event_x2_cb(closure, afb_event_x1_to_event_x2(event));
+	return xreq_hooked_unsubscribe_event_x2_cb(closure, event.closure);
 }
 
 static void xreq_hooked_legacy_subcall_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*), void *closure)
@@ -959,19 +958,9 @@ const char *afb_xreq_raw(struct afb_xreq *xreq, size_t *size)
 	return result;
 }
 
-void afb_xreq_unhooked_legacy_subcall(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *), void *cb_closure)
-{
-	xreq_legacy_subcall_request_cb(xreq_to_req_x2(xreq), api, verb, args, callback, cb_closure);
-}
-
 void afb_xreq_unhooked_subcall(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, int flags, void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_req_x2 *), void *closure)
 {
 	xreq_subcall_cb(xreq_to_req_x2(xreq), api, verb, args, flags, callback, closure);
-}
-
-int afb_xreq_unhooked_legacy_subcall_sync(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, struct json_object **result)
-{
-	return xreq_legacy_subcallsync_cb(xreq_to_req_x2(xreq), api, verb, args, result);
 }
 
 void afb_xreq_addref(struct afb_xreq *xreq)
@@ -984,19 +973,9 @@ void afb_xreq_unref(struct afb_xreq *xreq)
 	afb_req_x2_unref(xreq_to_req_x2(xreq));
 }
 
-void afb_xreq_legacy_subcall(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *), void *cb_closure)
-{
-	afb_req_x2_subcall_legacy(xreq_to_req_x2(xreq), api, verb, args, callback, cb_closure);
-}
-
 void afb_xreq_subcall(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, int flags, void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_req_x2 *), void *closure)
 {
 	afb_req_x2_subcall(xreq_to_req_x2(xreq), api, verb, args, flags, callback, closure);
-}
-
-int afb_xreq_legacy_subcall_sync(struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, struct json_object **result)
-{
-	return afb_req_x2_subcall_sync_legacy(xreq_to_req_x2(xreq), api, verb, args, result);
 }
 
 int afb_xreq_reply_unknown_api(struct afb_xreq *xreq)

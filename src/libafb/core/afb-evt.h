@@ -25,7 +25,6 @@
 
 #include "../utils/uuid.h"
 
-struct afb_event_x1;
 struct afb_event_x2;
 struct afb_evtid;
 struct afb_session;
