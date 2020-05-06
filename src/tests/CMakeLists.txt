@@ -22,17 +22,22 @@
 # $RP_END_LICENSE$
 ###########################################################################
 
+pkg_check_modules(check check)
 
-PKG_CHECK_MODULES(check check)
+macro(addtest name)
+	add_executable(test-${name} test-${name}.c)
+	target_include_directories(test-${name} PRIVATE ${INCLUDE_DIRS} ${check_INCLUDE_DIRS})
+	target_link_libraries(test-${name} libafb ${link_libraries}  ${check_LDFLAGS})
+	add_test(NAME ${name} COMMAND test-${name} ${ARGN})
+endmacro(addtest)
+
 if(check_FOUND)
-	INCLUDE_DIRECTORIES(${INCLUDE_DIRS} ${check_INCLUDE_DIRS})
-	SET(link_libraries ${link_libraries} ${check_LDFLAGS})
-	add_subdirectory(session)
-	add_subdirectory(apiset)
-	add_subdirectory(apiv3)
-	add_subdirectory(wrap-json)
-	add_subdirectory(globset)
-	add_subdirectory(u16id)
+	addtest(session)
+	addtest(apiset)
+	addtest(apiv3)
+	addtest(wrap-json)
+	addtest(globset ${CMAKE_CURRENT_SOURCE_DIR}/globset.in ${CMAKE_CURRENT_SOURCE_DIR}/globset.out)
+	addtest(u16id)
 else(check_FOUND)
 	MESSAGE(WARNING "check not found! no test!")
 endif(check_FOUND)
