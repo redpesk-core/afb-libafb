@@ -24,6 +24,7 @@
 #pragma once
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <afb/afb-req-x2-itf.h>
 #include "../core/afb-context.h"
 
@@ -84,7 +85,7 @@ struct afb_xreq
  * @param ptr the pointer to an element 'field'
  * @return the pointer to the structure that contains the 'field' at address 'ptr'
  */
-#define CONTAINER_OF(type,field,ptr) ((type*)(((char*)(ptr))-((char*)&(((type*)0)->field))))
+#define CONTAINER_OF(type,field,ptr) ((type*) (((char*)(ptr)) - offsetof(type,field)))
 
 /**
  * Macro for retrieve the pointer of a structure of 'type' having a field named "xreq"

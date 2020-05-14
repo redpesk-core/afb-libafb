@@ -43,7 +43,6 @@ struct afb_cred
 
 extern struct afb_cred *afb_cred_current();
 
-
 extern int afb_cred_create(struct afb_cred **cred, uid_t uid, gid_t gid, pid_t pid, const char *label);
 extern int afb_cred_create_for_socket(struct afb_cred **cred, int fd);
 extern struct afb_cred *afb_cred_addref(struct afb_cred *cred);
