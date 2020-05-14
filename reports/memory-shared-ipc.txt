@@ -1,0 +1,229 @@
+Memory shared IPC report
+========================
+
+Topic
+-----
+
+J'avais déja cité à José dans les trucs à regarder,
+
+• le binder d'Android (a minima pour pouvoir expliquer
+  pourquoi on ne l'utilise pas :-)) mais aussi
+  potentiellement pour piquer leur bonnes idées.
+
+• LMDB (Lightning Memory-Mapped DB à priori une version
+  simplifié de BSGdb) http://www.lmdb.tech/doc/
+
+Je pense peux sans doute ajouter à la liste des recherches:
+
+• Redis https://redis.io/
+
+• Peut etre Memcache http://memcached.org/ (même si a priori
+  LMDB fait le même chose en plus simple)
+
+Sinon il y a des solution de transfert de packet:
+• https://core.dpdk.org/ (je connais pas, mais si 
+  le papier ca semble plutot bien)
+• Mempool ?
+
+Dans les points qui sont importants:
+• Les perfs (évidemment)
+• Le portage sur des petits CPU
+• La sécurité
+• Les interface de sérialisation (certain outils on déja fait une bonne partie du travail)
+• La facilité d'usage
+• La communauté
+• La valeur marketing (reconnaissance par le marché)
+• etc ...
+
+First pass of study
+===================
+
+Android binder
+--------------
+
+Accessed from Java part, the class *Binder* is an implementation
+of the *IBinder* interface <https://developer.android.com/reference/android/os/IBinder>
+used to call methods. The call is BLOCKING, the method is designated by a number,
+it sends *Parcel* and receives back a *Parcel*.
+
+*Parcel* is an object handling self describing data,
+<https://developer.android.com/reference/android/os/Parcel>.
+
+The binder kernel's module is visible at
+<https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/android>
+and some documentation here
+<https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/admin-guide/binderfs.rst>
+
+It emphasis: "Android 8 uses scatter-gather optimization to
+reduce the number of copies from 3 to 1. Instead of serializing
+data in a Parcel first, data remains in its original structure
+and memory layout and the driver immediately copies it to the
+target process. After the data is in the target process, the
+structure and memory layout is the same and the data can be
+read without requiring another copy."
+(see <https://en.wikipedia.org/wiki/Vectored_I/O>)
+
+This last note enforce the proposal of afb_data.
+
+Aside is a description of memory block sharing:
+<https://source.android.com/devices/architecture/hidl/memoryblock>
+It is not related to the binder itself but of interest.
+
+Note the definition of HIDL an interface description language for
+Hardaware Abstaration Layers:
+<https://source.android.com/devices/architecture/hidl>
+And also the Android Interface Definition Language (AIDL)
+<https://source.android.com/devices/architecture/aidl/stable-aidl>
+
+Lightning Memory-Mapped DB (LMDB)
+---------------------------------
+
+The goal of the data base is to enable several applications
+running on the same system to concurrently map the database
+file in memory.
+
+It can fit the requirement.
+
+License OpenLDAP, near BSD3.
+
+Links:
+
+* <https://github.com/LMDB/lmdb>
+* <https://symas.com/lmdb/>
+
+Redis
+-----
+
+My understanding is that redis server store its data in memory but
+doesn't share that memory with its clients. Instead it transmits its
+data through streaming on a socket.
+
+Links:
+
+* <https://redis.io/>
+* <http://try.redis.io/>
+
+Memcached
+---------
+
+Memcached is a server that caches its requested data in memory
+and files and that manages an in-memory LRU cache. It transmits
+its data through streaming on a socket.
+
+Links:
+
+* <https://www.memcached.org/>
+
+dpdk and mempool
+----------------
+
+The project is intended to leverage hardware capacities for
+best processing of packets. The sizes of managed objects is
+fixed. This is a difficulty.
+
+The libraries Mbuf/Mempool can be used in multi-process
+environment as shows <https://doc.dpdk.org/guides/prog_guide/multi_proc_support.html>
+but the role of the processes doesn't lloks symetric.
+That might imply the creation of a dedicated server.
+
+Limitation exists on linux, notabily Address-Space Layout Randomization (ASLR).
+See <https://doc.dpdk.org/guides/prog_guide/multi_proc_support.html#multi-process-limitations>
+
+Links:
+
+* <https://core.dpdk.org/>
+* <https://doc.dpdk.org/guides/prog_guide/index.html>
+
+Other searchs
+=============
+
+Searches for keywords "memory shared ipc" left few interesting
+implementations and many student works. Below some interesting
+findings.
+
+Unified communication X (UCX)
+----------------------------------
+
+This project is really promising. It is intended to allow
+abstracting the communication layer that can then be
+anything including memory shared.
+
+It is big and BSD3.
+
+Links:
+
+* <https://www.openucx.org/>
+* <https://github.com/openucx/ucx>
+* <https://openucx.readthedocs.io/en/master/index.html>
+
+Shadesmar
+---------
+
+This project is small and could fit the requirement but
+unless modified, it requires boost and msgpack.
+
+License MIT.
+
+Links:
+
+* <https://github.com/Squadrick/shadesmar>
+
+Mabain
+------
+
+Mabain is a like LMDB a key/value database that can use
+memory mapping and have multiprocess feature. But with
+assumed caveats.
+
+The license GPLv2 surely forbids to use it.
+
+Links:
+
+* <https://github.com/chxdeng/mabain>
+
+RPMsg-lite
+----------
+
+This project is an optimisation with shared memory of
+OPEN-AMP RPMsg. It is used to enable fast and efficient
+communication on Asymetric Multiprocessor Platforms (AMP).
+
+RPMsg stands for Remote Processor Messaging.
+
+The value is that AMP is a known target implementation.
+Linux includes drivers for AMP (remoteproc and rpmsg) for
+AMP.
+
+Notabily, there is some link with VIRTIO. Unfortunately,
+VIRTIO/libvirt/kvm don't have shared memory API.
+
+Links:
+
+* <https://nxpmicro.github.io/rpmsg-lite/>
+* <https://github.com/NXPmicro/rpmsg-lite>
+
+Enhanced Communication Abstraction Layer (eCAL)
+-----------------------------------------------
+
+Continental develop a full feature communication layer.
+It is perhaps for being able to plug their code with or on
+any other framework (capnproto/protobuf/flatbuffers).
+
+Big and license APACHE 2
+
+Links:
+
+* <https://github.com/continental/ecal>
+
+Second pass on interesting projects
+===================================
+
+The interresting projects are:
+
+* lmdb
+* mabain
+* mbuf/mempool
+* ucx
+* RPMsg-lite
+
+
