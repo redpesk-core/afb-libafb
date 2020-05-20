@@ -28,18 +28,18 @@
 #include <stdint.h>
 
 #include "core/afb-perm.h"
-#include "core/afb-context.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
 #include "core/afb-session.h"
+#include "core/afb-req-common.h"
 #include "sys/verbose.h"
 
 /*********************************************************************************/
 
-static inline const char *session_of_context(struct afb_context *context)
+static inline const char *session_of_req(struct afb_req_common *req)
 {
-	return context->token ? afb_token_string(context->token)
-                : context->session ? afb_session_uuid(context->session)
+	return req->token ? afb_token_string(req->token)
+                : req->session ? afb_session_uuid(req->session)
                 : "";
 }
 
@@ -138,44 +138,8 @@ static void cynagora_release()
 	pthread_mutex_unlock(&mutex);
 }
 
-#if SYNCHRONOUS_CHECKS
-int afb_perm_check(struct afb_context *context, const char *permission)
-{
-	int rc;
-	cynagora_key_t key;
-
-#if WITH_CRED
-	if (!context->credentials) {
-		/* case of permission for self */
-		return 1;
-	}
-#endif
-	if (!permission) {
-		ERROR("Got a null permission!");
-		return 0;
-	}
-
-	rc = cynagora_acquire();
-	if (rc < 0)
-		return 0;
-
-#if WITH_CRED
-	key.client = context->credentials->label;
-	key.user = context->credentials->user;
-#else
-	key.client = "";
-	key.user = "";
-#endif
-	key.session = session_of_context(context);
-	key.permission = permission;
-	rc = cynagora_check(cynagora, &key, 0);
-	cynagora_release();
-	return rc > 0;
-}
-#endif
-
-void afb_perm_check_async(
-	struct afb_context *context,
+void afb_perm_check_req_async(
+	struct afb_req_common *req,
 	const char *permission,
 	void (*callback)(void *closure, int status),
 	void *closure
@@ -185,7 +149,7 @@ void afb_perm_check_async(
 	cynagora_key_t key;
 
 #if WITH_CRED
-	if (!context->credentials)
+	if (!req->credentials)
 		/* case of permission for self */
 		rc = 1;
 
@@ -199,13 +163,13 @@ void afb_perm_check_async(
 		rc = cynagora_acquire();
 		if (rc >= 0) {
 #if WITH_CRED
-			key.client = context->credentials->label;
-			key.user = context->credentials->user;
+			key.client = req->credentials->label;
+			key.user = req->credentials->user;
 #else
 			key.client = "";
 			key.user = "";
 #endif
-			key.session = session_of_context(context);
+			key.session = session_of_req(req);
 			key.permission = permission;
 			rc = cynagora_async_check(cynagora, &key, 0, 0, callback, closure);
 			cynagora_release();
@@ -220,23 +184,16 @@ void afb_perm_check_async(
 /*********************************************************************************/
 #else
 
-int afb_perm_check(struct afb_context *context, const char *permission)
-{
-	NOTICE("Granting permission %s by default of backend", permission ?: "(null)");
-	return !!permission;
-}
-
-void afb_perm_check_async(
-	struct afb_context *context,
+void afb_perm_check_req_async(
+	struct afb_req_common *req,
 	const char *permission,
-	void (*callback)(void *closure, int status),
+	void (*callback)(void *_closure, int _status),
 	void *closure
-)
-{
-	callback(closure, afb_perm_check(context, permission));
+) {
+	NOTICE("Granting permission %s by default of backend", permission ?: "(null)");
+	callback(closure, !!permission);
 }
 
 #endif
 
 #endif /* WITH_CRED */
-

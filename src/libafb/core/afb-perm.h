@@ -23,16 +23,12 @@
 
 #pragma once
 
-struct afb_context;
+struct afb_req_common;
 
 #if WITH_CRED
 
-#if SYNCHRONOUS_CHECKS
-extern int afb_perm_check(struct afb_context *context, const char *permission);
-#endif
-
-extern void afb_perm_check_async(
-	struct afb_context *context,
+extern void afb_perm_check_req_async(
+	struct afb_req_common *req,
 	const char *permission,
 	void (*callback)(void *closure, int status),
 	void *closure
@@ -40,15 +36,8 @@ extern void afb_perm_check_async(
 
 #else
 
-#if SYNCHRONOUS_CHECKS
-static inline int afb_perm_check(struct afb_context *context, const char *permission)
-{
-	return 1;
-}
-#endif
-
-static inline void afb_perm_check_async(
-	struct afb_context *context,
+static inline void afb_perm_check_req_async(
+	struct afb_req_common *req,
 	const char *permission,
 	void (*callback)(void *closure, int status),
 	void *closure

@@ -24,29 +24,7 @@
 #pragma once
 
 struct afb_auth;
-struct afb_context;
-struct afb_xreq;
 struct json_object;
 
-#if SYNCHRONOUS_CHECKS
-extern int afb_auth_check(struct afb_context *context, const struct afb_auth *auth);
-#endif
-extern void afb_auth_check_async(
-	struct afb_context *context,
-	const struct afb_auth *auth,
-	void (*callback)(void *_closure, int _status),
-	void *closure
-);
-
-#if SYNCHRONOUS_CHECKS
-extern int afb_auth_check_and_set_session_x2(struct afb_xreq *xreq, const struct afb_auth *auth, uint32_t session);
-#endif
-extern void afb_auth_check_and_set_session_x2_async(
-	struct afb_xreq *xreq,
-	const struct afb_auth *auth,
-	uint32_t sessionflags,
-	void (*callback)(struct afb_xreq *_xreq, int _status, void *_closure),
-	void *closure
-);
 extern struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t session);
 

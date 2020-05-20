@@ -36,10 +36,11 @@
 #include "core/afb-session.h"
 #include "core/afb-cred.h"
 #include "core/afb-apiset.h"
-#include "core/afb-xreq.h"
-#include "core/afb-context.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
 #include "core/afb-evt.h"
 #include "core/afb-token.h"
+#include "core/containerof.h"
 
 #include "sys/systemd.h"
 #include "sys/verbose.h"
@@ -56,10 +57,10 @@ static void aws_on_push_cb(void *closure, const char *event, uint16_t eventid, s
 static void aws_on_broadcast_cb(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop);
 
 /* predeclaration of wsreq callbacks */
-static void wsreq_destroy(struct afb_xreq *xreq);
-static void wsreq_reply(struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info);
-static int wsreq_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event);
-static int wsreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event);
+static void wsreq_destroy(struct afb_req_common *comreq);
+static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply);
+static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event);
+static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event);
 
 /* declaration of websocket structure */
 struct afb_ws_json1
@@ -80,7 +81,7 @@ struct afb_ws_json1
 /* declaration of wsreq structure */
 struct afb_wsreq
 {
-	struct afb_xreq xreq;
+	struct afb_req_common comreq;
 	struct afb_ws_json1 *aws;
 	struct afb_wsreq *next;
 	struct afb_wsj1_msg *msgj1;
@@ -92,8 +93,8 @@ static struct afb_wsj1_itf wsj1_itf = {
 	.on_call = aws_on_call_cb
 };
 
-/* interface for xreq */
-const struct afb_xreq_query_itf afb_ws_json1_xreq_itf = {
+/* interface for comreq */
+const struct afb_req_common_query_itf afb_ws_json1_req_common_itf = {
 	.reply = wsreq_reply,
 	.subscribe = wsreq_subscribe,
 	.unsubscribe = wsreq_unsubscribe,
@@ -114,12 +115,18 @@ static const struct afb_evt_itf evt_itf = {
 ****************************************************************
 ***************************************************************/
 
-struct afb_ws_json1 *afb_ws_json1_create(struct fdev *fdev, struct afb_apiset *apiset, struct afb_context *context, void (*cleanup)(void*), void *cleanup_closure)
-{
+struct afb_ws_json1 *
+afb_ws_json1_create(
+	struct fdev *fdev,
+	struct afb_apiset *apiset,
+	struct afb_session *session,
+	struct afb_token *token,
+	void (*cleanup)(void*),
+	void *cleanup_closure
+) {
 	struct afb_ws_json1 *result;
 
 	assert(fdev);
-	assert(context != NULL);
 
 	result = malloc(sizeof * result);
 	if (result == NULL)
@@ -128,8 +135,8 @@ struct afb_ws_json1 *afb_ws_json1_create(struct fdev *fdev, struct afb_apiset *a
 	result->refcount = 1;
 	result->cleanup = cleanup;
 	result->cleanup_closure = cleanup_closure;
-	result->session = afb_session_addref(context->session);
-	result->token = afb_token_addref(context->token);
+	result->session = afb_session_addref(session);
+	result->token = afb_token_addref(token);
 	if (result->session == NULL)
 		goto error2;
 
@@ -223,22 +230,21 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	}
 
 	/* init the context */
-	afb_xreq_init(&wsreq->xreq, &afb_ws_json1_xreq_itf);
-	afb_context_init(&wsreq->xreq.context, ws->session, ws->token);
+	afb_req_common_init(&wsreq->comreq, &afb_ws_json1_req_common_itf, api, verb);
+	afb_req_common_set_session(&wsreq->comreq, ws->session);
+	afb_req_common_set_token(&wsreq->comreq, ws->token);
 #if WITH_CRED
-	afb_context_change_cred(&wsreq->xreq.context, ws->cred);
+	afb_req_common_set_cred(&wsreq->comreq, ws->cred);
 #endif
 
 	/* fill and record the request */
 	afb_wsj1_msg_addref(msg);
 	wsreq->msgj1 = msg;
-	wsreq->xreq.request.called_api = api;
-	wsreq->xreq.request.called_verb = verb;
-	wsreq->xreq.json = afb_wsj1_msg_object_j(wsreq->msgj1);
+	wsreq->comreq.json = afb_wsj1_msg_object_j(wsreq->msgj1);
 	wsreq->aws = afb_ws_json1_addref(ws);
 
 	/* emits the call */
-	afb_xreq_process(&wsreq->xreq, ws->apiset);
+	afb_req_common_process(&wsreq->comreq, ws->apiset);
 }
 
 static void aws_on_event(struct afb_ws_json1 *aws, const char *event, struct json_object *object)
@@ -264,41 +270,41 @@ static void aws_on_broadcast_cb(void *closure, const char *event, struct json_ob
 ****************************************************************
 ***************************************************************/
 
-static void wsreq_destroy(struct afb_xreq *xreq)
+static void wsreq_destroy(struct afb_req_common *comreq)
 {
-	struct afb_wsreq *wsreq = CONTAINER_OF_XREQ(struct afb_wsreq, xreq);
+	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 
-	afb_context_disconnect(&wsreq->xreq.context);
+	afb_req_common_cleanup(comreq);
 	afb_wsj1_msg_unref(wsreq->msgj1);
 	afb_ws_json1_unref(wsreq->aws);
 	free(wsreq);
 }
 
-static void wsreq_reply(struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info)
+static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
-	struct afb_wsreq *wsreq = CONTAINER_OF_XREQ(struct afb_wsreq, xreq);
+	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 	int rc;
-	struct json_object *reply;
+	struct json_object *msg;
 
 	/* create the reply */
-	reply = afb_msg_json_reply(object, error, info, &xreq->context);
+	msg = afb_msg_json_reply(reply);
 
-	rc = (error ? afb_wsj1_reply_error_j : afb_wsj1_reply_ok_j)(
-			wsreq->msgj1, reply, NULL);
+	rc = (reply->error ? afb_wsj1_reply_error_j : afb_wsj1_reply_ok_j)(
+			wsreq->msgj1, msg, NULL);
 	if (rc)
 		ERROR("Can't send reply: %m");
 }
 
-static int wsreq_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
-	struct afb_wsreq *wsreq = CONTAINER_OF_XREQ(struct afb_wsreq, xreq);
+	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 
 	return afb_evt_listener_watch_x2(wsreq->aws->listener, event);
 }
 
-static int wsreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
-	struct afb_wsreq *wsreq = CONTAINER_OF_XREQ(struct afb_wsreq, xreq);
+	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 
 	return afb_evt_listener_unwatch_x2(wsreq->aws->listener, event);
 }

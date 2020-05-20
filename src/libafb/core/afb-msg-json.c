@@ -26,28 +26,28 @@
 #include <json-c/json.h>
 
 #include "core/afb-msg-json.h"
-#include "core/afb-context.h"
+#include "core/afb-req-reply.h"
 
 static const char _success_[] = "success";
 
-struct json_object *afb_msg_json_reply(struct json_object *resp, const char *error, const char *info, struct afb_context *context)
+struct json_object *afb_msg_json_reply(const struct afb_req_reply *reply)
 {
 	json_object *msg, *request;
 	json_object *type_reply = NULL;
 
 	msg = json_object_new_object();
-	if (resp != NULL)
-		json_object_object_add(msg, "response", resp);
+	if (reply->object != NULL)
+		json_object_object_add(msg, "response", json_object_get(reply->object));
 
 	type_reply = json_object_new_string("afb-reply");
 	json_object_object_add(msg, "jtype", type_reply);
 
 	request = json_object_new_object();
 	json_object_object_add(msg, "request", request);
-	json_object_object_add(request, "status", json_object_new_string(error ?: _success_));
+	json_object_object_add(request, "status", json_object_new_string(reply->error ?: _success_));
 
-	if (info != NULL)
-		json_object_object_add(request, "info", json_object_new_string(info));
+	if (reply->info != NULL)
+		json_object_object_add(request, "info", json_object_new_string(reply->info));
 
 	return msg;
 }

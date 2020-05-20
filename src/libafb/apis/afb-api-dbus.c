@@ -43,10 +43,11 @@
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "apis/afb-api-dbus.h"
-#include "core/afb-context.h"
 #include "core/afb-cred.h"
 #include "core/afb-evt.h"
-#include "core/afb-xreq.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
+#include "core/containerof.h"
 
 #include "sys/verbose.h"
 #include "sys/systemd.h"
@@ -231,7 +232,7 @@ static void destroy_api_dbus(struct api_dbus *api)
 struct dbus_memo {
 	struct dbus_memo *next;		/* the next memo */
 	struct api_dbus *api;		/* the dbus api */
-	struct afb_xreq *xreq;		/* the request */
+	struct afb_req_common *comreq;	/* the request */
 	uint64_t msgid;			/* the message identifier */
 };
 
@@ -244,14 +245,14 @@ struct dbus_event
 };
 
 /* allocates and init the memorizing data */
-static struct dbus_memo *api_dbus_client_memo_make(struct api_dbus *api, struct afb_xreq *xreq)
+static struct dbus_memo *api_dbus_client_memo_make(struct api_dbus *api, struct afb_req_common *comreq)
 {
 	struct dbus_memo *memo;
 
 	memo = malloc(sizeof *memo);
 	if (memo != NULL) {
-		afb_xreq_unhooked_addref(xreq);
-		memo->xreq = xreq;
+		afb_req_common_addref(comreq);
+		memo->comreq = comreq;
 		memo->msgid = 0;
 		memo->api = api;
 		memo->next = api->client.memos;
@@ -274,7 +275,7 @@ static void api_dbus_client_memo_destroy(struct dbus_memo *memo)
 		prv = &(*prv)->next;
 	}
 
-	afb_xreq_unhooked_unref(memo->xreq);
+	afb_req_common_unref(memo->comreq);
 	free(memo);
 }
 
@@ -306,7 +307,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	rc = sd_bus_message_read(message, "sss", &json, &error, &info);
 	if (rc < 0) {
 		/* failing to have the answer */
-		afb_xreq_reply(memo->xreq, NULL, "error", "dbus error");
+		afb_req_common_reply(memo->comreq, NULL, "error", "dbus error");
 	} else {
 		/* report the answer */
 		if (!*json)
@@ -316,40 +317,39 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 			if (jerr != json_tokener_success)
 				object = json_object_new_string(json);
 		}
-		afb_xreq_reply(memo->xreq, object, *error ? error : NULL, *info ? info : NULL);
+		afb_req_common_reply(memo->comreq, object, *error ? error : NULL, *info ? info : NULL);
 	}
 	api_dbus_client_memo_destroy(memo);
 	return 1;
 }
 
 /* on call, propagate it to the dbus service */
-static void api_dbus_client_call(void *closure, struct afb_xreq *xreq)
+static void api_dbus_client_process(void *closure, struct afb_req_common *comreq)
 {
 	struct api_dbus *api = closure;
-	size_t size;
 	int rc;
 	struct dbus_memo *memo;
 	struct sd_bus_message *msg;
 	const char *creds;
 
 	/* create the recording data */
-	memo = api_dbus_client_memo_make(api, xreq);
+	memo = api_dbus_client_memo_make(api, comreq);
 	if (memo == NULL) {
-		afb_xreq_reply(memo->xreq, NULL, "error", "out of memory");
+		afb_req_common_reply(memo->comreq, NULL, "error", "out of memory");
 		return;
 	}
 
 	/* creates the message */
 	msg = NULL;
-	rc = sd_bus_message_new_method_call(api->sdbus, &msg, api->name, api->path, api->name, xreq->request.called_verb);
+	rc = sd_bus_message_new_method_call(api->sdbus, &msg, api->name, api->path, api->name, comreq->verbname);
 	if (rc < 0)
 		goto error;
 
-	creds = xreq_on_behalf_cred_export(xreq);
+	creds = afb_req_common_on_behalf_cred_export(comreq);
 	rc = sd_bus_message_append(msg, "ssus",
-			afb_xreq_raw(xreq, &size),
-			afb_session_uuid(xreq->context.session),
-			(uint32_t)xreq->context.flags,
+			json_object_to_json_string(comreq->json),
+			afb_session_uuid(comreq->session),
+			0,
 			creds ?: "");
 	if (rc < 0)
 		goto error;
@@ -366,7 +366,7 @@ static void api_dbus_client_call(void *closure, struct afb_xreq *xreq)
 error:
 	/* if there was an error report it directly */
 	errno = -rc;
-	afb_xreq_reply(memo->xreq, NULL, "error", "dbus error");
+	afb_req_common_reply(memo->comreq, NULL, "error", "dbus error");
 	api_dbus_client_memo_destroy(memo);
 end:
 	sd_bus_message_unref(msg);
@@ -505,7 +505,7 @@ static void api_dbus_client_event_subscribe(struct api_dbus *api, int id, const 
 	}
 
 	/* subscribe the request to the event */
-	rc = afb_xreq_subscribe(memo->xreq, ev->event);
+	rc = afb_req_common_subscribe_event_x2(memo->comreq, ev->event);
 	if (rc < 0)
 		ERROR("can't subscribe: %s", strerror(-rc));
 }
@@ -532,7 +532,7 @@ static void api_dbus_client_event_unsubscribe(struct api_dbus *api, int id, cons
 	}
 
 	/* unsubscribe the request from the event */
-	rc = afb_xreq_unsubscribe(memo->xreq, ev->event);
+	rc = afb_req_common_unsubscribe_event_x2(memo->comreq, ev->event);
 	if (rc < 0)
 		ERROR("can't unsubscribe: %s", strerror(-rc));
 }
@@ -589,7 +589,7 @@ static int api_dbus_client_on_manage_event(sd_bus_message *m, void *userdata, sd
 }
 
 static struct afb_api_itf dbus_api_itf = {
-	.call = api_dbus_client_call
+	.process = api_dbus_client_process
 };
 
 /* adds a afb-dbus-service client api */
@@ -741,6 +741,12 @@ static struct origin *afb_api_dbus_server_origin_get(struct api_dbus *api, const
 	return origin;
 }
 
+static struct origin *afb_api_dbus_server_origin_addref(struct origin *origin)
+{
+	origin->refcount += 1;
+	return origin;
+}
+
 static void afb_api_dbus_server_origin_unref(struct origin *origin)
 {
 	if (!--origin->refcount) {
@@ -766,16 +772,35 @@ struct listener
 	struct afb_evt_listener *listener;
 };
 
-static void afb_api_dbus_server_listener_free(struct listener *listener)
+static void afb_api_dbus_server_listener_free(void *closure)
 {
+	struct listener *listener = closure;
 	afb_evt_listener_unref(listener->listener);
 	afb_api_dbus_server_origin_unref(listener->origin);
 	free(listener);
 }
 
+static void *afb_api_dbus_server_listener_make(void *closure)
+{
+	struct origin *origin = closure;
+	struct listener *listener;
+
+	listener = malloc(sizeof *listener);
+	if (listener != NULL) {
+		listener->listener = afb_evt_listener_create(&evt_push_itf, origin);
+		if (listener->listener != NULL) {
+			listener->origin = afb_api_dbus_server_origin_addref(origin);
+		}
+		else {
+			free(listener);
+			listener = NULL;
+		}
+	}
+	return listener;
+}
+
 static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, const char *sender, struct afb_session *session)
 {
-	int rc;
 	struct listener *listener;
 	struct origin *origin;
 
@@ -784,29 +809,9 @@ static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, c
 	if (origin == NULL)
 		return NULL;
 
-	/* retrieves the stored listener */
-	listener = afb_session_get_cookie(session, origin);
-	if (listener != NULL) {
-		/* found */
-		afb_api_dbus_server_origin_unref(origin);
-		return listener;
-	}
-
-	/* creates the listener */
-	listener = malloc(sizeof *listener);
+	listener = afb_session_cookie(session, origin, afb_api_dbus_server_listener_make, afb_api_dbus_server_listener_free, origin, Afb_Session_Cookie_Init);
 	if (listener == NULL)
 		errno = ENOMEM;
-	else {
-		listener->origin = origin;
-		listener->listener = afb_evt_listener_create(&evt_push_itf, origin);
-		if (listener->listener != NULL) {
-			rc = afb_session_set_cookie(session, origin, listener, (void*)afb_api_dbus_server_listener_free);
-			if (rc == 0)
-				return listener;
-			afb_evt_listener_unref(listener->listener);
-		}
-		free(listener);
-	}
 	afb_api_dbus_server_origin_unref(origin);
 	return NULL;
 }
@@ -817,7 +822,7 @@ static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, c
  * Structure for a dbus request
  */
 struct dbus_req {
-	struct afb_xreq xreq;		/**< the xreq of the request */
+	struct afb_req_common comreq;		/**< the comreq of the request */
 	sd_bus_message *message;	/**< the incoming request message */
 	const char *request;		/**< the readen request as string */
 	struct json_object *json;	/**< the readen request as object */
@@ -826,42 +831,42 @@ struct dbus_req {
 };
 
 /* decrement the reference count of the request and free/release it on falling to null */
-static void dbus_req_destroy(struct afb_xreq *xreq)
+static void dbus_req_destroy(struct afb_req_common *comreq)
 {
-	struct dbus_req *dreq = CONTAINER_OF_XREQ(struct dbus_req, xreq);
+	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 
-	afb_context_disconnect(&dreq->xreq.context);
+	afb_req_common_cleanup(comreq);
 	json_object_put(dreq->json);
 	sd_bus_message_unref(dreq->message);
 	free(dreq);
 }
 
 /* get the object of the request */
-static struct json_object *dbus_req_json(struct afb_xreq *xreq)
+static struct json_object *dbus_req_json(struct afb_req_common *comreq)
 {
-	struct dbus_req *dreq = CONTAINER_OF_XREQ(struct dbus_req, xreq);
+	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 
 	return dreq->json;
 }
 
-void dbus_req_raw_reply(struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info)
+void dbus_req_raw_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
-	struct dbus_req *dreq = CONTAINER_OF_XREQ(struct dbus_req, xreq);
+	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	int rc;
 
 	rc = sd_bus_reply_method_return(dreq->message, "sss",
-		obj ? json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE) : "",
-		error ? : "",
-		info ? : "");
+		reply->object ? json_object_to_json_string_ext(reply->object, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE) : "",
+		reply->error ? : "",
+		reply->info ? : "");
 	if (rc < 0)
 		ERROR("sending the reply failed");
 }
 
 static void afb_api_dbus_server_event_send(struct origin *origin, char order, const char *event, int eventid, const char *data, uint64_t msgid);
 
-static int dbus_req_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int dbus_req_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
-	struct dbus_req *dreq = CONTAINER_OF_XREQ(struct dbus_req, xreq);
+	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	uint64_t msgid;
 	int rc;
 
@@ -871,9 +876,9 @@ static int dbus_req_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
 	return rc;
 }
 
-static int dbus_req_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int dbus_req_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
-	struct dbus_req *dreq = CONTAINER_OF_XREQ(struct dbus_req, xreq);
+	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	uint64_t msgid;
 	int rc;
 
@@ -883,7 +888,7 @@ static int dbus_req_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *even
 	return rc;
 }
 
-const struct afb_xreq_query_itf afb_api_dbus_xreq_itf = {
+const struct afb_req_common_query_itf afb_api_dbus_req_common_itf = {
 	.json = dbus_req_json,
 	.reply = dbus_req_raw_reply,
 	.unref = dbus_req_destroy,
@@ -951,16 +956,6 @@ static void afb_api_dbus_server_event_broadcast(void *closure, const char *event
 	json_object_put(object);
 }
 
-static void on_context_ready(void *closure, int status)
-{
-	struct dbus_req *dreq = closure;
-
-	if (status < 0)
-		afb_xreq_reply_insufficient_scope(&dreq->xreq, NULL);
-	else
-		afb_xreq_process(&dreq->xreq, dreq->dbusapi->server.apiset);
-}
-
 /* called when the object for the service is called */
 static int api_dbus_server_on_object_called(sd_bus_message *message, void *userdata, sd_bus_error *ret_error)
 {
@@ -971,7 +966,6 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 	struct dbus_req *dreq;
 	struct api_dbus *api = userdata;
 	uint32_t flags;
-	struct afb_session *session;
 	struct listener *listener;
 	enum json_tokener_error jerr;
 
@@ -995,13 +989,11 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 	}
 
 	/* connect to the context */
-	afb_xreq_init(&dreq->xreq, &afb_api_dbus_xreq_itf);
-	if (afb_context_connect(&dreq->xreq.context, uuid, NULL) < 0)
-		goto out_of_memory;
-	session = dreq->xreq.context.session;
+	afb_req_common_init(&dreq->comreq, &afb_api_dbus_req_common_itf, api->api, method);
+	afb_req_common_set_session_string(&dreq->comreq, uuid);
 
 	/* get the listener */
-	listener = afb_api_dbus_server_listener_get(api, sd_bus_message_get_sender(message), session);
+	listener = afb_api_dbus_server_listener_get(api, sd_bus_message_get_sender(message), dreq->comreq.session);
 	if (listener == NULL)
 		goto out_of_memory;
 
@@ -1014,13 +1006,11 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 	}
 	dreq->listener = listener;
 	dreq->dbusapi = api;
-	dreq->xreq.request.called_api = api->api;
-	dreq->xreq.request.called_verb = method;
 
 #if WITH_CRED
-	afb_context_change_cred(&dreq->xreq.context, listener->origin->cred);
+	afb_req_common_set_cred(&dreq->comreq, listener->origin->cred);
 #endif
-	afb_context_on_behalf_import_async(&dreq->xreq.context, creds, on_context_ready, dreq);
+	afb_req_common_process_on_behalf(&dreq->comreq, dreq->dbusapi->server.apiset, creds);
 	return 1;
 
 out_of_memory:

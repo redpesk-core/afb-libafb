@@ -35,10 +35,11 @@
 
 #include "sys/x-dynlib.h"
 #include "core/afb-apiname.h"
+#include "core/afb-string-mode.h"
 #include "apis/afb-api-so-v3.h"
 #include "core/afb-api-v3.h"
 #include "core/afb-apiset.h"
-#include "core/afb-export.h"
+#include "sys/x-realpath.h"
 #include "sys/verbose.h"
 
 /*
@@ -55,22 +56,21 @@ struct args
 	int (*entry)(struct afb_api_x3 *);
 };
 
-static int init(void *closure, struct afb_api_x3 *api)
+static int init(void *closure, struct afb_api_v3 *api)
 {
 	const struct args *a = closure;
 	int rc = 0;
 
-	*a->root = api;
+	*a->root = afb_api_v3_get_api_x3(api);
 	if (a->desc) {
-		api->userdata = a->desc->userdata;
-		rc = afb_api_v3_set_binding_fields(a->desc, api);
+		rc = afb_api_v3_set_binding_fields(api, a->desc);
 	}
 
 	if (rc >= 0 && a->entry)
-		rc = afb_api_v3_safe_preinit(api, a->entry);
+		rc = afb_api_v3_safe_preinit_x3(api, a->entry);
 
 	if (rc >= 0)
-		afb_api_x3_seal(api);
+		afb_api_v3_seal(api);
 
 	return rc;
 }
@@ -80,7 +80,7 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 	int rc;
 	struct args a;
 	struct afb_api_v3 *api;
-	struct afb_export *export;
+	char rpath[PATH_MAX];
 
 	/* retrieves important exported symbols */
 	x_dynlib_symbol(dynlib, afb_api_so_v3_desc, (void**)&a.desc);
@@ -118,10 +118,14 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 			goto error;
 		}
 
-		api = afb_api_v3_create(declare_set, call_set, a.desc->api, a.desc->info, a.desc->noconcurrency, init, &a, 0, NULL, path);
-		if (api)
-			return 1;
-		rc = X_ENOMEM;
+		realpath(path, rpath);
+		rc = afb_api_v3_create(
+			&api, declare_set, call_set,
+			a.desc->api, Afb_String_Const,
+			a.desc->info, Afb_String_Const,
+			a.desc->noconcurrency,
+			init, &a,
+			rpath, Afb_String_Copy);
 	} else {
 		if (!a.entry) {
 			ERROR("binding [%s] incomplete symbol set: %s is missing",
@@ -130,20 +134,17 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 			goto error;
 		}
 
-		export = afb_export_create_none_for_path(declare_set, call_set, path, init, &a);
-		if (export) {
-			/*
-			 *  No call is done to afb_export_unref(export) because:
-			 *   - legacy applications may use the root API emitting messages
-			 *   - it allows writting applications like bindings without API
-			 *  But this has the sad effect to introduce a kind of leak.
-			 *  To avoid this, if necessary further developement should list bindings
-			 *  and their data.
-			 */
-			return 1;
-		}
-		rc = X_ENOMEM;
+		realpath(path, rpath);
+		rc = afb_api_v3_create(
+			&api, declare_set, call_set,
+			NULL, Afb_String_Const,
+			NULL, Afb_String_Const,
+			0,
+			init, &a,
+			rpath, Afb_String_Copy);
 	}
+	if (rc >= 0)
+		return 1;
 
 	ERROR("binding [%s] initialisation failed", path);
 

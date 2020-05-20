@@ -41,8 +41,6 @@
 # define MHD_ALLOW_SUSPEND_RESUME MHD_USE_SUSPEND_RESUME
 #endif
 
-#include "core/afb-context.h"
-#include "core/afb-xreq.h"
 #include "core/afb-jobs.h"
 #include "utils/locale-root.h"
 #include "sys/systemd.h"

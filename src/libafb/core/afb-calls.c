@@ -33,485 +33,472 @@
 
 #include "core/afb-calls.h"
 #include "core/afb-evt.h"
-#include "core/afb-export.h"
+#include "core/afb-api-common.h"
 #include "core/afb-hook.h"
 #include "core/afb-msg-json.h"
 #include "core/afb-session.h"
-#include "core/afb-xreq.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
 #include "core/afb-error-text.h"
 
 #include "core/afb-sched.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
+#include "containerof.h"
 
+/**
+ * Flags for calls
+ */
 #define CALLFLAGS            (afb_req_subcall_api_session|afb_req_subcall_catch_events)
 
-/************************************************************************/
 
-struct modes
+
+/******************************************************************************/
+
+/**
+ * Structure for call requests
+ */
+struct req_calls
 {
-	unsigned hooked: 1;
-	unsigned sync: 1;
-};
+	/** the common request item */
+	struct afb_req_common comreq;
 
-#if WITH_AFB_CALL_SYNC
-#define mode_sync  ((struct modes){ .hooked=0, .sync=1 })
-#endif
-#define mode_async  ((struct modes){ .hooked=0, .sync=0 })
+	/** the calling api */
+	struct afb_api_common *comapi;
 
-#if WITH_AFB_HOOK
-#if WITH_AFB_CALL_SYNC
-#define mode_hooked_sync  ((struct modes){ .hooked=1, .sync=1 })
-#endif
-#define mode_hooked_async  ((struct modes){ .hooked=1, .sync=0 })
-#endif
+	/** the closures for the result */
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*);
+	void *closure1;
+	void *closure2;
+	void *closure3;
 
-union callback {
-	void *any;
-	union {
-		void (*x3)(void*, struct json_object*, const char*, const char *, struct afb_req_x2*);
-	} subcall;
-	union {
-		void (*x3)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*);
-	} call;
-};
+	/** caller req */
+	struct afb_req_common *caller;
 
-struct callreq
-{
-	struct afb_xreq xreq;
-
-	struct afb_export *export;
-
-	struct modes mode;
-
+	/** flags for events */
 	int flags;
 
-	union {
-#if WITH_AFB_CALL_SYNC
-		struct {
-			struct afb_sched_lock *afb_sched_lock;
-			int returned;
-			int status;
-			struct json_object **object;
-			char **error;
-			char **info;
-		};
-#endif
-		struct {
-			union callback callback;
-			void *closure;
-			union {
-				void (*final)(void*, struct json_object*, const char*, const char*, union callback, struct afb_export*,struct afb_xreq*);
-			};
-		};
-	};
+	/* strings */
+	char strings[];
 };
 
 /******************************************************************************/
 
-static inline int errstr2errno(const char *error)
+/**
+ * handle reply to a call
+ */
+static void req_calls_reply_cb(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
-	return error ? X_EAGAIN : 0;
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
+	req->callback(req->closure1, req->closure2, req->closure3, reply);
 }
 
-/******************************************************************************/
-#if WITH_AFB_CALL_SYNC
-
-static int store_reply(
-		struct json_object *iobject, const char *ierror, const char *iinfo,
-		struct json_object **sobject, char **serror, char **sinfo)
+/**
+ * handle releasing a call
+ */
+static void req_calls_destroy_cb(struct afb_req_common *comreq)
 {
-	if (serror) {
-		if (!ierror)
-			*serror = NULL;
-		else if (!(*serror = strdup(ierror))) {
-			ERROR("can't report error %s", ierror);
-			json_object_put(iobject);
-			iobject = NULL;
-			iinfo = NULL;
-		}
-	}
-
-	if (sobject)
-		*sobject = iobject;
-	else
-		json_object_put(iobject);
-
-	if (sinfo) {
-		if (!iinfo)
-			*sinfo = NULL;
-		else if (!(*sinfo = strdup(iinfo)))
-			ERROR("can't report info %s", iinfo);
-	}
-
-	return errstr2errno(ierror);
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
+	json_object_put(comreq->json);
+	afb_req_common_cleanup(comreq);
+	free(req);
 }
 
-static void sync_leave(struct callreq *callreq)
+/**
+ * handle subscribing from a call
+ */
+static int req_calls_subscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
-	struct afb_sched_lock *afb_sched_lock = __atomic_exchange_n(&callreq->afb_sched_lock, NULL, __ATOMIC_RELAXED);
-	if (afb_sched_lock)
-		afb_sched_leave(afb_sched_lock);
-}
-
-static void sync_enter(int signum, void *closure, struct afb_sched_lock *afb_sched_lock)
-{
-	struct callreq *callreq = closure;
-	if (!signum) {
-		callreq->afb_sched_lock = afb_sched_lock;
-		afb_export_process_xreq(callreq->export, &callreq->xreq);
-	} else {
-		afb_xreq_reply(&callreq->xreq, NULL, afb_error_text_internal_error, NULL);
-	}
-}
-
-#endif
-/******************************************************************************/
-
-static void callreq_destroy_cb(struct afb_xreq *xreq)
-{
-	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
-
-	afb_context_disconnect(&callreq->xreq.context);
-	json_object_put(callreq->xreq.json);
-	free(callreq);
-}
-
-static void callreq_reply_cb(struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info)
-{
-	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
-
-#if WITH_AFB_HOOK
-	/* centralized hooking */
-	if (callreq->mode.hooked) {
-		if (callreq->mode.sync) {
-			if (callreq->xreq.caller)
-				afb_hook_xreq_subcallsync_result(callreq->xreq.caller, errstr2errno(error), object, error, info);
-			else
-				afb_hook_api_callsync_result(callreq->export, errstr2errno(error), object, error, info);
-		} else {
-			if (callreq->xreq.caller)
-				afb_hook_xreq_subcall_result(callreq->xreq.caller, object, error, info);
-			else
-				afb_hook_api_call_result(callreq->export, object, error, info);
-		}
-	}
-#endif
-
-	/* true report of the result */
-#if WITH_AFB_CALL_SYNC
-	if (callreq->mode.sync) {
-		callreq->returned = 1;
-		callreq->status = store_reply(object, error, info,
-				callreq->object, callreq->error, callreq->info);
-		sync_leave(callreq);
-	} else {
-#endif
-		callreq->final(callreq->closure, object, error, info, callreq->callback, callreq->export, callreq->xreq.caller);
-		json_object_put(object);
-#if WITH_AFB_CALL_SYNC
-	}
-#endif
-}
-
-static int callreq_subscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *event)
-{
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
 	int rc = 0, rc2;
-	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
 
-	if (callreq->flags & afb_req_subcall_pass_events)
-		rc = afb_xreq_subscribe(callreq->xreq.caller, event);
-	if (callreq->flags & afb_req_subcall_catch_events) {
-		rc2 = afb_export_subscribe(callreq->export, event);
+	if (req->flags & afb_req_subcall_pass_events)
+		rc = afb_req_common_subscribe_event_x2(req->caller, event);
+
+	if (req->flags & afb_req_subcall_catch_events) {
+		rc2 = afb_api_common_subscribe_event_x2(req->comapi, event);
 		if (rc2 < 0)
 			rc = rc2;
 	}
+
 	return rc;
 }
 
-static int callreq_unsubscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *event)
+/**
+ * handle unsubscribing from a call
+ */
+static int req_calls_unsubscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
 	int rc = 0, rc2;
-	struct callreq *callreq = CONTAINER_OF_XREQ(struct callreq, xreq);
 
-	if (callreq->flags & afb_req_subcall_pass_events)
-		rc = afb_xreq_unsubscribe(callreq->xreq.caller, event);
-	if (callreq->flags & afb_req_subcall_catch_events) {
-		rc2 = afb_export_unsubscribe(callreq->export, event);
+	if (req->flags & afb_req_subcall_pass_events)
+		rc = afb_req_common_unsubscribe_event_x2(req->caller, event);
+
+	if (req->flags & afb_req_subcall_catch_events) {
+		rc2 = afb_api_common_unsubscribe_event_x2(req->comapi, event);
 		if (rc2 < 0)
 			rc = rc2;
 	}
+
 	return rc;
 }
 
-/******************************************************************************/
-
-const struct afb_xreq_query_itf afb_calls_xreq_itf = {
-	.unref = callreq_destroy_cb,
-	.reply = callreq_reply_cb,
-	.subscribe = callreq_subscribe_cb,
-	.unsubscribe = callreq_unsubscribe_cb
+/**
+ * call handling interface
+ */
+const struct afb_req_common_query_itf req_call_itf = {
+	.unref = req_calls_destroy_cb,
+	.reply = req_calls_reply_cb,
+	.subscribe = req_calls_subscribe_cb,
+	.unsubscribe = req_calls_unsubscribe_cb
 };
 
 /******************************************************************************/
 
-static struct callreq *callreq_create(
-		struct afb_export *export,
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		int flags,
-		struct modes mode)
-{
-	struct callreq *callreq;
+static
+void
+process(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	struct afb_req_common *caller,
+	int flags,
+	const struct afb_req_common_query_itf *itf,
+	int copynames
+) {
+	struct req_calls *req;
+	struct afb_req_reply reply;
 	size_t lenapi, lenverb;
-	char *api2, *verb2;
 
-	lenapi = 1 + strlen(api);
-	lenverb = 1 + strlen(verb);
-	callreq = malloc(lenapi + lenverb + sizeof *callreq);
-	if (!callreq) {
+	/* allocates the call request */
+	if (copynames) {
+		lenapi = 1 + strlen(api);
+		lenverb = 1 + strlen(verb);
+	}
+	else {
+		lenapi = 0;
+		lenverb = 0;
+	}
+	req = malloc(lenapi + lenverb + sizeof *req);
+	if (!req) {
+		/* error! out of memory */
 		ERROR("out of memory");
 		json_object_put(args);
-	} else {
-		afb_xreq_init(&callreq->xreq, &afb_calls_xreq_itf);
-		api2 = (char*)&callreq[1];
-		callreq->xreq.request.called_api = memcpy(api2, api, lenapi);;
-		verb2 = &api2[lenapi];
-		callreq->xreq.request.called_verb = memcpy(verb2, verb, lenverb);
-		callreq->xreq.json = args;
-		callreq->mode = mode;
-		if (!caller)
-			afb_export_context_init(export, &callreq->xreq.context);
-		else {
-			if (flags & afb_req_subcall_api_session)
-				afb_export_context_init(export, &callreq->xreq.context);
-			else
-				afb_context_subinit(&callreq->xreq.context, &caller->context);
-			if (flags & afb_req_subcall_on_behalf)
-				afb_context_on_behalf_other_context(&callreq->xreq.context, &caller->context);
-			callreq->xreq.caller = caller;
-			afb_xreq_unhooked_addref(caller);
-			export = afb_export_from_api_x3(caller->request.api);
-		}
-		callreq->export = export;
-		callreq->flags = flags;
+		reply.object = NULL;
+		reply.info = NULL;
+		reply.error = "out-of-memory";
+		callback(closure1, closure2, closure3, &reply);
 	}
-	return callreq;
+	else {
+		/* success of allocation */
+		if (copynames) {
+			/* copy names */
+			api = memcpy(req->strings, api, lenapi);
+			verb = memcpy(req->strings + lenapi, verb, lenverb);
+		}
+
+		/* initialise the request */
+		req->comapi = comapi;
+		req->callback = callback;
+		req->closure1 = closure1;
+		req->closure2 = closure2;
+		req->closure3 = closure3;
+		req->caller = caller;
+		req->flags = flags;
+		afb_req_common_init(&req->comreq, itf, api, verb);
+		req->comreq.json = args;
+		if (flags & afb_req_subcall_api_session) {
+			afb_req_common_set_session(&req->comreq, afb_api_common_session_get(comapi));
+		}
+		else {
+			afb_req_common_set_session(&req->comreq, caller->session);
+		}
+		if (flags & afb_req_subcall_on_behalf) {
+			afb_req_common_set_token(&req->comreq, caller->token);
+#if WITH_CRED
+			afb_req_common_set_cred(&req->comreq, caller->credentials);
+#endif
+		}
+		else {
+			afb_req_common_set_token(&req->comreq, NULL); /* FIXME: comapi */
+#if WITH_CRED
+			afb_req_common_set_cred(&req->comreq, NULL); /* FIXME: comapi */
+#endif
+		}
+
+		/* process the request now */
+		afb_req_common_process(&req->comreq, afb_api_common_call_set(comapi));
+	}
 }
 
-/******************************************************************************/
 #if WITH_AFB_CALL_SYNC
-static int do_sync(
-		struct afb_export *export,
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		int flags,
-		struct json_object **object,
-		char **error,
-		char **info,
-		struct modes mode)
+struct psync
 {
-	struct callreq *callreq;
+	struct afb_api_common *comapi;
+	const char *api;
+	const char *verb;
+	struct json_object *args;
+	struct afb_req_reply *reply;
+	struct afb_req_common *caller;
+	int flags;
+
+	struct afb_sched_lock *lock;
+	int result;
+	int completed;
+};
+
+static void call_sync_leave(void *closure1, void *closure2, void *closure3, const struct afb_req_reply *reply)
+{
+	struct psync *ps = closure1;
 	int rc;
 
-	/* allocates the request */
-	callreq = callreq_create(export, caller, api, verb, args, flags, mode);
-	if (!callreq)
-		goto interr;
-
-	/* initializes the request */
-	callreq->afb_sched_lock = NULL;
-	callreq->returned = 0;
-	callreq->status = 0;
-	callreq->object = object;
-	callreq->error = error;
-	callreq->info = info;
-
-	afb_xreq_unhooked_addref(&callreq->xreq); /* avoid early callreq destruction */
-
-	rc = afb_sched_enter(NULL, 0, sync_enter, callreq);
-	if (rc >= 0 && callreq->returned) {
-		rc = callreq->status;
-		afb_xreq_unhooked_unref(&callreq->xreq);
-		return rc;
-	}
-
-	afb_xreq_unhooked_unref(&callreq->xreq);
-interr:
-	return store_reply(NULL, afb_error_text_internal_error, NULL, object, error, info);
+	rc = afb_req_reply_copy(reply, ps->reply);
+	ps->result = rc < 0 ? rc : reply->error ? -X_EPROTO : 0;
+	ps->completed = 1;
+	afb_sched_leave(ps->lock);
 }
-#endif
 
-/******************************************************************************/
-
-static void do_async(
-		struct afb_export *export,
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		int flags,
-		void *callback,
-		void *closure,
-		void (*final)(void*, struct json_object*, const char*, const char*, union callback, struct afb_export*,struct afb_xreq*),
-		struct modes mode)
+static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lock *afb_sched_lock)
 {
-	struct callreq *callreq;
+	struct psync *ps = closure;
+	if (!signum) {
+		ps->lock = afb_sched_lock;
+		process(ps->comapi, ps->api, ps->verb, ps->args,
+			call_sync_leave, ps, 0, 0,
+			ps->caller, ps->flags, &req_call_itf, 0);
+	} else {
+		ps->result = X_EINTR;
+	}
+}
 
-	callreq = callreq_create(export, caller, api, verb, args, flags, mode);
+int
+process_sync(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply,
+	struct afb_req_common *caller,
+	int flags
+) {
+	int rc;
+	struct psync ps;
 
-	if (!callreq)
-		final(closure, NULL, afb_error_text_internal_error, NULL, (union callback){ .any = callback }, export, caller);
+	ps.comapi = comapi;
+	ps.api = api;
+	ps.verb = verb;
+	ps.args = args;
+	ps.reply = reply;
+	ps.caller = caller;
+	ps.flags = flags;
+
+	ps.result = 0;
+	ps.completed = 0;
+
+	rc = afb_sched_enter(NULL, 0, process_sync_enter_cb, &ps);
+	if (rc >= 0 && ps.completed) {
+		rc = ps.result;
+	}
 	else {
-		callreq->callback.any = callback;
-		callreq->closure = closure;
-		callreq->final = final;
-
-		afb_export_process_xreq(callreq->export, &callreq->xreq);
+		if (rc >= 0)
+			rc = X_EINTR;
+		if (reply) {
+			reply->object = NULL;
+			reply->error = strdup("internal-error");
+			reply->info = NULL;
+		}
 	}
+	return rc;
 }
-
-/******************************************************************************/
-
-static void final_call(
-	void *closure,
-	struct json_object *object,
-	const char *error,
-	const char *info,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.call.x3)
-		callback.call.x3(closure, object, error, info, afb_export_to_api_x3(export));
-}
-
-static void final_subcall(
-	void *closure,
-	struct json_object *object,
-	const char *error,
-	const char *info,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.subcall.x3)
-		callback.subcall.x3(closure, object, error, info, xreq_to_req_x2(caller));
-}
-
-/******************************************************************************/
-
-void afb_calls_call(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, struct json_object*, const char *error, const char *info, struct afb_api_x3*),
-		void *closure)
-{
-	do_async(export, NULL, api, verb, args, CALLFLAGS, callback, closure, final_call, mode_async);
-}
-
-#if WITH_AFB_CALL_SYNC
-int afb_calls_call_sync(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **object,
-		char **error,
-		char **info)
-{
-	return do_sync(export, NULL, api, verb, args, CALLFLAGS, object, error, info, mode_sync);
+#else
+int
+process_sync(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply,
+	struct afb_req_common *caller,
+	int flags
+) {
+	ERROR("Calls/Subcalls sync are not supported");
+	if (reply) {
+		reply->object = NULL;
+		reply->error = strdup("no-call-sync");
+		reply->info = NULL;
+	}
+	return X_ENOTSUP;
 }
 #endif
 
-void afb_calls_subcall(
-			struct afb_xreq *xreq,
-			const char *api,
-			const char *verb,
-			struct json_object *args,
-			int flags,
-			void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
-			void *closure)
-{
-	do_async(NULL, xreq, api, verb, args, flags, callback, closure, final_subcall, mode_async);
+/******************************************************************************/
+/** calls */
+/******************************************************************************/
+
+void
+afb_calls_call(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	void *closure1,
+	void *closure2,
+	void *closure3
+) {
+	process(comapi, api, verb, args,
+		callback, closure1, closure2, closure3,
+		NULL, CALLFLAGS, &req_call_itf, 1);
 }
 
-#if WITH_AFB_CALL_SYNC
-int afb_calls_subcall_sync(
-			struct afb_xreq *xreq,
-			const char *api,
-			const char *verb,
-			struct json_object *args,
-			int flags,
-			struct json_object **object,
-			char **error,
-			char **info)
-{
-	return do_sync(NULL, xreq, api, verb, args, flags, object, error, info, mode_sync);
+int
+afb_calls_call_sync(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply
+) {
+	return process_sync(comapi, api, verb, args, reply, NULL, CALLFLAGS);
 }
-#endif
 
+/******************************************************************************/
 #if WITH_AFB_HOOK
-void afb_calls_hooked_call(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, struct json_object*, const char *error, const char *info, struct afb_api_x3*),
-		void *closure)
+static void req_calls_reply_hookable_cb(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
-	afb_hook_api_call(export, api, verb, args);
-	do_async(export, NULL, api, verb, args, CALLFLAGS, callback, closure, final_call, mode_hooked_async);
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
+	afb_hook_api_call_result(req->comapi, reply->object, reply->error, reply->info);
+	req_calls_reply_cb(comreq, reply);
 }
 
-#if WITH_AFB_CALL_SYNC
-int afb_calls_hooked_call_sync(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **object,
-		char **error,
-		char **info)
-{
-	afb_hook_api_callsync(export, api, verb, args);
-	return do_sync(export, NULL, api, verb, args, CALLFLAGS, object, error, info, mode_hooked_sync);
-}
-#endif
+const struct afb_req_common_query_itf req_calls_hookable_itf = {
+	.unref = req_calls_destroy_cb,
+	.reply = req_calls_reply_hookable_cb,
+	.subscribe = req_calls_subscribe_cb,
+	.unsubscribe = req_calls_unsubscribe_cb
+};
 
-void afb_calls_hooked_subcall(
-			struct afb_xreq *xreq,
-			const char *api,
-			const char *verb,
-			struct json_object *args,
-			int flags,
-			void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
-			void *closure)
-{
-	afb_hook_xreq_subcall(xreq, api, verb, args, flags);
-	do_async(NULL, xreq, api, verb, args, flags, callback, closure, final_subcall, mode_hooked_async);
+void
+afb_calls_call_hookable(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	void *closure1,
+	void *closure2,
+	void *closure3
+) {
+	afb_hook_api_call(comapi, api, verb, args);
+	process(comapi, api, verb, args,
+		callback, closure1, closure2, closure3,
+		NULL, CALLFLAGS, &req_calls_hookable_itf, 1);
 }
 
-#if WITH_AFB_CALL_SYNC
-int afb_calls_hooked_subcall_sync(
-			struct afb_xreq *xreq,
-			const char *api,
-			const char *verb,
-			struct json_object *args,
-			int flags,
-			struct json_object **object,
-			char **error,
-			char **info)
-{
-	afb_hook_xreq_subcallsync(xreq, api, verb, args, flags);
-	return do_sync(NULL, xreq, api, verb, args, flags, object, error, info, mode_hooked_sync);
+int
+afb_calls_call_sync_hookable(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply
+) {
+	int result;
+	afb_hook_api_callsync(comapi, api, verb, args);
+	result = afb_calls_call_sync(comapi, api, verb, args, reply);
+	return afb_hook_api_callsync_result(comapi, result, reply->object, reply->error, reply->info);
 }
 #endif
-#endif
 
+/******************************************************************************/
+/** subcalls                                                                  */
+/******************************************************************************/
+
+void
+afb_calls_subcall(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	struct afb_req_common *comreq,
+	int flags
+) {
+	process(comapi, api, verb, args,
+		callback, closure1, closure2, closure3,
+		comreq, flags, &req_call_itf, 1);
+}
+
+int
+afb_calls_subcall_sync(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply,
+	struct afb_req_common *comreq,
+	int flags
+) {
+	return process_sync(comapi, api, verb, args, reply, comreq, flags);
+}
+
+/******************************************************************************/
+#if WITH_AFB_HOOK
+static void req_subcalls_reply_hookable_cb(struct afb_req_common *comreq, const struct afb_req_reply *reply)
+{
+	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
+	afb_hook_req_subcall_result(&req->comreq, reply->object, reply->error, reply->info);
+	req_calls_reply_hookable_cb(comreq, reply);
+}
+
+const struct afb_req_common_query_itf req_subcalls_hookable_itf = {
+	.unref = req_calls_destroy_cb,
+	.reply = req_subcalls_reply_hookable_cb,
+	.subscribe = req_calls_subscribe_cb,
+	.unsubscribe = req_calls_unsubscribe_cb
+};
+
+void
+afb_calls_subcall_hookable(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	struct afb_req_common *comreq,
+	int flags
+) {
+	afb_hook_req_subcall(comreq, api, verb, args, flags);
+	process(comapi, api, verb, args,
+		callback, closure1, closure2, closure3,
+		comreq, flags, &req_subcalls_hookable_itf, 1);
+}
+
+int
+afb_calls_subcall_sync_hookable(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct afb_req_reply *reply,
+	struct afb_req_common *comreq,
+	int flags
+) {
+	int result;
+	afb_hook_req_subcallsync(comreq, api, verb, args, flags);
+	result = afb_calls_subcall_sync(comapi, api, verb, args, reply, comreq, flags);
+	return afb_hook_req_subcallsync_result(comreq, result, reply->object, reply->error, reply->info);
+}
+#endif

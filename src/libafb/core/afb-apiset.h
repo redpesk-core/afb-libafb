@@ -24,12 +24,12 @@
 #pragma once
 
 struct afb_apiset;
-struct afb_xreq;
+struct afb_req_common;
 struct json_object;
 
 struct afb_api_itf
 {
-	void (*call)(void *closure, struct afb_xreq *xreq);
+	void (*process)(void *closure, struct afb_req_common *req);
 	int (*service_start)(void *closure);
 #if WITH_AFB_HOOK
 	void (*update_hooks)(void *closure);

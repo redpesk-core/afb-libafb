@@ -10,10 +10,13 @@
 # define ck_assert_ptr_nonnull(X)   ck_assert_ptr_ne(X, NULL)
 #endif
 
+#include "libafb-config.h"
+
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
 #include "core/afb-apiset.h"
 #include "core/afb-api-v3.h"
+#include "core/afb-string-mode.h"
 #include "sys/verbose.h"
 
 struct inapis {
@@ -69,32 +72,34 @@ int in_init(struct afb_api_x3 *api)
 	return 0;
 }
 
-int in_preinit(void *closure, struct afb_api_x3 *api)
+int in_preinit(void *closure, struct afb_api_x3 *apix3)
 {
 	int rc;
 	struct inapis *desc = closure;
 
-	printf("default preinit of %s\n", api->apiname);
+	printf("default preinit of %s\n", apix3->apiname);
 
-	ck_assert_ptr_nonnull(api);
+	ck_assert_ptr_nonnull(apix3);
 	ck_assert_ptr_nonnull(desc);
-	ck_assert_ptr_nonnull(api->apiname);
-	ck_assert_ptr_null(api->userdata);
-	ck_assert_str_eq(api->apiname, desc->desc.api);
+	ck_assert_ptr_nonnull(apix3->apiname);
+	ck_assert_ptr_null(apix3->userdata);
+	ck_assert_str_eq(apix3->apiname, desc->desc.api);
 	ck_assert_ptr_null(desc->api);
 	ck_assert_int_eq(desc->init, 0);
 
-	rc = afb_api_v3_set_binding_fields(&desc->desc, api);
+/*
+	rc = afb_api_v3_set_binding_fields(api, &desc->desc);
 	ck_assert_int_eq(rc, 0);
+*/
 
-	api->userdata = desc;
-	desc->api = api;
+	apix3->userdata = desc;
+	desc->api = apix3;
 
 	if (desc->desc.preinit)
-		desc->desc.preinit(api);
+		desc->desc.preinit(apix3);
 
 	if (!desc->desc.init) {
-		rc =  afb_api_x3_on_init(api, in_init);
+		rc =  afb_api_x3_on_init(apix3, in_init);
 		ck_assert_int_eq(rc, 0);
 	}
 
@@ -109,24 +114,25 @@ int out_init(struct afb_api_x3 *api)
 struct afb_apiset *apiset;
 char out_apiname[] = "out";
 struct afb_api_v3 *out_v3;
-struct afb_api_x3 *out_api;
+struct afb_api_v3 *out_api;
 
-int out_preinit(void *closure, struct afb_api_x3 *api)
+int out_preinit(void *closure, struct afb_api_v3 *api)
 {
 	int i;
 	int rc;
 	struct afb_api_x3 *napi;
+	struct afb_api_x3 *apix3 = afb_api_v3_get_api_x3(api);
 
 	ck_assert_ptr_nonnull(api);
 	ck_assert_ptr_eq(closure, out_apiname);
-	ck_assert_ptr_null(api->userdata);
-	ck_assert_str_eq(api->apiname, out_apiname);
+	ck_assert_ptr_null(apix3->userdata);
+	ck_assert_str_eq(apix3->apiname, out_apiname);
 	out_api = api;
 
 	for (i = 0 ; inapis[i].desc.api ; i++) {
 		ck_assert_ptr_null(inapis[i].api);
 		napi = afb_api_x3_new_api(
-				api,
+				apix3,
 				inapis[i].desc.api,
 				NULL,
 				0,
@@ -137,7 +143,7 @@ int out_preinit(void *closure, struct afb_api_x3 *api)
 		ck_assert_ptr_eq(inapis[i].api, napi);
 	}
 
-	rc = afb_api_x3_on_init(api, out_init);
+	rc = afb_api_x3_on_init(apix3, out_init);
 	ck_assert_int_eq(rc, 0);
 
 	return 0;
@@ -151,19 +157,23 @@ START_TEST (test)
 	apiset = afb_apiset_create("test-apiv3", 1);
 	ck_assert_ptr_nonnull(apiset);
 
-	out_v3 = afb_api_v3_create(
+	rc = afb_api_v3_create(
+			&out_v3,
 			apiset,
 			apiset,
 			out_apiname,
+			Afb_String_Copy,
 			NULL,
+			Afb_String_Const,
 			0,
 			out_preinit,
 			out_apiname,
-			0,
 			NULL,
-			NULL);
+			Afb_String_Const);
+	ck_assert_int_eq(rc, 0);
 	ck_assert_ptr_nonnull(out_v3);
 	ck_assert_ptr_nonnull(out_api);
+	ck_assert_ptr_eq(out_v3, out_api);
 
 	/* start all services */
 	rc = afb_apiset_start_all_services(apiset);

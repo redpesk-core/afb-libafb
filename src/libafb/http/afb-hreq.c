@@ -45,11 +45,13 @@
 #endif
 
 #include "core/afb-msg-json.h"
-#include "core/afb-context.h"
 #include "core/afb-session.h"
 #include "utils/locale-root.h"
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
+#include "core/containerof.h"
 
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
@@ -90,12 +92,12 @@ struct hreq_data {
 	char *path;		/* path of the file saved */
 };
 
-static struct json_object *req_json(struct afb_xreq *xreq);
-static struct afb_arg req_get(struct afb_xreq *xreq, const char *name);
-static void req_reply(struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info);
-static void req_destroy(struct afb_xreq *xreq);
+static struct json_object *req_json(struct afb_req_common *comreq);
+static struct afb_arg req_get(struct afb_req_common *comreq, const char *name);
+static void req_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply);
+static void req_destroy(struct afb_req_common *comreq);
 
-const struct afb_xreq_query_itf afb_hreq_xreq_query_itf = {
+const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
 	.json = req_json,
 	.get = req_get,
 	.reply = req_reply,
@@ -178,7 +180,8 @@ static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_
 		k = va_arg(args, const char *);
 	}
 
-	v = afb_context_uuid(&hreq->xreq.context);
+
+	v = hreq->comreq.session ? afb_session_uuid(hreq->comreq.session) : NULL;
 	if (v != NULL && asprintf(&cookie, cookie_setter, v) > 0) {
 		MHD_add_response_header(response, MHD_HTTP_HEADER_SET_COOKIE, cookie);
 		free(cookie);
@@ -330,9 +333,9 @@ static const char *mimetype_fd_name(int fd, const char *filename)
 	return result;
 }
 
-static void req_destroy(struct afb_xreq *xreq)
+static void req_destroy(struct afb_req_common *comreq)
 {
-	struct afb_hreq *hreq = CONTAINER_OF_XREQ(struct afb_hreq, xreq);
+	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 	struct hreq_data *data;
 
 	if (hreq->postform != NULL)
@@ -350,23 +353,23 @@ static void req_destroy(struct afb_xreq *xreq)
 		free(data->value);
 		free(data);
 	}
-	afb_context_disconnect(&hreq->xreq.context);
+	afb_req_common_cleanup(&hreq->comreq);
 	json_object_put(hreq->json);
-	free((char*)hreq->xreq.request.called_api);
-	free((char*)hreq->xreq.request.called_verb);
+	free((char*)hreq->comreq.apiname);
+	free((char*)hreq->comreq.verbname);
 	free(hreq);
 }
 
 void afb_hreq_addref(struct afb_hreq *hreq)
 {
-	afb_xreq_unhooked_addref(&hreq->xreq);
+	afb_req_common_addref(&hreq->comreq);
 }
 
 void afb_hreq_unref(struct afb_hreq *hreq)
 {
 	if (hreq->replied)
-		hreq->xreq.replied = 1;
-	afb_xreq_unhooked_unref(&hreq->xreq);
+		hreq->comreq.replied = 1;
+	afb_req_common_unref(&hreq->comreq);
 }
 
 /*
@@ -874,10 +877,10 @@ int afb_hreq_post_add_file(struct afb_hreq *hreq, const char *key, const char *f
 	return !size;
 }
 
-static struct afb_arg req_get(struct afb_xreq *xreq, const char *name)
+static struct afb_arg req_get(struct afb_req_common *comreq, const char *name)
 {
 	const char *value;
-	struct afb_hreq *hreq = CONTAINER_OF_XREQ(struct afb_hreq, xreq);
+	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 	struct hreq_data *hdat = get_data(hreq, name, 0);
 	if (hdat)
 		return (struct afb_arg){
@@ -900,11 +903,11 @@ static int _iterargs_(struct json_object *obj, enum MHD_ValueKind kind, const ch
 	return 1;
 }
 
-static struct json_object *req_json(struct afb_xreq *xreq)
+static struct json_object *req_json(struct afb_req_common *comreq)
 {
 	struct hreq_data *hdat;
 	struct json_object *obj, *val;
-	struct afb_hreq *hreq = CONTAINER_OF_XREQ(struct afb_hreq, xreq);
+	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 
 	obj = hreq->json;
 	if (obj == NULL) {
@@ -940,34 +943,34 @@ static ssize_t send_json_cb(json_object *obj, uint64_t pos, char *buf, size_t ma
 	return len ? : (ssize_t)MHD_CONTENT_READER_END_OF_STREAM;
 }
 
-static void req_reply(struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info)
+static void req_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
-	struct afb_hreq *hreq = CONTAINER_OF_XREQ(struct afb_hreq, xreq);
-	struct json_object *sub, *reply;
+	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
+	struct json_object *sub, *jmsg;
 	const char *reqid;
 	struct MHD_Response *response;
 
 	/* create the reply */
-	reply = afb_msg_json_reply(object, error, info, &xreq->context);
+	jmsg = afb_msg_json_reply(reply);
 
 	/* append the req id on need */
 	reqid = afb_hreq_get_argument(hreq, long_key_for_reqid);
 	if (reqid == NULL)
 		reqid = afb_hreq_get_argument(hreq, short_key_for_reqid);
-	if (reqid != NULL && json_object_object_get_ex(reply, "request", &sub))
+	if (reqid != NULL && json_object_object_get_ex(jmsg, "request", &sub))
 		json_object_object_add(sub, "reqid", json_object_new_string(reqid));
 
 	response = MHD_create_response_from_callback(
-			(uint64_t)strlen(get_json_string(reply)),
+			(uint64_t)strlen(get_json_string(jmsg)),
 			SIZE_RESPONSE_BUFFER,
 			(void*)send_json_cb,
-			reply,
+			jmsg,
 			(void*)json_object_put);
 
 	/* handle authorisation feedback */
-	if (error == afb_error_text_invalid_token)
+	if (reply->error == afb_error_text_invalid_token)
 		afb_hreq_reply(hreq, MHD_HTTP_UNAUTHORIZED, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"invalid_token\"", NULL);
-	else if (error == afb_error_text_insufficient_scope)
+	else if (reply->error == afb_error_text_insufficient_scope)
 		afb_hreq_reply(hreq, MHD_HTTP_FORBIDDEN, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"insufficient_scope\"", NULL);
 	else
 		afb_hreq_reply(hreq, MHD_HTTP_OK, response, NULL);
@@ -975,16 +978,16 @@ static void req_reply(struct afb_xreq *xreq, struct json_object *object, const c
 
 void afb_hreq_call(struct afb_hreq *hreq, struct afb_apiset *apiset, const char *api, size_t lenapi, const char *verb, size_t lenverb)
 {
-	hreq->xreq.request.called_api = strndup(api, lenapi);
-	hreq->xreq.request.called_verb = strndup(verb, lenverb);
-	if (hreq->xreq.request.called_api == NULL || hreq->xreq.request.called_verb == NULL) {
+	hreq->comreq.apiname = strndup(api, lenapi);
+	hreq->comreq.verbname = strndup(verb, lenverb);
+	if (hreq->comreq.apiname == NULL || hreq->comreq.verbname == NULL) {
 		ERROR("Out of memory");
 		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 	} else if (afb_hreq_init_context(hreq) < 0) {
 		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 	} else {
-		afb_xreq_unhooked_addref(&hreq->xreq);
-		afb_xreq_process(&hreq->xreq, apiset);
+		afb_req_common_addref(&hreq->comreq);
+		afb_req_common_process(&hreq->comreq, apiset);
 	}
 }
 
@@ -992,9 +995,8 @@ int afb_hreq_init_context(struct afb_hreq *hreq)
 {
 	const char *uuid;
 	const char *token;
-	struct afb_token *tok;
 
-	if (hreq->xreq.context.session != NULL)
+	if (hreq->comreq.session != NULL)
 		return 0;
 
 	/* get the uuid of the session */
@@ -1021,11 +1023,11 @@ int afb_hreq_init_context(struct afb_hreq *hreq)
 			}
 		}
 	}
-	tok = NULL;
-	if (token)
-		afb_token_get(&tok, token);
 
-	return afb_context_connect(&hreq->xreq.context, uuid, tok);
+	afb_req_common_set_session_string(&hreq->comreq, uuid);
+	if (token)
+		afb_req_common_set_token_string(&hreq->comreq, token);
+	return 0;
 }
 
 int afb_hreq_init_cookie(int port, const char *path, int maxage)
@@ -1048,9 +1050,9 @@ int afb_hreq_init_cookie(int port, const char *path, int maxage)
 	return 1;
 }
 
-struct afb_xreq *afb_hreq_to_xreq(struct afb_hreq *hreq)
+struct afb_req_common *afb_hreq_to_req_common(struct afb_hreq *hreq)
 {
-	return &hreq->xreq;
+	return &hreq->comreq;
 }
 
 struct afb_hreq *afb_hreq_create()
@@ -1058,7 +1060,7 @@ struct afb_hreq *afb_hreq_create()
 	struct afb_hreq *hreq = calloc(1, sizeof *hreq);
 	if (hreq) {
 		/* init the request */
-		afb_xreq_init(&hreq->xreq, &afb_hreq_xreq_query_itf);
+		afb_req_common_init(&hreq->comreq, &afb_hreq_req_common_query_itf, NULL, NULL);
 		hreq->reqid = ++global_reqids;
 	}
 	return hreq;

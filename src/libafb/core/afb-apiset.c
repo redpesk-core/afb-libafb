@@ -30,8 +30,6 @@
 #include "core/afb-session.h"
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
-#include "core/afb-context.h"
-#include "core/afb-xreq.h"
 #include "core/afb-sched.h"
 
 #include "sys/x-errno.h"

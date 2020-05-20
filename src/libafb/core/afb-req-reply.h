@@ -23,23 +23,55 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
-struct fdev;
+#include "afb-string-mode.h"
+
+struct json_object;
+
+/**
+ * structure for handling replies
+ */
+struct afb_req_reply
+{
+	/** the replied object if any */
+	struct json_object *object;
+
+	/** the replied error if any */
+	char *error;
+
+	/** the replied info if any */
+	char *info;
+
+	/** object mode */
+	int8_t object_put;
+
+	/** string mode for the error */
+	int8_t error_mode;
+
+	/** string mode for the error */
+	int8_t info_mode;
+};
 
 extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
-	struct fdev *fdev,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
+void
+afb_req_reply_move_splitted(
+	const struct afb_req_reply *reply,
+	struct json_object **object,
+	char **error,
+	char **info
 );
 
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
+extern
+int
+afb_req_reply_copy_splitted(
+	const struct afb_req_reply *reply,
+	struct json_object **object,
+	char **error,
+	char **info
+);
 
+extern
+int
+afb_req_reply_copy(
+	const struct afb_req_reply *from_reply,
+	struct afb_req_reply *to_reply
+);

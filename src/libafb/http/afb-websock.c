@@ -31,7 +31,6 @@
 
 #include <microhttpd.h>
 
-#include "core/afb-context.h"
 #include "wsj1/afb-ws-json1.h"
 #include "misc/afb-fdev.h"
 #include "sys/fdev.h"
@@ -104,10 +103,19 @@ static int headerhas(const char *header, const char *needle)
 	}
 }
 
+typedef
+	void *(*wscreator_t)(
+		struct fdev *fdev,
+		struct afb_apiset *apiset, 
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure);
+
 struct protodef
 {
 	const char *name;
-	void *(*create)(struct fdev *fdev, struct afb_apiset *apiset, struct afb_context *context, void (*cleanup)(void*), void *cleanup_closure);
+	wscreator_t create;
 };
 
 static const struct protodef *search_proto(const struct protodef *protodefs, const char *protocols)
@@ -163,7 +171,7 @@ static void upgrade_to_websocket(
 		close_websocket(urh);
 	} else {
 		fdev_set_autoclose(fdev, 0);
-		ws = memo->proto->create(fdev, memo->apiset, &memo->hreq->xreq.context, close_websocket, urh);
+		ws = memo->proto->create(fdev, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
 		if (ws == NULL) {
 			/* TODO */
 			close_websocket(urh);

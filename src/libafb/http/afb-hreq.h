@@ -28,7 +28,7 @@
 struct json_object;
 struct json_tokener;
 
-#include "../core/afb-xreq.h"
+#include "../core/afb-req-common.h"
 
 struct afb_session;
 struct hreq_data;
@@ -36,7 +36,7 @@ struct afb_hsrv;
 struct locale_search;
 
 struct afb_hreq {
-	struct afb_xreq xreq;
+	struct afb_req_common comreq;
 	struct afb_hsrv *hsrv;
 	const char *cacheTimeout;
 	struct MHD_Connection *connection;

@@ -26,13 +26,13 @@
 
 const char afb_error_text_aborted[]            = "aborted";
 const char afb_error_text_disconnected[]       = "disconnected";
+const char afb_error_text_insufficient_scope[] = "insufficient-scope";
+const char afb_error_text_internal_error[]     = "internal-error";
 const char afb_error_text_invalid_request[]    = "invalid-request";
+const char afb_error_text_invalid_token[]      = "invalid-token";
 const char afb_error_text_not_available[]      = "not-available";
 const char afb_error_text_not_replied[]        = "not-replied";
 const char afb_error_text_unknown_api[]        = "unknown-api";
 const char afb_error_text_unknown_session[]    = "unknown-session";
 const char afb_error_text_unknown_verb[]       = "unknown-verb";
-const char afb_error_text_insufficient_scope[] = "insufficient-scope";
-const char afb_error_text_internal_error[]     = "internal-error";
-const char afb_error_text_invalid_token[]      = "invalid-token";
 

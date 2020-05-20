@@ -39,7 +39,7 @@
 #include <afb/afb-binding.h>
 
 #include "core/afb-apiset.h"
-#include "core/afb-xreq.h"
+#include "core/afb-req-common.h"
 #include "misc/afb-trace.h"
 #include "core/afb-session.h"
 #include "misc/afb-supervision.h"
@@ -79,10 +79,10 @@ static struct {
 static struct afb_apiset *supervision_apiset;
 
 /* local api implementation */
-static void on_supervision_call(void *closure, struct afb_xreq *xreq);
+static void on_supervision_process(void *closure, struct afb_req_common *comreq);
 static struct afb_api_itf supervision_api_itf =
 {
-	.call = on_supervision_call
+	.process = on_supervision_process
 };
 
 /* the supervisor link */
@@ -310,14 +310,13 @@ static const char *verbs[] = {
 	"break", "config", "do", "exit", "sclose", "slist", "trace", "wait" };
 enum  {  Break ,  Config ,  Do ,  Exit ,  Sclose ,  Slist ,  Trace ,  Wait  };
 
-static void on_supervision_call(void *closure, struct afb_xreq *xreq)
+static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 {
 	int i;
 	struct json_object *args, *sub, *list;
 	const char *api, *verb, *uuid;
 	struct afb_session *session;
 	const struct afb_api_item *xapi;
-	afb_req_t req;
 	int rc;
 #if WITH_AFB_TRACE
 	struct json_object *drop, *add;
@@ -325,14 +324,14 @@ static void on_supervision_call(void *closure, struct afb_xreq *xreq)
 
 	/* search the verb */
 	i = (int)(sizeof verbs / sizeof *verbs);
-	while(--i >= 0 && strcasecmp(verbs[i], xreq->request.called_verb));
+	while(--i >= 0 && strcasecmp(verbs[i], comreq->verbname));
 	if (i < 0) {
-		afb_xreq_reply_unknown_verb(xreq);
+		afb_req_common_reply_verb_unknown(comreq);
 		return;
 	}
 
 	/* process */
-	args = afb_xreq_json(xreq);
+	args = afb_req_common_json(comreq);
 	switch(i) {
 	case Exit:
 		i = 0;
@@ -346,29 +345,28 @@ static void on_supervision_call(void *closure, struct afb_xreq *xreq)
 		if (wrap_json_unpack(args, "s", &uuid))
 			wrap_json_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
-			afb_xreq_reply(xreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_req_common_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			session = afb_session_search(uuid);
 			if (!session)
-				afb_xreq_reply(xreq, NULL, afb_error_text_unknown_session, NULL);
+				afb_req_common_reply(comreq, NULL, afb_error_text_unknown_session, NULL);
 			else {
 				afb_session_close(session);
 				afb_session_unref(session);
 				afb_session_purge();
-				afb_xreq_reply(xreq, NULL, NULL, NULL);
+				afb_req_common_reply(comreq, NULL, NULL, NULL);
 			}
 		}
 		break;
 	case Slist:
 		list = json_object_new_object();
 		afb_session_foreach(slist, list);
-		afb_xreq_reply(xreq, list, NULL, NULL);
+		afb_req_common_reply(comreq, list, NULL, NULL);
 		break;
 	case Config:
-		afb_xreq_reply(xreq, json_object_get(global.config), NULL, NULL);
+		afb_req_common_reply(comreq, json_object_get(global.config), NULL, NULL);
 		break;
 	case Trace:
-		req = xreq_to_req_x2(xreq);
 #if WITH_AFB_TRACE
 		if (!trace)
 			trace = afb_trace_create(supervisor_apiname, NULL /* not bound to any session */);
@@ -376,48 +374,55 @@ static void on_supervision_call(void *closure, struct afb_xreq *xreq)
 		add = drop = NULL;
 		wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 		if (add) {
-			rc = afb_trace_add(req, add, trace);
+			rc = afb_trace_add(comreq, add, trace);
 			if (rc)
 				return;
 		}
 		if (drop) {
-			rc = afb_trace_drop(req, drop, trace);
+			rc = afb_trace_drop(comreq, drop, trace);
 			if (rc)
 				return;
 		}
-		afb_req_success(req, NULL, NULL);
+		afb_req_common_reply(comreq, NULL, NULL, NULL);
 #else
-		afb_req_reply(req, NULL, afb_error_text_not_available, NULL);
+		afb_req_common_reply_unavailable(comreq);
 #endif
 		break;
 	case Do:
 		sub = NULL;
 		if (wrap_json_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
-			afb_xreq_reply(xreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_req_common_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);
 			if (rc < 0)
-				afb_xreq_reply_unknown_api(xreq);
+				afb_req_common_reply_api_unknown(comreq);
 			else {
 #if WITH_CRED
-				afb_context_change_cred(&xreq->context, NULL);
+				afb_req_common_set_cred(comreq, NULL);
 #endif
-				xreq->request.called_api = api;
-				xreq->request.called_verb = verb;
-				xreq->json = json_object_get(sub);
-				xapi->itf->call(xapi->closure, xreq);
+				comreq->apiname = api;
+				comreq->verbname = verb;
+				comreq->json = json_object_get(sub);
+				xapi->itf->process(xapi->closure, comreq);
 				json_object_put(args);
 			}
 		}
 		break;
+#if WITH_AFB_DEBUG
 	case Wait:
-		afb_xreq_reply(xreq, NULL, NULL, NULL);
+		afb_req_common_reply(comreq, NULL, NULL, NULL);
 		afb_debug_wait("supervisor");
 		break;
 	case Break:
-		afb_xreq_reply(xreq, NULL, NULL, NULL);
+		afb_req_common_reply(comreq, NULL, NULL, NULL);
 		afb_debug_break("supervisor");
 		break;
+#else
+	case Wait:
+	case Break:
+		afb_req_common_reply_unavailable(comreq);
+		break;
+#endif
 	}
 }
 

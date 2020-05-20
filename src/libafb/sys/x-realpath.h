@@ -23,9 +23,12 @@
 
 #pragma once
 
+#include <limits.h>
+#include <stdlib.h>
+
 #if WITH_REALPATH
 extern char *realpath(const char *path, char *resolved_path);
 #else
-#define realpath(p,r) ((r) ? strcpy(r,p) : strdup(p))
+#define realpath(p,r) ((r) ? strncpy(r,p,PATH_MAX) : strndup(p,PATH_MAX))
 #endif
 

@@ -24,27 +24,32 @@
 #include "libafb-config.h"
 
 #include <string.h>
+#include <stdarg.h>
 
 #include <json-c/json.h>
 
-#define AFB_BINDING_VERSION 3
-#define AFB_BINDING_NO_ROOT
+#define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
 
 #include "core/afb-apiset.h"
-#include "core/afb-api-v3.h"
+#include "core/afb-api-common.h"
 #include "core/afb-evt.h"
-#include "core/afb-xreq.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
 #include "misc/afb-trace.h"
 #include "core/afb-session.h"
 #include "core/afb-error-text.h"
 #include "sys/verbose.h"
+#include "sys/x-errno.h"
 #include "utils/wrap-json.h"
 
-#include "misc/monitor-api.inc"
-
-static const char _verbosity_[] = "verbosity";
 static const char _apis_[] = "apis";
+static const char _get_[] = "get";
+static const char _monitor_[] = "monitor";
+static const char _session_[] = "session";
+static const char _set_[] = "set";
+static const char _trace_[] = "trace";
+static const char _verbosity_[] = "verbosity";
 
 static const char _debug_[] = "debug";
 static const char _info_[] = "info";
@@ -52,13 +57,40 @@ static const char _notice_[] = "notice";
 static const char _warning_[] = "warning";
 static const char _error_[] = "error";
 
+static struct afb_api_common *monitor_api;
 
-static struct afb_apiset *target_set;
+static void monitor_process(void *closure, struct afb_req_common *req);
+static void monitor_describe(void *closure, void (*describecb)(void *, struct json_object *), void *clocb);
+
+static struct afb_api_itf monitor_itf =
+{
+	.process = monitor_process,
+	.describe = monitor_describe
+};
 
 int afb_monitor_init(struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
-	target_set = call_set;
-	return -!afb_api_v3_from_binding(&_afb_binding_monitor, declare_set, call_set);
+	int rc;
+	struct afb_api_item item;
+
+	if (monitor_api != NULL) {
+		rc = 0;
+	}
+	else {
+		monitor_api = malloc(sizeof *monitor_api);
+		if (monitor_api == NULL) {
+			rc = X_ENOMEM;
+		}
+		else {
+			afb_api_common_init(monitor_api, declare_set, call_set, _monitor_, 0, NULL, 0, NULL, 0);
+			item.closure = NULL;
+			item.group = NULL;
+			item.itf = &monitor_itf;
+			rc = afb_apiset_add(declare_set, _monitor_, item);
+		}
+	}
+
+	return rc;
 }
 
 /******************************************************************************
@@ -127,9 +159,9 @@ static void set_verbosity_to(const char *name, int level)
 	if (!name || !name[0])
 		verbosity_set(level);
 	else if (name[0] == '*' && !name[1])
-		afb_apiset_enum(target_set, 1, set_verbosity_to_all_cb, (void*)(intptr_t)mask);
+		afb_apiset_enum(monitor_api->call_set, 1, set_verbosity_to_all_cb, (void*)(intptr_t)mask);
 	else
-		afb_apiset_set_logmask(target_set, name, mask);
+		afb_apiset_set_logmask(monitor_api->call_set, name, mask);
 }
 
 /**
@@ -201,9 +233,9 @@ static void get_verbosity_of(struct json_object *resu, const char *name)
 	if (!name || !name[0])
 		json_object_object_add(resu, "", encode_verbosity(verbosity_get()));
 	else if (name[0] == '*' && !name[1])
-		afb_apiset_enum(target_set, 1, get_verbosity_of_all_cb, resu);
+		afb_apiset_enum(monitor_api->call_set, 1, get_verbosity_of_all_cb, resu);
 	else {
-		m = afb_apiset_get_logmask(target_set, name);
+		m = afb_apiset_get_logmask(monitor_api->call_set, name);
 		if (m >= 0)
 			json_object_object_add(resu, name, encode_verbosity(verbosity_from_mask(m)));
 	}
@@ -315,7 +347,7 @@ static struct namelist *get_apis_namelist(struct json_object *spec)
 	} else if (json_object_is_type(spec, json_type_string)) {
 		add_one_name_to_namelist(&head, json_object_get_string(spec), NULL);
 	} else if (json_object_get_boolean(spec)) {
-		afb_apiset_enum(target_set, 1, get_apis_namelist_of_all_cb, &head);
+		afb_apiset_enum(monitor_api->call_set, 1, get_apis_namelist_of_all_cb, &head);
 	}
 	return reverse_namelist(head);
 }
@@ -328,7 +360,7 @@ struct desc_apis {
 	struct namelist *names;
 	struct json_object *resu;
 	struct json_object *apis;
-	afb_req_t req;
+	struct afb_req_common *req;
 };
 
 static void describe_first_api(struct desc_apis *desc);
@@ -338,7 +370,7 @@ static void on_api_description(void *closure, struct json_object *apidesc)
 	struct desc_apis *desc = closure;
 	struct namelist *head = desc->names;
 
-	if (apidesc || afb_apiset_get_api(target_set, head->name, 1, 0, NULL))
+	if (apidesc || afb_apiset_get_api(monitor_api->call_set, head->name, 1, 0, NULL))
 		json_object_object_add(desc->apis, head->name, apidesc);
 	desc->names = head->next;
 	free(head);
@@ -350,23 +382,23 @@ static void describe_first_api(struct desc_apis *desc)
 	struct namelist *head = desc->names;
 
 	if (head)
-		afb_apiset_describe(target_set, head->name, on_api_description, desc);
+		afb_apiset_describe(monitor_api->call_set, head->name, on_api_description, desc);
 	else {
-		afb_req_success(desc->req, desc->resu, NULL);
-		afb_req_unref(desc->req);
+		afb_req_common_reply(desc->req, desc->resu, NULL, NULL);
+		afb_req_common_unref(desc->req);
 		free(desc);
 	}
 }
 
-static void describe_apis(afb_req_t req, struct json_object *resu, struct json_object *spec)
+static void describe_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
 {
 	struct desc_apis *desc;
 
 	desc = malloc(sizeof *desc);
 	if (!desc)
-		afb_req_fail(req, "out-of-memory", NULL);
+		afb_req_common_reply_out_of_memory(req);
 	else {
-		desc->req = afb_req_addref(req);
+		desc->req = afb_req_common_addref(req);
 		desc->resu = resu;
 		desc->apis = json_object_new_object();
 		json_object_object_add(desc->resu, _apis_, desc->apis);
@@ -379,47 +411,49 @@ static void describe_apis(afb_req_t req, struct json_object *resu, struct json_o
 **** Implementation monitoring verbs
 ******************************************************************************/
 
-static void f_get(afb_req_t req)
+static void f_get(struct afb_req_common *req)
 {
 	struct json_object *r;
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
 
-	wrap_json_unpack(afb_req_json(req), "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
+	wrap_json_unpack(afb_req_common_json(req), "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
 	if (!verbosity && !apis)
-		afb_req_success(req, NULL, NULL);
+		afb_req_common_reply(req, NULL, NULL, NULL);
 	else {
 		r = json_object_new_object();
 		if (!r)
-			afb_req_fail(req, "out-of-memory", NULL);
+			afb_req_common_reply_out_of_memory(req);
 		else {
 			if (verbosity) {
 				verbosity = get_verbosity(verbosity);
 				json_object_object_add(r, _verbosity_, verbosity);
 			}
 			if (!apis)
-				afb_req_success(req, r, NULL);
+				afb_req_common_reply(req, r, NULL, NULL);
 			else
 				describe_apis(req, r, apis);
 		}
 	}
 }
 
-static void f_set(afb_req_t req)
+static void f_set(struct afb_req_common *req)
 {
 	struct json_object *verbosity = NULL;
 
-	wrap_json_unpack(afb_req_json(req), "{s?:o}", _verbosity_, &verbosity);
+	wrap_json_unpack(afb_req_common_json(req), "{s?:o}", _verbosity_, &verbosity);
 	if (verbosity)
 		set_verbosity(verbosity);
 
-	afb_req_success(req, NULL, NULL);
+	afb_req_common_reply(req, NULL, NULL, NULL);
 }
 
 #if WITH_AFB_TRACE
 static void *context_create(void *closure)
 {
-	return afb_trace_create(_afb_binding_monitor.api, NULL);
+	struct afb_req_common *req = closure;
+
+	return afb_trace_create(req->apiname?:_monitor_, NULL);
 }
 
 static void context_destroy(void *pointer)
@@ -428,15 +462,15 @@ static void context_destroy(void *pointer)
 	afb_trace_unref(trace);
 }
 
-static void f_trace(afb_req_t req)
+static void f_trace(struct afb_req_common *req)
 {
 	int rc;
 	struct json_object *add = NULL;
 	struct json_object *drop = NULL;
 	struct afb_trace *trace;
 
-	trace = afb_req_context(req, 0, context_create, context_destroy, NULL);
-	wrap_json_unpack(afb_req_json(req), "{s?o s?o}", "add", &add, "drop", &drop);
+	trace = afb_session_cookie(req->session, _monitor_, context_create, context_destroy, req, Afb_Session_Cookie_Init);
+	wrap_json_unpack(afb_req_common_json(req), "{s?o s?o}", "add", &add, "drop", &drop);
 	if (add) {
 		rc = afb_trace_add(req, add, trace);
 		if (rc)
@@ -447,35 +481,81 @@ static void f_trace(afb_req_t req)
 		if (rc)
 			goto end;
 	}
-	afb_req_success(req, NULL, NULL);
+	afb_req_common_reply(req, NULL, NULL, NULL);
 end:
-	afb_apiset_update_hooks(target_set, NULL);
+	afb_apiset_update_hooks(monitor_api->call_set, NULL);
 	afb_evt_update_hooks();
 	return;
 }
 #else
-static void f_trace(afb_req_t req)
+static void f_trace(struct afb_req_common *req)
 {
-	afb_req_reply(req, NULL, afb_error_text_not_available, NULL);
+	afb_req_common_reply_unavailable(req);
 }
 #endif
 
-static void f_session(afb_req_t req)
+static void f_session(struct afb_req_common *req)
 {
 	struct json_object *r = NULL;
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-
-	/* check right to call it */
-	if (xreq->context.super) {
-		afb_req_fail(req, "invalid", "reserved to direct clients");
-		return;
-	}
 
 	/* make the result */
 	wrap_json_pack(&r, "{s:s,s:i,s:i}",
-			"uuid", afb_session_uuid(xreq->context.session),
-			"timeout", afb_session_timeout(xreq->context.session),
-			"remain", afb_session_what_remains(xreq->context.session));
-	afb_req_success(req, r, NULL);
+			"uuid", afb_session_uuid(req->session),
+			"timeout", afb_session_timeout(req->session),
+			"remain", afb_session_what_remains(req->session));
+	afb_req_common_reply(req, r, NULL, NULL);
 }
 
+void checkcb(void *closure, int status)
+{
+	struct afb_req_common *req = closure;
+	void (*fun)(struct afb_req_common*);
+
+	if (status > 0) {
+		fun = afb_req_common_async_pop(req);
+		fun(req);
+	}
+}
+
+static void monitor_process(void *closure, struct afb_req_common *req)
+{
+	void (*fun)(struct afb_req_common*) = NULL;
+	struct afb_auth *auth = NULL;
+
+	switch (req->verbname[0]) {
+	case 'g':
+		if (0 == strcmp(req->verbname, _get_))
+			fun = f_get;
+		break;
+	case 's':
+		if (0 == strcmp(req->verbname, _set_))
+			fun = f_set;
+		else if (0 == strcmp(req->verbname, _session_))
+			fun = f_session;
+		break;
+	case 't':
+		if (0 == strcmp(req->verbname, _trace_))
+			fun = f_trace;
+		break;
+	default:
+		break;
+	}
+	if (fun == NULL) {
+		afb_req_common_reply_verb_unknown(req);
+	}
+	else if (auth) {
+		if (afb_req_common_async_push(req, fun) < 0)
+			afb_req_common_reply_internal_error(req);
+		else
+			afb_req_common_check_and_set_session_async(req, auth, AFB_SESSION_CHECK_X2, checkcb, req);
+
+	}
+	else {
+		fun(req);
+	}
+}
+
+static void monitor_describe(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
+{
+	describecb(clocb, NULL /* TODO */);
+}

@@ -23,23 +23,16 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
-struct fdev;
+struct afb_req_common;
+struct afb_api_v3;
+struct afb_api_x3;
+struct afb_verb_v3;
 
 extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
-	struct fdev *fdev,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
+void
+afb_req_v3_process(
+	struct afb_req_common *comreq,
+	struct afb_api_v3 *api,
+	struct afb_api_x3 *apix3,
+	const struct afb_verb_v3 *verbv3
 );
-
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
-

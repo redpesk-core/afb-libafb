@@ -39,12 +39,11 @@
 
 #include <afb/afb-event-x2.h>
 
-#include "core/afb-context.h"
 #include "core/afb-hook.h"
 #include "core/afb-session.h"
 #include "core/afb-cred.h"
-#include "core/afb-xreq.h"
-#include "core/afb-export.h"
+#include "core/afb-req-common.h"
+#include "core/afb-api-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-apiname.h"
 #include "core/afb-msg-json.h"
@@ -66,21 +65,21 @@
 #define MATCH_SESSION(pattern,string)	MATCH(pattern,string)
 
 /**
- * Definition of a hook for xreq
+ * Definition of a hook for req
  */
-struct afb_hook_xreq {
-	struct afb_hook_xreq *next; /**< next hook */
+struct afb_hook_req {
+	struct afb_hook_req *next; /**< next hook */
 	unsigned refcount; /**< reference count */
 	unsigned flags; /**< hook flags */
 	char *api; /**< api hooked or NULL for any */
 	char *verb; /**< verb hooked or NULL for any */
 	struct afb_session *session; /**< session hooked or NULL if any */
-	struct afb_hook_xreq_itf *itf; /**< interface of hook */
+	struct afb_hook_req_itf *itf; /**< interface of hook */
 	void *closure; /**< closure for callbacks */
 };
 
 /**
- * Definition of a hook for export
+ * Definition of a hook for comapi
  */
 struct afb_hook_api {
 	struct afb_hook_api *next; /**< next hook */
@@ -130,10 +129,10 @@ struct afb_hook_global {
 static x_rwlock_t rwlock = X_RWLOCK_INITIALIZER;
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 
-/* list of hooks for xreq */
-static struct afb_hook_xreq *list_of_xreq_hooks = NULL;
+/* list of hooks for req */
+static struct afb_hook_req *list_of_req_hooks = NULL;
 
-/* list of hooks for export */
+/* list of hooks for comapi */
 static struct afb_hook_api *list_of_api_hooks = NULL;
 
 /* list of hooks for evt */
@@ -215,23 +214,23 @@ static void _hook_(const char *fmt1, const char *fmt2, va_list arg2, ...)
 	free(mem2);
 }
 
-static void _hook_xreq_(const struct afb_xreq *xreq, const char *format, ...)
+static void _hook_req_(const struct afb_req_common *req, const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	_hook_("xreq-%06d:%s/%s", format, ap, xreq->hookindex, xreq->request.called_api, xreq->request.called_verb);
+	_hook_("req-%06d:%s/%s", format, ap, req->hookindex, req->apiname, req->verbname);
 	va_end(ap);
 }
 
-static void hook_xreq_begin_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
+static void hook_req_begin_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
 #if WITH_CRED
-	struct afb_cred *cred = xreq->context.credentials;
+	struct afb_cred *cred = req->credentials;
 
 	if (!cred)
-		_hook_xreq_(xreq, "BEGIN");
+		_hook_req_(req, "BEGIN");
 	else
-		_hook_xreq_(xreq, "BEGIN uid=%d=%s gid=%d pid=%d label=%s id=%s",
+		_hook_req_(req, "BEGIN uid=%d=%s gid=%d pid=%d label=%s id=%s",
 			(int)cred->uid,
 			cred->user,
 			(int)cred->gid,
@@ -240,81 +239,81 @@ static void hook_xreq_begin_cb(void *closure, const struct afb_hookid *hookid, c
 			cred->id?:"(null)"
 		);
 #else
-	_hook_xreq_(xreq, "BEGIN");
+	_hook_req_(req, "BEGIN");
 #endif
 }
 
-static void hook_xreq_end_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
+static void hook_req_end_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
-	_hook_xreq_(xreq, "END");
+	_hook_req_(req, "END");
 }
 
-static void hook_xreq_json_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *obj)
+static void hook_req_json_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct json_object *obj)
 {
-	_hook_xreq_(xreq, "json() -> %s", json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_req_(req, "json() -> %s", json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_xreq_get_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *name, struct afb_arg arg)
+static void hook_req_get_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *name, struct afb_arg arg)
 {
-	_hook_xreq_(xreq, "get(%s) -> { name: %s, value: %s, path: %s }", name, arg.name, arg.value, arg.path);
+	_hook_req_(req, "get(%s) -> { name: %s, value: %s, path: %s }", name, arg.name, arg.value, arg.path);
 }
 
-static void hook_xreq_reply_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info)
+static void hook_req_reply_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct json_object *obj, const char *error, const char *info)
 {
-	_hook_xreq_(xreq, "reply[%s](%s, %s)", error?:"success", json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE), info);
+	_hook_req_(req, "reply[%s](%s, %s)", error?:"success", json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE), info);
 }
 
-static void hook_xreq_addref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
+static void hook_req_addref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
-	_hook_xreq_(xreq, "addref()");
+	_hook_req_(req, "addref()");
 }
 
-static void hook_xreq_unref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
+static void hook_req_unref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
-	_hook_xreq_(xreq, "unref()");
+	_hook_req_(req, "unref()");
 }
 
-static void hook_xreq_session_close_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
+static void hook_req_session_close_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
-	_hook_xreq_(xreq, "session_close()");
+	_hook_req_(req, "session_close()");
 }
 
-static void hook_xreq_session_set_LOA_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, unsigned level, int result)
+static void hook_req_session_set_LOA_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, unsigned level, int result)
 {
-	_hook_xreq_(xreq, "session_set_LOA(%u) -> %d", level, result);
+	_hook_req_(req, "session_set_LOA(%u) -> %d", level, result);
 }
 
-static void hook_xreq_subscribe_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct afb_event_x2 *event_x2, int result)
+static void hook_req_subscribe_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_event_x2 *event_x2, int result)
 {
-	_hook_xreq_(xreq, "subscribe(%s:%d) -> %d", afb_evt_event_x2_fullname(event_x2), afb_evt_event_x2_id(event_x2), result);
+	_hook_req_(req, "subscribe(%s:%d) -> %d", afb_evt_event_x2_fullname(event_x2), afb_evt_event_x2_id(event_x2), result);
 }
 
-static void hook_xreq_unsubscribe_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct afb_event_x2 *event_x2, int result)
+static void hook_req_unsubscribe_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_event_x2 *event_x2, int result)
 {
-	_hook_xreq_(xreq, "unsubscribe(%s:%d) -> %d", afb_evt_event_x2_fullname(event_x2), afb_evt_event_x2_id(event_x2), result);
+	_hook_req_(req, "unsubscribe(%s:%d) -> %d", afb_evt_event_x2_fullname(event_x2), afb_evt_event_x2_id(event_x2), result);
 }
 
-static void hook_xreq_subcall_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args)
+static void hook_req_subcall_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, struct json_object *args)
 {
-	_hook_xreq_(xreq, "subcall(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_req_(req, "subcall(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_xreq_subcall_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info)
+static void hook_req_subcall_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct json_object *object, const char *error, const char *info)
 {
-	_hook_xreq_(xreq, "    ...subcall... [%s] -> %s (%s)", error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
+	_hook_req_(req, "    ...subcall... [%s] -> %s (%s)", error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
 }
 
-static void hook_xreq_subcallsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args)
+static void hook_req_subcallsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, struct json_object *args)
 {
-	_hook_xreq_(xreq, "subcallsync(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_req_(req, "subcallsync(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_xreq_subcallsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int status, struct json_object *object, const char *error, const char *info)
+static void hook_req_subcallsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, struct json_object *object, const char *error, const char *info)
 {
-	_hook_xreq_(xreq, "    ...subcallsync... %d [%s] -> %s (%s)", status, error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
+	_hook_req_(req, "    ...subcallsync... %d [%s] -> %s (%s)", status, error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
 }
 
-static void hook_xreq_vverbose_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
+static void hook_req_vverbose_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
 {
 	int len;
 	char *msg;
@@ -325,60 +324,60 @@ static void hook_xreq_vverbose_cb(void *closure, const struct afb_hookid *hookid
 	va_end(ap);
 
 	if (len < 0)
-		_hook_xreq_(xreq, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, func, fmt);
+		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, func, fmt);
 	else {
-		_hook_xreq_(xreq, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, func, msg);
+		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, func, msg);
 		free(msg);
 	}
 }
 
-static void hook_xreq_has_permission_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *permission, int result)
+static void hook_req_has_permission_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *permission, int result)
 {
-	_hook_xreq_(xreq, "has_permission(%s) -> %d", permission, result);
+	_hook_req_(req, "has_permission(%s) -> %d", permission, result);
 }
 
-static void hook_xreq_get_application_id_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, char *result)
+static void hook_req_get_application_id_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, char *result)
 {
-	_hook_xreq_(xreq, "get_application_id() -> %s", result);
+	_hook_req_(req, "get_application_id() -> %s", result);
 }
 
-static void hook_xreq_context_make_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result)
+static void hook_req_context_make_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result)
 {
-	_hook_xreq_(xreq, "context_make(replace=%s, %p, %p, %p) -> %p", replace?"yes":"no", create_value, free_value, create_closure, result);
+	_hook_req_(req, "context_make(replace=%s, %p, %p, %p) -> %p", replace?"yes":"no", create_value, free_value, create_closure, result);
 }
 
-static void hook_xreq_get_uid_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int result)
+static void hook_req_get_uid_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result)
 {
-	_hook_xreq_(xreq, "get_uid() -> %d", result);
+	_hook_req_(req, "get_uid() -> %d", result);
 }
 
-static void hook_xreq_get_client_info_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *result)
+static void hook_req_get_client_info_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct json_object *result)
 {
-	_hook_xreq_(xreq, "get_client_info() -> %s", json_object_to_json_string_ext(result, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_req_(req, "get_client_info() -> %s", json_object_to_json_string_ext(result, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static struct afb_hook_xreq_itf hook_xreq_default_itf = {
-	.hook_xreq_begin = hook_xreq_begin_cb,
-	.hook_xreq_end = hook_xreq_end_cb,
-	.hook_xreq_json = hook_xreq_json_cb,
-	.hook_xreq_get = hook_xreq_get_cb,
-	.hook_xreq_reply = hook_xreq_reply_cb,
-	.hook_xreq_addref = hook_xreq_addref_cb,
-	.hook_xreq_unref = hook_xreq_unref_cb,
-	.hook_xreq_session_close = hook_xreq_session_close_cb,
-	.hook_xreq_session_set_LOA = hook_xreq_session_set_LOA_cb,
-	.hook_xreq_subscribe = hook_xreq_subscribe_cb,
-	.hook_xreq_unsubscribe = hook_xreq_unsubscribe_cb,
-	.hook_xreq_subcall = hook_xreq_subcall_cb,
-	.hook_xreq_subcall_result = hook_xreq_subcall_result_cb,
-	.hook_xreq_subcallsync = hook_xreq_subcallsync_cb,
-	.hook_xreq_subcallsync_result = hook_xreq_subcallsync_result_cb,
-	.hook_xreq_vverbose = hook_xreq_vverbose_cb,
-	.hook_xreq_has_permission = hook_xreq_has_permission_cb,
-	.hook_xreq_get_application_id = hook_xreq_get_application_id_cb,
-	.hook_xreq_context_make = hook_xreq_context_make_cb,
-	.hook_xreq_get_uid = hook_xreq_get_uid_cb,
-	.hook_xreq_get_client_info = hook_xreq_get_client_info_cb,
+static struct afb_hook_req_itf hook_req_default_itf = {
+	.hook_req_begin = hook_req_begin_cb,
+	.hook_req_end = hook_req_end_cb,
+	.hook_req_json = hook_req_json_cb,
+	.hook_req_get = hook_req_get_cb,
+	.hook_req_reply = hook_req_reply_cb,
+	.hook_req_addref = hook_req_addref_cb,
+	.hook_req_unref = hook_req_unref_cb,
+	.hook_req_session_close = hook_req_session_close_cb,
+	.hook_req_session_set_LOA = hook_req_session_set_LOA_cb,
+	.hook_req_subscribe = hook_req_subscribe_cb,
+	.hook_req_unsubscribe = hook_req_unsubscribe_cb,
+	.hook_req_subcall = hook_req_subcall_cb,
+	.hook_req_subcall_result = hook_req_subcall_result_cb,
+	.hook_req_subcallsync = hook_req_subcallsync_cb,
+	.hook_req_subcallsync_result = hook_req_subcallsync_result_cb,
+	.hook_req_vverbose = hook_req_vverbose_cb,
+	.hook_req_has_permission = hook_req_has_permission_cb,
+	.hook_req_get_application_id = hook_req_get_application_id_cb,
+	.hook_req_context_make = hook_req_context_make_cb,
+	.hook_req_get_uid = hook_req_get_uid_cb,
+	.hook_req_get_client_info = hook_req_get_client_info_cb,
 };
 
 /******************************************************************************
@@ -386,19 +385,19 @@ static struct afb_hook_xreq_itf hook_xreq_default_itf = {
  *****************************************************************************/
 
 #define _HOOK_XREQ_2_(flag,func,...)   \
-	struct afb_hook_xreq *hook; \
+	struct afb_hook_req *hook; \
 	struct afb_hookid hookid; \
 	x_rwlock_rdlock(&rwlock); \
 	init_hookid(&hookid); \
-	hook = list_of_xreq_hooks; \
+	hook = list_of_req_hooks; \
 	while (hook) { \
 		if (hook->refcount \
-		 && hook->itf->hook_xreq_##func \
+		 && hook->itf->hook_req_##func \
 		 && (hook->flags & afb_hook_flag_req_##flag) != 0 \
-		 && (!hook->session || hook->session == xreq->context.session) \
-		 && MATCH_API(hook->api, xreq->request.called_api) \
-		 && MATCH_VERB(hook->verb, xreq->request.called_verb)) { \
-			hook->itf->hook_xreq_##func(hook->closure, &hookid, __VA_ARGS__); \
+		 && (!hook->session || hook->session == req->session) \
+		 && MATCH_API(hook->api, req->apiname) \
+		 && MATCH_VERB(hook->verb, req->verbname)) { \
+			hook->itf->hook_req_##func(hook->closure, &hookid, __VA_ARGS__); \
 		} \
 		hook = hook->next; \
 	} \
@@ -406,144 +405,144 @@ static struct afb_hook_xreq_itf hook_xreq_default_itf = {
 
 #define _HOOK_XREQ_(what,...)   _HOOK_XREQ_2_(what,what,__VA_ARGS__)
 
-void afb_hook_xreq_begin(const struct afb_xreq *xreq)
+void afb_hook_req_begin(const struct afb_req_common *req)
 {
-	_HOOK_XREQ_(begin, xreq);
+	_HOOK_XREQ_(begin, req);
 }
 
-void afb_hook_xreq_end(const struct afb_xreq *xreq)
+void afb_hook_req_end(const struct afb_req_common *req)
 {
-	_HOOK_XREQ_(end, xreq);
+	_HOOK_XREQ_(end, req);
 }
 
-struct json_object *afb_hook_xreq_json(const struct afb_xreq *xreq, struct json_object *obj)
+struct json_object *afb_hook_req_json(const struct afb_req_common *req, struct json_object *obj)
 {
-	_HOOK_XREQ_(json, xreq, obj);
+	_HOOK_XREQ_(json, req, obj);
 	return obj;
 }
 
-struct afb_arg afb_hook_xreq_get(const struct afb_xreq *xreq, const char *name, struct afb_arg arg)
+struct afb_arg afb_hook_req_get(const struct afb_req_common *req, const char *name, struct afb_arg arg)
 {
-	_HOOK_XREQ_(get, xreq, name, arg);
+	_HOOK_XREQ_(get, req, name, arg);
 	return arg;
 }
 
-void afb_hook_xreq_reply(const struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info)
+void afb_hook_req_reply(const struct afb_req_common *req, struct json_object *obj, const char *error, const char *info)
 {
-	_HOOK_XREQ_(reply, xreq, obj, error, info);
+	_HOOK_XREQ_(reply, req, obj, error, info);
 }
 
-void afb_hook_xreq_addref(const struct afb_xreq *xreq)
+void afb_hook_req_addref(const struct afb_req_common *req)
 {
-	_HOOK_XREQ_(addref, xreq);
+	_HOOK_XREQ_(addref, req);
 }
 
-void afb_hook_xreq_unref(const struct afb_xreq *xreq)
+void afb_hook_req_unref(const struct afb_req_common *req)
 {
-	_HOOK_XREQ_(unref, xreq);
+	_HOOK_XREQ_(unref, req);
 }
 
-void afb_hook_xreq_session_close(const struct afb_xreq *xreq)
+void afb_hook_req_session_close(const struct afb_req_common *req)
 {
-	_HOOK_XREQ_(session_close, xreq);
+	_HOOK_XREQ_(session_close, req);
 }
 
-int afb_hook_xreq_session_set_LOA(const struct afb_xreq *xreq, unsigned level, int result)
+int afb_hook_req_session_set_LOA(const struct afb_req_common *req, unsigned level, int result)
 {
-	_HOOK_XREQ_(session_set_LOA, xreq, level, result);
+	_HOOK_XREQ_(session_set_LOA, req, level, result);
 	return result;
 }
 
-int afb_hook_xreq_subscribe(const struct afb_xreq *xreq, struct afb_event_x2 *event_x2, int result)
+int afb_hook_req_subscribe(const struct afb_req_common *req, struct afb_event_x2 *event_x2, int result)
 {
-	_HOOK_XREQ_(subscribe, xreq, event_x2, result);
+	_HOOK_XREQ_(subscribe, req, event_x2, result);
 	return result;
 }
 
-int afb_hook_xreq_unsubscribe(const struct afb_xreq *xreq, struct afb_event_x2 *event_x2, int result)
+int afb_hook_req_unsubscribe(const struct afb_req_common *req, struct afb_event_x2 *event_x2, int result)
 {
-	_HOOK_XREQ_(unsubscribe, xreq, event_x2, result);
+	_HOOK_XREQ_(unsubscribe, req, event_x2, result);
 	return result;
 }
 
-void afb_hook_xreq_subcall(const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, int flags)
+void afb_hook_req_subcall(const struct afb_req_common *req, const char *api, const char *verb, struct json_object *args, int flags)
 {
-	_HOOK_XREQ_(subcall, xreq, api, verb, args);
+	_HOOK_XREQ_(subcall, req, api, verb, args);
 }
 
-void afb_hook_xreq_subcall_result(const struct afb_xreq *xreq, struct json_object *object, const char *error, const char *info)
+void afb_hook_req_subcall_result(const struct afb_req_common *req, struct json_object *object, const char *error, const char *info)
 {
-	_HOOK_XREQ_(subcall_result, xreq, object, error, info);
+	_HOOK_XREQ_(subcall_result, req, object, error, info);
 }
 
-void afb_hook_xreq_subcallsync(const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, int flags)
+void afb_hook_req_subcallsync(const struct afb_req_common *req, const char *api, const char *verb, struct json_object *args, int flags)
 {
-	_HOOK_XREQ_(subcallsync, xreq, api, verb, args);
+	_HOOK_XREQ_(subcallsync, req, api, verb, args);
 }
 
-int  afb_hook_xreq_subcallsync_result(const struct afb_xreq *xreq, int status, struct json_object *object, const char *error, const char *info)
+int  afb_hook_req_subcallsync_result(const struct afb_req_common *req, int status, struct json_object *object, const char *error, const char *info)
 {
-	_HOOK_XREQ_(subcallsync_result, xreq, status, object, error, info);
+	_HOOK_XREQ_(subcallsync_result, req, status, object, error, info);
 	return status;
 }
 
-void afb_hook_xreq_vverbose(const struct afb_xreq *xreq, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
+void afb_hook_req_vverbose(const struct afb_req_common *req, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
 {
-	_HOOK_XREQ_(vverbose, xreq, level, file ?: "?", line, func ?: "?", fmt, args);
+	_HOOK_XREQ_(vverbose, req, level, file ?: "?", line, func ?: "?", fmt, args);
 }
 
-int afb_hook_xreq_has_permission(const struct afb_xreq *xreq, const char *permission, int result)
+int afb_hook_req_has_permission(const struct afb_req_common *req, const char *permission, int result)
 {
-	_HOOK_XREQ_(has_permission, xreq, permission, result);
+	_HOOK_XREQ_(has_permission, req, permission, result);
 	return result;
 }
 
-char *afb_hook_xreq_get_application_id(const struct afb_xreq *xreq, char *result)
+char *afb_hook_req_get_application_id(const struct afb_req_common *req, char *result)
 {
-	_HOOK_XREQ_(get_application_id, xreq, result);
+	_HOOK_XREQ_(get_application_id, req, result);
 	return result;
 }
 
-void *afb_hook_xreq_context_make(const struct afb_xreq *xreq, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result)
+void *afb_hook_req_context_make(const struct afb_req_common *req, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result)
 {
-	_HOOK_XREQ_(context_make, xreq, replace, create_value, free_value, create_closure, result);
+	_HOOK_XREQ_(context_make, req, replace, create_value, free_value, create_closure, result);
 	return result;
 }
 
-int afb_hook_xreq_get_uid(const struct afb_xreq *xreq, int result)
+int afb_hook_req_get_uid(const struct afb_req_common *req, int result)
 {
-	_HOOK_XREQ_(get_uid, xreq, result);
+	_HOOK_XREQ_(get_uid, req, result);
 	return result;
 }
 
-struct json_object *afb_hook_xreq_get_client_info(const struct afb_xreq *xreq, struct json_object *result)
+struct json_object *afb_hook_req_get_client_info(const struct afb_req_common *req, struct json_object *result)
 {
-	_HOOK_XREQ_(get_client_info, xreq, result);
+	_HOOK_XREQ_(get_client_info, req, result);
 	return result;
 }
 
 /******************************************************************************
- * section: hooking xreqs
+ * section: hooking reqs
  *****************************************************************************/
 
-void afb_hook_init_xreq(struct afb_xreq *xreq)
+void afb_hook_init_req(struct afb_req_common *req)
 {
 	static int reqindex = 0;
 
 	int f, flags;
 	int add, x;
-	struct afb_hook_xreq *hook;
+	struct afb_hook_req *hook;
 
 	/* scan hook list to get the expected flags */
 	flags = 0;
 	x_rwlock_rdlock(&rwlock);
-	hook = list_of_xreq_hooks;
+	hook = list_of_req_hooks;
 	while (hook) {
 		f = hook->flags & afb_hook_flags_req_all;
 		add = f != 0
-		   && (!hook->session || hook->session == xreq->context.session)
-		   && MATCH_API(hook->api, xreq->request.called_api)
-		   && MATCH_VERB(hook->verb, xreq->request.called_verb);
+		   && (!hook->session || hook->session == req->session)
+		   && MATCH_API(hook->api, req->apiname)
+		   && MATCH_VERB(hook->verb, req->verbname);
 		if (add)
 			flags |= f;
 		hook = hook->next;
@@ -551,18 +550,18 @@ void afb_hook_init_xreq(struct afb_xreq *xreq)
 	x_rwlock_unlock(&rwlock);
 
 	/* store the hooking data */
-	xreq->hookflags = flags;
+	req->hookflags = flags;
 	if (flags) {
 		do {
 			x = __atomic_load_n(&reqindex, __ATOMIC_RELAXED);
-			xreq->hookindex = (x + 1) % 1000000 ?: 1;
-		} while (x != __atomic_exchange_n(&reqindex, xreq->hookindex, __ATOMIC_RELAXED));
+			req->hookindex = (x + 1) % 1000000 ?: 1;
+		} while (x != __atomic_exchange_n(&reqindex, req->hookindex, __ATOMIC_RELAXED));
 	}
 }
 
-struct afb_hook_xreq *afb_hook_create_xreq(const char *api, const char *verb, struct afb_session *session, int flags, struct afb_hook_xreq_itf *itf, void *closure)
+struct afb_hook_req *afb_hook_create_req(const char *api, const char *verb, struct afb_session *session, int flags, struct afb_hook_req_itf *itf, void *closure)
 {
-	struct afb_hook_xreq *hook;
+	struct afb_hook_req *hook;
 
 	/* alloc the result */
 	hook = calloc(1, sizeof *hook);
@@ -585,34 +584,34 @@ struct afb_hook_xreq *afb_hook_create_xreq(const char *api, const char *verb, st
 		afb_session_addref(session);
 	hook->refcount = 1;
 	hook->flags = flags;
-	hook->itf = itf ? itf : &hook_xreq_default_itf;
+	hook->itf = itf ? itf : &hook_req_default_itf;
 	hook->closure = closure;
 
 	/* record the hook */
 	x_mutex_lock(&mutex);
-	hook->next = list_of_xreq_hooks;
-	list_of_xreq_hooks = hook;
+	hook->next = list_of_req_hooks;
+	list_of_req_hooks = hook;
 	x_mutex_unlock(&mutex);
 
 	/* returns it */
 	return hook;
 }
 
-struct afb_hook_xreq *afb_hook_addref_xreq(struct afb_hook_xreq *hook)
+struct afb_hook_req *afb_hook_addref_req(struct afb_hook_req *hook)
 {
 	__atomic_add_fetch(&hook->refcount, 1, __ATOMIC_RELAXED);
 	return hook;
 }
 
-static void hook_clean_xreq()
+static void hook_clean_req()
 {
-	struct afb_hook_xreq **prv, *hook, *head;
+	struct afb_hook_req **prv, *hook, *head;
 
 	if (x_rwlock_trywrlock(&rwlock) == 0) {
 		/* unlink under mutex */
 		head = NULL;
 		x_mutex_lock(&mutex);
-		prv = &list_of_xreq_hooks;
+		prv = &list_of_req_hooks;
 		while ((hook = *prv)) {
 			if (hook->refcount)
 				prv = &(*prv)->next;
@@ -637,50 +636,50 @@ static void hook_clean_xreq()
 	}
 }
 
-void afb_hook_unref_xreq(struct afb_hook_xreq *hook)
+void afb_hook_unref_req(struct afb_hook_req *hook)
 {
 	if (hook && !__atomic_sub_fetch(&hook->refcount, 1, __ATOMIC_RELAXED))
-		hook_clean_xreq();
+		hook_clean_req();
 }
 
 /******************************************************************************
  * section: default callbacks for tracing daemon interface
  *****************************************************************************/
 
-static void _hook_api_(const struct afb_export *export, const char *format, ...)
+static void _hook_api_(const struct afb_api_common *comapi, const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	_hook_("api-%s", format, ap, afb_export_apiname(export));
+	_hook_("api-%s", format, ap, afb_api_common_apiname(comapi));
 	va_end(ap);
 }
 
-static void hook_api_event_broadcast_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, struct json_object *object)
+static void hook_api_event_broadcast_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct json_object *object)
 {
-	_hook_api_(export, "event_broadcast.before(%s, %s)....", name, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "event_broadcast.before(%s, %s)....", name, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_event_broadcast_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, struct json_object *object, int result)
+static void hook_api_event_broadcast_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct json_object *object, int result)
 {
-	_hook_api_(export, "event_broadcast.after(%s, %s) -> %d", name, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), result);
+	_hook_api_(comapi, "event_broadcast.after(%s, %s) -> %d", name, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), result);
 }
 
-static void hook_api_get_event_loop_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct sd_event *result)
+static void hook_api_get_event_loop_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct sd_event *result)
 {
-	_hook_api_(export, "get_event_loop() -> %p", result);
+	_hook_api_(comapi, "get_event_loop() -> %p", result);
 }
 
-static void hook_api_get_user_bus_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct sd_bus *result)
+static void hook_api_get_user_bus_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct sd_bus *result)
 {
-	_hook_api_(export, "get_user_bus() -> %p", result);
+	_hook_api_(comapi, "get_user_bus() -> %p", result);
 }
 
-static void hook_api_get_system_bus_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct sd_bus *result)
+static void hook_api_get_system_bus_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct sd_bus *result)
 {
-	_hook_api_(export, "get_system_bus() -> %p", result);
+	_hook_api_(comapi, "get_system_bus() -> %p", result);
 }
 
-static void hook_api_vverbose_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int level, const char *file, int line, const char *function, const char *fmt, va_list args)
+static void hook_api_vverbose_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int level, const char *file, int line, const char *function, const char *fmt, va_list args)
 {
 	int len;
 	char *msg;
@@ -691,34 +690,34 @@ static void hook_api_vverbose_cb(void *closure, const struct afb_hookid *hookid,
 	va_end(ap);
 
 	if (len < 0)
-		_hook_api_(export, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, function, fmt);
+		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, function, fmt);
 	else {
-		_hook_api_(export, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, function, msg);
+		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, function, msg);
 		free(msg);
 	}
 }
 
-static void hook_api_event_make_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, struct afb_event_x2 *result)
+static void hook_api_event_make_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct afb_event_x2 *result)
 {
-	_hook_api_(export, "event_make(%s) -> %s:%d", name, afb_evt_event_x2_fullname(result), afb_evt_event_x2_id(result));
+	_hook_api_(comapi, "event_make(%s) -> %s:%d", name, afb_evt_event_x2_fullname(result), afb_evt_event_x2_id(result));
 }
 
-static void hook_api_rootdir_get_fd_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result)
+static void hook_api_rootdir_get_fd_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result)
 {
 	char path[PATH_MAX], proc[100];
 	ssize_t s;
 
 	if (result < 0)
-		_hook_api_(export, "rootdir_get_fd() -> %d, %m", result);
+		_hook_api_(comapi, "rootdir_get_fd() -> %d, %m", result);
 	else {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
 		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
-		_hook_api_(export, "rootdir_get_fd() -> %d = %s", result, path);
+		_hook_api_(comapi, "rootdir_get_fd() -> %d = %s", result, path);
 	}
 }
 
-static void hook_api_rootdir_open_locale_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *filename, int flags, const char *locale, int result)
+static void hook_api_rootdir_open_locale_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *filename, int flags, const char *locale, int result)
 {
 	char path[PATH_MAX], proc[100];
 	ssize_t s;
@@ -726,158 +725,158 @@ static void hook_api_rootdir_open_locale_cb(void *closure, const struct afb_hook
 	if (!locale)
 		locale = "(null)";
 	if (result < 0)
-		_hook_api_(export, "rootdir_open_locale(%s, %d, %s) -> %d, %m", filename, flags, locale, result);
+		_hook_api_(comapi, "rootdir_open_locale(%s, %d, %s) -> %d, %m", filename, flags, locale, result);
 	else {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
 		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
-		_hook_api_(export, "rootdir_open_locale(%s, %d, %s) -> %d = %s", filename, flags, locale, result, path);
+		_hook_api_(comapi, "rootdir_open_locale(%s, %d, %s) -> %d = %s", filename, flags, locale, result, path);
 	}
 }
 
-static void hook_api_queue_job_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
+static void hook_api_queue_job_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
 {
-	_hook_api_(export, "queue_job(%p, %p, %p, %d) -> %d", callback, argument, group, timeout, result);
+	_hook_api_(comapi, "queue_job(%p, %p, %p, %d) -> %d", callback, argument, group, timeout, result);
 }
 
-static void hook_api_require_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized)
+static void hook_api_require_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized)
 {
-	_hook_api_(export, "require_api(%s, %d)...", name, initialized);
+	_hook_api_(comapi, "require_api(%s, %d)...", name, initialized);
 }
 
-static void hook_api_require_api_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized, int result)
+static void hook_api_require_api_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized, int result)
 {
-	_hook_api_(export, "...require_api(%s, %d) -> %d", name, initialized, result);
+	_hook_api_(comapi, "...require_api(%s, %d) -> %d", name, initialized, result);
 }
 
-static void hook_api_add_alias_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *api, const char *alias, int result)
+static void hook_api_add_alias_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *alias, int result)
 {
-	_hook_api_(export, "add_alias(%s -> %s) -> %d", api, alias?:"<null>", result);
+	_hook_api_(comapi, "add_alias(%s -> %s) -> %d", api, alias?:"<null>", result);
 }
 
-static void hook_api_start_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export)
+static void hook_api_start_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi)
 {
-	_hook_api_(export, "start.before");
+	_hook_api_(comapi, "start.before");
 }
 
-static void hook_api_start_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int status)
+static void hook_api_start_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int status)
 {
-	_hook_api_(export, "start.after -> %d", status);
+	_hook_api_(comapi, "start.after -> %d", status);
 }
 
-static void hook_api_on_event_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *event, int event_x2, struct json_object *object)
+static void hook_api_on_event_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object)
 {
-	_hook_api_(export, "on_event.before(%s, %d, %s)", event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "on_event.before(%s, %d, %s)", event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_on_event_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *event, int event_x2, struct json_object *object)
+static void hook_api_on_event_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object)
 {
-	_hook_api_(export, "on_event.after(%s, %d, %s)", event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "on_event.after(%s, %d, %s)", event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_call_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *api, const char *verb, struct json_object *args)
+static void hook_api_call_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, struct json_object *args)
 {
-	_hook_api_(export, "call(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "call(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_call_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct json_object *object, const char *error, const char *info)
+static void hook_api_call_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct json_object *object, const char *error, const char *info)
 {
-	_hook_api_(export, "    ...call... [%s] -> %s (%s)", error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
+	_hook_api_(comapi, "    ...call... [%s] -> %s (%s)", error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
 }
 
-static void hook_api_callsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *api, const char *verb, struct json_object *args)
+static void hook_api_callsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, struct json_object *args)
 {
-	_hook_api_(export, "callsync(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "callsync(%s/%s, %s) ...", api, verb, json_object_to_json_string_ext(args, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_callsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int status, struct json_object *object, const char *error, const char *info)
+static void hook_api_callsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int status, struct json_object *object, const char *error, const char *info)
 {
-	_hook_api_(export, "    ...callsync... %d [%s] -> %s (%s)", status, error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
+	_hook_api_(comapi, "    ...callsync... %d [%s] -> %s (%s)", status, error?:"success", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE), info?:"");
 }
 
-static void hook_api_new_api_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *api, const char *info, int noconcurrency)
+static void hook_api_new_api_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *info, int noconcurrency)
 {
-	_hook_api_(export, "new_api.before %s (%s)%s ...", api, info?:"", noconcurrency?" no-concurrency" : "");
+	_hook_api_(comapi, "new_api.before %s (%s)%s ...", api, info?:"", noconcurrency?" no-concurrency" : "");
 }
 
-static void hook_api_new_api_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *api)
+static void hook_api_new_api_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *api)
 {
-	_hook_api_(export, "... new_api.after %s -> %s (%d)", api, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "... new_api.after %s -> %s (%d)", api, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_set_verbs_v2_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const struct afb_verb_v2 *verbs)
+static void hook_api_api_set_verbs_v2_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const struct afb_verb_v2 *verbs)
 {
-	_hook_api_(export, "set_verbs_v2 -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "set_verbs_v2 -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_set_verbs_v3_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const struct afb_verb_v3 *verbs)
+static void hook_api_api_set_verbs_v3_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const struct afb_verb_v3 *verbs)
 {
-	_hook_api_(export, "set_verbs_v3 -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "set_verbs_v3 -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_add_verb_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *verb, const char *info, int glob)
+static void hook_api_api_add_verb_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *verb, const char *info, int glob)
 {
-	_hook_api_(export, "add_verb(%s%s [%s]) -> %s (%d)", verb, glob?" (GLOB)":"", info?:"", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "add_verb(%s%s [%s]) -> %s (%d)", verb, glob?" (GLOB)":"", info?:"", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_del_verb_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *verb)
+static void hook_api_api_del_verb_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *verb)
 {
-	_hook_api_(export, "del_verb(%s) -> %s (%d)", verb, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "del_verb(%s) -> %s (%d)", verb, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_set_on_event_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result)
+static void hook_api_api_set_on_event_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result)
 {
-	_hook_api_(export, "set_on_event -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "set_on_event -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_set_on_init_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result)
+static void hook_api_api_set_on_init_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result)
 {
-	_hook_api_(export, "set_on_init -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "set_on_init -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_api_seal_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export)
+static void hook_api_api_seal_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi)
 {
-	_hook_api_(export, "seal");
+	_hook_api_(comapi, "seal");
 }
 
-static void hook_api_event_handler_add_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *pattern)
+static void hook_api_event_handler_add_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *pattern)
 {
-	_hook_api_(export, "event_handler_add(%s) -> %s (%d)", pattern, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "event_handler_add(%s) -> %s (%d)", pattern, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_event_handler_del_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *pattern)
+static void hook_api_event_handler_del_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *pattern)
 {
-	_hook_api_(export, "event_handler_del(%s) -> %s (%d)", pattern, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "event_handler_del(%s) -> %s (%d)", pattern, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_class_provide_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *name)
+static void hook_api_class_provide_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *name)
 {
-	_hook_api_(export, "class_provide(%s) -> %s (%d)", name, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "class_provide(%s) -> %s (%d)", name, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_class_require_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result, const char *name)
+static void hook_api_class_require_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, const char *name)
 {
-	_hook_api_(export, "class_require(%s) -> %s (%d)", name, result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "class_require(%s) -> %s (%d)", name, result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_delete_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result)
+static void hook_api_delete_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result)
 {
-	_hook_api_(export, "delete_api -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
+	_hook_api_(comapi, "delete_api -> %s (%d)", result >= 0 ? "OK" : "ERROR", result);
 }
 
-static void hook_api_on_event_handler_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *event, int event_x2, struct json_object *object, const char *pattern)
+static void hook_api_on_event_handler_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object, const char *pattern)
 {
-	_hook_api_(export, "on_event_handler[%s].before(%s, %d, %s)", pattern, event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "on_event_handler[%s].before(%s, %d, %s)", pattern, event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_on_event_handler_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *event, int event_x2, struct json_object *object, const char *pattern)
+static void hook_api_on_event_handler_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object, const char *pattern)
 {
-	_hook_api_(export, "on_event_handler[%s].after(%s, %d, %s)", pattern, event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "on_event_handler[%s].after(%s, %d, %s)", pattern, event, event_x2, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
-static void hook_api_settings_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct json_object *object)
+static void hook_api_settings_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct json_object *object)
 {
-	_hook_api_(export, "settings -> %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+	_hook_api_(comapi, "settings -> %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
 static struct afb_hook_api_itf hook_api_default_itf = {
@@ -922,13 +921,13 @@ static struct afb_hook_api_itf hook_api_default_itf = {
 };
 
 /******************************************************************************
- * section: hooks for tracing daemon interface (export)
+ * section: hooks for tracing daemon interface (comapi)
  *****************************************************************************/
 
 #define _HOOK_API_2_(flag,func,...)   \
 	struct afb_hook_api *hook; \
 	struct afb_hookid hookid; \
-	const char *apiname = afb_export_apiname(export); \
+	const char *apiname = afb_api_common_apiname(comapi); \
 	x_rwlock_rdlock(&rwlock); \
 	init_hookid(&hookid); \
 	hook = list_of_api_hooks; \
@@ -945,221 +944,221 @@ static struct afb_hook_api_itf hook_api_default_itf = {
 
 #define _HOOK_API_(what,...)   _HOOK_API_2_(what,what,__VA_ARGS__)
 
-void afb_hook_api_event_broadcast_before(const struct afb_export *export, const char *name, struct json_object *object)
+void afb_hook_api_event_broadcast_before(const struct afb_api_common *comapi, const char *name, struct json_object *object)
 {
-	_HOOK_API_2_(event_broadcast, event_broadcast_before, export, name, object);
+	_HOOK_API_2_(event_broadcast, event_broadcast_before, comapi, name, object);
 }
 
-int afb_hook_api_event_broadcast_after(const struct afb_export *export, const char *name, struct json_object *object, int result)
+int afb_hook_api_event_broadcast_after(const struct afb_api_common *comapi, const char *name, struct json_object *object, int result)
 {
-	_HOOK_API_2_(event_broadcast, event_broadcast_after, export, name, object, result);
+	_HOOK_API_2_(event_broadcast, event_broadcast_after, comapi, name, object, result);
 	return result;
 }
 
-struct sd_event *afb_hook_api_get_event_loop(const struct afb_export *export, struct sd_event *result)
+struct sd_event *afb_hook_api_get_event_loop(const struct afb_api_common *comapi, struct sd_event *result)
 {
-	_HOOK_API_(get_event_loop, export, result);
+	_HOOK_API_(get_event_loop, comapi, result);
 	return result;
 }
 
-struct sd_bus *afb_hook_api_get_user_bus(const struct afb_export *export, struct sd_bus *result)
+struct sd_bus *afb_hook_api_get_user_bus(const struct afb_api_common *comapi, struct sd_bus *result)
 {
-	_HOOK_API_(get_user_bus, export, result);
+	_HOOK_API_(get_user_bus, comapi, result);
 	return result;
 }
 
-struct sd_bus *afb_hook_api_get_system_bus(const struct afb_export *export, struct sd_bus *result)
+struct sd_bus *afb_hook_api_get_system_bus(const struct afb_api_common *comapi, struct sd_bus *result)
 {
-	_HOOK_API_(get_system_bus, export, result);
+	_HOOK_API_(get_system_bus, comapi, result);
 	return result;
 }
 
-void afb_hook_api_vverbose(const struct afb_export *export, int level, const char *file, int line, const char *function, const char *fmt, va_list args)
+void afb_hook_api_vverbose(const struct afb_api_common *comapi, int level, const char *file, int line, const char *function, const char *fmt, va_list args)
 {
-	_HOOK_API_(vverbose, export, level, file, line, function, fmt, args);
+	_HOOK_API_(vverbose, comapi, level, file, line, function, fmt, args);
 }
 
-struct afb_event_x2 *afb_hook_api_event_make(const struct afb_export *export, const char *name, struct afb_event_x2 *result)
+struct afb_event_x2 *afb_hook_api_event_make(const struct afb_api_common *comapi, const char *name, struct afb_event_x2 *result)
 {
-	_HOOK_API_(event_make, export, name, result);
+	_HOOK_API_(event_make, comapi, name, result);
 	return result;
 }
 
-int afb_hook_api_rootdir_get_fd(const struct afb_export *export, int result)
+int afb_hook_api_rootdir_get_fd(const struct afb_api_common *comapi, int result)
 {
-	_HOOK_API_(rootdir_get_fd, export, result);
+	_HOOK_API_(rootdir_get_fd, comapi, result);
 	return result;
 }
 
-int afb_hook_api_rootdir_open_locale(const struct afb_export *export, const char *filename, int flags, const char *locale, int result)
+int afb_hook_api_rootdir_open_locale(const struct afb_api_common *comapi, const char *filename, int flags, const char *locale, int result)
 {
-	_HOOK_API_(rootdir_open_locale, export, filename, flags, locale, result);
+	_HOOK_API_(rootdir_open_locale, comapi, filename, flags, locale, result);
 	return result;
 }
 
-int afb_hook_api_queue_job(const struct afb_export *export, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
+int afb_hook_api_queue_job(const struct afb_api_common *comapi, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
 {
-	_HOOK_API_(queue_job, export, callback, argument, group, timeout, result);
+	_HOOK_API_(queue_job, comapi, callback, argument, group, timeout, result);
 	return result;
 }
 
-void afb_hook_api_require_api(const struct afb_export *export, const char *name, int initialized)
+void afb_hook_api_require_api(const struct afb_api_common *comapi, const char *name, int initialized)
 {
-	_HOOK_API_(require_api, export, name, initialized);
+	_HOOK_API_(require_api, comapi, name, initialized);
 }
 
-int afb_hook_api_require_api_result(const struct afb_export *export, const char *name, int initialized, int result)
+int afb_hook_api_require_api_result(const struct afb_api_common *comapi, const char *name, int initialized, int result)
 {
-	_HOOK_API_2_(require_api, require_api_result, export, name, initialized, result);
+	_HOOK_API_2_(require_api, require_api_result, comapi, name, initialized, result);
 	return result;
 }
 
-int afb_hook_api_add_alias(const struct afb_export *export, const char *api, const char *alias, int result)
+int afb_hook_api_add_alias(const struct afb_api_common *comapi, const char *api, const char *alias, int result)
 {
-	_HOOK_API_(add_alias, export, api, alias, result);
+	_HOOK_API_(add_alias, comapi, api, alias, result);
 	return result;
 }
 
-void afb_hook_api_start_before(const struct afb_export *export)
+void afb_hook_api_start_before(const struct afb_api_common *comapi)
 {
-	_HOOK_API_2_(start, start_before, export);
+	_HOOK_API_2_(start, start_before, comapi);
 }
 
-int afb_hook_api_start_after(const struct afb_export *export, int status)
+int afb_hook_api_start_after(const struct afb_api_common *comapi, int status)
 {
-	_HOOK_API_2_(start, start_after, export, status);
+	_HOOK_API_2_(start, start_after, comapi, status);
 	return status;
 }
 
-void afb_hook_api_on_event_before(const struct afb_export *export, const char *event, int event_x2, struct json_object *object)
+void afb_hook_api_on_event_before(const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object)
 {
-	_HOOK_API_2_(on_event, on_event_before, export, event, event_x2, object);
+	_HOOK_API_2_(on_event, on_event_before, comapi, event, event_x2, object);
 }
 
-void afb_hook_api_on_event_after(const struct afb_export *export, const char *event, int event_x2, struct json_object *object)
+void afb_hook_api_on_event_after(const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object)
 {
-	_HOOK_API_2_(on_event, on_event_after, export, event, event_x2, object);
+	_HOOK_API_2_(on_event, on_event_after, comapi, event, event_x2, object);
 }
 
-void afb_hook_api_call(const struct afb_export *export, const char *api, const char *verb, struct json_object *args)
+void afb_hook_api_call(const struct afb_api_common *comapi, const char *api, const char *verb, struct json_object *args)
 {
-	_HOOK_API_(call, export, api, verb, args);
+	_HOOK_API_(call, comapi, api, verb, args);
 }
 
-void afb_hook_api_call_result(const struct afb_export *export, struct json_object *object, const char*error, const char *info)
+void afb_hook_api_call_result(const struct afb_api_common *comapi, struct json_object *object, const char*error, const char *info)
 {
-	_HOOK_API_2_(call, call_result, export, object, error, info);
+	_HOOK_API_2_(call, call_result, comapi, object, error, info);
 
 }
 
-void afb_hook_api_callsync(const struct afb_export *export, const char *api, const char *verb, struct json_object *args)
+void afb_hook_api_callsync(const struct afb_api_common *comapi, const char *api, const char *verb, struct json_object *args)
 {
-	_HOOK_API_(callsync, export, api, verb, args);
+	_HOOK_API_(callsync, comapi, api, verb, args);
 }
 
-int afb_hook_api_callsync_result(const struct afb_export *export, int status, struct json_object *object, const char *error, const char *info)
+int afb_hook_api_callsync_result(const struct afb_api_common *comapi, int status, struct json_object *object, const char *error, const char *info)
 {
-	_HOOK_API_2_(callsync, callsync_result, export, status, object, error, info);
+	_HOOK_API_2_(callsync, callsync_result, comapi, status, object, error, info);
 	return status;
 }
 
-void afb_hook_api_new_api_before(const struct afb_export *export, const char *api, const char *info, int noconcurrency)
+void afb_hook_api_new_api_before(const struct afb_api_common *comapi, const char *api, const char *info, int noconcurrency)
 {
-	_HOOK_API_2_(new_api, new_api_before, export, api, info, noconcurrency);
+	_HOOK_API_2_(new_api, new_api_before, comapi, api, info, noconcurrency);
 }
 
-int afb_hook_api_new_api_after(const struct afb_export *export, int result, const char *api)
+int afb_hook_api_new_api_after(const struct afb_api_common *comapi, int result, const char *api)
 {
-	_HOOK_API_2_(new_api, new_api_after, export, result, api);
+	_HOOK_API_2_(new_api, new_api_after, comapi, result, api);
 	return result;
 }
 
-int afb_hook_api_api_set_verbs_v2(const struct afb_export *export, int result, const struct afb_verb_v2 *verbs)
+int afb_hook_api_api_set_verbs_v2(const struct afb_api_common *comapi, int result, const struct afb_verb_v2 *verbs)
 {
-	_HOOK_API_2_(api_set_verbs, api_set_verbs_v2, export, result, verbs);
+	_HOOK_API_2_(api_set_verbs, api_set_verbs_v2, comapi, result, verbs);
 	return result;
 }
 
-int afb_hook_api_api_set_verbs_v3(const struct afb_export *export, int result, const struct afb_verb_v3 *verbs)
+int afb_hook_api_api_set_verbs_v3(const struct afb_api_common *comapi, int result, const struct afb_verb_v3 *verbs)
 {
-	_HOOK_API_2_(api_set_verbs, api_set_verbs_v3, export, result, verbs);
+	_HOOK_API_2_(api_set_verbs, api_set_verbs_v3, comapi, result, verbs);
 	return result;
 }
 
-int afb_hook_api_api_add_verb(const struct afb_export *export, int result, const char *verb, const char *info, int glob)
+int afb_hook_api_api_add_verb(const struct afb_api_common *comapi, int result, const char *verb, const char *info, int glob)
 {
-	_HOOK_API_(api_add_verb, export, result, verb, info, glob);
+	_HOOK_API_(api_add_verb, comapi, result, verb, info, glob);
 	return result;
 }
 
-int afb_hook_api_api_del_verb(const struct afb_export *export, int result, const char *verb)
+int afb_hook_api_api_del_verb(const struct afb_api_common *comapi, int result, const char *verb)
 {
-	_HOOK_API_(api_del_verb, export, result, verb);
+	_HOOK_API_(api_del_verb, comapi, result, verb);
 	return result;
 }
 
-int afb_hook_api_api_set_on_event(const struct afb_export *export, int result)
+int afb_hook_api_api_set_on_event(const struct afb_api_common *comapi, int result)
 {
-	_HOOK_API_(api_set_on_event, export, result);
+	_HOOK_API_(api_set_on_event, comapi, result);
 	return result;
 }
 
-int afb_hook_api_api_set_on_init(const struct afb_export *export, int result)
+int afb_hook_api_api_set_on_init(const struct afb_api_common *comapi, int result)
 {
-	_HOOK_API_(api_set_on_init, export, result);
+	_HOOK_API_(api_set_on_init, comapi, result);
 	return result;
 }
 
-void afb_hook_api_api_seal(const struct afb_export *export)
+void afb_hook_api_api_seal(const struct afb_api_common *comapi)
 {
-	_HOOK_API_(api_seal, export);
+	_HOOK_API_(api_seal, comapi);
 }
 
-int afb_hook_api_event_handler_add(const struct afb_export *export, int result, const char *pattern)
+int afb_hook_api_event_handler_add(const struct afb_api_common *comapi, int result, const char *pattern)
 {
-	_HOOK_API_(event_handler_add, export, result, pattern);
+	_HOOK_API_(event_handler_add, comapi, result, pattern);
 	return result;
 }
-int afb_hook_api_event_handler_del(const struct afb_export *export, int result, const char *pattern)
+int afb_hook_api_event_handler_del(const struct afb_api_common *comapi, int result, const char *pattern)
 {
-	_HOOK_API_(event_handler_del, export, result, pattern);
+	_HOOK_API_(event_handler_del, comapi, result, pattern);
 	return result;
 }
-int afb_hook_api_class_provide(const struct afb_export *export, int result, const char *name)
+int afb_hook_api_class_provide(const struct afb_api_common *comapi, int result, const char *name)
 {
-	_HOOK_API_(class_provide, export, result, name);
+	_HOOK_API_(class_provide, comapi, result, name);
 	return result;
 }
-int afb_hook_api_class_require(const struct afb_export *export, int result, const char *name)
+int afb_hook_api_class_require(const struct afb_api_common *comapi, int result, const char *name)
 {
-	_HOOK_API_(class_require, export, result, name);
-	return result;
-}
-
-int afb_hook_api_delete_api(const struct afb_export *export, int result)
-{
-	_HOOK_API_(delete_api, export, result);
+	_HOOK_API_(class_require, comapi, result, name);
 	return result;
 }
 
-void afb_hook_api_on_event_handler_before(const struct afb_export *export, const char *event, int event_x2, struct json_object *object, const char *pattern)
+int afb_hook_api_delete_api(const struct afb_api_common *comapi, int result)
 {
-	_HOOK_API_2_(on_event_handler, on_event_handler_before, export, event, event_x2, object, pattern);
+	_HOOK_API_(delete_api, comapi, result);
+	return result;
 }
 
-void afb_hook_api_on_event_handler_after(const struct afb_export *export, const char *event, int event_x2, struct json_object *object, const char *pattern)
+void afb_hook_api_on_event_handler_before(const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object, const char *pattern)
 {
-	_HOOK_API_2_(on_event_handler, on_event_handler_after, export, event, event_x2, object, pattern);
+	_HOOK_API_2_(on_event_handler, on_event_handler_before, comapi, event, event_x2, object, pattern);
 }
 
-struct json_object *afb_hook_api_settings(const struct afb_export *export, struct json_object *object)
+void afb_hook_api_on_event_handler_after(const struct afb_api_common *comapi, const char *event, int event_x2, struct json_object *object, const char *pattern)
 {
-	_HOOK_API_(settings, export, object);
+	_HOOK_API_2_(on_event_handler, on_event_handler_after, comapi, event, event_x2, object, pattern);
+}
+
+struct json_object *afb_hook_api_settings(const struct afb_api_common *comapi, struct json_object *object)
+{
+	_HOOK_API_(settings, comapi, object);
 	return object;
 }
 
 /******************************************************************************
- * section: hooking export
+ * section: hooking comapi
  *****************************************************************************/
 
 int afb_hook_flags_api(const char *api)

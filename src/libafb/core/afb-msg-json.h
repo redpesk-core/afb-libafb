@@ -25,8 +25,9 @@
 
 struct json_object;
 struct afb_context;
+struct afb_req_reply;
 
-extern struct json_object *afb_msg_json_reply(struct json_object *resp, const char *status, const char *info, struct afb_context *context);
+extern struct json_object *afb_msg_json_reply(const struct afb_req_reply *reply);
 
 extern struct json_object *afb_msg_json_event(const char *event, struct json_object *object);
 

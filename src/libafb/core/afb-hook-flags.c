@@ -48,7 +48,7 @@ struct flags
 
 #define FLAGS(x)   ((struct flags){ .flags = x, .count = (int)(sizeof x / sizeof * x) })
 
-static struct flag xreq_flags[] = { /* must be sorted by names */
+static struct flag req_flags[] = { /* must be sorted by names */
 		{ "addref",		afb_hook_flag_req_addref },
 		{ "all",		afb_hook_flags_req_all },
 		{ "args",		afb_hook_flags_req_args },
@@ -257,9 +257,9 @@ static char *to_text(int value, struct flags flags)
 	return result;
 }
 
-int afb_hook_flags_xreq_from_text(const char *text)
+int afb_hook_flags_req_from_text(const char *text)
 {
-	return from_text(text, FLAGS(xreq_flags));
+	return from_text(text, FLAGS(req_flags));
 }
 
 int afb_hook_flags_api_from_text(const char *text)
@@ -282,9 +282,9 @@ int afb_hook_flags_global_from_text(const char *text)
 	return from_text(text, FLAGS(global_flags));
 }
 
-char *afb_hook_flags_xreq_to_text(int value)
+char *afb_hook_flags_req_to_text(int value)
 {
-	return to_text(value, FLAGS(xreq_flags));
+	return to_text(value, FLAGS(req_flags));
 }
 
 char *afb_hook_flags_api_to_text(int value)

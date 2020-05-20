@@ -30,7 +30,6 @@
 
 #include <microhttpd.h>
 
-#include "core/afb-context.h"
 #include "core/afb-apiset.h"
 #include "core/afb-session.h"
 #include "http/afb-hreq.h"

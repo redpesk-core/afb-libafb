@@ -38,15 +38,16 @@
 #include "core/afb-apiset.h"
 #include "wsapi/afb-proto-ws.h"
 #include "wsapi/afb-stub-ws.h"
-#include "core/afb-context.h"
 #include "core/afb-evt.h"
-#include "core/afb-xreq.h"
+#include "core/afb-req-common.h"
+#include "core/afb-req-reply.h"
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
 #include "core/afb-jobs.h"
 #include "sys/verbose.h"
 #include "sys/fdev.h"
 #include "utils/u16id.h"
+#include "core/containerof.h"
 
 struct afb_stub_ws;
 
@@ -54,9 +55,10 @@ struct afb_stub_ws;
  * structure for a ws request: requests on server side
  */
 struct server_req {
-	struct afb_xreq xreq;		/**< the xreq */
+	struct afb_req_common comreq;	/**< the request */
 	struct afb_stub_ws *stubws;	/**< the client of the request */
 	struct afb_proto_ws_call *call;	/**< the incoming call */
+	char strings[];			/**< for storing strings */
 };
 
 /**
@@ -140,32 +142,32 @@ static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws,
 /******************* ws request part for server *****************/
 
 /* decrement the reference count of the request and free/release it on falling to null */
-static void server_req_destroy_cb(struct afb_xreq *xreq)
+static void server_req_destroy_cb(struct afb_req_common *comreq)
 {
-	struct server_req *wreq = CONTAINER_OF_XREQ(struct server_req, xreq);
+	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	afb_context_disconnect(&wreq->xreq.context);
-	json_object_put(wreq->xreq.json);
+	json_object_put(comreq->json);
+	afb_req_common_cleanup(comreq);
+
 	afb_proto_ws_call_unref(wreq->call);
 	afb_stub_ws_unref(wreq->stubws);
 	free(wreq);
 }
 
-static void server_req_reply_cb(struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info)
+static void server_req_reply_cb(struct afb_req_common *comreq, const struct afb_req_reply *reply)
 {
 	int rc;
-	struct server_req *wreq = CONTAINER_OF_XREQ(struct server_req, xreq);
+	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	rc = afb_proto_ws_call_reply(wreq->call, obj, error, info);
+	rc = afb_proto_ws_call_reply(wreq->call, reply->object, reply->error, reply->info);
 	if (rc < 0)
 		ERROR("error while sending reply");
-	json_object_put(obj);
 }
 
-static int server_req_subscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
 	int rc;
-	struct server_req *wreq = CONTAINER_OF_XREQ(struct server_req, xreq);
+	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
 	rc = afb_evt_listener_watch_x2(wreq->stubws->listener, event);
 	if (rc >= 0)
@@ -175,10 +177,10 @@ static int server_req_subscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *e
 	return rc;
 }
 
-static int server_req_unsubscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 *event)
+static int server_req_unsubscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
 {
 	int rc;
-	struct server_req *wreq = CONTAINER_OF_XREQ(struct server_req, xreq);
+	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
 	rc = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_event_x2_id(event));
 	if (rc < 0)
@@ -186,7 +188,7 @@ static int server_req_unsubscribe_cb(struct afb_xreq *xreq, struct afb_event_x2 
 	return rc;
 }
 
-static const struct afb_xreq_query_itf server_req_xreq_itf = {
+static const struct afb_req_common_query_itf server_req_req_common_itf = {
 	.reply = server_req_reply_cb,
 	.unref = server_req_destroy_cb,
 	.subscribe = server_req_subscribe_cb,
@@ -209,7 +211,7 @@ static struct afb_proto_ws *client_get_proto(struct afb_stub_ws *stubws)
 	return proto;
 }
 
-static int client_make_ids(struct afb_stub_ws *stubws, struct afb_proto_ws *proto, struct afb_context *context, uint16_t *sessionid, uint16_t *tokenid)
+static int client_make_ids(struct afb_stub_ws *stubws, struct afb_proto_ws *proto, struct afb_req_common *comreq, uint16_t *sessionid, uint16_t *tokenid)
 {
 	int rc, rc2;
 	uint16_t sid, tid;
@@ -217,27 +219,27 @@ static int client_make_ids(struct afb_stub_ws *stubws, struct afb_proto_ws *prot
 	rc = 0;
 
 	/* get the session */
-	if (!context->session)
+	if (!comreq->session)
 		sid = 0;
 	else {
-		sid = afb_session_id(context->session);
+		sid = afb_session_id(comreq->session);
 		rc2 = u16id2bool_set(&stubws->session_flags, sid, 1);
 		if (rc2 < 0)
 			rc = rc2;
 		else if (rc2 == 0)
-			rc = afb_proto_ws_client_session_create(proto, sid, afb_session_uuid(context->session));
+			rc = afb_proto_ws_client_session_create(proto, sid, afb_session_uuid(comreq->session));
 	}
 
 	/* get the token */
-	if (!context->token)
+	if (!comreq->token)
 		tid = 0;
 	else {
-		tid = afb_token_id(context->token);
+		tid = afb_token_id(comreq->token);
 		rc2 = u16id2bool_set(&stubws->token_flags, tid, 1);
 		if (rc2 < 0)
 			rc = rc2;
 		else if (rc2 == 0) {
-			rc2 = afb_proto_ws_client_token_create(proto, tid, afb_token_string(context->token));
+			rc2 = afb_proto_ws_client_token_create(proto, tid, afb_token_string(comreq->token));
 			if (rc2 < 0)
 				rc = rc2;
 		}
@@ -249,7 +251,7 @@ static int client_make_ids(struct afb_stub_ws *stubws, struct afb_proto_ws *prot
 }
 
 /* on call, propagate it to the ws service */
-static void client_api_call_cb(void * closure, struct afb_xreq *xreq)
+static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
 {
 	int rc;
 	struct afb_stub_ws *stubws = closure;
@@ -259,25 +261,25 @@ static void client_api_call_cb(void * closure, struct afb_xreq *xreq)
 
 	proto = client_get_proto(stubws);
 	if (proto == NULL) {
-		afb_xreq_reply(xreq, NULL, afb_error_text_disconnected, NULL);
+		afb_req_common_reply(comreq, NULL, afb_error_text_disconnected, NULL);
 		return;
 	}
 
-	rc = client_make_ids(stubws, proto, &xreq->context, &sessionid, &tokenid);
+	rc = client_make_ids(stubws, proto, comreq, &sessionid, &tokenid);
 	if (rc >= 0) {
-		afb_xreq_unhooked_addref(xreq);
+		afb_req_common_addref(comreq);
 		rc = afb_proto_ws_client_call(
 				proto,
-				xreq->request.called_verb,
-				afb_xreq_json(xreq),
+				comreq->verbname,
+				afb_req_common_json(comreq),
 				sessionid,
 				tokenid,
-				xreq,
-				xreq_on_behalf_cred_export(xreq));
+				comreq,
+				afb_req_common_on_behalf_cred_export(comreq));
 	}
 	if (rc < 0) {
-		afb_xreq_reply(xreq, NULL, afb_error_text_internal_error, "can't send message");
-		afb_xreq_unhooked_unref(xreq);
+		afb_req_common_reply(comreq, NULL, afb_error_text_internal_error, "can't send message");
+		afb_req_common_unref(comreq);
 	}
 }
 
@@ -343,10 +345,10 @@ static void server_event_broadcast_cb(void *closure, const char *event, struct j
 
 static void client_on_reply_cb(void *closure, void *request, struct json_object *object, const char *error, const char *info)
 {
-	struct afb_xreq *xreq = request;
+	struct afb_req_common *comreq = request;
 
-	afb_xreq_reply(xreq, object, error, info);
-	afb_xreq_unhooked_unref(xreq);
+	afb_req_common_reply_hookable(comreq, object, error, info);
+	afb_req_common_unref(comreq);
 }
 
 static void client_on_event_create_cb(void *closure, uint16_t event_id, const char *event_name)
@@ -382,24 +384,24 @@ static void client_on_event_remove_cb(void *closure, uint16_t event_id)
 static void client_on_event_subscribe_cb(void *closure, void *request, uint16_t event_id)
 {
 	struct afb_stub_ws *stubws = closure;
-	struct afb_xreq *xreq = request;
+	struct afb_req_common *comreq = request;
 	struct afb_event_x2 *event;
 	int rc;
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
-	if (rc < 0 || !event || afb_xreq_subscribe(xreq, event) < 0)
+	if (rc < 0 || !event || afb_req_common_subscribe_event_x2_hookable(comreq, event) < 0)
 		ERROR("can't subscribe: %m");
 }
 
 static void client_on_event_unsubscribe_cb(void *closure, void *request, uint16_t event_id)
 {
 	struct afb_stub_ws *stubws = closure;
-	struct afb_xreq *xreq = request;
+	struct afb_req_common *comreq = request;
 	struct afb_event_x2 *event;
 	int rc;
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
-	if (rc < 0 || !event || afb_xreq_unsubscribe(xreq, event) < 0)
+	if (rc < 0 || !event || afb_req_common_unsubscribe_event_x2_hookable(comreq, event) < 0)
 		ERROR("can't unsubscribe: %m");
 }
 
@@ -499,23 +501,22 @@ static void server_on_event_unexpected_cb(void *closure, uint16_t eventid)
 	afb_evt_listener_unwatch_id(stubws->listener, eventid);
 }
 
-static void on_context_ready(void *closure, int status)
-{
-	struct server_req *wreq = closure;
-
-	if (status < 0)
-		afb_xreq_reply_insufficient_scope(&wreq->xreq, NULL);
-	else
-		afb_xreq_process(&wreq->xreq, wreq->stubws->apiset);
-}
-
-static void server_on_call_cb(void *closure, struct afb_proto_ws_call *call, const char *verb, struct json_object *args, uint16_t sessionid, uint16_t tokenid, const char *user_creds)
-{
+static void
+server_on_call_cb(
+	void *closure,
+	struct afb_proto_ws_call *call,
+	const char *verb,
+	struct json_object *args,
+	uint16_t sessionid,
+	uint16_t tokenid,
+	const char *user_creds
+) {
 	const char *errstr = afb_error_text_internal_error;
 	struct afb_stub_ws *stubws = closure;
 	struct server_req *wreq;
 	struct afb_session *session;
 	struct afb_token *token;
+	size_t lenverb, lencreds;
 	int rc;
 
 	afb_stub_ws_addref(stubws);
@@ -533,27 +534,28 @@ static void server_on_call_cb(void *closure, struct afb_proto_ws_call *call, con
 		token = NULL;
 
 	/* create the request */
-	wreq = malloc(sizeof *wreq + 1 + strlen(verb) + (user_creds ? 1 + strlen(user_creds) : 0));
+	lenverb = 1 + strlen(verb);
+	lencreds = user_creds ? 1 + strlen(user_creds) : 0;
+	wreq = malloc(sizeof *wreq + lenverb + lencreds);
 	if (wreq == NULL)
 		goto out_of_memory;
 
-	afb_xreq_init(&wreq->xreq, &server_req_xreq_itf);
+	/* copy strings */
+	memcpy(wreq->strings, verb, lenverb);
+	if (lencreds)
+		user_creds = memcpy(wreq->strings + lenverb, user_creds, lencreds);
+
+	/* initialise */
 	wreq->stubws = stubws;
 	wreq->call = call;
-
-	/* set the call */
-	wreq->xreq.request.called_api = stubws->apiname;
-	wreq->xreq.request.called_verb = strcpy((char*)(wreq+1), verb);
-	if (user_creds)
-		user_creds = strcpy((char*)&(wreq->xreq.request.called_verb[1+strlen(verb)]), user_creds);
-	wreq->xreq.json = args;
-
-	/* init the context */
-	afb_context_init(&wreq->xreq.context, session, token);
+	afb_req_common_init(&wreq->comreq, &server_req_req_common_itf, stubws->apiname, wreq->strings);
+	wreq->comreq.json = args;
+	afb_req_common_set_session(&wreq->comreq, session);
+	afb_req_common_set_token(&wreq->comreq, token);
 #if WITH_CRED
-	afb_context_change_cred(&wreq->xreq.context, stubws->cred);
+	afb_req_common_set_cred(&wreq->comreq, stubws->cred);
 #endif
-	afb_context_on_behalf_import_async(&wreq->xreq.context, user_creds, on_context_ready, wreq);
+	afb_req_common_process_on_behalf(&wreq->comreq, wreq->stubws->apiset, user_creds);
 	return;
 
 no_session:
@@ -594,7 +596,7 @@ static const struct afb_proto_ws_client_itf client_itf =
 };
 
 static struct afb_api_itf client_api_itf = {
-	.call = client_api_call_cb,
+	.process = client_api_process_cb,
 	.describe = client_api_describe_cb
 };
 

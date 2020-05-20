@@ -23,23 +23,13 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
-struct fdev;
-
-extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
-	struct fdev *fdev,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
-);
-
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
+/**
+ * Macro for retrieve the pointer of a structure of 'type' having a field named 'field'
+ * of address 'ptr'.
+ * @param type the type that has the 'field' (ex: "struct mystruct")
+ * @param field the name of the field within the structure 'type'
+ * @param ptr the pointer to an element 'field'
+ * @return the pointer to the structure that contains the 'field' at address 'ptr'
+ */
+#define containerof(type,field,ptr) ((type*) (((char*)(ptr)) - offsetof(type,field)))
 

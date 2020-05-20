@@ -59,7 +59,7 @@ const char *extras[] = {
 };
 
 struct afb_api_itf api_itf_null = {
-	.call = NULL,
+	.process = NULL,
 	.service_start = NULL,
 #if WITH_AFB_HOOK
 	.update_hooks = NULL,
@@ -430,7 +430,7 @@ int set_cb_start(void *closure)
 }
 
 struct afb_api_itf set_api_itf = {
-	.call = NULL,
+	.process = NULL,
 	.service_start = set_cb_start,
 #if WITH_AFB_HOOK
 	.update_hooks = set_cb0,
@@ -544,7 +544,7 @@ int clacb_start(void *closure)
 }
 
 struct afb_api_itf clitf = {
-	.call = NULL,
+	.process = NULL,
 	.service_start = clacb_start,
 #if WITH_AFB_HOOK
 	.update_hooks = NULL,

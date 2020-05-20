@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 IoT.bzh Company
+ * Copyright (C) 2015-2020IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,23 +23,17 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
-struct fdev;
+/**
+ * Defines how to handle strings associated strings
+ */
+enum afb_string_mode
+{
+	/** The string is global, should not be freed */
+	Afb_String_Const,
 
-extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
-	struct fdev *fdev,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
-);
+	/** The string is global, must be freed using 'free' */
+	Afb_String_Free,
 
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
-
+	/** The string local to the call, must be copied */
+	Afb_String_Copy
+};

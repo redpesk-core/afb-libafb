@@ -25,13 +25,13 @@
 
 #if WITH_AFB_HOOK  /***********************************************************/
 
-extern int afb_hook_flags_xreq_from_text(const char *text);
+extern int afb_hook_flags_req_from_text(const char *text);
 extern int afb_hook_flags_api_from_text(const char *text);
 extern int afb_hook_flags_evt_from_text(const char *text);
 extern int afb_hook_flags_session_from_text(const char *text);
 extern int afb_hook_flags_global_from_text(const char *text);
 
-extern char *afb_hook_flags_xreq_to_text(int value);
+extern char *afb_hook_flags_req_to_text(int value);
 extern char *afb_hook_flags_api_to_text(int value);
 extern char *afb_hook_flags_evt_to_text(int value);
 extern char *afb_hook_flags_session_to_text(int value);
