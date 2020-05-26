@@ -602,14 +602,9 @@ static void legacy_call_x3(
 		void (*callback)(void*, int, struct json_object*, struct afb_api_x3*),
 		void *closure)
 {
-#if WITH_LEGACY_CALLS
-	struct afb_export *export = from_api_x3(apix3);
-	afb_calls_legacy_call_v3(export, api, verb, args, callback, closure);
-#else
 	ERROR("Legacy calls are not supported");
 	if (callback)
 		callback(closure, X_ENOTSUP, NULL, apix3);
-#endif
 }
 
 static int legacy_call_sync(
@@ -619,22 +614,10 @@ static int legacy_call_sync(
 		struct json_object *args,
 		struct json_object **result)
 {
-#if WITH_LEGACY_CALLS
-#if WITH_AFB_CALL_SYNC
-	struct afb_export *export = from_api_x3(apix3);
-	return afb_calls_legacy_call_sync(export, api, verb, args, result);
-#else
-	ERROR("Call sync are not supported");
-	if (result)
-		*result = afb_msg_json_reply(NULL, "no-call-sync", NULL, NULL);
-	return X_ENOTSUP;
-#endif
-#else
 	ERROR("Legacy calls are not supported");
 	if (result)
 		*result = NULL;
 	return X_ENOTSUP;
-#endif
 }
 
 #if WITH_AFB_HOOK
@@ -675,12 +658,7 @@ static void legacy_hooked_call_x3(
 		void (*callback)(void*, int, struct json_object*, struct afb_api_x3*),
 		void *closure)
 {
-#if WITH_LEGACY_CALLS
-	struct afb_export *export = from_api_x3(apix3);
-	afb_calls_legacy_hooked_call_v3(export, api, verb, args, callback, closure);
-#else
 	return legacy_call_x3(apix3, api, verb, args, callback, closure);
-#endif
 }
 
 static int legacy_hooked_call_sync(
@@ -690,12 +668,7 @@ static int legacy_hooked_call_sync(
 		struct json_object *args,
 		struct json_object **result)
 {
-#if WITH_LEGACY_CALLS && WITH_AFB_CALL_SYNC
-	struct afb_export *export = from_api_x3(apix3);
-	return afb_calls_legacy_hooked_call_sync(export, api, verb, args, result);
-#else
 	return legacy_call_sync(apix3, api, verb, args, result);
-#endif
 }
 
 #endif

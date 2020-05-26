@@ -46,58 +46,32 @@
 
 #define CALLFLAGS            (afb_req_subcall_api_session|afb_req_subcall_catch_events)
 
-#if WITH_LEGACY_CALLS
-#define LEGACY_SUBCALLFLAGS  (afb_req_subcall_pass_events|afb_req_subcall_on_behalf)
-#endif
-
 /************************************************************************/
 
 struct modes
 {
 	unsigned hooked: 1;
 	unsigned sync: 1;
-	unsigned legacy: 1;
 };
 
 #if WITH_AFB_CALL_SYNC
-#define mode_sync  ((struct modes){ .hooked=0, .sync=1, .legacy=0 })
+#define mode_sync  ((struct modes){ .hooked=0, .sync=1 })
 #endif
-#define mode_async  ((struct modes){ .hooked=0, .sync=0, .legacy=0 })
-#if WITH_LEGACY_CALLS
-#if WITH_AFB_CALL_SYNC
-#define mode_legacy_sync  ((struct modes){ .hooked=0, .sync=1, .legacy=1 })
-#endif
-#define mode_legacy_async  ((struct modes){ .hooked=0, .sync=0, .legacy=1 })
-#endif
+#define mode_async  ((struct modes){ .hooked=0, .sync=0 })
 
 #if WITH_AFB_HOOK
 #if WITH_AFB_CALL_SYNC
-#define mode_hooked_sync  ((struct modes){ .hooked=1, .sync=1, .legacy=0 })
+#define mode_hooked_sync  ((struct modes){ .hooked=1, .sync=1 })
 #endif
-#define mode_hooked_async  ((struct modes){ .hooked=1, .sync=0, .legacy=0 })
-#if WITH_LEGACY_CALLS
-#if WITH_AFB_CALL_SYNC
-#define mode_hooked_legacy_sync  ((struct modes){ .hooked=1, .sync=1, .legacy=1 })
-#endif
-#define mode_hooked_legacy_async  ((struct modes){ .hooked=1, .sync=0, .legacy=1 })
-#endif
+#define mode_hooked_async  ((struct modes){ .hooked=1, .sync=0 })
 #endif
 
 union callback {
 	void *any;
 	union {
-#if WITH_LEGACY_CALLS
-		void (*legacy_v1)(void*, int, struct json_object*);
-		void (*legacy_v2)(void*, int, struct json_object*, struct afb_req_x1);
-		void (*legacy_v3)(void*, int, struct json_object*, struct afb_req_x2*);
-#endif
 		void (*x3)(void*, struct json_object*, const char*, const char *, struct afb_req_x2*);
 	} subcall;
 	union {
-#if WITH_LEGACY_CALLS
-		void (*legacy_v12)(void*, int, struct json_object*);
-		void (*legacy_v3)(void*, int, struct json_object*, struct afb_api_x3*);
-#endif
 		void (*x3)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*);
 	} call;
 };
@@ -128,9 +102,6 @@ struct callreq
 			void *closure;
 			union {
 				void (*final)(void*, struct json_object*, const char*, const char*, union callback, struct afb_export*,struct afb_xreq*);
-#if WITH_LEGACY_CALLS
-				void (*legacy_final)(void*, int, struct json_object*, union callback, struct afb_export*,struct afb_xreq*);
-#endif
 			};
 		};
 	};
@@ -231,29 +202,12 @@ static void callreq_reply_cb(struct afb_xreq *xreq, struct json_object *object, 
 #if WITH_AFB_CALL_SYNC
 	if (callreq->mode.sync) {
 		callreq->returned = 1;
-		if (callreq->mode.legacy) {
-			callreq->status = errstr2errno(error);
-			if (callreq->object)
-				*callreq->object = afb_msg_json_reply(object, error, info, NULL);
-			else
-				json_object_put(object);
-		} else {
-			callreq->status = store_reply(object, error, info,
-					callreq->object, callreq->error, callreq->info);
-		}
+		callreq->status = store_reply(object, error, info,
+				callreq->object, callreq->error, callreq->info);
 		sync_leave(callreq);
 	} else {
 #endif
-#if WITH_LEGACY_CALLS
-		if (callreq->mode.legacy) {
-			object = afb_msg_json_reply(object, error, info, NULL);
-			callreq->legacy_final(callreq->closure, errstr2errno(error), object, callreq->callback, callreq->export, callreq->xreq.caller);
-		} else {
-#else
-		{
-#endif
-			callreq->final(callreq->closure, object, error, info, callreq->callback, callreq->export, callreq->xreq.caller);
-		}
+		callreq->final(callreq->closure, object, error, info, callreq->callback, callreq->export, callreq->xreq.caller);
 		json_object_put(object);
 #if WITH_AFB_CALL_SYNC
 	}
@@ -561,298 +515,3 @@ int afb_calls_hooked_subcall_sync(
 #endif
 #endif
 
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-/******************************************************************************/
-#if WITH_LEGACY_CALLS
-
-#if WITH_AFB_CALL_SYNC
-static int do_legacy_sync(
-		struct afb_export *export,
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		int flags,
-		struct json_object **object,
-		struct modes mode)
-{
-	struct callreq *callreq;
-	int rc;
-
-	/* allocates the request */
-	callreq = callreq_create(export, caller, api, verb, args, flags, mode);
-	if (!callreq)
-		goto interr;
-
-	/* initializes the request */
-	callreq->jobloop = NULL;
-	callreq->returned = 0;
-	callreq->status = 0;
-	callreq->object = object;
-
-	afb_xreq_unhooked_addref(&callreq->xreq); /* avoid early callreq destruction */
-
-	rc = afb_sched_enter(NULL, 0, sync_enter, callreq);
-	if (rc >= 0 && callreq->returned) {
-		rc = callreq->status;
-		afb_xreq_unhooked_unref(&callreq->xreq);
-		return rc;
-	}
-
-	afb_xreq_unhooked_unref(&callreq->xreq);
-interr:
-	if (object)
-		*object = afb_msg_json_reply(NULL, afb_error_text_internal_error, NULL, NULL);
-	return -1;
-}
-#endif
-
-/******************************************************************************/
-
-static void do_legacy_async(
-		struct afb_export *export,
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		int flags,
-		void *callback,
-		void *closure,
-		void (*final)(void*, int, struct json_object*, union callback, struct afb_export*,struct afb_xreq*),
-		struct modes mode)
-{
-	struct callreq *callreq;
-	struct json_object *ie;
-
-	callreq = callreq_create(export, caller, api, verb, args, flags, mode);
-
-	if (!callreq) {
-		ie = afb_msg_json_reply(NULL, afb_error_text_internal_error, NULL, NULL);
-		final(closure, -1, ie, (union callback){ .any = callback }, export, caller);
-		json_object_put(ie);
-	} else {
-		callreq->callback.any = callback;
-		callreq->closure = closure;
-		callreq->legacy_final = final;
-
-		afb_export_process_xreq(callreq->export, &callreq->xreq);
-	}
-}
-
-/******************************************************************************/
-
-static void final_legacy_call_v3(
-	void *closure,
-	int status,
-	struct json_object *object,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.call.legacy_v3)
-		callback.call.legacy_v3(closure, status, object, afb_export_to_api_x3(export));
-}
-
-/******************************************************************************/
-
-void afb_calls_legacy_call_v3(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_api_x3 *),
-		void *closure)
-{
-	do_legacy_async(export, NULL, api, verb, args, CALLFLAGS, callback, closure, final_legacy_call_v3, mode_legacy_async);
-}
-
-#if WITH_AFB_CALL_SYNC
-int afb_calls_legacy_call_sync(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result)
-{
-	return do_legacy_sync(export, NULL, api, verb, args, CALLFLAGS, result, mode_legacy_sync);
-}
-#endif
-
-#if WITH_AFB_HOOK
-void afb_calls_legacy_hooked_call_v3(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_api_x3 *),
-		void *closure)
-{
-	afb_hook_api_call(export, api, verb, args);
-	do_legacy_async(export, NULL, api, verb, args, CALLFLAGS, callback, closure, final_legacy_call_v3, mode_hooked_legacy_async);
-}
-
-#if WITH_AFB_CALL_SYNC
-int afb_calls_legacy_hooked_call_sync(
-		struct afb_export *export,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result)
-{
-	int rc;
-	struct json_object *object;
-
-	afb_hook_api_callsync(export, api, verb, args);
-	rc = do_legacy_sync(export, NULL, api, verb, args, CALLFLAGS, &object, mode_hooked_legacy_sync);
-	if (result)
-		*result = object;
-	else
-		json_object_put(object);
-	return rc;
-}
-#endif
-#endif
-
-/******************************************************************************/
-
-static void final_legacy_subcall_v1(
-	void *closure,
-	int status,
-	struct json_object *object,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.subcall.legacy_v1)
-		callback.subcall.legacy_v1(closure, status, object);
-}
-
-static void final_legacy_subcall_v2(
-	void *closure,
-	int status,
-	struct json_object *object,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.subcall.legacy_v2)
-		callback.subcall.legacy_v2(closure, status, object, xreq_to_req_x1(caller));
-}
-
-static void final_legacy_subcall_v3(
-	void *closure,
-	int status,
-	struct json_object *object,
-	union callback callback,
-	struct afb_export *export,
-	struct afb_xreq *caller)
-{
-	if (callback.subcall.legacy_v3)
-		callback.subcall.legacy_v3(closure, status, object, xreq_to_req_x2(caller));
-}
-
-/******************************************************************************/
-
-void afb_calls_legacy_subcall_v1(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*),
-		void *closure)
-{
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v1, mode_legacy_async);
-}
-
-void afb_calls_legacy_subcall_v2(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x1),
-		void *closure)
-{
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v2, mode_legacy_async);
-}
-
-void afb_calls_legacy_subcall_v3(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *),
-		void *closure)
-{
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v3, mode_legacy_async);
-}
-
-#if WITH_AFB_CALL_SYNC
-int afb_calls_legacy_subcall_sync(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result)
-{
-	return do_legacy_sync(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, result, mode_legacy_sync);
-}
-#endif
-
-#if WITH_AFB_HOOK
-void afb_calls_legacy_hooked_subcall_v1(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*),
-		void *closure)
-{
-	afb_hook_xreq_subcall(caller, api, verb, args, LEGACY_SUBCALLFLAGS);
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v1, mode_hooked_legacy_async);
-}
-
-void afb_calls_legacy_hooked_subcall_v2(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x1),
-		void *closure)
-{
-	afb_hook_xreq_subcall(caller, api, verb, args, LEGACY_SUBCALLFLAGS);
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v2, mode_hooked_legacy_async);
-}
-
-void afb_calls_legacy_hooked_subcall_v3(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *),
-		void *closure)
-{
-	afb_hook_xreq_subcall(caller, api, verb, args, LEGACY_SUBCALLFLAGS);
-	do_legacy_async(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, callback, closure, final_legacy_subcall_v3, mode_hooked_legacy_async);
-}
-
-#if WITH_AFB_CALL_SYNC
-int afb_calls_legacy_hooked_subcall_sync(
-		struct afb_xreq *caller,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result)
-{
-	afb_hook_xreq_subcallsync(caller, api, verb, args, LEGACY_SUBCALLFLAGS);
-	return do_legacy_sync(NULL, caller, api, verb, args, LEGACY_SUBCALLFLAGS, result, mode_hooked_legacy_sync);
-}
-#endif
-#endif
-
-#endif

@@ -38,7 +38,6 @@ struct afb_verb_v3;
 struct afb_session;
 struct afb_xreq;
 struct afb_export;
-struct afb_stored_req;
 struct sd_bus;
 struct sd_event;
 struct afb_hook_xreq;
@@ -67,8 +66,8 @@ struct afb_hookid
 #define afb_hook_flag_req_get			0x00000008
 #define afb_hook_flag_req_reply 		0x00000010
 #define afb_hook_flag_req_get_client_info	0x00000020
-#define afb_hook_flag_req_legacy_context_get	0x00000040
-#define afb_hook_flag_req_legacy_context_set	0x00000080
+#define __afb_hook_spare_1			0x00000040
+#define __afb_hook_spare_2			0x00000080
 #define afb_hook_flag_req_addref		0x00000100
 #define afb_hook_flag_req_unref			0x00000200
 #define afb_hook_flag_req_session_close		0x00000400
@@ -80,8 +79,8 @@ struct afb_hookid
 #define afb_hook_flag_req_subcallsync		0x00010000
 #define afb_hook_flag_req_subcallsync_result	0x00020000
 #define afb_hook_flag_req_vverbose		0x00040000
-#define afb_hook_flag_req_legacy_store		0x00080000
-#define afb_hook_flag_req_legacy_unstore	0x00100000
+#define __afb_hook_spare_3			0x00080000
+#define __afb_hook_spare_4			0x00100000
 #define afb_hook_flag_req_has_permission	0x00200000
 #define afb_hook_flag_req_get_application_id	0x00400000
 #define afb_hook_flag_req_context_make		0x00800000
@@ -99,16 +98,13 @@ struct afb_hookid
 
 /* extra flags */
 #define afb_hook_flags_req_ref		(afb_hook_flag_req_addref|afb_hook_flag_req_unref)
-#define afb_hook_flags_req_context	(afb_hook_flag_req_legacy_context_get|afb_hook_flag_req_legacy_context_set\
-					|afb_hook_flag_req_context_make)
-#define afb_hook_flags_req_stores	(afb_hook_flag_req_legacy_store|afb_hook_flag_req_legacy_unstore)
+#define afb_hook_flags_req_context	(afb_hook_flag_req_context_make)
 
 /* predefined groups */
 #define afb_hook_flags_req_common	(afb_hook_flags_req_life|afb_hook_flags_req_args|afb_hook_flag_req_reply\
 					|afb_hook_flags_req_session|afb_hook_flags_req_event|afb_hook_flags_req_subcalls\
 					|afb_hook_flag_req_vverbose|afb_hook_flags_req_security)
-#define afb_hook_flags_req_extra	(afb_hook_flags_req_common|afb_hook_flags_req_ref|afb_hook_flags_req_context\
-					|afb_hook_flags_req_stores)
+#define afb_hook_flags_req_extra	(afb_hook_flags_req_common|afb_hook_flags_req_ref|afb_hook_flags_req_context)
 #define afb_hook_flags_req_all		(afb_hook_flags_req_extra)
 
 struct afb_hook_xreq_itf {
@@ -117,8 +113,6 @@ struct afb_hook_xreq_itf {
 	void (*hook_xreq_json)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *obj);
 	void (*hook_xreq_get)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *name, struct afb_arg arg);
 	void (*hook_xreq_reply)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info);
-	void (*hook_xreq_legacy_context_get)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value);
-	void (*hook_xreq_legacy_context_set)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value, void (*free_value)(void*));
 	void (*hook_xreq_addref)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq);
 	void (*hook_xreq_unref)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq);
 	void (*hook_xreq_session_close)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq);
@@ -130,8 +124,6 @@ struct afb_hook_xreq_itf {
 	void (*hook_xreq_subcallsync)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args);
 	void (*hook_xreq_subcallsync_result)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int status, struct json_object *object, const char *error, const char *info);
 	void (*hook_xreq_vverbose)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int level, const char *file, int line, const char *func, const char *fmt, va_list args);
-	void (*hook_xreq_legacy_store)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct afb_stored_req *sreq);
-	void (*hook_xreq_legacy_unstore)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq);
 	void (*hook_xreq_has_permission)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *permission, int result);
 	void (*hook_xreq_get_application_id)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, char *result);
 	void (*hook_xreq_context_make)(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result);
@@ -151,8 +143,6 @@ extern void afb_hook_xreq_end(const struct afb_xreq *xreq);
 extern struct json_object *afb_hook_xreq_json(const struct afb_xreq *xreq, struct json_object *obj);
 extern struct afb_arg afb_hook_xreq_get(const struct afb_xreq *xreq, const char *name, struct afb_arg arg);
 extern void afb_hook_xreq_reply(const struct afb_xreq *xreq, struct json_object *obj, const char *error, const char *info);
-extern void *afb_hook_xreq_legacy_context_get(const struct afb_xreq *xreq, void *value);
-extern void afb_hook_xreq_legacy_context_set(const struct afb_xreq *xreq, void *value, void (*free_value)(void*));
 extern void afb_hook_xreq_addref(const struct afb_xreq *xreq);
 extern void afb_hook_xreq_unref(const struct afb_xreq *xreq);
 extern void afb_hook_xreq_session_close(const struct afb_xreq *xreq);
@@ -164,8 +154,6 @@ extern void afb_hook_xreq_subcall_result(const struct afb_xreq *xreq, struct jso
 extern void afb_hook_xreq_subcallsync(const struct afb_xreq *xreq, const char *api, const char *verb, struct json_object *args, int flags);
 extern int afb_hook_xreq_subcallsync_result(const struct afb_xreq *xreq, int status, struct json_object *object, const char *error, const char *info);
 extern void afb_hook_xreq_vverbose(const struct afb_xreq *xreq, int level, const char *file, int line, const char *func, const char *fmt, va_list args);
-extern void afb_hook_xreq_legacy_store(const struct afb_xreq *xreq, struct afb_stored_req *sreq);
-extern void afb_hook_xreq_legacy_unstore(const struct afb_xreq *xreq);
 extern int afb_hook_xreq_has_permission(const struct afb_xreq *xreq, const char *permission, int result);
 extern char *afb_hook_xreq_get_application_id(const struct afb_xreq *xreq, char *result);
 extern void *afb_hook_xreq_context_make(const struct afb_xreq *xreq, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result);
@@ -203,7 +191,7 @@ extern struct json_object *afb_hook_xreq_get_client_info(const struct afb_xreq *
 #define afb_hook_flag_api_delete_api			0x01000000
 #define afb_hook_flag_api_start				0x02000000
 #define afb_hook_flag_api_on_event			0x04000000
-#define afb_hook_flag_api_legacy_unstore_req		0x08000000
+#define __afb_hook_spare_5				0x08000000
 #define afb_hook_flag_api_on_event_handler		0x10000000
 #define afb_hook_flag_api_settings			0x20000000
 
@@ -225,8 +213,7 @@ extern struct json_object *afb_hook_xreq_get_client_info(const struct afb_xreq *
 					|afb_hook_flag_api_get_user_bus\
 					|afb_hook_flag_api_get_system_bus\
 					|afb_hook_flag_api_rootdir_get_fd\
-					|afb_hook_flag_api_rootdir_open_locale\
-					|afb_hook_flag_api_legacy_unstore_req)
+					|afb_hook_flag_api_rootdir_open_locale)
 
 
 #define afb_hook_flags_api_api		(afb_hook_flag_api_new_api\
@@ -273,7 +260,6 @@ extern struct json_object *afb_hook_xreq_get_client_info(const struct afb_xreq *
 					|afb_hook_flag_api_rootdir_get_fd\
 					|afb_hook_flag_api_rootdir_open_locale\
 					|afb_hook_flag_api_queue_job\
-					|afb_hook_flag_api_legacy_unstore_req\
 					|afb_hook_flag_api_require_api\
 					|afb_hook_flag_api_require_api)
 
@@ -293,7 +279,6 @@ struct afb_hook_api_itf {
 	void (*hook_api_rootdir_get_fd)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, int result);
 	void (*hook_api_rootdir_open_locale)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *filename, int flags, const char *locale, int result);
 	void (*hook_api_queue_job)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result);
-	void (*hook_api_legacy_unstore_req)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, struct afb_stored_req *sreq);
 	void (*hook_api_require_api)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized);
 	void (*hook_api_require_api_result)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized, int result);
 	void (*hook_api_add_alias)(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *oldname, const char *newname, int result);
@@ -334,7 +319,6 @@ extern struct afb_event_x2 *afb_hook_api_event_make(const struct afb_export *exp
 extern int afb_hook_api_rootdir_get_fd(const struct afb_export *export, int result);
 extern int afb_hook_api_rootdir_open_locale(const struct afb_export *export, const char *filename, int flags, const char *locale, int result);
 extern int afb_hook_api_queue_job(const struct afb_export *export, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result);
-extern void afb_hook_api_legacy_unstore_req(const struct afb_export *export, struct afb_stored_req *sreq);
 extern void afb_hook_api_require_api(const struct afb_export *export, const char *name, int initialized);
 extern int afb_hook_api_require_api_result(const struct afb_export *export, const char *name, int initialized, int result);
 extern int afb_hook_api_add_alias(const struct afb_export *export, const char *api, const char *alias, int result);

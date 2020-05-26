@@ -55,9 +55,7 @@ static struct flag xreq_flags[] = { /* must be sorted by names */
 		{ "begin",		afb_hook_flag_req_begin },
 		{ "common",		afb_hook_flags_req_common },
 		{ "context",		afb_hook_flags_req_context },
-		{ "context_get",	afb_hook_flag_req_legacy_context_get },
 		{ "context_make",	afb_hook_flag_req_context_make },
-		{ "context_set",	afb_hook_flag_req_legacy_context_set },
 		{ "end",		afb_hook_flag_req_end },
 		{ "event",		afb_hook_flags_req_event },
 		{ "extra",		afb_hook_flags_req_extra },
@@ -74,8 +72,6 @@ static struct flag xreq_flags[] = { /* must be sorted by names */
 		{ "session",		afb_hook_flags_req_session },
 		{ "session_close",	afb_hook_flag_req_session_close },
 		{ "session_set_LOA",	afb_hook_flag_req_session_set_LOA },
-		{ "store",		afb_hook_flag_req_legacy_store },
-		{ "stores",		afb_hook_flags_req_stores },
 		{ "subcall",		afb_hook_flag_req_subcall },
 		{ "subcall_result",	afb_hook_flag_req_subcall_result },
 		{ "subcalls",		afb_hook_flags_req_subcalls },
@@ -83,7 +79,6 @@ static struct flag xreq_flags[] = { /* must be sorted by names */
 		{ "subcallsync_result",	afb_hook_flag_req_subcallsync_result },
 		{ "subscribe",		afb_hook_flag_req_subscribe },
 		{ "unref",		afb_hook_flag_req_unref },
-		{ "unstore",		afb_hook_flag_req_legacy_unstore },
 		{ "unsubscribe",	afb_hook_flag_req_unsubscribe },
 		{ "vverbose",		afb_hook_flag_req_vverbose },
 };
@@ -113,7 +108,6 @@ static struct flag api_flags[] = { /* must be sorted by names */
 		{ "get_event_loop",	afb_hook_flag_api_get_event_loop },
 		{ "get_system_bus",	afb_hook_flag_api_get_system_bus },
 		{ "get_user_bus",	afb_hook_flag_api_get_user_bus },
-		{ "legacy_unstore_req",	afb_hook_flag_api_legacy_unstore_req },
 		{ "new_api",		afb_hook_flag_api_new_api },
 		{ "on_event",		afb_hook_flag_api_on_event },
 		{ "on_event_handler",	afb_hook_flag_api_on_event_handler },
@@ -329,7 +323,6 @@ static struct flag legacy_ditf_flags[] = { /* must be sorted by names */
 		{ "require_api_result",		afb_hook_flag_api_require_api },
 		{ "rootdir_get_fd",		afb_hook_flag_api_rootdir_get_fd },
 		{ "rootdir_open_locale",	afb_hook_flag_api_rootdir_open_locale },
-		{ "unstore_req",		afb_hook_flag_api_legacy_unstore_req },
 		{ "vverbose",			afb_hook_flag_api_vverbose },
 };
 

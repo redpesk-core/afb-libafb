@@ -264,16 +264,6 @@ static void hook_xreq_reply_cb(void *closure, const struct afb_hookid *hookid, c
 	_hook_xreq_(xreq, "reply[%s](%s, %s)", error?:"success", json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE), info);
 }
 
-static void hook_xreq_legacy_context_get_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value)
-{
-	_hook_xreq_(xreq, "context_get() -> %p", value);
-}
-
-static void hook_xreq_legacy_context_set_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value, void (*free_value)(void*))
-{
-	_hook_xreq_(xreq, "context_set(%p, %p)", value, free_value);
-}
-
 static void hook_xreq_addref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
 {
 	_hook_xreq_(xreq, "addref()");
@@ -342,16 +332,6 @@ static void hook_xreq_vverbose_cb(void *closure, const struct afb_hookid *hookid
 	}
 }
 
-static void hook_xreq_legacy_store_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct afb_stored_req *sreq)
-{
-	_hook_xreq_(xreq, "store() -> %p", sreq);
-}
-
-static void hook_xreq_legacy_unstore_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
-{
-	_hook_xreq_(xreq, "unstore()");
-}
-
 static void hook_xreq_has_permission_cb(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *permission, int result)
 {
 	_hook_xreq_(xreq, "has_permission(%s) -> %d", permission, result);
@@ -383,8 +363,6 @@ static struct afb_hook_xreq_itf hook_xreq_default_itf = {
 	.hook_xreq_json = hook_xreq_json_cb,
 	.hook_xreq_get = hook_xreq_get_cb,
 	.hook_xreq_reply = hook_xreq_reply_cb,
-	.hook_xreq_legacy_context_get = hook_xreq_legacy_context_get_cb,
-	.hook_xreq_legacy_context_set = hook_xreq_legacy_context_set_cb,
 	.hook_xreq_addref = hook_xreq_addref_cb,
 	.hook_xreq_unref = hook_xreq_unref_cb,
 	.hook_xreq_session_close = hook_xreq_session_close_cb,
@@ -396,8 +374,6 @@ static struct afb_hook_xreq_itf hook_xreq_default_itf = {
 	.hook_xreq_subcallsync = hook_xreq_subcallsync_cb,
 	.hook_xreq_subcallsync_result = hook_xreq_subcallsync_result_cb,
 	.hook_xreq_vverbose = hook_xreq_vverbose_cb,
-	.hook_xreq_legacy_store = hook_xreq_legacy_store_cb,
-	.hook_xreq_legacy_unstore = hook_xreq_legacy_unstore_cb,
 	.hook_xreq_has_permission = hook_xreq_has_permission_cb,
 	.hook_xreq_get_application_id = hook_xreq_get_application_id_cb,
 	.hook_xreq_context_make = hook_xreq_context_make_cb,
@@ -457,17 +433,6 @@ void afb_hook_xreq_reply(const struct afb_xreq *xreq, struct json_object *obj, c
 	_HOOK_XREQ_(reply, xreq, obj, error, info);
 }
 
-void *afb_hook_xreq_legacy_context_get(const struct afb_xreq *xreq, void *value)
-{
-	_HOOK_XREQ_(legacy_context_get, xreq, value);
-	return value;
-}
-
-void afb_hook_xreq_legacy_context_set(const struct afb_xreq *xreq, void *value, void (*free_value)(void*))
-{
-	_HOOK_XREQ_(legacy_context_set, xreq, value, free_value);
-}
-
 void afb_hook_xreq_addref(const struct afb_xreq *xreq)
 {
 	_HOOK_XREQ_(addref, xreq);
@@ -525,16 +490,6 @@ int  afb_hook_xreq_subcallsync_result(const struct afb_xreq *xreq, int status, s
 void afb_hook_xreq_vverbose(const struct afb_xreq *xreq, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
 {
 	_HOOK_XREQ_(vverbose, xreq, level, file ?: "?", line, func ?: "?", fmt, args);
-}
-
-void afb_hook_xreq_legacy_store(const struct afb_xreq *xreq, struct afb_stored_req *sreq)
-{
-	_HOOK_XREQ_(legacy_store, xreq, sreq);
-}
-
-void afb_hook_xreq_legacy_unstore(const struct afb_xreq *xreq)
-{
-	_HOOK_XREQ_(legacy_unstore, xreq);
 }
 
 int afb_hook_xreq_has_permission(const struct afb_xreq *xreq, const char *permission, int result)
@@ -785,11 +740,6 @@ static void hook_api_queue_job_cb(void *closure, const struct afb_hookid *hookid
 	_hook_api_(export, "queue_job(%p, %p, %p, %d) -> %d", callback, argument, group, timeout, result);
 }
 
-static void hook_api_unstore_req_cb(void *closure, const struct afb_hookid *hookid,  const struct afb_export *export, struct afb_stored_req *sreq)
-{
-	_hook_api_(export, "unstore_req(%p)", sreq);
-}
-
 static void hook_api_require_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized)
 {
 	_hook_api_(export, "require_api(%s, %d)...", name, initialized);
@@ -941,7 +891,6 @@ static struct afb_hook_api_itf hook_api_default_itf = {
 	.hook_api_rootdir_get_fd = hook_api_rootdir_get_fd_cb,
 	.hook_api_rootdir_open_locale = hook_api_rootdir_open_locale_cb,
 	.hook_api_queue_job = hook_api_queue_job_cb,
-	.hook_api_legacy_unstore_req = hook_api_unstore_req_cb,
 	.hook_api_require_api = hook_api_require_api_cb,
 	.hook_api_require_api_result = hook_api_require_api_result_cb,
 	.hook_api_add_alias = hook_api_add_alias_cb,
@@ -1052,11 +1001,6 @@ int afb_hook_api_queue_job(const struct afb_export *export, void (*callback)(int
 {
 	_HOOK_API_(queue_job, export, callback, argument, group, timeout, result);
 	return result;
-}
-
-void afb_hook_api_legacy_unstore_req(const struct afb_export *export, struct afb_stored_req *sreq)
-{
-	_HOOK_API_(legacy_unstore_req, export, sreq);
 }
 
 void afb_hook_api_require_api(const struct afb_export *export, const char *name, int initialized)

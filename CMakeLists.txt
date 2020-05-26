@@ -73,7 +73,6 @@ option(WITH_ENVIRONMENT           "Use environment variables"              ON)
 option(WITH_AFB_DEBUG             "Activtes debug features"                ON)
 option(WITH_CALL_PERSONALITY      "Call to personality (debugging)"        ON)
 option(WITH_AFB_CALL_SYNC         "Allows the (sub)call synchronous"       ON)
-option(WITH_LEGACY_CALLS          "Allow legacy calls"                     ON)
 # tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)

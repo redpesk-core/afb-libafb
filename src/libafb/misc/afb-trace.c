@@ -272,16 +272,6 @@ static void hook_xreq_reply(void *closure, const struct afb_hookid *hookid, cons
 						"info", info);
 }
 
-static void hook_xreq_context_get(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value)
-{
-	hook_xreq(closure, hookid, xreq, "context_get", NULL);
-}
-
-static void hook_xreq_context_set(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, void *value, void (*free_value)(void*))
-{
-	hook_xreq(closure, hookid, xreq, "context_set", NULL);
-}
-
 static void hook_xreq_addref(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
 {
 	hook_xreq(closure, hookid, xreq, "addref", NULL);
@@ -381,16 +371,6 @@ static void hook_xreq_vverbose(void *closure, const struct afb_hookid *hookid, c
 	free(msg);
 }
 
-static void hook_xreq_store(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, struct afb_stored_req *sreq)
-{
-	hook_xreq(closure, hookid, xreq, "store", NULL);
-}
-
-static void hook_xreq_unstore(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq)
-{
-	hook_xreq(closure, hookid, xreq, "unstore", NULL);
-}
-
 static void hook_xreq_has_permission(void *closure, const struct afb_hookid *hookid, const struct afb_xreq *xreq, const char *permission, int result)
 {
 	hook_xreq(closure, hookid, xreq, "has_permission", "{ss sb}",
@@ -437,8 +417,6 @@ static struct afb_hook_xreq_itf hook_xreq_itf = {
 	.hook_xreq_json = hook_xreq_json,
 	.hook_xreq_get = hook_xreq_get,
 	.hook_xreq_reply = hook_xreq_reply,
-	.hook_xreq_legacy_context_get = hook_xreq_context_get,
-	.hook_xreq_legacy_context_set = hook_xreq_context_set,
 	.hook_xreq_addref = hook_xreq_addref,
 	.hook_xreq_unref = hook_xreq_unref,
 	.hook_xreq_session_close = hook_xreq_session_close,
@@ -450,8 +428,6 @@ static struct afb_hook_xreq_itf hook_xreq_itf = {
 	.hook_xreq_subcallsync = hook_xreq_subcallsync,
 	.hook_xreq_subcallsync_result = hook_xreq_subcallsync_result,
 	.hook_xreq_vverbose = hook_xreq_vverbose,
-	.hook_xreq_legacy_store = hook_xreq_store,
-	.hook_xreq_legacy_unstore = hook_xreq_unstore,
 	.hook_xreq_has_permission = hook_xreq_has_permission,
 	.hook_xreq_get_application_id = hook_xreq_get_application_id,
 	.hook_xreq_context_make = hook_xreq_context_make,
@@ -580,11 +556,6 @@ static void hook_api_rootdir_open_locale(void *closure, const struct afb_hookid 
 static void hook_api_queue_job(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
 {
 	hook_api(closure, hookid, export, "queue_job", "{ss}", "result", result);
-}
-
-static void hook_api_unstore_req(void * closure, const struct afb_hookid *hookid, const struct afb_export *export, struct afb_stored_req *sreq)
-{
-	hook_api(closure, hookid, export, "unstore_req", NULL);
 }
 
 static void hook_api_require_api(void *closure, const struct afb_hookid *hookid, const struct afb_export *export, const char *name, int initialized)
@@ -749,7 +720,6 @@ static struct afb_hook_api_itf hook_api_itf = {
 	.hook_api_rootdir_get_fd = hook_api_rootdir_get_fd,
 	.hook_api_rootdir_open_locale = hook_api_rootdir_open_locale,
 	.hook_api_queue_job = hook_api_queue_job,
-	.hook_api_legacy_unstore_req = hook_api_unstore_req,
 	.hook_api_require_api = hook_api_require_api,
 	.hook_api_require_api_result = hook_api_require_api_result,
 	.hook_api_add_alias = hook_api_add_alias_cb,

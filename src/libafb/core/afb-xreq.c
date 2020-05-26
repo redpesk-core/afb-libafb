@@ -197,38 +197,6 @@ static void xreq_vreply_cb(struct afb_req_x2 *closure, struct json_object *obj, 
 	}
 }
 
-static void xreq_legacy_success_cb(struct afb_req_x2 *closure, struct json_object *obj, const char *info)
-{
-	xreq_reply_cb(closure, obj, NULL, info);
-}
-
-static void xreq_legacy_fail_cb(struct afb_req_x2 *closure, const char *status, const char *info)
-{
-	xreq_reply_cb(closure, NULL, status, info);
-}
-
-static void xreq_legacy_vsuccess_cb(struct afb_req_x2 *closure, struct json_object *obj, const char *fmt, va_list args)
-{
-	xreq_vreply_cb(closure, obj, NULL, fmt, args);
-}
-
-static void xreq_legacy_vfail_cb(struct afb_req_x2 *closure, const char *status, const char *fmt, va_list args)
-{
-	xreq_vreply_cb(closure, NULL, status, fmt, args);
-}
-
-static void *xreq_legacy_context_get_cb(struct afb_req_x2 *closure)
-{
-	struct afb_xreq *xreq = xreq_from_req_x2(closure);
-	return afb_context_get(&xreq->context);
-}
-
-static void xreq_legacy_context_set_cb(struct afb_req_x2 *closure, void *value, void (*free_value)(void*))
-{
-	struct afb_xreq *xreq = xreq_from_req_x2(closure);
-	afb_context_set(&xreq->context, value, free_value);
-}
-
 static struct afb_req_x2 *xreq_addref_cb(struct afb_req_x2 *closure)
 {
 	struct afb_xreq *xreq = xreq_from_req_x2(closure);
@@ -303,11 +271,6 @@ static int xreq_subscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_eve
 	return afb_xreq_subscribe(xreq, event);
 }
 
-static int xreq_legacy_subscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
-{
-	return xreq_subscribe_event_x2_cb(closure, event.closure);
-}
-
 int afb_xreq_subscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
 {
 	if (xreq->replied) {
@@ -326,11 +289,6 @@ static int xreq_unsubscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_e
 	return afb_xreq_unsubscribe(xreq, event);
 }
 
-static int xreq_legacy_unsubscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
-{
-	return xreq_unsubscribe_event_x2_cb(closure, event.closure);
-}
-
 int afb_xreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
 {
 	if (xreq->replied) {
@@ -341,66 +299,6 @@ int afb_xreq_unsubscribe(struct afb_xreq *xreq, struct afb_event_x2 *event)
 		return xreq->queryitf->unsubscribe(xreq, event);
 	ERROR("no event listener, unsubscription impossible");
 	return X_ENOTSUP;
-}
-
-static void xreq_legacy_subcall_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*), void *closure)
-{
-#if WITH_LEGACY_CALLS
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	return afb_calls_legacy_subcall_v1(xreq, api, verb, args, callback, closure);
-#else
-	ERROR("Legacy subcall not supported");
-	if (callback) {
-		callback(closure, X_ENOTSUP, NULL);
-	}
-#endif
-}
-
-static void xreq_legacy_subcall_req_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x1), void *closure)
-{
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-#if WITH_LEGACY_CALLS
-	return afb_calls_legacy_subcall_v2(xreq, api, verb, args, callback, closure);
-#else
-	ERROR("Legacy subcall not supported");
-	if (callback) {
-		callback(closure, X_ENOTSUP, NULL, xreq_to_req_x1(xreq));
-	}
-#endif
-}
-
-static void xreq_legacy_subcall_request_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x2*), void *closure)
-{
-#if WITH_LEGACY_CALLS
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	return afb_calls_legacy_subcall_v3(xreq, api, verb, args, callback, closure);
-#else
-	ERROR("Legacy subcall not supported");
-	if (callback) {
-		callback(closure, X_ENOTSUP, NULL, req);
-	}
-#endif
-}
-
-static int xreq_legacy_subcallsync_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, struct json_object **result)
-{
-#if WITH_LEGACY_CALLS
-#if WITH_AFB_CALL_SYNC
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	return afb_calls_legacy_subcall_sync(xreq, api, verb, args, result);
-#else
-	ERROR("Subcall sync are not supported");
-	if (result)
-		*result = afb_msg_json_reply(NULL, "no-subcall-sync", NULL, NULL);
-	errno = ENOTSUP;
-	return -1;
-#endif
-#else
-	ERROR("Legacy subcallsync not supported");
-	if (result)
-		*result = NULL;
-	return X_ENOTSUP;
-#endif
 }
 
 static void xreq_vverbose_cb(struct afb_req_x2 *closure, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
@@ -414,12 +312,6 @@ static void xreq_vverbose_cb(struct afb_req_x2 *closure, int level, const char *
 		verbose(level, file, line, func, "[REQ/API %s] %s", xreq->request.called_api, p);
 		free(p);
 	}
-}
-
-static struct afb_stored_req *xreq_legacy_store_cb(struct afb_req_x2 *closure)
-{
-	xreq_addref_cb(closure);
-	return (struct afb_stored_req*)closure;
 }
 
 #if SYNCHRONOUS_CHECKS
@@ -601,29 +493,29 @@ static void xreq_check_permission_cb(struct afb_req_x2 *req, const char *permiss
 const struct afb_req_x2_itf xreq_itf = {
 	.json = xreq_json_cb,
 	.get = xreq_get_cb,
-	.legacy_success = xreq_legacy_success_cb,
-	.legacy_fail = xreq_legacy_fail_cb,
-	.legacy_vsuccess = xreq_legacy_vsuccess_cb,
-	.legacy_vfail = xreq_legacy_vfail_cb,
-	.legacy_context_get = xreq_legacy_context_get_cb,
-	.legacy_context_set = xreq_legacy_context_set_cb,
+	.legacy_success = NULL,
+	.legacy_fail = NULL,
+	.legacy_vsuccess = NULL,
+	.legacy_vfail = NULL,
+	.legacy_context_get = NULL,
+	.legacy_context_set = NULL,
 	.addref = xreq_addref_cb,
 	.unref = xreq_unref_cb,
 	.session_close = xreq_session_close_cb,
 	.session_set_LOA = xreq_session_set_LOA_cb,
-	.legacy_subscribe_event_x1 = xreq_legacy_subscribe_event_x1_cb,
-	.legacy_unsubscribe_event_x1 = xreq_legacy_unsubscribe_event_x1_cb,
-	.legacy_subcall = xreq_legacy_subcall_cb,
-	.legacy_subcallsync = xreq_legacy_subcallsync_cb,
+	.legacy_subscribe_event_x1 = NULL,
+	.legacy_unsubscribe_event_x1 = NULL,
+	.legacy_subcall = NULL,
+	.legacy_subcallsync = NULL,
 	.vverbose = xreq_vverbose_cb,
-	.legacy_store_req = xreq_legacy_store_cb,
-	.legacy_subcall_req = xreq_legacy_subcall_req_cb,
+	.legacy_store_req = NULL,
+	.legacy_subcall_req = NULL,
 	.has_permission = xreq_has_permission_cb,
 	.get_application_id = xreq_get_application_id_cb,
 	.context_make = xreq_context_make_cb,
 	.subscribe_event_x2 = xreq_subscribe_event_x2_cb,
 	.unsubscribe_event_x2 = xreq_unsubscribe_event_x2_cb,
-	.legacy_subcall_request = xreq_legacy_subcall_request_cb,
+	.legacy_subcall_request = NULL,
 	.get_uid = xreq_get_uid_cb,
 	.reply = xreq_reply_cb,
 	.vreply = xreq_vreply_cb,
@@ -665,40 +557,6 @@ static void xreq_hooked_vreply_cb(struct afb_req_x2 *closure, struct json_object
 	free(info);
 }
 
-static void xreq_hooked_legacy_success_cb(struct afb_req_x2 *closure, struct json_object *obj, const char *info)
-{
-	xreq_hooked_reply_cb(closure, obj, NULL, info);
-}
-
-static void xreq_hooked_legacy_fail_cb(struct afb_req_x2 *closure, const char *status, const char *info)
-{
-	xreq_hooked_reply_cb(closure, NULL, status, info);
-}
-
-static void xreq_hooked_legacy_vsuccess_cb(struct afb_req_x2 *closure, struct json_object *obj, const char *fmt, va_list args)
-{
-	xreq_hooked_vreply_cb(closure, obj, NULL, fmt, args);
-}
-
-static void xreq_hooked_legacy_vfail_cb(struct afb_req_x2 *closure, const char *status, const char *fmt, va_list args)
-{
-	xreq_hooked_vreply_cb(closure, NULL, status, fmt, args);
-}
-
-static void *xreq_hooked_legacy_context_get_cb(struct afb_req_x2 *closure)
-{
-	void *r = xreq_legacy_context_get_cb(closure);
-	struct afb_xreq *xreq = xreq_from_req_x2(closure);
-	return afb_hook_xreq_legacy_context_get(xreq, r);
-}
-
-static void xreq_hooked_legacy_context_set_cb(struct afb_req_x2 *closure, void *value, void (*free_value)(void*))
-{
-	struct afb_xreq *xreq = xreq_from_req_x2(closure);
-	afb_hook_xreq_legacy_context_set(xreq, value, free_value);
-	xreq_legacy_context_set_cb(closure, value, free_value);
-}
-
 static struct afb_req_x2 *xreq_hooked_addref_cb(struct afb_req_x2 *closure)
 {
 	struct afb_xreq *xreq = xreq_from_req_x2(closure);
@@ -734,61 +592,11 @@ static int xreq_hooked_subscribe_event_x2_cb(struct afb_req_x2 *closure, struct 
 	return afb_hook_xreq_subscribe(xreq, event, r);
 }
 
-static int xreq_hooked_legacy_subscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
-{
-	return xreq_hooked_subscribe_event_x2_cb(closure, event.closure);
-}
-
 static int xreq_hooked_unsubscribe_event_x2_cb(struct afb_req_x2 *closure, struct afb_event_x2 *event)
 {
 	int r = xreq_unsubscribe_event_x2_cb(closure, event);
 	struct afb_xreq *xreq = xreq_from_req_x2(closure);
 	return afb_hook_xreq_unsubscribe(xreq, event, r);
-}
-
-static int xreq_hooked_legacy_unsubscribe_event_x1_cb(struct afb_req_x2 *closure, struct afb_event_x1 event)
-{
-	return xreq_hooked_unsubscribe_event_x2_cb(closure, event.closure);
-}
-
-static void xreq_hooked_legacy_subcall_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*), void *closure)
-{
-#if WITH_LEGACY_CALLS
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	afb_calls_legacy_hooked_subcall_v1(xreq, api, verb, args, callback, closure);
-#else
-	xreq_legacy_subcall_cb(req, api, verb, args, callback, closure);
-#endif
-}
-
-static void xreq_hooked_legacy_subcall_req_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x1), void *closure)
-{
-#if WITH_LEGACY_CALLS
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	afb_calls_legacy_hooked_subcall_v2(xreq, api, verb, args, callback, closure);
-#else
-	xreq_legacy_subcall_req_cb(req, api, verb, args, callback, closure);
-#endif
-}
-
-static void xreq_hooked_legacy_subcall_request_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, void (*callback)(void*, int, struct json_object*, struct afb_req_x2 *), void *closure)
-{
-#if WITH_LEGACY_CALLS
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	afb_calls_legacy_hooked_subcall_v3(xreq, api, verb, args, callback, closure);
-#else
-	xreq_legacy_subcall_request_cb(req, api, verb, args, callback, closure);
-#endif
-}
-
-static int xreq_hooked_legacy_subcallsync_cb(struct afb_req_x2 *req, const char *api, const char *verb, struct json_object *args, struct json_object **result)
-{
-#if WITH_LEGACY_CALLS && WITH_AFB_CALL_SYNC
-	struct afb_xreq *xreq = xreq_from_req_x2(req);
-	return afb_calls_legacy_hooked_subcall_sync(xreq, api, verb, args, result);
-#else
-	return xreq_legacy_subcallsync_cb(req, api, verb, args, result);
-#endif
 }
 
 static void xreq_hooked_vverbose_cb(struct afb_req_x2 *closure, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
@@ -799,14 +607,6 @@ static void xreq_hooked_vverbose_cb(struct afb_req_x2 *closure, int level, const
 	xreq_vverbose_cb(closure, level, file, line, func, fmt, args);
 	afb_hook_xreq_vverbose(xreq, level, file, line, func, fmt, ap);
 	va_end(ap);
-}
-
-static struct afb_stored_req *xreq_hooked_legacy_store_cb(struct afb_req_x2 *closure)
-{
-	struct afb_xreq *xreq = xreq_from_req_x2(closure);
-	struct afb_stored_req *r = xreq_legacy_store_cb(closure);
-	afb_hook_xreq_legacy_store(xreq, r);
-	return r;
 }
 
 static int xreq_hooked_has_permission_cb(struct afb_req_x2 *closure, const char *permission)
@@ -880,29 +680,29 @@ static int xreq_hooked_subcallsync_cb(
 const struct afb_req_x2_itf xreq_hooked_itf = {
 	.json = xreq_hooked_json_cb,
 	.get = xreq_hooked_get_cb,
-	.legacy_success = xreq_hooked_legacy_success_cb,
-	.legacy_fail = xreq_hooked_legacy_fail_cb,
-	.legacy_vsuccess = xreq_hooked_legacy_vsuccess_cb,
-	.legacy_vfail = xreq_hooked_legacy_vfail_cb,
-	.legacy_context_get = xreq_hooked_legacy_context_get_cb,
-	.legacy_context_set = xreq_hooked_legacy_context_set_cb,
+	.legacy_success = NULL,
+	.legacy_fail = NULL,
+	.legacy_vsuccess = NULL,
+	.legacy_vfail = NULL,
+	.legacy_context_get = NULL,
+	.legacy_context_set = NULL,
 	.addref = xreq_hooked_addref_cb,
 	.unref = xreq_hooked_unref_cb,
 	.session_close = xreq_hooked_session_close_cb,
 	.session_set_LOA = xreq_hooked_session_set_LOA_cb,
-	.legacy_subscribe_event_x1 = xreq_hooked_legacy_subscribe_event_x1_cb,
-	.legacy_unsubscribe_event_x1 = xreq_hooked_legacy_unsubscribe_event_x1_cb,
-	.legacy_subcall = xreq_hooked_legacy_subcall_cb,
-	.legacy_subcallsync = xreq_hooked_legacy_subcallsync_cb,
+	.legacy_subscribe_event_x1 = NULL,
+	.legacy_unsubscribe_event_x1 = NULL,
+	.legacy_subcall = NULL,
+	.legacy_subcallsync = NULL,
 	.vverbose = xreq_hooked_vverbose_cb,
-	.legacy_store_req = xreq_hooked_legacy_store_cb,
-	.legacy_subcall_req = xreq_hooked_legacy_subcall_req_cb,
+	.legacy_store_req = NULL,
+	.legacy_subcall_req = NULL,
 	.has_permission = xreq_hooked_has_permission_cb,
 	.get_application_id = xreq_hooked_get_application_id_cb,
 	.context_make = xreq_hooked_context_make_cb,
 	.subscribe_event_x2 = xreq_hooked_subscribe_event_x2_cb,
 	.unsubscribe_event_x2 = xreq_hooked_unsubscribe_event_x2_cb,
-	.legacy_subcall_request = xreq_hooked_legacy_subcall_request_cb,
+	.legacy_subcall_request = NULL,
 	.get_uid = xreq_hooked_get_uid_cb,
 	.reply = xreq_hooked_reply_cb,
 	.vreply = xreq_hooked_vreply_cb,
@@ -914,16 +714,6 @@ const struct afb_req_x2_itf xreq_hooked_itf = {
 #endif
 
 /******************************************************************************/
-
-struct afb_req_x1 afb_xreq_unstore(struct afb_stored_req *sreq)
-{
-	struct afb_xreq *xreq = (struct afb_xreq *)sreq;
-#if WITH_AFB_HOOK
-	if (xreq->hookflags)
-		afb_hook_xreq_legacy_unstore(xreq);
-#endif
-	return xreq_to_req_x1(xreq);
-}
 
 struct json_object *afb_xreq_json(struct afb_xreq *xreq)
 {

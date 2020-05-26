@@ -37,8 +37,6 @@ struct afb_event_x2;
 struct afb_verb_desc_v1;
 struct afb_verb_v2;
 struct afb_verb_v3;
-struct afb_req_x1;
-struct afb_stored_req;
 
 struct afb_xreq_query_itf {
 	struct json_object *(*json)(struct afb_xreq *xreq);
@@ -97,8 +95,6 @@ struct afb_xreq
 #define CONTAINER_OF_XREQ(type,x) CONTAINER_OF(type,xreq,x)
 
 /* req wrappers for xreq */
-extern struct afb_req_x1 afb_xreq_unstore(struct afb_stored_req *sreq);
-
 extern void afb_xreq_addref(struct afb_xreq *xreq);
 extern void afb_xreq_unref(struct afb_xreq *xreq);
 extern void afb_xreq_unhooked_addref(struct afb_xreq *xreq);
@@ -150,11 +146,6 @@ extern void afb_xreq_call_verb_v3(struct afb_xreq *xreq, const struct afb_verb_v
 extern const char *xreq_on_behalf_cred_export(struct afb_xreq *xreq);
 
 /******************************************************************************/
-
-static inline struct afb_req_x1 xreq_to_req_x1(struct afb_xreq *xreq)
-{
-	return (struct afb_req_x1){ .itf = xreq->request.itf, .closure = &xreq->request };
-}
 
 static inline struct afb_req_x2 *xreq_to_req_x2(struct afb_xreq *xreq)
 {
