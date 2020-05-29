@@ -7,6 +7,8 @@
 
 #include <check.h>
 
+#include "libafb-config.h"
+
 #include "utils/u16id.h"
 #include "sys/x-errno.h"
 

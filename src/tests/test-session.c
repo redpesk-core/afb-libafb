@@ -5,6 +5,8 @@
 
 #include <check.h>
 
+#include "libafb-config.h"
+
 #include "core/afb-session.h"
 #include "core/afb-hook.h"
 #include "sys/x-errno.h"
@@ -76,25 +78,34 @@ END_TEST
 
 /*********************************************************************/
 /* check that the maximum capacity is ensured */
+
+#define SESSION_COUNT_MIN 5
+
 START_TEST (check_capacity)
 {
-	struct afb_session *s[3];
-	ck_assert_int_eq(0, afb_session_init(2, 3600));
-	s[0] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
-	ck_assert(s[0]);
-	s[1] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
-	ck_assert(s[1]);
-	s[2] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
-	ck_assert(!s[2]);
+	int i;
+	struct afb_session *s[1 + SESSION_COUNT_MIN];
+	ck_assert_int_eq(0, afb_session_init(SESSION_COUNT_MIN, 3600));
+
+	/* creation ok until count set */
+	for (i = 0 ; i < SESSION_COUNT_MIN ; i++) {
+		s[i] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
+		ck_assert(s[i]);
+	}
+	/* not ok the +1th */
+	s[i] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
+	ck_assert(!s[i]);
+
 	afb_session_close(s[0]);
 	afb_session_unref(s[0]);
-	s[2] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
-	ck_assert(s[2]);
+	s[i] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
+	ck_assert(s[i]);
 	s[0] = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
 	ck_assert(!s[0]);
-	afb_session_unref(s[0]);
-	afb_session_unref(s[1]);
-	afb_session_unref(s[2]);
+
+	while (i) {
+		afb_session_unref(s[i--]);
+	}
 }
 END_TEST
 
@@ -136,7 +147,7 @@ START_TEST (check_cookies)
 				/* never set (i = 0) */
 				q = afb_session_cookie(s, k[j], NULL, NULL, d, 0);
 				ck_assert(q == d);
-				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, 0);
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, 1);
 				ck_assert(!p);
 			}
 			q = afb_session_cookie(s, k[j], mkcookie, freecookie, k[i], 1);
@@ -169,6 +180,59 @@ END_TEST
 
 
 /*********************************************************************/
+/* check the handling of LOA */
+
+START_TEST (check_LOA)
+{
+	char *k[] = { "key1", "key2", "key3", NULL };
+	struct afb_session *s;
+	int i, j;
+
+	/* init */
+	ck_assert_int_eq(0, afb_session_init(10, 3600));
+
+	/* create a session */
+	s = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
+	ck_assert(s);
+
+	/* special case of loa==0 */
+	for (i = 0 ; k[i] ; i++) {
+		ck_assert_int_eq(0, afb_session_get_loa(s, k[i]));
+		ck_assert_int_eq(0, afb_session_set_loa(s, k[i], 0));
+		ck_assert_int_eq(0, afb_session_get_loa(s, k[i]));
+	}
+
+	/* set the key/loa */
+	for (i = 0 ; k[i] ; i++) {
+		j = 0;
+		while (j < 7) {
+			ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
+			j++;
+			ck_assert_int_eq(j, afb_session_set_loa(s, k[i], j));
+		}
+		ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
+	}
+
+	/* set the loa/key */
+	while (j) {
+		for (i = 0 ; k[i] ; i++)
+			ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
+		j--;
+		for (i = 0 ; k[i] ; i++)
+			ck_assert_int_eq(j, afb_session_set_loa(s, k[i], j));
+	}
+
+	/* special case of loa==0 */
+	for (i = 0 ; k[i] ; i++)
+		ck_assert_int_eq(0, afb_session_set_loa(s, k[i], 0));
+
+	/* closing session */
+	afb_session_unref(s);
+}
+END_TEST
+
+
+/*********************************************************************/
 /* check hooking */
 
 #if WITH_AFB_HOOK
@@ -189,11 +253,6 @@ void on_destroy(void *closure, const struct afb_hookid *hookid, struct afb_sessi
 	hookflag |= afb_hook_flag_session_destroy;
 }
 
-void on_renew(void *closure, const struct afb_hookid *hookid, struct afb_session *session)
-{
-	hookflag |= afb_hook_flag_session_renew;
-}
-
 void on_addref(void *closure, const struct afb_hookid *hookid, struct afb_session *session)
 {
 	hookflag |= afb_hook_flag_session_addref;
@@ -208,7 +267,6 @@ struct afb_hook_session_itf hookitf = {
 	.hook_session_create = on_create,
 	.hook_session_close = on_close,
 	.hook_session_destroy = on_destroy,
-	.hook_session_renew = on_renew,
 	.hook_session_addref = on_addref,
 	.hook_session_unref = on_unref
 };
@@ -216,7 +274,6 @@ struct afb_hook_session_itf hookitf = {
 extern void afb_hook_session_create(struct afb_session *session);
 extern void afb_hook_session_close(struct afb_session *session);
 extern void afb_hook_session_destroy(struct afb_session *session);
-extern void afb_hook_session_renew(struct afb_session *session);
 extern void afb_hook_session_addref(struct afb_session *session);
 extern void afb_hook_session_unref(struct afb_session *session);
 
@@ -252,11 +309,6 @@ START_TEST (check_hooking)
 	hookflag = 0;
 	afb_session_unref(s);
 	ck_assert_int_eq(hookflag, afb_hook_flag_session_unref);
-
-	/* renew session token */
-	hookflag = 0;
-	afb_session_new_token(s);
-	ck_assert_int_eq(hookflag, afb_hook_flag_session_renew);
 
 	/* close session */
 	hookflag = 0;
@@ -314,6 +366,7 @@ int main(int ac, char **av)
 			addtest(check_creation);
 			addtest(check_capacity);
 			addtest(check_cookies);
+			addtest(check_LOA);
 #if WITH_AFB_HOOK
 			addtest(check_hooking);
 #endif

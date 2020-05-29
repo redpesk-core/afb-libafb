@@ -10,7 +10,10 @@
 #endif
 
 #include "libafb-config.h"
+
+#include "libafb-config.h"
 #include "core/afb-apiset.h"
+#include "sys/verbose.h"
 #include "sys/x-errno.h"
 
 const char *names[] = {
@@ -78,6 +81,8 @@ START_TEST (check_initialisation)
 	int noto = -1;
 	struct afb_apiset *a, *b;
 
+	verbosity_set(-1);
+
 	a = afb_apiset_create(NULL, noto);
 	ck_assert_ptr_nonnull(a);
 	ck_assert_str_eq(noname, afb_apiset_name(a));
@@ -108,6 +113,8 @@ START_TEST (check_sanity)
 {
 	struct afb_apiset *a;
 
+	verbosity_set(-1);
+
 	a = afb_apiset_addref(NULL);
 	ck_assert_ptr_null(a);
 	afb_apiset_unref(NULL);
@@ -126,12 +133,15 @@ START_TEST (check_creation)
 	const char *x, *y, **set;
 	const struct afb_api_item *pa, *pb;
 
+	verbosity_set(-1);
+
 	/* create a apiset */
 	a = afb_apiset_create(NULL, 0);
 	ck_assert_ptr_nonnull(a);
 
 	/* add apis */
 	for (i = 0 ; names[i] != NULL ; i++) {
+		fprintf(stderr, "add API %s\n", names[i]);
 		sa.itf = &api_itf_null;
 		sa.closure = (void*)names[i];
 		sa.group = names[i];
@@ -148,8 +158,21 @@ START_TEST (check_creation)
 	}
 	nn = i;
 
+	/* check no extras and no aliases */
+	for (i = 0 ; extras[i] != NULL ; i++) {
+		r = afb_apiset_get_api(a, extras[i], 1, 0, &pa);
+		ck_assert_int_eq(r, X_ENOENT);
+		ck_assert_ptr_null(pa);
+	}
+	for (i = 0 ; aliases[i] != NULL ; i += 2) {
+		r = afb_apiset_get_api(a, aliases[i], 1, 0, &pa);
+		ck_assert_int_eq(r, X_ENOENT);
+		ck_assert_ptr_null(pa);
+	}
+
 	/* add aliases */
 	for (i = 0 ; aliases[i] != NULL ; i += 2) {
+		fprintf(stderr, "add alias of API %s as %s\n", aliases[i + 1], aliases[i]);
 		ck_assert_int_eq(X_ENOENT, afb_apiset_add_alias(a, extras[0], aliases[i]));
 		ck_assert_int_eq(0, afb_apiset_add_alias(a, aliases[i + 1], aliases[i]));
 		r = afb_apiset_get_api(a, aliases[i], 1, 0, &pa);
@@ -211,6 +234,8 @@ START_TEST (check_creation)
 		if (!set[i])
 			continue;
 
+		fprintf(stderr, "deleting API %s\n", set[i]);
+
 		/* should be present */
 		ck_assert_int_eq(0, afb_apiset_get_api(a, set[i], 0, 0, NULL));
 
@@ -222,10 +247,11 @@ START_TEST (check_creation)
 			for (j = i + 1 ; j < nn + na ; j++) {
 				if (!set[j])
 					continue;
-				r = afb_apiset_get_api(a, set[i], 0, 0, &pb);
+				r = afb_apiset_get_api(a, set[j], 0, 0, &pb);
 				ck_assert_int_eq(0, r);
 				ck_assert_ptr_nonnull(pb);
 				if (afb_apiset_is_alias(a, set[j]) && pa == pb) {
+					fprintf(stderr, "   ... deleted API %s has alias %s\n", set[i], set[j]);
 					ck_assert(set[j][0] > 0);
 					((char*)set[j])[0] = (char)-set[j][0];
 				}
@@ -246,7 +272,8 @@ START_TEST (check_creation)
 				ck_assert_int_eq(0, afb_apiset_get_api(a, set[j], 0, 0, NULL));
 			else {
 				((char*)set[j])[0] = (char)-set[j][0];
-				ck_assert_int_eq(0, afb_apiset_get_api(a, set[j], 0, 0, NULL));
+				fprintf(stderr, "   Checking alias %s deleted\n", set[j]);
+				ck_assert_int_gt(0, afb_apiset_get_api(a, set[j], 0, 0, NULL));
 				set[j] = NULL;
 			}
 		}

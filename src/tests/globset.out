@@ -4,11 +4,11 @@ add [kilil]: 0, Success
 match [kilil]: found by kilil
 search [kilil]: found kilil
 match [kil]: NOT FOUND
-del [error]: -1, No such file or directory
-add [kilil]: -1, File exists
+del [error]: -2, No such file or directory
+add [kilil]: -17, File exists
 del [kilil]: 0, Success
 add [kilil]: 0, Success
-add [kilil]: -1, File exists
+add [kilil]: -17, File exists
 add [kil*]: 0, Success
 match [kilil]: found by kilil
 match [kililo]: found by kil*
