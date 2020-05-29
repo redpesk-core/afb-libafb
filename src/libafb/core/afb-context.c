@@ -409,7 +409,7 @@ struct setloa {
 
 int afb_context_force_loa(struct afb_context *context, unsigned loa)
 {
-	return afb_session_set_cookie(context->session, loa_key(context), loa2ptr(loa), NULL);
+	return afb_session_set_loa(context->session, context->api_key, (int)loa);
 }
 
 static void set_loa_async(void *closure, int status)
@@ -460,7 +460,7 @@ void afb_context_change_loa_async(struct afb_context *context, unsigned loa, voi
 unsigned afb_context_get_loa(struct afb_context *context)
 {
 	assert(context->session != NULL);
-	return ptr2loa(afb_session_get_cookie(context->session, loa_key(context)));
+	return (unsigned)afb_session_get_loa(context->session, context->api_key);
 }
 
 int afb_context_check_loa(struct afb_context *context, unsigned loa)

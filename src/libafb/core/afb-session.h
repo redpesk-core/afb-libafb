@@ -55,3 +55,7 @@ extern int afb_session_set_cookie(struct afb_session *session, const void *key, 
 
 extern int afb_session_set_language(struct afb_session *session, const char *lang);
 extern const char *afb_session_get_language(struct afb_session *session, const char *lang);
+
+extern int afb_session_get_loa(struct afb_session *session, const void *key);
+extern int afb_session_set_loa(struct afb_session *session, const void *key, int loa);
+

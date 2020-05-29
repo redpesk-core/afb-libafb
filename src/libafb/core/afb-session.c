@@ -64,6 +64,7 @@ struct cookie
 	const void *key;	/**< pointer key */
 	void *value;		/**< value */
 	void (*freecb)(void*);	/**< function to call when session is closed */
+	int loa;                /**< loa for the key */
 };
 
 /**
@@ -558,6 +559,74 @@ static int cookeyidx(const void *key)
 #endif
 
 /**
+ * Get the cookie structure for the given key. Create it if needed.
+ * 
+ * @param session the session (should be locked)
+ * @param key     the key of the cookie
+ * @param result  where to store the found cookie
+ * @param pprv    where to store pointer to the cookie
+ * 
+ * @return 0 if found, 1 if found but created, X_ENOMEM if not able to create
+ */
+static int getcookie(struct afb_session *session, const void *key, int create, struct cookie **result, struct cookie ***pprv)
+{
+	int rc;
+	int idx;
+	struct cookie *cookie, **prv;
+
+	/* get key hashed index */
+	idx = cookeyidx(key);
+	prv = &session->cookies[idx];
+	for (;;) {
+		cookie = *prv;
+		if (!cookie) {
+			if (!create) {
+				rc = X_ENOENT;
+			}
+			else {
+				/* 'key' not found, create it */
+				cookie = malloc(sizeof *cookie);
+				if (!cookie)
+					rc = X_ENOMEM;
+				else {
+					cookie->key = key;
+					cookie->value = NULL;
+					cookie->freecb = NULL;
+					cookie->next = NULL;
+					cookie->loa = 0;
+					*prv = cookie;
+					rc = 1;
+				}
+			}
+			break;
+		} else if (cookie->key == key) {
+			/* cookie of key found */
+			rc = 0;
+			break;
+		} else {
+			prv = &(cookie->next);
+		}
+	}
+	*result = cookie;
+	*pprv = prv;
+	return rc;
+}
+
+/**
+ * Check that the cookie is needed. If not, remove it.
+ * 
+ * @param cookie  the cookie to check
+ * @param prv     pointer to pointer to it
+ */
+static void checkcookie(struct cookie *cookie, struct cookie **prv)
+{
+	if (!cookie->value && !cookie->freecb && !cookie->loa) {
+		*prv = cookie->next;
+		free(cookie);
+	}
+}
+
+/**
  * Set, get, replace, remove a cookie of 'key' for the 'session'
  *
  * The behaviour of this function depends on its parameters:
@@ -583,41 +652,30 @@ static int cookeyidx(const void *key)
  */
 void *afb_session_cookie(struct afb_session *session, const void *key, void *(*makecb)(void *closure), void (*freecb)(void *item), void *closure, int replace)
 {
-	int idx;
+	int rc;
 	void *value;
 	struct cookie *cookie, **prv;
 
-	/* get key hashed index */
-	idx = cookeyidx(key);
-
-	/* lock session and search for the cookie of 'key' */
+	/* lock session */
 	session_lock(session);
-	prv = &session->cookies[idx];
-	for (;;) {
-		cookie = *prv;
-		if (!cookie) {
+
+	/* search for the cookie of 'key' */
+	rc = getcookie(session, key, 1, &cookie, &prv);
+	if (rc < 0) {
+		/* can't create it */
+		errno = -rc;
+		value = NULL;
+	}
+	else {
+		/* got a cookie for the key */
+		if (rc) {
+			/* created */
 			/* 'key' not found, create value using 'closure' and 'makecb' */
 			value = makecb ? makecb(closure) : closure;
-			/* store the the only if it has some meaning */
-			if (replace || makecb || freecb) {
-				cookie = malloc(sizeof *cookie);
-				if (!cookie) {
-					errno = X_ENOMEM;
-					/* calling freecb if there is no makecb may have issue */
-					if (makecb && freecb)
-						freecb(value);
-					value = NULL;
-				} else {
-					cookie->key = key;
-					cookie->value = value;
-					cookie->freecb = freecb;
-					cookie->next = NULL;
-					*prv = cookie;
-				}
-			}
-			break;
-		} else if (cookie->key == key) {
-			/* cookie of key found */
+			cookie->value = value;
+			cookie->freecb = freecb;
+		} else {
+			/* existing */
 			if (!replace)
 				/* not replacing, get the value */
 				value = cookie->value;
@@ -629,20 +687,12 @@ void *afb_session_cookie(struct afb_session *session, const void *key, void *(*m
 				if (cookie->value != value && cookie->freecb)
 					cookie->freecb(cookie->value);
 
-				/* if both value and freecb are NULL drop the cookie */
-				if (!value && !freecb) {
-					*prv = cookie->next;
-					free(cookie);
-				} else {
-					/* store the value and its releaser */
-					cookie->value = value;
-					cookie->freecb = freecb;
-				}
+				/* store the new value */
+				cookie->value = value;
+				cookie->freecb = freecb;
 			}
-			break;
-		} else {
-			prv = &(cookie->next);
 		}
+		checkcookie(cookie, prv);
 	}
 
 	/* unlock the session and return the value */
@@ -713,3 +763,71 @@ const char *afb_session_get_language(struct afb_session *session, const char *la
 {
 	return session->lang ?: lang;
 }
+
+/**
+ * Get the LOA value associated to session for the key
+ *
+ * The behaviour of this function depends on its parameters:
+ *
+ * @param session	the session
+ * @param key		the key of the cookie
+ *
+ * @return the loa value for the key
+ */
+int afb_session_get_loa(struct afb_session *session, const void *key)
+{
+	int rc;
+	struct cookie *cookie, **prv;
+
+	/* lock session */
+	session_lock(session);
+
+	/* search for the cookie of 'key' */
+	rc = getcookie(session, key, 0, &cookie, &prv);
+	if (rc < 0) {
+		rc = 0;
+	}
+	else {
+		rc = cookie->loa;
+	}
+
+	/* unlock the session and return the value */
+	session_unlock(session);
+	return rc;
+}
+
+/**
+ * Get the LOA value associated to session for the key
+ *
+ * The behaviour of this function depends on its parameters:
+ *
+ * @param session	the session
+ * @param key		the key of the cookie
+ * @param loa           the loa to set
+ *
+ * @return the loa value for the key or a negative number if error
+ */
+int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
+{
+	int rc;
+	struct cookie *cookie, **prv;
+
+	/* lock session */
+	session_lock(session);
+
+	/* search for the cookie of 'key' */
+	rc = getcookie(session, key, loa != 0, &cookie, &prv);
+	if (rc < 0) {
+		if (loa == 0)
+			rc = 0;
+	}
+	else {
+		rc = cookie->loa = loa;
+		checkcookie(cookie, prv);
+	}
+
+	/* unlock the session and return the value */
+	session_unlock(session);
+	return rc;
+}
+
