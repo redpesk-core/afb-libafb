@@ -218,64 +218,6 @@ void afb_perm_check_async(
 }
 
 /*********************************************************************************/
-#elif BACKEND_PERMISSION_IS_CYNARA
-
-#include <pthread.h>
-#include <cynara-client.h>
-
-static cynara *handle;
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
-int afb_perm_check(struct afb_context *context, const char *permission)
-{
-	int rc;
-
-#if WITH_CRED
-	if (!context->credentials) {
-		/* case of permission for self */
-		return 1;
-	}
-#endif
-	if (!permission) {
-		ERROR("Got a null permission!");
-		return 0;
-	}
-
-	/* cynara isn't reentrant */
-	pthread_mutex_lock(&mutex);
-
-	/* lazy initialisation */
-	if (!handle) {
-		rc = cynara_initialize(&handle, NULL);
-		if (rc != CYNARA_API_SUCCESS) {
-			handle = NULL;
-			ERROR("cynara initialisation failed with code %d", rc);
-			return 0;
-		}
-	}
-
-	/* query cynara permission */
-#if WITH_CRED
-	rc = cynara_check(handle, context->credentials->label, session_of_context(context), context->credentials->user, permission);
-#else
-	rc = cynara_check(handle, "", session_of_context(context), "", permission);
-#endif
-
-	pthread_mutex_unlock(&mutex);
-	return rc == CYNARA_API_ACCESS_ALLOWED;
-}
-
-void afb_perm_check_async(
-	struct afb_context *context,
-	const char *permission,
-	void (*callback)(void *closure, int status),
-	void *closure
-)
-{
-	callback(closure, afb_perm_check(context, permission));
-}
-
-/*********************************************************************************/
 #else
 
 int afb_perm_check(struct afb_context *context, const char *permission)
