@@ -55,6 +55,9 @@
 #define MAX_EXPIRATION	(_MAXEXP_ >= 0 ? _MAXEXP_ : _MAXEXP2_)
 #define NOW		(time_now())
 
+#define MASKLOA         7
+#define COOKIESET       8
+
 /**
  * structure for a cookie added to sessions
  */
@@ -563,6 +566,7 @@ static int cookeyidx(const void *key)
  * 
  * @param session the session (should be locked)
  * @param key     the key of the cookie
+ * @param create  create if needed (boolean)
  * @param result  where to store the found cookie
  * @param pprv    where to store pointer to the cookie
  * 
@@ -620,7 +624,7 @@ static int getcookie(struct afb_session *session, const void *key, int create, s
  */
 static void checkcookie(struct cookie *cookie, struct cookie **prv)
 {
-	if (!cookie->value && !cookie->freecb && !cookie->loa) {
+	if (cookie->loa == 0) {
 		*prv = cookie->next;
 		free(cookie);
 	}
@@ -636,7 +640,7 @@ static void checkcookie(struct cookie *cookie, struct cookie **prv)
  * @param makecb	the creation function or NULL
  * @param freecb	the release function or NULL
  * @param closure	an argument for makecb or the value if makecb==NULL
- * @param replace	a boolean enforcing replacement of the previous value
+ * @param operation	operation to perform
  *
  * @return the value of the cookie
  *
@@ -650,49 +654,100 @@ static void checkcookie(struct cookie *cookie, struct cookie **prv)
  *
  *   afb_session_cookie(session, key, NULL, NULL, value, 1)
  */
-void *afb_session_cookie(struct afb_session *session, const void *key, void *(*makecb)(void *closure), void (*freecb)(void *item), void *closure, int replace)
-{
-	int rc;
+void *afb_session_cookie(
+	struct afb_session *session,
+	const void *key,
+	void *(*makecb)(void *closure),
+	void (*freecb)(void *item),
+	void *closure,
+	enum afb_session_cookie_operator operation
+) {
+	int rc, mk;
 	void *value;
 	struct cookie *cookie, **prv;
 
 	/* lock session */
 	session_lock(session);
 
+	switch(operation) {
+	case Afb_Session_Cookie_Init:
+	case Afb_Session_Cookie_Set:
+		mk = 1;
+		break;
+	case Afb_Session_Cookie_Get:
+	case Afb_Session_Cookie_Delete:
+	case Afb_Session_Cookie_Exists:
+	default:
+		mk = 0;
+		break;
+	}
+
 	/* search for the cookie of 'key' */
-	rc = getcookie(session, key, 1, &cookie, &prv);
+	rc = getcookie(session, key, mk, &cookie, &prv);
 	if (rc < 0) {
-		/* can't create it */
-		errno = -rc;
+		/* no cookie found or creation impossible */
+		if (mk)
+			errno = -rc; /* can't create it */
 		value = NULL;
 	}
+	else if (rc) {
+		/* created new cookie for the key */
+		value = makecb ? makecb(closure) : closure;
+		cookie->value = value;
+		cookie->freecb = freecb;
+		cookie->loa |= COOKIESET;
+	}
 	else {
-		/* got a cookie for the key */
-		if (rc) {
-			/* created */
-			/* 'key' not found, create value using 'closure' and 'makecb' */
-			value = makecb ? makecb(closure) : closure;
-			cookie->value = value;
-			cookie->freecb = freecb;
-		} else {
-			/* existing */
-			if (!replace)
-				/* not replacing, get the value */
+		/* got existing cookie for the key */
+		switch(operation) {
+		case Afb_Session_Cookie_Init:
+			if (cookie->loa & COOKIESET) {
 				value = cookie->value;
+			}
 			else {
 				/* create value using 'closure' and 'makecb' */
 				value = makecb ? makecb(closure) : closure;
 
-				/* free previous value is needed */
-				if (cookie->value != value && cookie->freecb)
-					cookie->freecb(cookie->value);
-
 				/* store the new value */
 				cookie->value = value;
 				cookie->freecb = freecb;
+				cookie->loa |= COOKIESET;
 			}
+			break;
+		case Afb_Session_Cookie_Set:
+			if (cookie->loa & COOKIESET) {
+				/* free previous value is needed */
+				if (cookie->freecb)
+					cookie->freecb(cookie->value);
+			}
+			else {
+				cookie->loa |= COOKIESET;
+			}
+
+			/* create value using 'closure' and 'makecb' */
+			value = makecb ? makecb(closure) : closure;
+			cookie->value = value;
+			cookie->freecb = freecb;
+			break;
+		case Afb_Session_Cookie_Get:
+			value = cookie->loa & COOKIESET ? cookie->value : NULL;
+			break;
+		case Afb_Session_Cookie_Delete:
+			if (cookie->loa & COOKIESET) {
+				/* free previous value is needed */
+				if (cookie->freecb)
+					cookie->freecb(cookie->value);
+				cookie->loa &= MASKLOA;
+			}
+			checkcookie(cookie, prv);
+			/*@fallthrough@*/
+		default:
+			value = NULL;
+			break;
+		case Afb_Session_Cookie_Exists:
+			value = (cookie->loa & COOKIESET) ? (void*)(intptr_t)1 : NULL;
+			break;
 		}
-		checkcookie(cookie, prv);
 	}
 
 	/* unlock the session and return the value */
@@ -710,7 +765,7 @@ void *afb_session_cookie(struct afb_session *session, const void *key, void *(*m
  */
 void *afb_session_get_cookie(struct afb_session *session, const void *key)
 {
-	return afb_session_cookie(session, key, NULL, NULL, NULL, 0);
+	return afb_session_cookie(session, key, NULL, NULL, NULL, Afb_Session_Cookie_Get);
 }
 
 /**
@@ -726,7 +781,7 @@ void *afb_session_get_cookie(struct afb_session *session, const void *key)
  */
 int afb_session_set_cookie(struct afb_session *session, const void *key, void *value, void (*freecb)(void*))
 {
-	return -(value != afb_session_cookie(session, key, NULL, freecb, value, 1));
+	return -(value != afb_session_cookie(session, key, NULL, freecb, value, Afb_Session_Cookie_Set));
 }
 
 /**
@@ -788,7 +843,7 @@ int afb_session_get_loa(struct afb_session *session, const void *key)
 		rc = 0;
 	}
 	else {
-		rc = cookie->loa;
+		rc = cookie->loa & MASKLOA;
 	}
 
 	/* unlock the session and return the value */
@@ -812,6 +867,9 @@ int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 	int rc;
 	struct cookie *cookie, **prv;
 
+	if (loa != (loa & MASKLOA))
+		return X_EINVAL;
+
 	/* lock session */
 	session_lock(session);
 
@@ -823,6 +881,8 @@ int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 	}
 	else {
 		rc = cookie->loa = loa;
+		rc = loa;
+		cookie->loa = (cookie->loa & COOKIESET) | loa;
 		checkcookie(cookie, prv);
 	}
 
@@ -831,3 +891,29 @@ int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 	return rc;
 }
 
+/**
+ * drop loa and cookie of the given key
+ *
+ * @param session	the session
+ * @param key		the key of the cookie
+ */
+void afb_session_drop_key(struct afb_session *session, const void *key)
+{
+	struct cookie *cookie, **prv;
+
+	/* lock session */
+	session_lock(session);
+
+	/* search for the cookie of 'key' */
+	if (getcookie(session, key, 0, &cookie, &prv) >= 0) {
+		/* unlink it */
+		*prv = cookie->next;
+		/* free value is needed */
+		if (cookie->freecb)
+			cookie->freecb(cookie->value);
+		free(cookie);
+	}
+
+	/* unlock the session and return the value */
+	session_unlock(session);
+}

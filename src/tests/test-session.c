@@ -142,15 +142,25 @@ START_TEST (check_cookies)
 		for (j = 0 ; k[j] ; j++) {
 			/* retrieve the previous value */
 			mkcookie_got = freecookie_got = NULL;
-			p = afb_session_cookie(s, k[j], NULL, NULL, NULL, 0);
-			if (!p) {
+			if (i == 0) {
 				/* never set (i = 0) */
-				q = afb_session_cookie(s, k[j], NULL, NULL, d, 0);
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Exists);
+				ck_assert(p == NULL);
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Get);
+				ck_assert(p == NULL);
+				q = afb_session_cookie(s, k[j], NULL, NULL, d, Afb_Session_Cookie_Init);
 				ck_assert(q == d);
-				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, 1);
+				q = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Init);
+				ck_assert(q == d);
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Set);
 				ck_assert(!p);
 			}
-			q = afb_session_cookie(s, k[j], mkcookie, freecookie, k[i], 1);
+			else {
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Exists);
+				ck_assert(p != NULL);
+				p = afb_session_cookie(s, k[j], NULL, NULL, NULL, Afb_Session_Cookie_Get);
+			}
+			q = afb_session_cookie(s, k[j], mkcookie, freecookie, k[i], Afb_Session_Cookie_Set);
 			ck_assert(q == k[i]);
 			ck_assert(mkcookie_got == q);
 			ck_assert(freecookie_got == p);
@@ -160,19 +170,19 @@ START_TEST (check_cookies)
 	/* drop cookies */
 	for (i = 1 ; k[i] ; i++) {
 		mkcookie_got = freecookie_got = NULL;
-		p = afb_session_cookie(s, k[i], NULL, NULL, NULL, 0);
+		p = afb_session_cookie(s, k[i], NULL, NULL, NULL, Afb_Session_Cookie_Get);
 		ck_assert(!freecookie_got);
-		q = afb_session_cookie(s, k[i], NULL, NULL, NULL, 1);
+		q = afb_session_cookie(s, k[i], NULL, NULL, NULL, Afb_Session_Cookie_Delete);
 		ck_assert(!q);
 		ck_assert(freecookie_got == p);
 	}
 
 	/* closing session */
-	p = afb_session_cookie(s, k[0], NULL, NULL, NULL, 0);
+	p = afb_session_cookie(s, k[0], NULL, NULL, NULL, Afb_Session_Cookie_Get);
 	mkcookie_got = freecookie_got = NULL;
 	afb_session_close(s);
 	ck_assert(freecookie_got == p);
-	p = afb_session_cookie(s, k[0], NULL, NULL, NULL, 0);
+	p = afb_session_cookie(s, k[0], NULL, NULL, NULL, Afb_Session_Cookie_Get);
 	ck_assert(!p);
 	afb_session_unref(s);
 }
@@ -225,6 +235,52 @@ START_TEST (check_LOA)
 	/* special case of loa==0 */
 	for (i = 0 ; k[i] ; i++)
 		ck_assert_int_eq(0, afb_session_set_loa(s, k[i], 0));
+
+	/* closing session */
+	afb_session_unref(s);
+}
+END_TEST
+
+
+/*********************************************************************/
+/* check the handling of LOA */
+
+START_TEST (check_drop)
+{
+	void *p, *key = NULL;
+	struct afb_session *s;
+
+	/* init */
+	ck_assert_int_eq(0, afb_session_init(10, 3600));
+
+	/* create a session */
+	s = afb_session_create(AFB_SESSION_TIMEOUT_DEFAULT);
+	ck_assert(s);
+
+	/* set LOA */
+	ck_assert_int_eq(4, afb_session_set_loa(s, key, 4));
+	ck_assert_int_eq(4, afb_session_get_loa(s, key));
+
+	/* set a cookie */
+	freecookie_got = NULL;
+	p = afb_session_cookie(s, key, NULL, freecookie, check_drop, Afb_Session_Cookie_Set);
+	ck_assert(p == check_drop);
+	ck_assert(freecookie_got == NULL);
+
+	/* check state */
+	p = afb_session_cookie(s, key, NULL, NULL, NULL, Afb_Session_Cookie_Get);
+	ck_assert(p == check_drop);
+	ck_assert(freecookie_got == NULL);
+	ck_assert_int_eq(4, afb_session_get_loa(s, key));
+
+	/* drop key content */
+	afb_session_drop_key(s, key);
+	ck_assert(freecookie_got == check_drop);
+
+	/* check new state */
+	ck_assert_int_eq(0, afb_session_get_loa(s, key));
+	p = afb_session_cookie(s, key, NULL, NULL, NULL, Afb_Session_Cookie_Exists);
+	ck_assert(p == NULL);
 
 	/* closing session */
 	afb_session_unref(s);
@@ -365,9 +421,12 @@ int main(int ac, char **av)
 			addtest(check_sanity);
 			addtest(check_creation);
 			addtest(check_capacity);
+		addtcase("cookie");
 			addtest(check_cookies);
 			addtest(check_LOA);
+			addtest(check_drop);
 #if WITH_AFB_HOOK
+		addtcase("hooking");
 			addtest(check_hooking);
 #endif
 	return !!srun();
