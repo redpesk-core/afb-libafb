@@ -58,6 +58,7 @@
 #include "http/afb-hsrv.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
+#include "utils/namecmp.h"
 
 #define SIZE_RESPONSE_BUFFER   8192
 
@@ -108,7 +109,7 @@ static struct hreq_data *get_data(struct afb_hreq *hreq, const char *key, int cr
 {
 	struct hreq_data *data = hreq->data;
 	while (data != NULL) {
-		if (!strcasecmp(data->key, key))
+		if (!namecmp(data->key, key))
 			return data;
 		data = data->next;
 	}
@@ -381,7 +382,7 @@ int afb_hreq_unprefix(struct afb_hreq *hreq, const char *prefix, size_t length)
 {
 	/* check the prefix ? */
 	if (length > hreq->lentail || (hreq->tail[length] && hreq->tail[length] != '/')
-	    || strncasecmp(prefix, hreq->tail, length))
+	    || namencmp(prefix, hreq->tail, length))
 		return 0;
 
 	/* removes successives / */

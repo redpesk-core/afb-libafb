@@ -56,6 +56,7 @@
 #include "sys/x-socket.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
+#include "utils/namecmp.h"
 
 /* api and apiset name */
 static const char supervision_apiname[] = AFS_SUPERVISION_APINAME;
@@ -324,7 +325,7 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 
 	/* search the verb */
 	i = (int)(sizeof verbs / sizeof *verbs);
-	while(--i >= 0 && strcasecmp(verbs[i], comreq->verbname));
+	while(--i >= 0 && namecmp(verbs[i], comreq->verbname));
 	if (i < 0) {
 		afb_req_common_reply_verb_unknown(comreq);
 		return;

@@ -76,6 +76,7 @@ option(WITH_AFB_CALL_SYNC         "Allows the (sub)call synchronous"       ON)
 option(WITH_API_SESSIONS          "Allows one session per API"             OFF)
 option(WITH_API_CREATOR           "Record creator's API of API"            ON)
 option(WITH_REQ_PROCESS_ASYNC     "Enforce asynchronous processing of requests" ON)
+option(WITH_CASE_FOLDING          "fold case for API, VERB, EVENT names"   ON)
 # tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)

@@ -15,6 +15,7 @@
 #include "core/afb-apiset.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
+#include "utils/namecmp.h"
 
 const char *names[] = {
 	"Sadie",
@@ -181,7 +182,7 @@ START_TEST (check_creation)
 		ck_assert_int_eq(1, afb_apiset_is_alias(a, aliases[i]));
 		x = afb_apiset_unalias(a, aliases[i]);
 		y = afb_apiset_unalias(a, aliases[i + 1]);
-		ck_assert_int_eq(0, strcasecmp(x, y));
+		ck_assert_int_eq(0, namecmp(x, y));
 		ck_assert_int_eq(X_EEXIST, afb_apiset_add_alias(a, aliases[i + 1], aliases[i]));
 	}
 	na = i / 2;
@@ -202,7 +203,7 @@ START_TEST (check_creation)
 		ck_assert_ptr_nonnull(pa);
 		ck_assert_int_eq(0, afb_apiset_is_alias(a, set[i]));
 		if (i)
-			ck_assert_int_gt(0, strcasecmp(set[i-1], set[i]));
+			ck_assert_int_gt(0, namecmp(set[i-1], set[i]));
 	}
 	ck_assert_int_eq(i, nn);
 	free(set);
@@ -214,7 +215,7 @@ START_TEST (check_creation)
 		ck_assert_ptr_nonnull(pa);
 		ck_assert_int_eq(1, afb_apiset_is_alias(a, set[i]));
 		if (i)
-			ck_assert_int_gt(0, strcasecmp(set[i-1], set[i]));
+			ck_assert_int_gt(0, namecmp(set[i-1], set[i]));
 	}
 	ck_assert_int_eq(i, na);
 	free(set);
@@ -225,7 +226,7 @@ START_TEST (check_creation)
 		ck_assert_int_eq(0, r);
 		ck_assert_ptr_nonnull(pa);
 		if (i)
-			ck_assert_int_gt(0, strcasecmp(set[i-1], set[i]));
+			ck_assert_int_gt(0, namecmp(set[i-1], set[i]));
 	}
 	ck_assert_int_eq(i, nn + na);
 
@@ -347,7 +348,7 @@ START_TEST (check_onlack)
 		ck_assert_int_eq(1, afb_apiset_is_alias(a, aliases[i]));
 		x = afb_apiset_unalias(a, aliases[i]);
 		y = afb_apiset_unalias(a, aliases[i + 1]);
-		ck_assert_int_eq(0, strcasecmp(x, y));
+		ck_assert_int_eq(0, namecmp(x, y));
 		ck_assert_int_eq(X_EEXIST, afb_apiset_add_alias(a, aliases[i + 1], aliases[i]));
 	}
 

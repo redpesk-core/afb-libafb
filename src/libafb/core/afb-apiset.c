@@ -34,6 +34,7 @@
 
 #include "sys/x-errno.h"
 #include "sys/verbose.h"
+#include "utils/namecmp.h"
 
 #define INCR		8	/* CAUTION: must be a power of 2 */
 #define NOT_STARTED 	1
@@ -220,7 +221,7 @@ static struct api_class *class_search(const char *name, int create)
 	struct api_class *c;
 
 	for (c= all_classes ; c ; c = c->next) {
-		if (!strcasecmp(name, c->name))
+		if (!namecmp(name, c->name))
 			return c;
 	}
 
@@ -256,7 +257,7 @@ static struct api_desc *search(struct afb_apiset *set, const char *name)
 		/* check the mid of the slice */
 		i = (lo + up) >> 1;
 		a = set->apis.apis[i];
-		c = strcasecmp(a->name, name);
+		c = namecmp(a->name, name);
 		if (c == 0) {
 			/* found */
 			return a;
@@ -273,7 +274,7 @@ static struct api_desc *search(struct afb_apiset *set, const char *name)
 	for(;;) {
 		if (!aliases)
 			break;
-		c = strcasecmp(aliases->name, name);
+		c = namecmp(aliases->name, name);
 		if (!c)
 			return aliases->api;
 		if (c > 0)
@@ -488,7 +489,7 @@ int afb_apiset_add(struct afb_apiset *set, const char *name, struct afb_api_item
 
 	/* search insertion place */
 	for (i = 0 ; i < set->apis.count ; i++) {
-		c = strcasecmp(set->apis.apis[i]->name, name);
+		c = namecmp(set->apis.apis[i]->name, name);
 		if (c > 0)
 			break;
 	}
@@ -570,7 +571,7 @@ int afb_apiset_add_alias(struct afb_apiset *set, const char *name, const char *a
 int afb_apiset_is_alias(struct afb_apiset *set, const char *name)
 {
 	struct api_desc *api = searchrec(set, name);
-	return api && strcasecmp(api->name, name);
+	return api && namecmp(api->name, name);
 }
 
 const char *afb_apiset_unalias(struct afb_apiset *set, const char *name)
@@ -595,7 +596,7 @@ int afb_apiset_del(struct afb_apiset *set, const char *name)
 	/* search the alias */
 	pali = &set->aliases;
 	while ((ali = *pali)) {
-		c = strcasecmp(ali->name, name);
+		c = namecmp(ali->name, name);
 		if (!c) {
 			*pali = ali->next;
 			free(ali);
@@ -609,7 +610,7 @@ int afb_apiset_del(struct afb_apiset *set, const char *name)
 	/* search the api */
 	for (i = 0 ; i < set->apis.count ; i++) {
 		desc = set->apis.apis[i];
-		c = strcasecmp(desc->name, name);
+		c = namecmp(desc->name, name);
 		if (c == 0) {
 			/* remove from classes */
 			for (cla = all_classes ; cla ; cla = cla->next)
@@ -1022,7 +1023,7 @@ static void get_names_value(void *closure, struct afb_apiset *set, const char *n
 #if !defined(APISET_NO_SORT)
 static int get_names_sortcb(const void *a, const void *b)
 {
-	return strcasecmp(*(const char **)a, *(const char **)b);
+	return namecmp(*(const char **)a, *(const char **)b);
 }
 #endif
 

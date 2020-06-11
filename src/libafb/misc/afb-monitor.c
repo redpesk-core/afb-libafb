@@ -110,28 +110,7 @@ static int decode_verbosity(struct json_object *v)
 	if (!wrap_json_unpack(v, "i", &level)) {
 		level = level < _VERBOSITY_(Log_Level_Error) ? _VERBOSITY_(Log_Level_Error) : level > _VERBOSITY_(Log_Level_Debug) ? _VERBOSITY_(Log_Level_Debug) : level;
 	} else if (!wrap_json_unpack(v, "s", &s)) {
-		switch(*s&~' ') {
-		case 'D':
-			if (!strcasecmp(s, _debug_))
-				level = _VERBOSITY_(Log_Level_Debug);
-			break;
-		case 'I':
-			if (!strcasecmp(s, _info_))
-				level = _VERBOSITY_(Log_Level_Info);
-			break;
-		case 'N':
-			if (!strcasecmp(s, _notice_))
-				level = _VERBOSITY_(Log_Level_Notice);
-			break;
-		case 'W':
-			if (!strcasecmp(s, _warning_))
-				level = _VERBOSITY_(Log_Level_Warning);
-			break;
-		case 'E':
-			if (!strcasecmp(s, _error_))
-				level = _VERBOSITY_(Log_Level_Error);
-			break;
-		}
+		level = _VERBOSITY_(verbose_level_of_name(s));
 	}
 	return level;
 }

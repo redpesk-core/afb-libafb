@@ -356,7 +356,11 @@ int verbose_level_of_name(const char *name)
 	while (l < u) {
 		i = (l + u) >> 1;
 		r = (int)asort[i];
+#if WITH_CASE_FOLDING
 		c = strcasecmp(names[r], name);
+#else
+		c = strcmp(names[r], name);
+#endif
 		if (!c)
 			return r;
 		if (c < 0)

@@ -41,6 +41,7 @@
 #endif
 
 #include "sys/verbose.h"
+#include "utils/namecmp.h"
 
 static char key_env_break[] = "AFB_DEBUG_BREAK";
 static char key_env_wait[] = "AFB_DEBUG_WAIT";
@@ -56,7 +57,7 @@ static int has_key(const char *key, const char *list)
 		list += strspn(list, separs);
 		while (*list) {
 			size_t s = strcspn(list, separs);
-			if (!strncasecmp(list, key, s) && !key[s])
+			if (!namencmp(list, key, s) && !key[s])
 				return 1;
 			list += s;
 			list += strspn(list, separs);

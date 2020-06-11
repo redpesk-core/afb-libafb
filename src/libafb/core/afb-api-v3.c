@@ -59,6 +59,7 @@
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
 #include "utils/wrap-json.h"
+#include "utils/namecmp.h"
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"
 
@@ -846,8 +847,8 @@ static struct afb_api_itf export_api_itf =
 static int verb_name_compare(const struct afb_verb_v3 *verb, const char *name)
 {
 	return verb->glob
-		? fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_CASEFOLD|FNM_PERIOD)
-		: strcasecmp(verb->verb, name);
+		? fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM)
+		: namecmp(verb->verb, name);
 }
 
 static struct afb_verb_v3 *search_dynamic_verb(struct afb_api_v3 *api, const char *name)
@@ -1036,7 +1037,7 @@ afb_api_v3_add_verb(
 
 	for (i = 0 ; i < api->dyn_verb_count ; i++) {
 		v = api->verbs.dynamics[i];
-		if (glob == v->glob && !strcasecmp(verb, v->verb)) {
+		if (glob == v->glob && !namecmp(verb, v->verb)) {
 			/* refuse to redefine a dynamic verb */
 			return X_EEXIST;
 		}
@@ -1082,7 +1083,7 @@ afb_api_v3_del_verb(
 
 	for (i = 0 ; i < api->dyn_verb_count ; i++) {
 		v = api->verbs.dynamics[i];
-		if (!strcasecmp(verb, v->verb)) {
+		if (!namecmp(verb, v->verb)) {
 			api->verbs.dynamics[i] = api->verbs.dynamics[--api->dyn_verb_count];
 			if (vcbdata)
 				*vcbdata = v->vcbdata;

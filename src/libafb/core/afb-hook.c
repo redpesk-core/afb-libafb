@@ -49,20 +49,22 @@
 #include "core/afb-msg-json.h"
 
 #include "utils/globmatch.h"
+#include "utils/namecmp.h"
 #include "sys/verbose.h"
 #include "sys/x-uio.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
 
-#define MATCH(pattern,string)   (\
-		pattern \
-			? !fnmatch((pattern),(string),FNM_CASEFOLD|FNM_EXTMATCH|FNM_PERIOD) \
-			: afb_apiname_is_public(string))
+#define MATCHNAME(pattern,string)  !fnmatch(pattern,string,NAME_FOLD_FNM|FNM_EXTMATCH|FNM_PERIOD)
+#define MATCHVALUE(pattern,string) !fnmatch(pattern,string,FNM_EXTMATCH|FNM_PERIOD)
 
-#define MATCH_API(pattern,string)	MATCH(pattern,string)
-#define MATCH_VERB(pattern,string)	MATCH(pattern,string)
-#define MATCH_EVENT(pattern,string)	MATCH(pattern,string)
-#define MATCH_SESSION(pattern,string)	MATCH(pattern,string)
+#define MATCHN(pattern,string,def)   ((pattern) ? MATCHNAME(pattern,string) : (def))
+#define MATCHV(pattern,string,def)   ((pattern) ? MATCHVALUE(pattern,string) : (def))
+
+#define MATCH_API(pattern,string)	MATCHN(pattern,string,afb_apiname_is_public(string))
+#define MATCH_VERB(pattern,string)	MATCHN(pattern,string,1)
+#define MATCH_EVENT(pattern,string)	MATCHN(pattern,string,1)
+#define MATCH_SESSION(pattern,string)	MATCHV(pattern,string,1)
 
 /**
  * Definition of a hook for req
