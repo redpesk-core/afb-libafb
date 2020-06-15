@@ -152,10 +152,8 @@ else()
 endif(WITH_LIBMICROHTTPD)
 
 if(NOT WITHOUT_CYNAGORA)
-	PKG_CHECK_MODULES(cynagora cynagora)
-	if(cynagora_FOUND)
-		add_definitions(-DBACKEND_PERMISSION_IS_CYNAGORA=1)
-	endif()
+	PKG_CHECK_MODULES(cynagora REQUIRED cynagora)
+	add_definitions(-DBACKEND_PERMISSION_IS_CYNAGORA=1)
 endif()
 
 if(WITH_SYSTEMD)
