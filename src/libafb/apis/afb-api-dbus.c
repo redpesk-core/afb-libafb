@@ -389,7 +389,7 @@ static int api_dbus_client_on_broadcast_event(sd_bus_message *m, void *userdata,
 		object = json_tokener_parse_verbose(data, &jerr);
 		if (jerr != json_tokener_success)
 			object = json_object_new_string(data);
-		afb_evt_rebroadcast(event, object, uuid, hop);
+		afb_evt_rebroadcast_name(event, object, uuid, hop);
 	}
 	return 1;
 }

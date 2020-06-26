@@ -422,7 +422,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 
 static void client_on_event_broadcast_cb(void *closure, const char *event_name, struct json_object *data, const uuid_binary_t uuid, uint8_t hop)
 {
-	afb_evt_rebroadcast(event_name, data, uuid, hop);
+	afb_evt_rebroadcast_name(event_name, data, uuid, hop);
 }
 
 /*****************************************************/

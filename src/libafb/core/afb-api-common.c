@@ -257,7 +257,7 @@ afb_api_common_event_broadcast(
 	memcpy(event + plen + 1, name, nlen + 1);
 
 	/* broadcast the event */
-	return afb_evt_broadcast(event, object);
+	return afb_evt_broadcast_name(event, object);
 }
 
 int

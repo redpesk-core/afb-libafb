@@ -76,8 +76,8 @@ struct tag {
 
 /* struct for events */
 struct event {
-	struct event *next;		/* link to the next event */
-	struct afb_evtid *evtid;	/* the event */
+	struct event *next;	/* link to the next event */
+	struct afb_evt *evt;	/* the event */
 };
 
 /* struct for sessions */
@@ -194,7 +194,7 @@ static void emit(void *closure, const struct afb_hookid *hookid, const char *typ
 					type, data1,
 					"data", data2);
 
-	afb_evt_evtid_push(hook->event->evtid, data);
+	afb_evt_push(hook->event->evt, data);
 }
 
 /*******************************************************************************/
@@ -1027,7 +1027,7 @@ static void trace_cleanup(struct afb_trace *trace)
 			pevent = &event->next;
 		else {
 			*pevent = event->next;
-			afb_evt_evtid_unref(event->evtid);
+			afb_evt_unref(event->evt);
 			free(event);
 		}
 	}
@@ -1068,14 +1068,14 @@ static struct event *trace_get_event(struct afb_trace *trace, const char *name, 
 
 	/* search the event */
 	event = trace->events;
-	while (event && strcmp(afb_evt_evtid_name(event->evtid), name))
+	while (event && strcmp(afb_evt_name(event->evt), name))
 		event = event->next;
 
 	if (!event && alloc) {
 		event = malloc(sizeof * event);
 		if (event) {
-			event->evtid = afb_evt_evtid_create2(trace->apiname, name);
-			if (event->evtid) {
+			event->evt = afb_evt_create2(trace->apiname, name);
+			if (event->evt) {
 				event->next = trace->events;
 				trace->events = event;
 			} else {
@@ -1243,7 +1243,7 @@ static void addhook(struct desc *desc, enum trace_type type)
 	}
 
 	/* attach and activate the hook */
-	afb_req_common_subscribe_event_x2(desc->context->req, afb_evt_event_x2_from_evtid(hook->event->evtid));
+	afb_req_common_subscribe_event_x2(desc->context->req, afb_evt_as_x2(hook->event->evt));
 	trace_attach_hook(trace, hook, type);
 }
 
