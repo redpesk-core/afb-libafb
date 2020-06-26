@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -608,7 +608,7 @@ static int read_on_reply(struct readbuf *rb, struct msg *msg)
 {
 	msg->msg.type = afb_wsapi_msg_type_reply;
 	return pending_read_closure(msg->wsapi, rb, &msg->msg.reply.closure, afb_wsapi_msg_type_call, 1)
-		&& readbuf_nullstring(rb, &msg->msg.reply.error, NULL) 
+		&& readbuf_nullstring(rb, &msg->msg.reply.error, NULL)
 		&& readbuf_nullstring(rb, &msg->msg.reply.info, NULL)
 		&& readbuf_nullstring(rb, &msg->msg.reply.data, NULL);
 }
@@ -648,7 +648,7 @@ static int read_on_event_unsubscribe(struct readbuf *rb, struct msg *msg)
 static int read_on_event_push(struct readbuf *rb, struct msg *msg)
 {
 	msg->msg.type = afb_wsapi_msg_type_event_push;
-	return readbuf_uint16(rb, &msg->msg.event_push.eventid) 
+	return readbuf_uint16(rb, &msg->msg.event_push.eventid)
 		&& readbuf_nullstring(rb, &msg->msg.event_push.data, NULL);
 }
 

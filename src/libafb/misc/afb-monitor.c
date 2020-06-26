@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -35,10 +35,10 @@
 #include "core/afb-api-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
 #include "misc/afb-trace.h"
 #include "core/afb-session.h"
 #include "core/afb-error-text.h"
+#include "core/afb-json-legacy.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 #include "utils/wrap-json.h"
@@ -363,7 +363,7 @@ static void describe_first_api(struct desc_apis *desc)
 	if (head)
 		afb_apiset_describe(monitor_api->call_set, head->name, on_api_description, desc);
 	else {
-		afb_req_common_reply(desc->req, desc->resu, NULL, NULL);
+		afb_json_legacy_req_reply(desc->req, desc->resu, NULL, NULL);
 		afb_req_common_unref(desc->req);
 		free(desc);
 	}
@@ -390,15 +390,16 @@ static void describe_apis(struct afb_req_common *req, struct json_object *resu, 
 **** Implementation monitoring verbs
 ******************************************************************************/
 
-static void f_get(struct afb_req_common *req)
+static void f_get_cb(void *closure, struct json_object *args)
 {
+	struct afb_req_common *req = closure;
 	struct json_object *r;
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
 
-	wrap_json_unpack(afb_req_common_json(req), "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
+	wrap_json_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
 	if (!verbosity && !apis)
-		afb_req_common_reply(req, NULL, NULL, NULL);
+		afb_json_legacy_req_reply(req, NULL, NULL, NULL);
 	else {
 		r = json_object_new_object();
 		if (!r)
@@ -409,22 +410,33 @@ static void f_get(struct afb_req_common *req)
 				json_object_object_add(r, _verbosity_, verbosity);
 			}
 			if (!apis)
-				afb_req_common_reply(req, r, NULL, NULL);
+				afb_json_legacy_req_reply(req, r, NULL, NULL);
 			else
 				describe_apis(req, r, apis);
 		}
 	}
 }
 
-static void f_set(struct afb_req_common *req)
+static void f_get(struct afb_req_common *req)
 {
+	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_get_cb, req);
+}
+
+static void f_set_cb(void *closure, struct json_object *args)
+{
+	struct afb_req_common *req = closure;
 	struct json_object *verbosity = NULL;
 
-	wrap_json_unpack(afb_req_common_json(req), "{s?:o}", _verbosity_, &verbosity);
+	wrap_json_unpack(args, "{s?:o}", _verbosity_, &verbosity);
 	if (verbosity)
 		set_verbosity(verbosity);
 
-	afb_req_common_reply(req, NULL, NULL, NULL);
+	afb_json_legacy_req_reply(req, NULL, NULL, NULL);
+}
+
+static void f_set(struct afb_req_common *req)
+{
+	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_set_cb, req);
 }
 
 #if WITH_AFB_TRACE
@@ -441,15 +453,16 @@ static void context_destroy(void *pointer)
 	afb_trace_unref(trace);
 }
 
-static void f_trace(struct afb_req_common *req)
+static void f_trace_cb(void *closure, struct json_object *args)
 {
+	struct afb_req_common *req = closure;
 	int rc;
 	struct json_object *add = NULL;
 	struct json_object *drop = NULL;
 	struct afb_trace *trace;
 
 	trace = afb_session_cookie(req->session, _monitor_, context_create, context_destroy, req, Afb_Session_Cookie_Init);
-	wrap_json_unpack(afb_req_common_json(req), "{s?o s?o}", "add", &add, "drop", &drop);
+	wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 	if (add) {
 		rc = afb_trace_add(req, add, trace);
 		if (rc)
@@ -460,16 +473,21 @@ static void f_trace(struct afb_req_common *req)
 		if (rc)
 			goto end;
 	}
-	afb_req_common_reply(req, NULL, NULL, NULL);
+	afb_json_legacy_req_reply(req, NULL, NULL, NULL);
 end:
 	afb_apiset_update_hooks(monitor_api->call_set, NULL);
 	afb_evt_update_hooks();
 	return;
 }
+
+static void f_trace(struct afb_req_common *req)
+{
+	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_trace_cb, req);
+}
 #else
 static void f_trace(struct afb_req_common *req)
 {
-	afb_req_common_reply_unavailable(req);
+	afb_json_legacy_req_reply_unavailable(req);
 }
 #endif
 
@@ -482,7 +500,7 @@ static void f_session(struct afb_req_common *req)
 			"uuid", afb_session_uuid(req->session),
 			"timeout", afb_session_timeout(req->session),
 			"remain", afb_session_what_remains(req->session));
-	afb_req_common_reply(req, r, NULL, NULL);
+	afb_json_legacy_req_reply(req, r, NULL, NULL);
 }
 
 void checkcb(void *closure, int status)

@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -29,9 +29,6 @@
 #include <stdarg.h>
 
 #include <json-c/json.h>
-#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
-#define JSON_C_TO_STRING_NOSLASHESCAPE 0
-#endif
 
 #include <afb/afb-binding-v3.h>
 #include <afb/afb-req-x2.h>
@@ -44,10 +41,12 @@
 #include "core/afb-calls.h"
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
+#include "core/afb-data.h"
+#include "core/afb-params.h"
+#include "core/afb-evt.h"
 #include "core/afb-hook.h"
-#include "core/afb-msg-json.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
 #include "core/afb-req-v3.h"
 #include "core/afb-error-text.h"
 #include "core/afb-jobs.h"
@@ -74,6 +73,9 @@ struct afb_req_v3
 
 	/** exported x2 */
 	struct afb_req_x2 x2;
+
+	/** as json object */
+	struct json_object *json;
 
 	/** count of references */
 	uint16_t refcount;
@@ -140,18 +142,41 @@ x2_req_unref(
 	afb_req_v3_unref(req);
 }
 
+struct x2subcallcb2 {
+	struct afb_req_v3 *req;
+	void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_req_x2*);
+	void *closure;
+};
+
+static
+void subcall_cb2(
+	void *closure,
+	struct json_object *object,
+	const char *error,
+	const char *info
+) {
+	struct x2subcallcb2 *sc = closure;
+
+	sc->callback(sc->closure, object, error, info, req_v3_to_req_x2(sc->req));
+	afb_req_v3_unref(sc->req);
+}
+
 static
 void subcall_cb(
 	void *closure1,
 	void *closure2,
 	void *closure3,
-	const struct afb_req_reply *reply
+	int status,
+	unsigned nreplies,
+	const struct afb_data_x4 * const *replies
 ) {
-	struct afb_req_v3 *req = closure1;
-	void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_req_x2*) = closure2;
-	void *closure = closure3;
-	callback(closure, reply->object, reply->error, reply->info, req_v3_to_req_x2(req));
-	afb_req_v3_unref(req);
+	struct x2subcallcb2 sc;
+
+	sc.req = closure1;
+	sc.callback = closure2;
+	sc.closure = closure3;
+
+	afb_json_legacy_do_reply_json_c(&sc, status, nreplies, replies, subcall_cb2);
 }
 
 static
@@ -166,8 +191,18 @@ x2_req_subcall(
 	void *closure
 ) {
 	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
-	afb_req_v3_addref(req);
-	afb_calls_subcall(afb_api_v3_get_api_common(req->api), api, verb, args, subcall_cb, req, callback, closure, req->comreq, flags);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		callback(closure, 0, afb_error_text_internal_error, 0, xreq);
+	}
+	else {
+		afb_req_v3_addref(req);
+		afb_calls_subcall_x4(afb_api_v3_get_api_common(req->api), api, verb, 1, &data,
+					subcall_cb, req, callback, closure, req->comreq, flags);
+	}
 }
 
 static
@@ -182,11 +217,29 @@ x2_req_subcall_sync(
 	char **error,
 	char **info
 ) {
+	int rc;
 	int result;
-	struct afb_req_reply reply;
+	const struct afb_data_x4 *data;
+	const struct afb_data_x4 *replies[3];
+	unsigned nreplies;
+	int status;
 	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
-	result = afb_calls_subcall_sync(afb_api_v3_get_api_common(req->api), api, verb, args, &reply, req->comreq, flags);
-	afb_req_reply_move_splitted(&reply, object, error, info);
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		result = rc;
+		*object = 0;
+		*error = strdup(afb_error_text_internal_error);
+		*info = 0;
+	}
+	else {
+		nreplies = 3;
+		result = afb_calls_subcall_sync_x4(afb_api_v3_get_api_common(req->api),
+					api, verb, 1, &data,
+					&status, &nreplies, replies, req->comreq, flags);
+		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
+		afb_params_unref(nreplies, replies);
+	}
 	return result;
 }
 
@@ -195,8 +248,8 @@ struct json_object *
 x2_req_json(
 	struct afb_req_x2 *reqx2
 ) {
-	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_json(comreq);
+	struct afb_req_v3 *req = req_v3_from_req_x2(reqx2);
+	return req->json;
 }
 
 static
@@ -205,8 +258,27 @@ x2_req_get(
 	struct afb_req_x2 *reqx2,
 	const char *name
 ) {
-	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_get(comreq, name);
+	struct afb_req_v3 *req = req_v3_from_req_x2(reqx2);
+	struct afb_arg arg;
+	struct json_object *value, *file, *path;
+
+	if (json_object_object_get_ex(req->json, name, &value)) {
+		arg.name = name;
+		if (json_object_object_get_ex(value, "file", &file)
+		 && json_object_object_get_ex(value, "path", &path)) {
+			arg.value = json_object_get_string(file);
+			arg.path = json_object_get_string(path);
+		}
+		else {
+			arg.value = json_object_get_string(value);
+			arg.path = NULL;
+		}
+	} else {
+		arg.name = NULL;
+		arg.value = NULL;
+		arg.path = NULL;
+	}
+	return arg;
 }
 
 static
@@ -218,7 +290,8 @@ x2_req_reply(
 	const char *info
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	afb_req_common_reply(comreq, obj, error, info);
+
+	afb_json_legacy_req_reply(comreq, obj, error, info);
 }
 
 static
@@ -231,7 +304,8 @@ x2_req_vreply(
 	va_list args
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	afb_req_common_vreply(comreq, obj, error, fmt, args);
+
+	afb_json_legacy_req_vreply(comreq, obj, error, fmt, args);
 }
 
 static
@@ -392,35 +466,64 @@ static int x2_req_hooked_get_uid(struct afb_req_x2 *closure)
 }
 
 static void x2_req_hooked_subcall(
-				struct afb_req_x2 *xreq,
-				const char *api,
-				const char *verb,
-				struct json_object *args,
-				int flags,
-				void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
-				void *closure)
+	struct afb_req_x2 *xreq,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	int flags,
+	void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
+	void *closure)
 {
 	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
-	afb_req_v3_addref(req);
-	afb_calls_subcall_hookable(afb_api_v3_get_api_common(req->api), api, verb, args, subcall_cb, req, callback, closure, req->comreq, flags);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		callback(closure, 0, afb_error_text_internal_error, 0, xreq);
+	}
+	else {
+		afb_req_v3_addref(req);
+		afb_calls_subcall_hookable_x4(afb_api_v3_get_api_common(req->api), api, verb, 1, &data,
+					subcall_cb, req, callback, closure, req->comreq, flags);
+	}
 }
 
-static int x2_req_hooked_subcall_sync(
-				struct afb_req_x2 *xreq,
-				const char *api,
-				const char *verb,
-				struct json_object *args,
-				int flags,
-				struct json_object **object,
-				char **error,
-				char **info)
-{
-	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
-	struct afb_req_reply reply;
+static
+int
+x2_req_hooked_subcall_sync(
+	struct afb_req_x2 *xreq,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	int flags,
+	struct json_object **object,
+	char **error,
+	char **info
+) {
+	int rc;
 	int result;
+	const struct afb_data_x4 *data;
+	const struct afb_data_x4 *replies[3];
+	unsigned nreplies;
+	int status;
+	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
 
-	result = afb_calls_subcall_sync_hookable(afb_api_v3_get_api_common(req->api), api, verb, args, &reply, req->comreq, flags);
-	afb_req_reply_move_splitted(&reply, object, error, info);
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		result = rc;
+		*object = 0;
+		*error = strdup(afb_error_text_internal_error);
+		*info = 0;
+	}
+	else {
+		nreplies = 3;
+		result = afb_calls_subcall_sync_hookable_x4(afb_api_v3_get_api_common(req->api),
+					api, verb, 1, &data,
+					&status, &nreplies, replies, req->comreq, flags);
+		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
+		afb_params_unref(nreplies, replies);
+	}
 	return result;
 }
 
@@ -430,7 +533,8 @@ x2_req_hooked_json(
 	struct afb_req_x2 *reqx2
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_json_hookable(comreq);
+	struct json_object *r = x2_req_json(reqx2);
+	return afb_hook_req_json(comreq, r);
 }
 
 static
@@ -440,7 +544,8 @@ x2_req_hooked_get(
 	const char *name
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_get_hookable(comreq, name);
+	struct afb_arg r = x2_req_get(reqx2, name);
+	return afb_hook_req_get(comreq, name, r);
 }
 
 static
@@ -452,7 +557,8 @@ x2_req_hooked_reply(
 	const char *info
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	afb_req_common_reply_hookable(comreq, obj, error, info);
+
+	afb_json_legacy_req_hooked_reply(comreq, obj, error, info);
 }
 
 static
@@ -465,7 +571,8 @@ x2_req_hooked_vreply(
 	va_list args
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	afb_req_common_vreply_hookable(comreq, obj, error, fmt, args);
+
+	afb_json_legacy_req_hooked_vreply(comreq, obj, error, fmt, args);
 }
 
 static
@@ -553,32 +660,49 @@ static void call_checked_v3(void *closure, int status)
 	afb_req_v3_unref(req);
 }
 
+static void get_json_object(void *closure, struct json_object *object, const void *unused)
+{
+	struct afb_req_v3 *req = closure;
+	req->json = json_object_get(object);
+}
+
 void afb_req_v3_process(
 	struct afb_req_common *comreq,
 	struct afb_api_v3 *api,
 	struct afb_api_x3 *apix3,
 	const struct afb_verb_v3 *verb
 ) {
+	int rc;
 	struct afb_req_v3 *req;
-
 
 	req = malloc(sizeof *req);
 	if (req == NULL) {
 		afb_req_common_reply_internal_error(comreq);
+		return;
 	}
-	else {
-		req->comreq = afb_req_common_addref(comreq);
-		req->api = api;
-		req->x2.api = apix3;
-		req->x2.called_api = comreq->apiname;
-		req->x2.called_verb = comreq->verbname;
+
+	rc = afb_json_legacy_do2_single_json_c(
+			comreq->nparams, comreq->params,
+			get_json_object, req, 0);
+	if (rc < 0) {
+		free(req);
+		afb_req_common_reply_internal_error(comreq);
+		return;
+	}
+
+	req->comreq = afb_req_common_addref(comreq);
+	req->api = api;
+	req->x2.api = apix3;
+	req->x2.called_api = comreq->apiname;
+	req->x2.called_verb = comreq->verbname;
 #if WITH_AFB_HOOK
-		req->x2.itf = comreq->hookflags ? &req_v3_hooked_itf : &req_v3_itf;
+	req->x2.itf = comreq->hookflags ? &req_v3_hooked_itf : &req_v3_itf;
 #else
-		req->x2.itf = &req_v3_itf;
+	req->x2.itf = &req_v3_itf;
 #endif
-		req->x2.vcbdata = (void*)verb;
-		req->refcount = 1;
-		afb_req_common_check_and_set_session_async(comreq, verb->auth, verb->session, call_checked_v3, req);
-	}
+	req->x2.vcbdata = (void*)verb;
+	req->refcount = 1;
+	afb_req_common_check_and_set_session_async(comreq,
+			verb->auth, verb->session,
+			call_checked_v3, req);
 }

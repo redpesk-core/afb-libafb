@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -33,6 +33,7 @@
 #include "sys/x-dynlib.h"
 #include "apis/afb-api-so.h"
 #include "apis/afb-api-so-v3.h"
+#include "apis/afb-api-so-v4.h"
 #include "sys/verbose.h"
 #include "core/afb-sig-monitor.h"
 
@@ -83,9 +84,19 @@ static int load_binding(const char *path, int force, struct afb_apiset *declare_
 		);
 		goto error;
 	}
+
 	/*
 	 * This is a loadable library let's check if it's a binding ...
 	 */
+
+	/* try the version 4 */
+	rc = afb_api_so_v4_add(path, &dynlib, declare_set, call_set);
+	if (rc < 0)
+		/* error when loading a valid v3 binding */
+		goto error2;
+
+	if (rc)
+		return 0; /* yes version 3 */
 
 	/* try the version 3 */
 	rc = afb_api_so_v3_add(path, &dynlib, declare_set, call_set);

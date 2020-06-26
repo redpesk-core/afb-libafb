@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -31,22 +31,20 @@
 #include <assert.h>
 
 #include <systemd/sd-bus.h>
-#include <json-c/json.h>
-#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
-#define JSON_C_TO_STRING_NOSLASHESCAPE 0
-#endif
 
 #include <afb/afb-event-x2.h>
+#include <afb/afb-data-x4.h>
+#include <afb/afb-type-x4.h>
 
 #include "core/afb-session.h"
-#include "core/afb-msg-json.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "apis/afb-api-dbus.h"
 #include "core/afb-cred.h"
+#include "core/afb-data.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
 #include "core/containerof.h"
 
 #include "sys/verbose.h"
@@ -84,7 +82,7 @@ struct api_dbus
 		} client;
 		struct {
 			struct sd_bus_slot *slot_call;
-			struct afb_evt_listener *listener; /* listener for broadcasted events */
+			struct afb_evt_listener *listener; /* listener for events */
 			struct origin *origins;
 			struct afb_apiset *apiset;
 		} server;
@@ -297,8 +295,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	int rc;
 	struct dbus_memo *memo;
 	const char *json, *error, *info;
-	struct json_object *object;
-	enum json_tokener_error jerr;
+	const struct afb_data_x4 *params[3];
 
 	/* retrieve the recorded data */
 	memo = userdata;
@@ -307,17 +304,23 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	rc = sd_bus_message_read(message, "sss", &json, &error, &info);
 	if (rc < 0) {
 		/* failing to have the answer */
-		afb_req_common_reply(memo->comreq, NULL, "error", "dbus error");
+		afb_req_common_reply_internal_error(memo->comreq);
 	} else {
-		/* report the answer */
-		if (!*json)
-			object = NULL;
-		else {
-			object = json_tokener_parse_verbose(json, &jerr);
-			if (jerr != json_tokener_success)
-				object = json_object_new_string(json);
+		/* build the reply */
+		json = *json ? json : 0;
+		error = *error ? error : 0;
+		info = *info ? info : 0;
+		sd_bus_message_ref(sd_bus_message_ref(sd_bus_message_ref(message)));
+		rc = afb_json_legacy_make_reply_json_string_x4(params,
+				json, (void*)sd_bus_message_unref, message,
+				error, (void*)sd_bus_message_unref, message,
+				info, (void*)sd_bus_message_unref, message);
+		if (rc < 0) {
+			/* failing to have the answer */
+			afb_req_common_reply_internal_error(memo->comreq);
+		} else {
+			afb_req_common_reply(memo->comreq, LEGACY_STATUS(error), 3, params);
 		}
-		afb_req_common_reply(memo->comreq, object, *error ? error : NULL, *info ? info : NULL);
 	}
 	api_dbus_client_memo_destroy(memo);
 	return 1;
@@ -331,11 +334,14 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 	struct dbus_memo *memo;
 	struct sd_bus_message *msg;
 	const char *creds;
+	const char *uuid;
+	const char *json;
+	struct afb_data *arg = NULL;
 
 	/* create the recording data */
 	memo = api_dbus_client_memo_make(api, comreq);
 	if (memo == NULL) {
-		afb_req_common_reply(memo->comreq, NULL, "error", "out of memory");
+		afb_req_common_reply_out_of_memory(memo->comreq);
 		return;
 	}
 
@@ -345,12 +351,16 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 	if (rc < 0)
 		goto error;
 
-	creds = afb_req_common_on_behalf_cred_export(comreq);
-	rc = sd_bus_message_append(msg, "ssus",
-			json_object_to_json_string(comreq->json),
-			afb_session_uuid(comreq->session),
-			0,
-			creds ?: "");
+	creds = afb_req_common_on_behalf_cred_export(comreq) ?: "";
+	uuid = afb_session_uuid(comreq->session);
+	if (comreq->nparams < 1
+	 || afb_data_convert_to_x4(afb_data_of_data_x4(comreq->params[0]), AFB_TYPE_X4_JSON, &arg) < 0) {
+		 json = "null";
+	}
+	else {
+		json = afb_data_pointer(arg);
+	}
+	rc = sd_bus_message_append(msg, "ssus", json, uuid, 0, creds);
 	if (rc < 0)
 		goto error;
 
@@ -366,30 +376,31 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 error:
 	/* if there was an error report it directly */
 	errno = -rc;
-	afb_req_common_reply(memo->comreq, NULL, "error", "dbus error");
+	afb_req_common_reply_internal_error(memo->comreq);
 	api_dbus_client_memo_destroy(memo);
 end:
+	afb_data_unref(arg);
 	sd_bus_message_unref(msg);
 }
 
 /* receives broadcasted events */
 static int api_dbus_client_on_broadcast_event(sd_bus_message *m, void *userdata, sd_bus_error *ret_error)
 {
-	struct json_object *object;
+	const struct afb_data_x4 *param;
 	const char *event, *data;
 	const unsigned char *uuid;
 	size_t szuuid;
 	uint8_t hop;
-	enum json_tokener_error jerr;
 
 	int rc = sd_bus_message_read(m, "ssayy", &event, &data, &uuid, &szuuid, &hop);
 	if (rc < 0)
 		ERROR("unreadable broadcasted event");
 	else {
-		object = json_tokener_parse_verbose(data, &jerr);
-		if (jerr != json_tokener_success)
-			object = json_object_new_string(data);
-		afb_evt_rebroadcast_name(event, object, uuid, hop);
+		data = *data ? data : "null";
+		rc = afb_data_x4_create_set_x4(&param, AFB_TYPE_X4_JSON, data, 1+strlen(data),
+						(void*)sd_bus_message_unref, sd_bus_message_ref(m));
+		if (rc >= 0)
+			afb_evt_rebroadcast_name_x4(event, 1, &param, uuid, hop);
 	}
 	return 1;
 }
@@ -421,8 +432,7 @@ static void api_dbus_client_event_create(struct api_dbus *api, int id, const cha
 	/* no conflict, try to add it */
 	ev = malloc(sizeof *ev);
 	if (ev != NULL) {
-		ev->event = afb_evt_create(name);
-		if (ev->event == NULL)
+		if (afb_evt_create(&ev->event, name) < 0)
 			free(ev);
 		else {
 			ev->refcount = 1;
@@ -463,11 +473,11 @@ static void api_dbus_client_event_drop(struct api_dbus *api, int id, const char 
 }
 
 /* pushs an event */
-static void api_dbus_client_event_push(struct api_dbus *api, int id, const char *name, const char *data)
+static void api_dbus_client_event_push(struct api_dbus *api, int id, const char *name, const char *data, sd_bus_message *m)
 {
-	struct json_object *object;
+	int rc;
+	const struct afb_data_x4 *param;
 	struct dbus_event *ev;
-	enum json_tokener_error jerr;
 
 	/* retrieves the event */
 	ev = api_dbus_client_event_search(api, id, name);
@@ -476,11 +486,11 @@ static void api_dbus_client_event_push(struct api_dbus *api, int id, const char 
 		return;
 	}
 
-	/* destroys the event */
-	object = json_tokener_parse_verbose(data, &jerr);
-	if (jerr != json_tokener_success)
-		object = json_object_new_string(data);
-	afb_evt_push(ev->event, object);
+	data = *data ? data : "null";
+	rc = afb_data_x4_create_set_x4(&param, AFB_TYPE_X4_JSON, data, 1+strlen(data),
+					(void*)sd_bus_message_unref, sd_bus_message_ref(m));
+	if (rc >= 0)
+		afb_evt_push_x4(ev->event, 1, &param);
 }
 
 /* subscribes an event */
@@ -572,7 +582,7 @@ static int api_dbus_client_on_manage_event(sd_bus_message *m, void *userdata, sd
 		api_dbus_client_event_drop(api, eventid, eventname);
 		break;
 	case '!': /* pushs the event */
-		api_dbus_client_event_push(api, eventid, eventname, data);
+		api_dbus_client_event_push(api, eventid, eventname, data, m);
 		break;
 	case 'S': /* subscribe event for a request */
 		api_dbus_client_event_subscribe(api, eventid, eventname, msgid);
@@ -648,8 +658,8 @@ error:
 
 static void afb_api_dbus_server_event_add(void *closure, const char *event, uint16_t eventid);
 static void afb_api_dbus_server_event_remove(void *closure, const char *event, uint16_t eventid);
-static void afb_api_dbus_server_event_push(void *closure, const char *event, uint16_t eventid, struct json_object *object);
-static void afb_api_dbus_server_event_broadcast(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop);
+static void afb_api_dbus_server_event_push(void *closure, const struct afb_evt_pushed *event);
+static void afb_api_dbus_server_event_broadcast(void *closure, const struct afb_evt_broadcasted *event);
 
 /* the interface for events broadcasting */
 static const struct afb_evt_itf evt_broadcast_itf = {
@@ -824,8 +834,6 @@ static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, c
 struct dbus_req {
 	struct afb_req_common comreq;		/**< the comreq of the request */
 	sd_bus_message *message;	/**< the incoming request message */
-	const char *request;		/**< the readen request as string */
-	struct json_object *json;	/**< the readen request as object */
 	struct listener *listener;	/**< the listener for events */
 	struct api_dbus *dbusapi;	/**< the api */
 };
@@ -836,30 +844,27 @@ static void dbus_req_destroy(struct afb_req_common *comreq)
 	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 
 	afb_req_common_cleanup(comreq);
-	json_object_put(dreq->json);
 	sd_bus_message_unref(dreq->message);
 	free(dreq);
 }
 
-/* get the object of the request */
-static struct json_object *dbus_req_json(struct afb_req_common *comreq)
+void dbus_req_raw_reply_cb(void *closure, const char *object, const char *error, const char *info)
 {
-	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
-
-	return dreq->json;
-}
-
-void dbus_req_raw_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
-{
+	struct afb_req_common *comreq = closure;
 	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	int rc;
 
 	rc = sd_bus_reply_method_return(dreq->message, "sss",
-		reply->object ? json_object_to_json_string_ext(reply->object, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE) : "",
-		reply->error ? : "",
-		reply->info ? : "");
+		object ?: "",
+		error ?: "",
+		info ?: "");
 	if (rc < 0)
 		ERROR("sending the reply failed");
+}
+
+void dbus_req_raw_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+{
+	afb_json_legacy_do_reply_json_string(comreq, status, nreplies, replies, dbus_req_raw_reply_cb);
 }
 
 static void afb_api_dbus_server_event_send(struct origin *origin, char order, const char *event, int eventid, const char *data, uint64_t msgid);
@@ -889,7 +894,6 @@ static int dbus_req_unsubscribe(struct afb_req_common *comreq, struct afb_evt *e
 }
 
 const struct afb_req_common_query_itf afb_api_dbus_req_common_itf = {
-	.json = dbus_req_json,
 	.reply = dbus_req_raw_reply,
 	.unref = dbus_req_destroy,
 	.subscribe = dbus_req_subscribe,
@@ -935,25 +939,39 @@ static void afb_api_dbus_server_event_remove(void *closure, const char *event, u
 	afb_api_dbus_server_event_send(closure, '-', event, eventid, "", 0);
 }
 
-static void afb_api_dbus_server_event_push(void *closure, const char *event, uint16_t eventid, struct json_object *object)
+static void server_event_push_cb(void *closure1, const char *json, const void *closure2)
 {
-	const char *data = json_object_to_json_string_ext(object, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE);
-	afb_api_dbus_server_event_send(closure, '!', event, eventid, data, 0);
-	json_object_put(object);
+	struct origin *origin = closure1;
+	const struct afb_evt_pushed *event = closure2;
+
+	afb_api_dbus_server_event_send(origin, '!', event->data.name, event->data.eventid, json, 0);
 }
 
-static void afb_api_dbus_server_event_broadcast(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+static void afb_api_dbus_server_event_push(void *closure, const struct afb_evt_pushed *event)
 {
-	int rc;
-	struct api_dbus *api;
+	afb_json_legacy_do2_single_json_string(event->data.nparams, event->data.params, server_event_push_cb, closure, event);
+}
 
-	api = closure;
-	rc = sd_bus_emit_signal(api->sdbus, api->path, api->name, "broadcast",
-			"ssayy", event, json_object_to_json_string_ext(object, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE),
-			uuid, UUID_BINARY_LENGTH, hop);
+struct server_event_broadcast_cb_data
+{
+	struct api_dbus *api;
+	const struct afb_evt_broadcasted *event;
+};
+
+static void server_event_broadcast_cb(void *closure1, const char *json, const void *closure2)
+{
+	struct api_dbus *api = closure1;
+	const struct afb_evt_broadcasted *event = closure2;
+	int rc = sd_bus_emit_signal(api->sdbus, api->path, api->name, "broadcast",
+			"ssayy", event->data.name, json,
+			event->uuid, UUID_BINARY_LENGTH, event->hop);
 	if (rc < 0)
-		ERROR("error while broadcasting event %s", event);
-	json_object_put(object);
+		ERROR("error while broadcasting event %s", event->data.name);
+}
+
+static void afb_api_dbus_server_event_broadcast(void *closure, const struct afb_evt_broadcasted *event)
+{
+	afb_json_legacy_do2_single_json_string(event->data.nparams, event->data.params, server_event_broadcast_cb, closure, event);
 }
 
 /* called when the object for the service is called */
@@ -961,13 +979,15 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 {
 	int rc;
 	const char *method;
+	const char *request;
 	const char *uuid;
 	const char *creds;
 	struct dbus_req *dreq;
 	struct api_dbus *api = userdata;
 	uint32_t flags;
 	struct listener *listener;
-	enum json_tokener_error jerr;
+	const struct afb_data_x4 *arg;
+	struct afb_session *session;
 
 	/* check the interface */
 	if (strcmp(sd_bus_message_get_interface(message), api->name) != 0)
@@ -982,28 +1002,28 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 		goto out_of_memory;
 
 	/* get the data */
-	rc = sd_bus_message_read(message, "ssus", &dreq->request, &uuid, &flags, &creds);
+	rc = sd_bus_message_read(message, "ssus", &request, &uuid, &flags, &creds);
 	if (rc < 0) {
 		sd_bus_reply_method_errorf(message, SD_BUS_ERROR_INVALID_SIGNATURE, "invalid signature");
 		goto error;
 	}
-
-	/* connect to the context */
-	afb_req_common_init(&dreq->comreq, &afb_api_dbus_req_common_itf, api->api, method);
-	afb_req_common_set_session_string(&dreq->comreq, uuid);
-
+	session = afb_session_get(uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
 	/* get the listener */
 	listener = afb_api_dbus_server_listener_get(api, sd_bus_message_get_sender(message), dreq->comreq.session);
 	if (listener == NULL)
 		goto out_of_memory;
 
+	rc = afb_data_x4_create_set_x4(&arg, AFB_TYPE_X4_JSON, request, 1+strlen(request),
+					(void*)sd_bus_message_unref, sd_bus_message_ref(message));
+	if (rc < 0)
+		goto out_of_memory;
+
+	/* connect to the context */
+	afb_req_common_init(&dreq->comreq, &afb_api_dbus_req_common_itf, api->api, method, 1, &arg);
+	afb_req_common_set_session(&dreq->comreq, session);
+
 	/* fulfill the request and emit it */
 	dreq->message = sd_bus_message_ref(message);
-	dreq->json = json_tokener_parse_verbose(dreq->request, &jerr);
-	if (jerr != json_tokener_success) {
-		/* lazy error detection of json request. Is it to improve? */
-		dreq->json = json_object_new_string(dreq->request);
-	}
 	dreq->listener = listener;
 	dreq->dbusapi = api;
 

@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -23,22 +23,21 @@
 
 #pragma once
 
-struct json_object;
 struct afb_api_common;
 struct afb_req_common;
-struct afb_req_reply;
+struct afb_dataset;
+struct afb_data_x4;
 
-/******************************************************************************/
-/** calls */
 /******************************************************************************/
 extern
 void
-afb_calls_call(
+afb_calls_call_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
 	void *closure1,
 	void *closure2,
 	void *closure3
@@ -46,51 +45,26 @@ afb_calls_call(
 
 extern
 int
-afb_calls_call_sync(
+afb_calls_call_sync_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	struct afb_req_reply *reply
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	int *status,
+	unsigned *nreplies,
+	const struct afb_data_x4 **replies
 );
 
-/******************************************************************************/
-#if WITH_AFB_HOOK
 extern
 void
-afb_calls_call_hookable(
+afb_calls_subcall_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
-	void *closure1,
-	void *closure2,
-	void *closure3
-);
-
-extern
-int
-afb_calls_call_sync_hookable(
-	struct afb_api_common *comapi,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	struct afb_req_reply *reply
-);
-#endif
-
-/******************************************************************************/
-/** subcalls                                                                  */
-/******************************************************************************/
-extern
-void
-afb_calls_subcall(
-	struct afb_api_common *comapi,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
 	void *closure1,
 	void *closure2,
 	void *closure3,
@@ -100,12 +74,15 @@ afb_calls_subcall(
 
 extern
 int
-afb_calls_subcall_sync(
+afb_calls_subcall_sync_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	struct afb_req_reply *reply,
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	int *status,
+	unsigned *nreplies,
+	const struct afb_data_x4 **replies,
 	struct afb_req_common *comreq,
 	int flags
 );
@@ -114,12 +91,40 @@ afb_calls_subcall_sync(
 #if WITH_AFB_HOOK
 extern
 void
-afb_calls_subcall_hookable(
+afb_calls_call_hookable_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	void (*callback)(void*, void*, void*, const struct afb_req_reply*),
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
+	void *closure1,
+	void *closure2,
+	void *closure3
+);
+
+extern
+int
+afb_calls_call_sync_hookable_x4(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	int *status,
+	unsigned *nreplies,
+	const struct afb_data_x4 **replies
+);
+
+extern
+void
+afb_calls_subcall_hookable_x4(
+	struct afb_api_common *comapi,
+	const char *api,
+	const char *verb,
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
 	void *closure1,
 	void *closure2,
 	void *closure3,
@@ -129,12 +134,15 @@ afb_calls_subcall_hookable(
 
 extern
 int
-afb_calls_subcall_sync_hookable(
+afb_calls_subcall_sync_hookable_x4(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
-	struct json_object *args,
-	struct afb_req_reply *reply,
+	unsigned nparams,
+	const struct afb_data_x4 * const*params,
+	int *status,
+	unsigned *nreplies,
+	const struct afb_data_x4 **replies,
 	struct afb_req_common *comreq,
 	int flags
 );

@@ -1,0 +1,39 @@
+How parameters and replies are managed in API v4
+================================================
+
+Applicative bindings receive and emit massages carrying data.
+These data are called parameters of the message. This paper
+presents how parameters are handled in the API of bindings
+version 4.
+
+Emitting parameters
+-------------------
+
+Let start with the simplest. Emitting parameters is done
+in the following situations:
+
+- broadcasting or pushing events
+- calling or sub-calling a verb
+
+The procedure to follow is:
+
+- collect or build the data that will be emitted,
+- if needed, add one reference to each data that remains
+  used after emission,
+- emit the data using an array.
+
+The sent parameters are released by the binder framework
+when the sending is completed.
+
+Here is an example:
+
+```C
+int push(afb_event_t event, int value)
+{
+	afb_data_t params[1] = { NULL };
+	afb_evt_new_data(event, &params[0]);
+	afb_data_copy(params[0], AFB_TYPE_INT, &value, sizeof value);
+	afb_event_push(event, 1, params);
+}
+
+```

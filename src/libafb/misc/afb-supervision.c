@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -40,7 +40,9 @@
 
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"
+#include "core/afb-json-legacy.h"
 #include "misc/afb-trace.h"
+#include "core/afb-params.h"
 #include "core/afb-session.h"
 #include "misc/afb-supervision.h"
 #include "misc/afs-supervision.h"
@@ -145,8 +147,10 @@ static void disconnect_supervisor()
 
 static void on_supervisor_hangup(struct afb_stub_ws *s)
 {
-	if (s && s == supervisor)
+	if (s && s == supervisor) {
+		NOTICE("disconnecting from supervisor");
 		disconnect_supervisor();
+	}
 }
 
 /* try to connect to supervisor */
@@ -178,9 +182,10 @@ static void try_connect_supervisor()
 	}
 
 	/* negotiation */
+	NOTICE("connecting to supervisor %s", supervisor_socket_path);
 	do { srd = read(fd, &initiator, sizeof initiator); } while(srd < 0 && errno == -X_EINTR);
 	if (srd < 0) {
-		NOTICE("Can't read supervisor %s: %m", supervisor_socket_path);
+		ERROR("Can't read supervisor %s: %m", supervisor_socket_path);
 		goto end2;
 	}
 	if ((size_t)srd != sizeof initiator) {
@@ -202,7 +207,7 @@ static void try_connect_supervisor()
 
 	/* interprets extras */
 	if (!strcmp(initiator.extra, "CLOSE")) {
-		INFO("Supervisor asks to CLOSE");
+		NOTICE("Supervisor asks to CLOSE");
 		goto end2;
 	}
 #if WITH_AFB_DEBUG
@@ -311,13 +316,15 @@ static const char *verbs[] = {
 	"break", "config", "do", "exit", "sclose", "slist", "trace", "wait" };
 enum  {  Break ,  Config ,  Do ,  Exit ,  Sclose ,  Slist ,  Trace ,  Wait  };
 
-static void on_supervision_process(void *closure, struct afb_req_common *comreq)
+static void process_cb(void *closure, struct json_object *args)
 {
 	int i;
-	struct json_object *args, *sub, *list;
+	struct afb_req_common *comreq = closure;
+	struct json_object *sub, *list;
 	const char *api, *verb, *uuid;
 	struct afb_session *session;
 	const struct afb_api_item *xapi;
+	const struct afb_data_x4 *data;
 	int rc;
 #if WITH_AFB_TRACE
 	struct json_object *drop, *add;
@@ -332,7 +339,6 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 	}
 
 	/* process */
-	args = afb_req_common_json(comreq);
 	switch(i) {
 	case Exit:
 		i = 0;
@@ -346,26 +352,26 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 		if (wrap_json_unpack(args, "s", &uuid))
 			wrap_json_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
-			afb_req_common_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			session = afb_session_search(uuid);
 			if (!session)
-				afb_req_common_reply(comreq, NULL, afb_error_text_unknown_session, NULL);
+				afb_json_legacy_req_reply(comreq, NULL, afb_error_text_unknown_session, NULL);
 			else {
 				afb_session_close(session);
 				afb_session_unref(session);
 				afb_session_purge();
-				afb_req_common_reply(comreq, NULL, NULL, NULL);
+				afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
 			}
 		}
 		break;
 	case Slist:
 		list = json_object_new_object();
 		afb_session_foreach(slist, list);
-		afb_req_common_reply(comreq, list, NULL, NULL);
+		afb_json_legacy_req_reply(comreq, list, NULL, NULL);
 		break;
 	case Config:
-		afb_req_common_reply(comreq, json_object_get(global.config), NULL, NULL);
+		afb_json_legacy_req_reply(comreq, json_object_get(global.config), NULL, NULL);
 		break;
 	case Trace:
 #if WITH_AFB_TRACE
@@ -384,7 +390,7 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 			if (rc)
 				return;
 		}
-		afb_req_common_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
 #else
 		afb_req_common_reply_unavailable(comreq);
 #endif
@@ -392,30 +398,38 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 	case Do:
 		sub = NULL;
 		if (wrap_json_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
-			afb_req_common_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);
 			if (rc < 0)
 				afb_req_common_reply_api_unknown(comreq);
 			else {
+				rc = afb_json_legacy_make_data_x4_json_c(&data, json_object_get(sub));
+				if (rc < 0)
+					afb_req_common_reply_internal_error(comreq);
+				else {
 #if WITH_CRED
-				afb_req_common_set_cred(comreq, NULL);
+					afb_req_common_set_cred(comreq, NULL);
 #endif
-				comreq->apiname = api;
-				comreq->verbname = verb;
-				comreq->json = json_object_get(sub);
-				xapi->itf->process(xapi->closure, comreq);
-				json_object_put(args);
+					json_object_get(args);
+					comreq->apiname = api;
+					comreq->verbname = verb;
+					afb_params_unref(comreq->nparams, comreq->params);
+					comreq->params[0] = data;
+					comreq->nparams = 1;
+					xapi->itf->process(xapi->closure, comreq);
+					json_object_put(args);
+				}
 			}
 		}
 		break;
 #if WITH_AFB_DEBUG
 	case Wait:
-		afb_req_common_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
 		afb_debug_wait("supervisor");
 		break;
 	case Break:
-		afb_req_common_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
 		afb_debug_break("supervisor");
 		break;
 #else
@@ -425,6 +439,11 @@ static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 		break;
 #endif
 	}
+}
+
+static void on_supervision_process(void *closure, struct afb_req_common *comreq)
+{
+	afb_json_legacy_do_single_json_c(comreq->nparams, comreq->params, process_cb, comreq);
 }
 
 #endif

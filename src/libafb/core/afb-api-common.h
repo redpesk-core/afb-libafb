@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -31,7 +31,9 @@ struct afb_evt_listener;
 struct afb_req_common;
 
 struct afb_evt;
+struct afb_evt_data;
 struct afb_event_x2;
+struct afb_data_x4;
 
 struct globset;
 
@@ -90,7 +92,7 @@ struct afb_api_common
 	struct globset *event_handlers;
 
 	/* handler of events */
-	void (*onevent)(void *callback, void *closure, const char *event, struct json_object *object, struct afb_api_common *comapi);
+	void (*onevent)(void *callback, void *closure, const struct afb_evt_data *event, struct afb_api_common *comapi);
 
 	/* settings */
 	struct json_object *settings;
@@ -111,7 +113,7 @@ struct afb_api_common
 
 /**
  * Initialisation of the common api structure
- * 
+ *
  * @param comapi        the api to initialize
  * @param declare_set   the apiset to declare the api
  * @param call_set      the apiset for calls of the api
@@ -138,7 +140,7 @@ afb_api_common_init(
 
 /**
  * Increment the reference count
- * 
+ *
  * @param comapi        the api
  */
 extern
@@ -149,9 +151,9 @@ afb_api_common_incref(
 
 /**
  * Decrement the reference count
- * 
+ *
  * @param comapi        the api
- * 
+ *
  * @return 1 if the reference count falled to 0 or otherwise,
  *         if the object is stiil referenced returns 0. In other
  *         words returns 1 if the api must be released.
@@ -167,7 +169,7 @@ afb_api_common_decref(
  * references it handles, free strings if required.
  * Must be called during destruction of api, after afb_api_common_decref
  * returned 1.
- * 
+ *
  * @param comapi        the api
  */
 extern
@@ -178,9 +180,9 @@ afb_api_common_cleanup(
 
 /**
  * Get the apiname (if any)
- * 
+ *
  * @param comapi the api
- * 
+ *
  * @return the name that can be NULL for anonymous api
  */
 static inline
@@ -193,9 +195,9 @@ afb_api_common_apiname(
 
 /**
  * Is the api sealed?
- * 
+ *
  * @param comapi the api
- * 
+ *
  * @return 1 if sealed or 0 if not sealed
  */
 static inline
@@ -208,10 +210,10 @@ afb_api_common_is_sealed(
 
 /**
  * Get the apiset for calling?
- * 
+ *
  * @param comapi the api
- * 
- * @return 
+ *
+ * @return
  */
 static inline
 struct afb_apiset *
@@ -245,7 +247,7 @@ afb_api_common_session_get(
 );
 
 /**
- * 
+ *
  */
 extern
 void
@@ -318,10 +320,11 @@ afb_api_common_new_event(
 
 extern
 int
-afb_api_common_event_broadcast(
+afb_api_common_event_broadcast_x4(
 	const struct afb_api_common *comapi,
 	const char *name,
-	struct json_object *object
+	unsigned nparams,
+	const struct afb_data_x4 **params
 );
 
 extern
@@ -399,10 +402,11 @@ afb_api_common_new_event_hookable(
 
 extern
 int
-afb_api_common_event_broadcast_hookable(
+afb_api_common_event_broadcast_hookable_x4(
 	const struct afb_api_common *comapi,
 	const char *name,
-	struct json_object *object
+	unsigned nparams,
+	const struct afb_data_x4 **params
 );
 
 extern

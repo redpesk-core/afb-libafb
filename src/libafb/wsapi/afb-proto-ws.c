@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -587,7 +587,7 @@ static void client_on_event_create(struct afb_proto_ws *protows, struct readbuf 
 	const char *event_name;
 	uint16_t event_id;
 
-	if (protows->client_itf->on_event_create 
+	if (protows->client_itf->on_event_create
 			&& readbuf_uint16(rb, &event_id)
 			&& readbuf_string(rb, &event_name, NULL))
 		protows->client_itf->on_event_create(protows->closure, event_id, event_name);

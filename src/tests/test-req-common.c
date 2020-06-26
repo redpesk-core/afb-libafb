@@ -21,33 +21,17 @@
 
 /*********************************************************************/
 
-struct afb_req_common *test_json_req;
-struct json_object *test_json_$result;
-struct json_object *test_json(struct afb_req_common *req)
-{
-	test_json_req = req;
-	return test_json_$result;
-}
-
-struct afb_req_common *test_get_req;
-const char *test_get_name;
-struct afb_arg test_get(struct afb_req_common *req, const char *name)
-{
-	struct afb_arg arg;
-	test_get_req = req;
-	test_get_name = name;
-	arg.name = name;
-	arg.value = NULL;
-	arg.path = NULL;
-	return arg;
-}
-
 struct afb_req_common *test_reply_req;
-const struct afb_req_reply *test_reply_reply;
-void test_reply(struct afb_req_common *req, const struct afb_req_reply *reply)
+int test_reply_status;
+struct afb_dataset *test_reply_reply;
+unsigned test_reply_nreplies;
+const struct afb_data_x4 * const *test_reply_replies;
+void test_reply(struct afb_req_common *req, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
 {
 	test_reply_req = req;
-	test_reply_reply = reply;
+	test_reply_status = status;
+	test_reply_nreplies = nreplies;
+	test_reply_replies = replies;
 }
 
 struct afb_req_common *test_unref_req;
@@ -77,8 +61,6 @@ int test_unsubscribe(struct afb_req_common *req, struct afb_evt *event)
 
 struct afb_req_common_query_itf test_queryitf =
 {
-	.json = test_json,
-	.get = test_get,
 	.reply = test_reply,
 	.unref = test_unref,
 	.subscribe = test_subscribe,
@@ -93,7 +75,7 @@ START_TEST (test)
 {
 	struct afb_req_common *req = &comreq;
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
 	ck_assert_ptr_eq(req->queryitf, &test_queryitf);
 	ck_assert_ptr_eq(req->apiname, apiname);
 	ck_assert_ptr_eq(req->verbname, verbname);

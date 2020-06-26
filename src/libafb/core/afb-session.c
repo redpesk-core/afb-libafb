@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -563,13 +563,13 @@ static int cookeyidx(const void *key)
 
 /**
  * Get the cookie structure for the given key. Create it if needed.
- * 
+ *
  * @param session the session (should be locked)
  * @param key     the key of the cookie
  * @param create  create if needed (boolean)
  * @param result  where to store the found cookie
  * @param pprv    where to store pointer to the cookie
- * 
+ *
  * @return 0 if found, 1 if found but created, X_ENOMEM if not able to create
  */
 static int getcookie(struct afb_session *session, const void *key, int create, struct cookie **result, struct cookie ***pprv)
@@ -618,7 +618,7 @@ static int getcookie(struct afb_session *session, const void *key, int create, s
 
 /**
  * Check that the cookie is needed. If not, remove it.
- * 
+ *
  * @param cookie  the cookie to check
  * @param prv     pointer to pointer to it
  */

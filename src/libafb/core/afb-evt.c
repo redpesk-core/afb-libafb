@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -25,19 +25,32 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <assert.h>
 
-#include <json-c/json.h>
 #include <afb/afb-event-x2-itf.h>
+#include <afb/afb-event-x4-itf.h>
 
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
+#include "core/afb-data.h"
+#include "core/afb-params.h"
 #include "sys/verbose.h"
 #include "core/afb-jobs.h"
 #include "utils/uuid.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
 #include "sys/x-errno.h"
+#include "core/containerof.h"
+
+#if !defined(AFB_EVT_NPARAMS_MAX)
+#define AFB_EVT_NPARAMS_MAX	8
+#endif
+#if AFB_EVT_NPARAMS_MAX > 255
+#undef AFB_EVT_NPARAMS_MAX
+#define AFB_EVT_NPARAMS_MAX	255
+#endif
+
 
 struct afb_evt_watch;
 
@@ -71,7 +84,11 @@ struct afb_evt_listener {
 struct afb_evt {
 
 	/* interface */
-	struct afb_event_x2 eventx2;
+	union {
+		struct { void *itf; } none;
+		struct afb_event_x2 x2;
+		struct afb_event_x4 x4;
+	};
 
 	/* next event */
 	struct afb_evt *next;
@@ -86,7 +103,6 @@ struct afb_evt {
 	/* hooking */
 	int hookflags;
 #endif
-
 	/* refcount */
 	uint16_t refcount;
 
@@ -115,59 +131,11 @@ struct afb_evt_watch {
 	struct afb_evt_watch *next_by_listener;
 };
 
-/*
- * structure for job of broadcasting events
- */
-struct job_broadcast
-{
-	/** object atached to the event */
-	struct json_object *object;
-
-	/** the uuid of the event */
-	uuid_binary_t  uuid;
-
-	/** remaining hop */
-	uint8_t hop;
-
-	/** name of the event to broadcast */
-	char event[];
-};
-
-/*
- * structure for job of broadcasting or pushing events
- */
-struct job_evt
-{
-	/** the event to broadcast */
-	struct afb_evt *evt;
-
-	/** object atached to the event */
-	struct json_object *object;
-};
-
 /* the interface for events */
-static struct afb_event_x2_itf afb_evt_event_x2_itf = {
-	.broadcast = (void*)afb_evt_broadcast,
-	.push = (void*)afb_evt_push,
-	.unref = (void*)afb_evt_unref,
-	.name = (void*)afb_evt_name,
-	.addref = (void*)afb_evt_addref
-};
-
+static struct afb_event_x2_itf afb_evt_event_x2_itf;
 #if WITH_AFB_HOOK
-/* the interface for events */
-static struct afb_event_x2_itf afb_evt_hooked_event_x2_itf = {
-	.broadcast = (void*)afb_evt_hooked_broadcast,
-	.push = (void*)afb_evt_hooked_push,
-	.unref = (void*)afb_evt_hooked_unref,
-	.name = (void*)afb_evt_hooked_name,
-	.addref = (void*)afb_evt_hooked_addref
-};
+static struct afb_event_x2_itf afb_evt_hooked_event_x2_itf;
 #endif
-
-/* job groups for events push/broadcast */
-#define BROADCAST_JOB_GROUP  (&afb_evt_event_x2_itf)
-#define PUSH_JOB_GROUP       (&afb_evt_event_x2_itf)
 
 /* head of the list of listeners */
 static x_rwlock_t listeners_rwlock = X_RWLOCK_INITIALIZER;
@@ -178,6 +146,10 @@ static x_rwlock_t events_rwlock = X_RWLOCK_INITIALIZER;
 static struct afb_evt *evt_list_head = NULL;
 static uint16_t event_genid = 0;
 static uint16_t event_count = 0;
+
+/* job groups for events push/broadcast */
+#define BROADCAST_JOB_GROUP  (&afb_evt_event_x2_itf)
+#define PUSH_JOB_GROUP       (&afb_evt_event_x2_itf)
 
 /* head of uniqueness of events */
 #if !defined(EVENT_BROADCAST_HOP_MAX)
@@ -204,25 +176,44 @@ static struct {
  * Create structure for job of broadcasting string 'event' with 'object'
  * Returns the created structure or NULL if out of memory
  */
-static struct job_broadcast *make_job_broadcast(const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
-{
-	size_t sz = 1 + strlen(event);
-	struct job_broadcast *jb = malloc(sz + sizeof *jb);
+static
+struct afb_evt_broadcasted *
+make_evt_broadcasted(
+	const char *event,
+	unsigned nparams,
+	const struct afb_data_x4 * const *params,
+	const uuid_binary_t uuid,
+	uint8_t hop
+) {
+	size_t sz;
+	struct afb_evt_broadcasted *jb;
+	char *name;
+
+	sz = 1 + strlen(event);
+	jb = malloc(sizeof *jb + nparams * sizeof jb->data.params[0] + sz);
 	if (jb) {
-		jb->object = object;
-		memcpy(jb->uuid, uuid, sizeof jb->uuid);
+		jb->data.nparams = (uint16_t)nparams;
+		afb_params_copy(nparams, params, jb->data.params);
 		jb->hop = hop;
-		memcpy(jb->event, event, sz);
+		memcpy(jb->uuid, uuid, sizeof jb->uuid);
+		jb->data.name = name = (char*)&jb->data.params[nparams];
+		memcpy(name, event, sz);
+		jb->data.eventid = 0;
+		return jb;
 	}
-	return jb;
+	afb_params_unref(nparams, params);
+	return 0;
 }
 
 /*
  * Destroy structure 'jb' for job of broadcasting string events
  */
-static void destroy_job_broadcast(struct job_broadcast *jb)
-{
-	json_object_put(jb->object);
+static
+void
+destroy_evt_broadcasted(
+	struct afb_evt_broadcasted *jb
+) {
+	afb_params_unref(jb->data.nparams, jb->data.params);
 	free(jb);
 }
 
@@ -230,30 +221,45 @@ static void destroy_job_broadcast(struct job_broadcast *jb)
  * Create structure for job of broadcasting or pushing 'evt' with 'object'
  * Returns the created structure or NULL if out of memory
  */
-static struct job_evt *make_job_evt(struct afb_evt *evt, struct json_object *object)
-{
-	struct job_evt *je = malloc(sizeof *je);
+static
+struct afb_evt_pushed *
+make_evt_pushed(
+	struct afb_evt *evt,
+	unsigned nparams,
+	const struct afb_data_x4 * const *params
+) {
+	struct afb_evt_pushed *je;
+
+	je = malloc(sizeof *je + nparams * sizeof je->data.params[0]);
 	if (je) {
 		je->evt = afb_evt_addref(evt);
-		je->object = object;
+		je->data.nparams = (uint16_t)nparams;
+		afb_params_copy(nparams, params, je->data.params);
+		je->data.name = evt->fullname;
+		je->data.eventid = evt->id;
+		return je;
 	}
-	return je;
+	afb_params_unref(nparams, params);
+	return 0;
 }
 
 /*
  * Destroy structure for job of broadcasting or pushing evt
  */
-static void destroy_job_evt(struct job_evt *je)
-{
+static
+void
+destroy_evt_pushed(
+	struct afb_evt_pushed *je
+) {
 	afb_evt_unref(je->evt);
-	json_object_put(je->object);
+	afb_params_unref(je->data.nparams, je->data.params);
 	free(je);
 }
 
 /*
  * Broadcasts the 'event' of 'id' with its 'object'
  */
-static void broadcast(struct job_broadcast *jb)
+static void broadcast(struct afb_evt_broadcasted *jb)
 {
 	struct afb_evt_listener *listener;
 
@@ -261,7 +267,8 @@ static void broadcast(struct job_broadcast *jb)
 	listener = listeners;
 	while(listener) {
 		if (listener->itf->broadcast != NULL)
-			listener->itf->broadcast(listener->closure, jb->event, json_object_get(jb->object), jb->uuid, jb->hop);
+			listener->itf->broadcast(listener->closure, jb);
+
 		listener = listener->next;
 	}
 	x_rwlock_unlock(&listeners_rwlock);
@@ -272,20 +279,20 @@ static void broadcast(struct job_broadcast *jb)
  */
 static void broadcast_job(int signum, void *closure)
 {
-	struct job_broadcast *jb = closure;
+	struct afb_evt_broadcasted *jb = closure;
 
 	if (signum == 0)
 		broadcast(jb);
-	destroy_job_broadcast(jb);
+	destroy_evt_broadcasted(jb);
 }
 
 /*
  * Broadcasts the string 'event' with its 'object'
  */
-static int unhooked_broadcast_name(const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+static int unhooked_broadcast_name_x4(const char *event, unsigned nparams, const struct afb_data_x4 * const *params, const uuid_binary_t uuid, uint8_t hop)
 {
 	uuid_binary_t local_uuid;
-	struct job_broadcast *jb;
+	struct afb_evt_broadcasted *jb;
 	int rc;
 #if EVENT_BROADCAST_MEMORY_COUNT
 	int iter, count;
@@ -324,103 +331,76 @@ static int unhooked_broadcast_name(const char *event, struct json_object *object
 #endif
 
 	/* create the structure for the job */
-	jb = make_job_broadcast(event, object, uuid, hop);
+	jb = make_evt_broadcasted(event, nparams, params, uuid, hop);
 	if (jb == NULL) {
-		ERROR("Cant't create broadcast string job item for %s(%s)",
-			event, json_object_to_json_string(object));
-		json_object_put(object);
+		ERROR("Cant't create broadcast string job item for %s", event);
 		return X_ENOMEM;
 	}
 
 	/* queue the job */
 	rc = afb_jobs_queue(BROADCAST_JOB_GROUP, 0, broadcast_job, jb);
 	if (rc < 0) {
-		ERROR("cant't queue broadcast string job item for %s(%s)",
-			event, json_object_to_json_string(object));
-		destroy_job_broadcast(jb);
+		ERROR("cant't queue broadcast string job item for %s", event);
+		destroy_evt_broadcasted(jb);
 	}
 	return rc;
 }
 
 /*
  * Broadcasts the event 'evt' with its 'object'
- * 'object' is released (like json_object_put)
+ * 'object' is released (like afb_dataset_unref)
  * Returns the count of listener that received the event.
  */
-int afb_evt_broadcast(struct afb_evt *evt, struct json_object *object)
+int afb_evt_broadcast_x4(struct afb_evt *evt, unsigned nparams, const struct afb_data_x4 * const *params)
 {
-	return unhooked_broadcast_name(evt->fullname, object, NULL, 0);
+	return unhooked_broadcast_name_x4(evt->fullname, nparams, params, NULL, 0);
 }
 
-#if WITH_AFB_HOOK
-/*
- * Broadcasts the event 'evt' with its 'object'
- * 'object' is released (like json_object_put)
- * Returns the count of listener that received the event.
- */
-int afb_evt_hooked_broadcast(struct afb_evt *evt, struct json_object *object)
-{
-	int result;
-
-	json_object_get(object);
-
-	if (evt->hookflags & afb_hook_flag_evt_broadcast_before)
-		afb_hook_evt_broadcast_before(evt->fullname, evt->id, object);
-
-	result = afb_evt_broadcast(evt, object);
-
-	if (evt->hookflags & afb_hook_flag_evt_broadcast_after)
-		afb_hook_evt_broadcast_after(evt->fullname, evt->id, object, result);
-
-	json_object_put(object);
-
-	return result;
-}
-#endif
-
-int afb_evt_rebroadcast_name(const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+int afb_evt_rebroadcast_name_x4(const char *event, unsigned nparams, const struct afb_data_x4 * const *params, const uuid_binary_t uuid, uint8_t hop)
 {
 	int result;
 
 #if WITH_AFB_HOOK
-	json_object_get(object);
-	afb_hook_evt_broadcast_before(event, 0, object);
+	afb_params_addref(nparams, params);
+	afb_hook_evt_broadcast_before(event, 0, nparams, params);
 #endif
 
-	result = unhooked_broadcast_name(event, object, uuid, hop);
+	result = unhooked_broadcast_name_x4(event, nparams, params, uuid, hop);
 
 #if WITH_AFB_HOOK
-	afb_hook_evt_broadcast_after(event, 0, object, result);
-	json_object_put(object);
+	afb_hook_evt_broadcast_after(event, 0, nparams, params, result);
+	afb_params_unref(nparams, params);
 #endif
 	return result;
 }
 
 /*
  * Broadcasts the 'event' with its 'object'
- * 'object' is released (like json_object_put)
+ * 'object' is released (like afb_dataset_unref)
  * Returns the count of listener having receive the event.
  */
-int afb_evt_broadcast_name(const char *event, struct json_object *object)
+int afb_evt_broadcast_name_x4(const char *event, unsigned nparams, const struct afb_data_x4 * const *params)
 {
-	return afb_evt_rebroadcast_name(event, object, NULL, 0);
+	return afb_evt_rebroadcast_name_x4(event, nparams, params, NULL, 0);
 }
 
 /*
  * Pushes the event 'evt' with 'obj' to its listeners
  * Returns the count of listener that received the event.
  */
-static void push_evt(struct afb_evt *evt, struct json_object *object)
+static void push_evt(struct afb_evt_pushed *je)
 {
 	struct afb_evt_watch *watch;
 	struct afb_evt_listener *listener;
+	struct afb_evt *evt;
 
+	evt = je->evt;
 	x_rwlock_rdlock(&evt->rwlock);
 	watch = evt->watchs;
 	while(watch) {
 		listener = watch->listener;
 		assert(listener->itf->push != NULL);
-		listener->itf->push(listener->closure, evt->fullname, evt->id, json_object_get(object));
+		listener->itf->push(listener->closure, je);
 		watch = watch->next_by_evt;
 	}
 	x_rwlock_unlock(&evt->rwlock);
@@ -429,82 +409,47 @@ static void push_evt(struct afb_evt *evt, struct json_object *object)
 /*
  * Jobs callback for pushing evt asynchronously
  */
-static void push_job_evt(int signum, void *closure)
+static void push_afb_evt_pushed(int signum, void *closure)
 {
-	struct job_evt *je = closure;
+	struct afb_evt_pushed *je = closure;
 
 	if (signum == 0)
-		push_evt(je->evt, je->object);
-	destroy_job_evt(je);
+		push_evt(je);
+	destroy_evt_pushed(je);
 }
 
 /*
  * Pushes the event 'evt' with 'obj' to its listeners
- * 'obj' is released (like json_object_put)
+ * 'obj' is released (like afb_dataset_unref)
  * Returns 1 if at least one listener exists or 0 if no listener exists or
  * -1 in case of error and the event can't be delivered
  */
-int afb_evt_push(struct afb_evt *evt, struct json_object *object)
+int afb_evt_push_x4(struct afb_evt *evt, unsigned nparams, const struct afb_data_x4 * const *params)
 {
-	struct job_evt *je;
+	struct afb_evt_pushed *je;
 	int rc;
 
 	if (!evt->watchs) {
-		json_object_put(object);
+		afb_params_unref(nparams, params);
 		return 0;
 	}
 
-	je = make_job_evt(evt, object);
+	je = make_evt_pushed(evt, nparams, params);
 	if (je == NULL) {
-		ERROR("Cant't create push evt job item for %s(%s)",
-			evt->fullname, json_object_to_json_string(object));
-		json_object_put(object);
+		ERROR("Cant't create push evt job item for %s", evt->fullname);
 		return X_ENOMEM;
 	}
 
-	rc = afb_jobs_queue(PUSH_JOB_GROUP, 0, push_job_evt, je);
+	rc = afb_jobs_queue(PUSH_JOB_GROUP, 0, push_afb_evt_pushed, je);
 	if (rc == 0)
 		rc = 1;
 	else {
-		ERROR("cant't queue push evt job item for %s(%s)",
-			evt->fullname, json_object_to_json_string(object));
-		destroy_job_evt(je);
+		ERROR("cant't queue push evt job item for %s", evt->fullname);
+		destroy_evt_pushed(je);
 	}
 
 	return rc;
 }
-
-#if WITH_AFB_HOOK
-/*
- * Pushes the event 'evt' with 'obj' to its listeners
- * 'obj' is released (like json_object_put)
- * Emits calls to hooks.
- * Returns the count of listener taht received the event.
- */
-int afb_evt_hooked_push(struct afb_evt *evt, struct json_object *obj)
-{
-
-	int result;
-
-	/* lease the object */
-	json_object_get(obj);
-
-	/* hook before push */
-	if (evt->hookflags & afb_hook_flag_evt_push_before)
-		afb_hook_evt_push_before(evt->fullname, evt->id, obj);
-
-	/* push */
-	result = afb_evt_push(evt, obj);
-
-	/* hook after push */
-	if (evt->hookflags & afb_hook_flag_evt_push_after)
-		afb_hook_evt_push_after(evt->fullname, evt->id, obj, result);
-
-	/* release the object */
-	json_object_put(obj);
-	return result;
-}
-#endif
 
 static void unwatch(struct afb_evt_listener *listener, struct afb_evt *evt, int remove)
 {
@@ -560,27 +505,38 @@ static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *
 }
 
 /*
- * Creates an event of name 'fullname' and returns it or NULL on error.
+ * Creates an event of name 'fullname'
  */
-struct afb_evt *afb_evt_create(const char *fullname)
+static int create_evt(struct afb_evt **evt, const char *fullname, size_t len)
 {
-	size_t len;
-	struct afb_evt *evt, *oevt;
+	struct afb_evt *nevt, *oevt;
 	uint16_t id;
 
 	/* allocates the event */
-	len = strlen(fullname);
-	evt = malloc(len + 1 + sizeof * evt);
-	if (evt == NULL)
-		goto error;
+	nevt = malloc(len + 1 + sizeof * nevt);
+	if (nevt == NULL) {
+		*evt = NULL;
+		return X_ENOMEM;
+	}
+
+	memcpy(nevt->fullname, fullname, len + 1);
+	nevt->refcount = 1;
+	nevt->watchs = NULL;
+	nevt->none.itf = NULL;
+#if WITH_AFB_HOOK
+	nevt->hookflags = afb_hook_flags_evt(nevt->fullname);
+#endif
+	x_rwlock_init(&nevt->rwlock);
 
 	/* allocates the id */
 	x_rwlock_wrlock(&events_rwlock);
 	if (event_count == UINT16_MAX) {
 		x_rwlock_unlock(&events_rwlock);
-		free(evt);
+		x_rwlock_destroy(&nevt->rwlock);
+		free(nevt);
 		ERROR("Can't create more events");
-		return NULL;
+		*evt = NULL;
+		return X_ECANCELED;
 	}
 	event_count++;
 	do {
@@ -594,33 +550,32 @@ struct afb_evt *afb_evt_create(const char *fullname)
 	} while (oevt != NULL);
 
 	/* initialize the event */
-	memcpy(evt->fullname, fullname, len + 1);
-	evt->next = evt_list_head;
-	evt->refcount = 1;
-	evt->watchs = NULL;
-	evt->id = id;
-	x_rwlock_init(&evt->rwlock);
-	evt_list_head = evt;
-#if WITH_AFB_HOOK
-	evt->hookflags = afb_hook_flags_evt(evt->fullname);
-	evt->eventx2.itf = evt->hookflags ? &afb_evt_hooked_event_x2_itf : &afb_evt_event_x2_itf;
-	if (evt->hookflags & afb_hook_flag_evt_create)
-		afb_hook_evt_create(evt->fullname, evt->id);
-#else
-	evt->eventx2.itf = &afb_evt_event_x2_itf;
-#endif
+	nevt->next = evt_list_head;
+	nevt->id = id;
+	evt_list_head = nevt;
 	x_rwlock_unlock(&events_rwlock);
 
 	/* returns the event */
-	return evt;
-error:
-	return NULL;
+#if WITH_AFB_HOOK
+	if (nevt->hookflags & afb_hook_flag_evt_create)
+		afb_hook_evt_create(nevt->fullname, nevt->id);
+#endif
+	*evt = nevt;
+	return 0;
+}
+
+/*
+ * Creates an event of name 'fullname'
+ */
+int afb_evt_create(struct afb_evt **evt, const char *fullname)
+{
+	return create_evt(evt, fullname, strlen(fullname));
 }
 
 /*
  * Creates an event of name 'prefix'/'name' and returns it or NULL on error.
  */
-struct afb_evt *afb_evt_create2(const char *prefix, const char *name)
+int afb_evt_create2(struct afb_evt **evt, const char *prefix, const char *name)
 {
 	size_t prelen, postlen;
 	char *fullname;
@@ -634,7 +589,7 @@ struct afb_evt *afb_evt_create2(const char *prefix, const char *name)
 	memcpy(fullname + prelen + 1, name, postlen + 1);
 
 	/* create the event */
-	return afb_evt_create(fullname);
+	return create_evt(evt, fullname, prelen + postlen + 1);
 }
 
 /*
@@ -645,18 +600,6 @@ struct afb_evt *afb_evt_addref(struct afb_evt *evt)
 	__atomic_add_fetch(&evt->refcount, 1, __ATOMIC_RELAXED);
 	return evt;
 }
-
-#if WITH_AFB_HOOK
-/*
- * increment the reference count of the event 'evt'
- */
-struct afb_evt *afb_evt_hooked_addref(struct afb_evt *evt)
-{
-	if (evt->hookflags & afb_hook_flag_evt_addref)
-		afb_hook_evt_addref(evt->fullname, evt->id);
-	return afb_evt_addref(evt);
-}
-#endif
 
 /*
  * decrement the reference count of the event 'evt'
@@ -703,19 +646,6 @@ void afb_evt_unref(struct afb_evt *evt)
 	}
 }
 
-#if WITH_AFB_HOOK
-/*
- * decrement the reference count of the event 'evt'
- * and destroy it when the count reachs zero
- */
-void afb_evt_hooked_unref(struct afb_evt *evt)
-{
-	if (evt->hookflags & afb_hook_flag_evt_unref)
-		afb_hook_evt_unref(evt->fullname, evt->id);
-	afb_evt_unref(evt);
-}
-#endif
-
 /*
  * Returns the true name of the 'event'
  */
@@ -733,7 +663,36 @@ const char *afb_evt_name(struct afb_evt *evt)
 	return name ? name + 1 : evt->fullname;
 }
 
+/*
+ * Returns the id of the 'event'
+ */
+uint16_t afb_evt_id(struct afb_evt *evt)
+{
+	return evt->id;
+}
+
 #if WITH_AFB_HOOK
+/*
+ * increment the reference count of the event 'evt'
+ */
+struct afb_evt *afb_evt_hooked_addref(struct afb_evt *evt)
+{
+	if (evt->hookflags & afb_hook_flag_evt_addref)
+		afb_hook_evt_addref(evt->fullname, evt->id);
+	return afb_evt_addref(evt);
+}
+
+/*
+ * decrement the reference count of the event 'evt'
+ * and destroy it when the count reachs zero
+ */
+void afb_evt_hooked_unref(struct afb_evt *evt)
+{
+	if (evt->hookflags & afb_hook_flag_evt_unref)
+		afb_hook_evt_unref(evt->fullname, evt->id);
+	afb_evt_unref(evt);
+}
+
 /*
  * Returns the name associated to the event 'evt'.
  */
@@ -744,15 +703,69 @@ const char *afb_evt_hooked_name(struct afb_evt *evt)
 		afb_hook_evt_name(evt->fullname, evt->id, result);
 	return result;
 }
-#endif
 
 /*
- * Returns the id of the 'event'
+ * Pushes the event 'evt' with 'obj' to its listeners
+ * 'obj' is released (like afb_dataset_unref)
+ * Emits calls to hooks.
+ * Returns the count of listener taht received the event.
  */
-uint16_t afb_evt_id(struct afb_evt *evt)
+int afb_evt_hooked_push_x4(struct afb_evt *evt, unsigned nparams, const struct afb_data_x4 * const *params)
 {
-	return evt->id;
+	int result;
+
+	/* lease the parameters */
+	afb_params_addref(nparams, params);
+
+	/* hook before push */
+	if (evt->hookflags & afb_hook_flag_evt_push_before)
+		afb_hook_evt_push_before(evt->fullname, evt->id, nparams, params);
+
+	/* push */
+	result = afb_evt_push_x4(evt, nparams, params);
+
+	/* hook after push */
+	if (evt->hookflags & afb_hook_flag_evt_push_after)
+		afb_hook_evt_push_after(evt->fullname, evt->id,  nparams, params, result);
+
+	/* release the parameters */
+	afb_params_unref(nparams, params);
+
+	return result;
 }
+
+/*
+ * Broadcasts the event 'evt' with its 'object'
+ * 'object' is released (like afb_dataset_unref)
+ * Returns the count of listener that received the event.
+ */
+int afb_evt_hooked_broadcast_x4(struct afb_evt *evt, unsigned nparams, const struct afb_data_x4 * const *params)
+{
+	int result;
+
+	/* lease the parameters */
+	afb_params_addref(nparams, params);
+
+	/* hook before broadcast */
+	if (evt->hookflags & afb_hook_flag_evt_broadcast_before)
+		afb_hook_evt_broadcast_before(evt->fullname, evt->id, nparams, params);
+
+	/* broadcast */
+	result = afb_evt_broadcast_x4(evt, nparams, params);
+
+	/* hook after broadcast */
+	if (evt->hookflags & afb_hook_flag_evt_broadcast_after)
+		afb_hook_evt_broadcast_after(evt->fullname, evt->id, nparams, params, result);
+
+	/* release the parameters */
+	afb_params_unref(nparams, params);
+
+	return result;
+}
+#endif
+
+
+/**************************************************************************/
 
 /*
  * Returns an instance of the listener defined by the 'send' callback
@@ -960,6 +973,207 @@ void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int remove)
 	}
 }
 
+/**************************************************************************/
+/**************************************************************************/
+/*************    X4                                    *******************/
+/**************************************************************************/
+/**************************************************************************/
+
+inline struct afb_evt *afb_evt_of_x4(afb_event_x4_t evtx4)
+{
+	return containerof(struct afb_evt, x4, evtx4);
+}
+
+inline afb_event_x4_t afb_evt_as_x4(struct afb_evt *evt)
+{
+	return &evt->x4;
+}
+
+static afb_event_x4_t x4_event_addref(afb_event_x4_t evtx4)
+{
+	return afb_evt_as_x4(afb_evt_addref(afb_evt_of_x4(evtx4)));
+}
+
+static void x4_event_unref(afb_event_x4_t evtx4)
+{
+	afb_evt_unref(afb_evt_of_x4(evtx4));
+}
+
+static const char *x4_event_name(afb_event_x4_t evtx4)
+{
+	return afb_evt_name(afb_evt_of_x4(evtx4));
+}
+
+
+static int x4_event_push(afb_event_x4_t evtx4, unsigned nparams, const struct afb_data_x4 * const *params)
+{
+	return afb_evt_push_x4(afb_evt_of_x4(evtx4), nparams, params);
+}
+
+
+static int x4_event_broadcast(afb_event_x4_t evtx4, unsigned nparams, const struct afb_data_x4 * const *params)
+{
+	return afb_evt_broadcast_x4(afb_evt_of_x4(evtx4), nparams, params);
+}
+
+/* the interface for events */
+static struct afb_event_x4_itf afb_evt_event_x4_itf = {
+	.broadcast = x4_event_broadcast,
+	.push = x4_event_push,
+	.unref = x4_event_unref,
+	.name = x4_event_name,
+	.addref = x4_event_addref
+};
+
+#if WITH_AFB_HOOK
+static afb_event_x4_t x4_event_hooked_addref(afb_event_x4_t evtx4)
+{
+	return afb_evt_as_x4(afb_evt_hooked_addref(afb_evt_of_x4(evtx4)));
+}
+
+static void x4_event_hooked_unref(afb_event_x4_t evtx4)
+{
+	afb_evt_hooked_unref(afb_evt_of_x4(evtx4));
+}
+
+static const char *x4_event_hooked_name(afb_event_x4_t evtx4)
+{
+	return afb_evt_hooked_name(afb_evt_of_x4(evtx4));
+}
+
+static int x4_event_hooked_push(afb_event_x4_t evtx4, unsigned nparams, const struct afb_data_x4 * const *params)
+{
+	return afb_evt_hooked_push_x4(afb_evt_of_x4(evtx4), nparams, params);
+}
+
+static int x4_event_hooked_broadcast(afb_event_x4_t evtx4, unsigned nparams, const struct afb_data_x4 * const *params)
+{
+	return afb_evt_hooked_broadcast_x4(afb_evt_of_x4(evtx4), nparams, params);
+}
+
+/* the interface for events */
+static struct afb_event_x4_itf afb_evt_hooked_event_x4_itf = {
+	.broadcast = x4_event_hooked_broadcast,
+	.push = x4_event_hooked_push,
+	.unref = x4_event_hooked_unref,
+	.name = x4_event_hooked_name,
+	.addref = x4_event_hooked_addref
+};
+#endif
+
+inline afb_event_x4_t afb_evt_make_x4(struct afb_evt *evt)
+{
+#if WITH_AFB_HOOK
+	evt->x4.itf = evt->hookflags ? &afb_evt_hooked_event_x4_itf : &afb_evt_event_x4_itf;
+#else
+	evt->x4.itf = &afb_evt_event_x4_itf;
+#endif
+	return &evt->x4;
+}
+
+/**************************************************************************/
+/**************************************************************************/
+/*************    X2                                    *******************/
+/**************************************************************************/
+/**************************************************************************/
+
+#include <json-c/json.h>
+#include "core/afb-json-legacy.h"
+
+inline struct afb_evt *afb_evt_of_x2(struct afb_event_x2 *evtx2)
+{
+	return containerof(struct afb_evt, x2, evtx2);
+}
+
+inline struct afb_event_x2 *afb_evt_as_x2(struct afb_evt *evt)
+{
+	return &evt->x2;
+}
+
+static struct afb_event_x2 *x2_event_addref(struct afb_event_x2 *evtx2)
+{
+	return afb_evt_as_x2(afb_evt_addref(afb_evt_of_x2(evtx2)));
+}
+
+static void x2_event_unref(struct afb_event_x2 *evtx2)
+{
+	afb_evt_unref(afb_evt_of_x2(evtx2));
+}
+
+static const char *x2_event_name(struct afb_event_x2 *evtx2)
+{
+	return afb_evt_name(afb_evt_of_x2(evtx2));
+}
+
+
+static int x2_event_push(struct afb_event_x2 *evtx2, struct json_object *obj)
+{
+	return afb_json_legacy_event_push(afb_evt_of_x2(evtx2), obj);
+}
+
+
+static int x2_event_broadcast(struct afb_event_x2 *evtx2, struct json_object *obj)
+{
+	return afb_json_legacy_event_broadcast(afb_evt_of_x2(evtx2), obj);
+}
+
+/* the interface for events */
+static struct afb_event_x2_itf afb_evt_event_x2_itf = {
+	.broadcast = x2_event_broadcast,
+	.push = x2_event_push,
+	.unref = x2_event_unref,
+	.name = x2_event_name,
+	.addref = x2_event_addref
+};
+
+#if WITH_AFB_HOOK
+static struct afb_event_x2 *x2_event_hooked_addref(struct afb_event_x2 *evtx2)
+{
+	return afb_evt_as_x2(afb_evt_hooked_addref(afb_evt_of_x2(evtx2)));
+}
+
+static void x2_event_hooked_unref(struct afb_event_x2 *evtx2)
+{
+	afb_evt_hooked_unref(afb_evt_of_x2(evtx2));
+}
+
+static const char *x2_event_hooked_name(struct afb_event_x2 *evtx2)
+{
+	return afb_evt_hooked_name(afb_evt_of_x2(evtx2));
+}
+
+static int x2_event_hooked_push(struct afb_event_x2 *evtx2, struct json_object *obj)
+{
+	return afb_json_legacy_event_hooked_push(afb_evt_of_x2(evtx2), obj);
+}
+
+static int x2_event_hooked_broadcast(struct afb_event_x2 *evtx2, struct json_object *obj)
+{
+	return afb_json_legacy_event_hooked_broadcast(afb_evt_of_x2(evtx2), obj);
+}
+
+/* the interface for events */
+static struct afb_event_x2_itf afb_evt_hooked_event_x2_itf = {
+	.broadcast = x2_event_hooked_broadcast,
+	.push = x2_event_hooked_push,
+	.unref = x2_event_hooked_unref,
+	.name = x2_event_hooked_name,
+	.addref = x2_event_hooked_addref
+};
+#endif
+
+inline struct afb_event_x2 *afb_evt_make_x2(struct afb_evt *evt)
+{
+#if WITH_AFB_HOOK
+	evt->x2.itf = evt->hookflags ? &afb_evt_hooked_event_x2_itf : &afb_evt_event_x2_itf;
+#else
+	evt->x2.itf = &afb_evt_event_x2_itf;
+#endif
+	return &evt->x2;
+}
+
+/**************************************************************************/
+
 #if WITH_AFB_HOOK
 /*
  * update the hooks for events
@@ -971,19 +1185,17 @@ void afb_evt_update_hooks()
 	x_rwlock_rdlock(&events_rwlock);
 	for (evt = evt_list_head ; evt ; evt = evt->next) {
 		evt->hookflags = afb_hook_flags_evt(evt->fullname);
-		evt->eventx2.itf = evt->hookflags ? &afb_evt_hooked_event_x2_itf : &afb_evt_event_x2_itf;
+		if (evt->none.itf == &afb_evt_hooked_event_x2_itf
+		 || evt->none.itf == &afb_evt_event_x2_itf) {
+			evt->x2.itf = evt->hookflags ? &afb_evt_hooked_event_x2_itf : &afb_evt_event_x2_itf;
+		}
+		else
+		if (evt->none.itf == &afb_evt_hooked_event_x4_itf
+		 || evt->none.itf == &afb_evt_event_x4_itf) {
+			evt->x4.itf = evt->hookflags ? &afb_evt_hooked_event_x4_itf : &afb_evt_event_x4_itf;
+		}
 	}
 	x_rwlock_unlock(&events_rwlock);
 }
 #endif
-
-inline struct afb_evt *afb_evt_of_x2(struct afb_event_x2 *eventx2)
-{
-	return (struct afb_evt*)eventx2;
-}
-
-inline struct afb_event_x2 *afb_evt_as_x2(struct afb_evt *evt)
-{
-	return &evt->eventx2;
-}
 

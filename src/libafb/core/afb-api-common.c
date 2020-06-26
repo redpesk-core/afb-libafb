@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -23,16 +23,13 @@
 
 #include "libafb-config.h"
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 
 #define ISSPACE(x) (isspace((int)(unsigned char)(x)))
-
-#include <json-c/json.h>
-#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
-#define JSON_C_TO_STRING_NOSLASHESCAPE 0
-#endif
 
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
@@ -40,9 +37,9 @@
 #include "core/afb-api-v3.h"
 #include "core/afb-common.h"
 #include "core/afb-evt.h"
-#include "core/afb-api-common.h"
+#include "core/afb-data.h"
+#include "core/afb-params.h"
 #include "core/afb-hook.h"
-#include "core/afb-msg-json.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "core/afb-calls.h"
@@ -221,36 +218,29 @@ afb_api_common_new_event(
 	const char *name,
 	struct afb_evt **evt
 ) {
-	int rc;
-	struct afb_evt *e;
-
 	/* check daemon state */
 	if (comapi->state == Api_State_Pre_Init) {
 		ERROR("[API %s] Bad call to 'afb_daemon_event_make(%s)', must not be in PreInit", comapi->name, name);
-		rc = X_EINVAL;
-		e = NULL;
+		*evt = NULL;
+		return X_EINVAL;
 	}
-	else {
-		e = afb_evt_create2(comapi->name, name); /* FIXME: use ret int */
-		rc = e ? 0 : X_ENOMEM;
-	}
-	*evt = e;
-	return rc;
+	return afb_evt_create2(evt, comapi->name, name);
 }
 
 int
-afb_api_common_event_broadcast(
+afb_api_common_event_broadcast_x4(
 	const struct afb_api_common *comapi,
 	const char *name,
-	struct json_object *object
+	unsigned nparams,
+	const struct afb_data_x4 **params
 ) {
 	size_t plen, nlen;
 	char *event;
 
 	/* check daemon state */
 	if (comapi->state == Api_State_Pre_Init) {
-		ERROR("[API %s] Bad call to 'afb_daemon_event_broadcast(%s, %s)', must not be in PreInit",
-			comapi->name, name, json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
+		ERROR("[API %s] Bad call to 'afb_daemon_event_broadcast(%s)', must not be in PreInit",
+			comapi->name, name);
 		errno = X_EINVAL;
 		return 0;
 	}
@@ -264,7 +254,7 @@ afb_api_common_event_broadcast(
 	memcpy(event + plen + 1, name, nlen + 1);
 
 	/* broadcast the event */
-	return afb_evt_broadcast_name(event, object);
+	return afb_evt_broadcast_name_x4(event, nparams, params);
 }
 
 int
@@ -464,17 +454,19 @@ afb_api_common_new_event_hookable(
 }
 
 int
-afb_api_common_event_broadcast_hookable(
+afb_api_common_event_broadcast_hookable_x4(
 	const struct afb_api_common *comapi,
 	const char *name,
-	struct json_object *object
+	unsigned nparams,
+	const struct afb_data_x4 **params
 ) {
 	int r;
-	json_object_get(object);
-	afb_hook_api_event_broadcast_before(comapi, name, object);
-	r = afb_api_common_event_broadcast(comapi, name, object);
-	afb_hook_api_event_broadcast_after(comapi, name, object, r);
-	json_object_put(object);
+
+	afb_params_addref(nparams, params);
+	afb_hook_api_event_broadcast_before(comapi, name, nparams, params);
+	r = afb_api_common_event_broadcast_x4(comapi, name, nparams, params);
+	afb_hook_api_event_broadcast_after(comapi, name, nparams, params, r);
+	afb_params_unref(nparams, params);
 	return r;
 }
 
@@ -560,7 +552,7 @@ afb_api_common_settings_hookable(
 /*
  * Propagates the event to the service
  */
-static void listener_of_events(void *closure, const char *event, uint16_t eventid, struct json_object *object)
+static void listener_of_events(void *closure, const struct afb_evt_data *event)
 {
 	const struct globset_handler *handler;
 	struct afb_api_common *comapi = closure;
@@ -568,43 +560,42 @@ static void listener_of_events(void *closure, const char *event, uint16_t eventi
 #if WITH_AFB_HOOK
 	/* hook the event before */
 	if (comapi->hooksvc & afb_hook_flag_api_on_event)
-		afb_hook_api_on_event_before(comapi, event, eventid, object);
+		afb_hook_api_on_event_before(comapi, event->name, event->eventid, event->nparams, event->params);
 #endif
 
 	/* transmit to specific handlers */
 	/* search the handler */
-	handler = comapi->event_handlers ? globset_match(comapi->event_handlers, event) : NULL;
+	handler = comapi->event_handlers ? globset_match(comapi->event_handlers, event->name) : NULL;
 	if (handler) {
 #if WITH_AFB_HOOK
 		if (comapi->hooksvc & afb_hook_flag_api_on_event_handler)
-			afb_hook_api_on_event_handler_before(comapi, event, eventid, object, handler->pattern);
+			afb_hook_api_on_event_handler_before(comapi, event->name, event->eventid, event->nparams, event->params, handler->pattern);
 #endif
-		comapi->onevent(handler->callback, handler->closure, event, object, comapi);
+		comapi->onevent(handler->callback, handler->closure, event, comapi);
 #if WITH_AFB_HOOK
 		if (comapi->hooksvc & afb_hook_flag_api_on_event_handler)
-			afb_hook_api_on_event_handler_after(comapi, event, eventid, object, handler->pattern);
+			afb_hook_api_on_event_handler_after(comapi, event->name, event->eventid, event->nparams, event->params, handler->pattern);
 #endif
 	} else {
 		/* transmit to default handler */
-		comapi->onevent(NULL, NULL, event, object, comapi);
+		comapi->onevent(NULL, NULL, event, comapi);
 	}
 
 #if WITH_AFB_HOOK
 	/* hook the event after */
 	if (comapi->hooksvc & afb_hook_flag_api_on_event)
-		afb_hook_api_on_event_after(comapi, event, eventid, object);
+		afb_hook_api_on_event_after(comapi, event->name, event->eventid, event->nparams, event->params);
 #endif
-	json_object_put(object);
 }
 
-static void listener_of_pushed_events(void *closure, const char *event, uint16_t eventid, struct json_object *object)
+static void listener_of_pushed_events(void *closure, const struct afb_evt_pushed *event)
 {
-	listener_of_events(closure, event, eventid, object);
+	listener_of_events(closure, &event->data);
 }
 
-static void listener_of_broadcasted_events(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+static void listener_of_broadcasted_events(void *closure, const struct afb_evt_broadcasted *event)
 {
-	listener_of_events(closure, event, 0, object);
+	listener_of_events(closure, &event->data);
 }
 
 /* the interface for events */

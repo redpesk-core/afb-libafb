@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -249,7 +249,7 @@ extern struct afb_wsj1 *afb_wsj1_msg_wsj1(struct afb_wsj1_msg *msg);
 /*
  * Returns the string representation of the object received with 'msg'
  */
-extern const char *afb_wsj1_msg_object_s(struct afb_wsj1_msg *msg);
+extern const char *afb_wsj1_msg_object_s(struct afb_wsj1_msg *msg, size_t *size);
 
 /*
  * Returns the object received with 'msg'

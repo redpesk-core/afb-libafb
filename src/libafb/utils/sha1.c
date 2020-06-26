@@ -2,7 +2,7 @@
  * sha1.c
  *
  * Originally witten by Steve Reid <steve@edmweb.com>
- * 
+ *
  * Modified by Aaron D. Gifford <agifford@infowest.com>
  *
  * Modified by José Bollo <jose.bollo@iot.bzh>

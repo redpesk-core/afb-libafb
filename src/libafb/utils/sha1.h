@@ -3,7 +3,7 @@
  *
  * Originally taken from the public domain SHA1 implementation
  * written by by Steve Reid <steve@edmweb.com>
- * 
+ *
  * Modified by Aaron D. Gifford <agifford@infowest.com>
  *
  * Modified by José Bollo <jose.bollo@iot.bzh>

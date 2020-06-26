@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -21,57 +21,13 @@
  * $RP_END_LICENSE$
  */
 
+
 #pragma once
 
-#include "afb-string-mode.h"
+#if WITH_DYNAMIC_BINDING
 
-struct json_object;
+struct afb_apiset;
 
-/**
- * structure for handling replies
- */
-struct afb_req_reply
-{
-	/** the replied object if any */
-	struct json_object *object;
+extern int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set);
 
-	/** the replied error if any */
-	char *error;
-
-	/** the replied info if any */
-	char *info;
-
-	/** object mode */
-	int8_t object_put;
-
-	/** string mode for the error */
-	int8_t error_mode;
-
-	/** string mode for the error */
-	int8_t info_mode;
-};
-
-extern
-void
-afb_req_reply_move_splitted(
-	const struct afb_req_reply *reply,
-	struct json_object **object,
-	char **error,
-	char **info
-);
-
-extern
-int
-afb_req_reply_copy_splitted(
-	const struct afb_req_reply *reply,
-	struct json_object **object,
-	char **error,
-	char **info
-);
-
-extern
-int
-afb_req_reply_copy(
-	const struct afb_req_reply *from_reply,
-	struct afb_req_reply *to_reply
-);
+#endif

@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -40,14 +40,16 @@
 #include "core/afb-apiset.h"
 #include "core/afb-auth.h"
 #include "core/afb-calls.h"
+#include "core/afb-data.h"
+#include "core/afb-params.h"
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
 #include "core/afb-hook.h"
-#include "core/afb-msg-json.h"
 #include "core/afb-req-common.h"
 #include "core/afb-error-text.h"
 #include "core/afb-jobs.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-sched.h"
 #include "core/afb-session.h"
 #include "core/afb-perm.h"
@@ -87,52 +89,59 @@ async_cb_status_final(
 
 /******************************************************************************/
 
+static int reply_error2(struct afb_req_common *req, int status, const char *text, const char *arg)
+{
+	const struct afb_data_x4 *reply[3];
+
+	/* FIXME */
+	afb_json_legacy_make_reply_json_c_x4(reply, 0, text, 0, 0, arg, 0, 0);
+	afb_req_common_reply_hookable(req, status, 3, reply);
+	return status;
+}
+
+static int reply_error(struct afb_req_common *req, int status, const char *text)
+{
+	return reply_error2(req, status, text, NULL);
+}
+
 int afb_req_common_reply_out_of_memory(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_internal_error, NULL);
-	return X_ENOMEM;
+	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
 
 int afb_req_common_reply_internal_error(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_internal_error, NULL);
-	return X_ENOMEM;
+	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
 
 int afb_req_common_reply_unavailable(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_not_available, NULL);
-	return X_ENOMEM;
+	return reply_error(req, X_ENOMEM, afb_error_text_not_available);
 }
 
 int afb_req_common_reply_api_unknown(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_unknown_api, NULL);
-	return X_EINVAL;
+	return reply_error(req, X_EINVAL, afb_error_text_unknown_api);
 }
 
 int afb_req_common_reply_api_bad_state(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_not_available, NULL);
-	return X_EINVAL;
+	return reply_error(req, X_EINVAL, afb_error_text_not_available);
 }
 
 int afb_req_common_reply_verb_unknown(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_unknown_verb, NULL);
-	return X_EINVAL;
+	return reply_error(req, X_EINVAL, afb_error_text_unknown_verb);
 }
 
 int afb_req_common_reply_invalid_token(struct afb_req_common *req)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_invalid_token, NULL); /* TODO: or "no token" */
-	return X_EPERM;
+	return reply_error(req, X_EPERM, afb_error_text_invalid_token);
 }
 
 int afb_req_common_reply_insufficient_scope(struct afb_req_common *req, const char *scope)
 {
-	afb_req_common_reply_hookable(req, NULL, afb_error_text_insufficient_scope, scope);
-	return X_EPERM;
+	return reply_error2(req, X_EPERM, afb_error_text_insufficient_scope, scope);
 }
 
 const char *afb_req_common_on_behalf_cred_export(struct afb_req_common *req)
@@ -195,13 +204,17 @@ afb_req_common_init(
 	struct afb_req_common *req,
 	const struct afb_req_common_query_itf *queryitf,
 	const char *apiname,
-	const char *verbname
+	const char *verbname,
+	unsigned nparams,
+	const struct afb_data_x4 * const *params
 ) {
 	memset(req, 0, sizeof *req);
 	req->refcount = 1;
 	req->queryitf = queryitf;
 	req->apiname = apiname;
 	req->verbname = verbname;
+	req->nparams = nparams;
+	memcpy(req->params, params, nparams * sizeof *params);
 }
 
 void
@@ -210,7 +223,7 @@ afb_req_common_set_session(
 	struct afb_session *session
 ) {
 	struct afb_session *osession;
-	
+
 	osession = req->session;
 	req->session = afb_session_addref(session);
 	afb_session_unref(osession);
@@ -222,7 +235,7 @@ afb_req_common_set_session_string(
 	const char *string
 ) {
 	struct afb_session *osession;
-	
+
 	osession = req->session;
 	req->session = afb_session_get(string, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
 	afb_session_unref(osession);
@@ -270,6 +283,7 @@ void
 afb_req_common_cleanup(
 	struct afb_req_common *req
 ) {
+	afb_params_unref(req->nparams, req->params);
 	if (req->session && req->closing)
 		afb_session_drop_key(req->session, req->api);
 	afb_req_common_set_session(req, NULL);
@@ -479,14 +493,13 @@ afb_req_common_has_loa(
 
 /******************************************************************************/
 
-
 static void check_and_set_final(
 	struct afb_req_common *req,
 	int status
 ) {
 	if (status <= 0) {
 		/* TODO FIXME report consistent error: scope/invalid... */
-		afb_req_common_reply(req, NULL, "invalid", NULL);
+		afb_req_common_reply_insufficient_scope(req, NULL);
 	}
 	async_cb_status_final(req, status);
 }
@@ -673,7 +686,7 @@ afb_req_common_unref(
 ) {
 	if (req && !__atomic_sub_fetch(&req->refcount, 1, __ATOMIC_RELAXED)) {
 		if (!req->replied) {
-			afb_req_common_reply(req, NULL, afb_error_text_not_replied, NULL);
+			reply_error(req, X_EINVAL, afb_error_text_not_replied);
 			if (__atomic_load_n(&req->refcount, __ATOMIC_RELAXED)) {
 				/* replying may have the side effect to re-increment
 				** the reference count, showing a delayed usage of
@@ -711,55 +724,6 @@ afb_req_common_vverbose(
 
 /******************************************************************************/
 
-struct json_object *
-afb_req_common_json(
-	struct afb_req_common *req
-) {
-	if (!req->json && req->queryitf->json)
-		req->json = req->queryitf->json(req);
-	return req->json;
-}
-
-struct afb_arg
-afb_req_common_get(
-	struct afb_req_common *req,
-	const char *name
-) {
-	struct afb_arg arg;
-	struct json_object *object, *value;
-
-	if (req->queryitf->get)
-		arg = req->queryitf->get(req, name);
-	else {
-		object = afb_req_common_json(req);
-		if (json_object_object_get_ex(object, name, &value)) {
-			arg.name = name;
-			arg.value = json_object_get_string(value);
-		} else {
-			arg.name = NULL;
-			arg.value = NULL;
-		}
-		arg.path = NULL;
-	}
-	return arg;
-}
-
-/******************************************************************************/
-
-static
-int
-check_not_replied(
-	struct afb_req_common *req,
-	struct json_object *obj
-) {
-	int result = !req->replied;
-	if (!result) {
-		ERROR("reply called more than one time!!");
-		json_object_put(obj);
-	}
-	return result;
-}
-
 #if WITH_REPLY_JOB
 static
 void
@@ -768,128 +732,70 @@ reply_job(
 	void *closure
 ) {
 	struct afb_req_common *req = closure;
-	if (!signum)
-		req->queryitf->reply(req, &req->reply);
 
-	if (req->reply.object_put)
-	 	json_object_put(req->reply.object);
-	 if (req->reply.error_mode == Afb_String_Free)
-		free(req->reply.error);
-	 if (req->reply.info_mode == Afb_String_Free)
-		free(req->reply.info);
+	if (!signum)
+		req->queryitf->reply(req, req->status, req->nreplies, req->replies);
+	afb_params_unref(req->nreplies, req->replies);
 	afb_req_common_unref(req);
 }
 
-static
+static inline
 void
 do_reply(
 	struct afb_req_common *req,
-	const struct afb_req_reply *reply
+	int status,
+	unsigned nreplies,
+	const struct afb_data_x4 * const *replies
 ) {
-	char *string;
-	int haderror = 0;
-
-	req->replied = 1;
-
-	req->reply.object = reply->object_put ? reply->object : json_object_get(reply->object);
-	req->reply.object_put = 1;
-
-	string = req->reply.error = reply->error;
-	if (reply->error_mode != Afb_String_Copy) {
-		req->reply.error_mode = reply->error_mode;
-	}
-	else if (!string) {
-		req->reply.error_mode = Afb_String_Const;
-	}
-	else {
-		string = strdup(string);
-		if (string) {
-			req->reply.error = string;
-			req->reply.error_mode = Afb_String_Free;
-		}
-		else {
-			haderror = 1;
-			req->reply.error_mode = Afb_String_Copy;
-		}
-	}
-
-	string = req->reply.info = reply->info;
-	if (reply->info_mode != Afb_String_Copy) {
-		req->reply.info_mode = reply->info_mode;
-	}
-	else if (!string) {
-		req->reply.info_mode = Afb_String_Const;
-	}
-	else {
-		string = strdup(string);
-		if (string) {
-			req->reply.info = string;
-			req->reply.info_mode = Afb_String_Free;
-		}
-		else {
-			haderror = 1;
-			req->reply.info_mode = Afb_String_Const;
-		}
-	}
+	req->status = status;
+	req->nreplies = nreplies;
+	afb_params_copy(nreplies, replies, req->replies);
 
 	afb_req_common_addref(req);
-	if (haderror || afb_jobs_queue(NULL, 0, reply_job, req) < 0)
+	if (afb_jobs_queue(NULL, 0, reply_job, req) < 0)
 		reply_job(0, req);
 }
 
 #else
 
-static
+static inline
 void
 do_reply(
 	struct afb_req_common *req,
-	const struct afb_req_reply *reply
+	int status,
+	unsigned nreplies,
+	const struct afb_data_x4 * const *replies
 ) {
-	req->replied = 1;
-	req->queryitf->reply(req, reply);
+	req->queryitf->reply(req, status, nreplies, replies);
+	afb_params_unref(nreplies, replies);
 }
 
 #endif
 
+/**
+ * Emits the reply to the request
+ *
+ * @param req       the common request to be replied
+ * @param status    the integer status of the reply
+ * @param nreplies  the count of data in the array replies
+ * @param replies   the data of the reply (can be NULL if nreplies is zero)
+ */
 void
 afb_req_common_reply(
 	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *info
+	int status,
+	unsigned nreplies,
+	const struct afb_data_x4 * const *replies
 ) {
-	struct afb_req_reply reply;
-	if (check_not_replied(req, obj)) {
-		reply.object = obj;
-		reply.error = (char*)error;
-		reply.info = (char*)info;
-		reply.object_put = 1;
-		reply.error_mode = Afb_String_Copy;
-		reply.info_mode = Afb_String_Copy;
-		do_reply(req, &reply);
+	if (req->replied) {
+		/* it is an error to reply more than one time */
+		ERROR("reply called more than one time!!");
+		afb_params_unref(nreplies, replies);
 	}
-}
-
-void afb_req_common_vreply(
-	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-) {
-	struct afb_req_reply reply;
-	char *info;
-
-	if (check_not_replied(req, obj)) {
-		if (fmt == NULL || vasprintf(&info, fmt, args) < 0)
-			info = NULL;
-		reply.object = obj;
-		reply.error = (char*)error;
-		reply.info = info;
-		reply.object_put = 1;
-		reply.error_mode = Afb_String_Copy;
-		reply.info_mode = info ? Afb_String_Free : Afb_String_Const;
-		do_reply(req, &reply);
+	else {
+		/* first reply, so emit it */
+		req->replied = 1;
+		do_reply(req, status, nreplies, replies);
 	}
 }
 
@@ -1041,91 +947,19 @@ afb_req_common_has_permission(
 }
 
 /******************************************************************************/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/******************************************************************************/
 #if WITH_AFB_HOOK
-
-struct json_object *
-afb_req_common_json_hookable(
-	struct afb_req_common *req
-) {
-	struct json_object *r = afb_req_common_json(req);
-	return afb_hook_req_json(req, r);
-}
-
-struct afb_arg
-afb_req_common_get_hookable(
-	struct afb_req_common *req,
-	const char *name
-) {
-	struct afb_arg r = afb_req_common_get(req, name);
-	return afb_hook_req_get(req, name, r);
-}
 
 void
 afb_req_common_reply_hookable(
 	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *info
+	int status,
+	unsigned nparams,
+	const struct afb_data_x4 **params
 ) {
 	if (req->hookflags & afb_hook_flag_req_reply)
-		afb_hook_req_reply(req, obj, error, info);
-	afb_req_common_reply(req, obj, error, info);
+		afb_hook_req_reply(req, status, nparams, params);
+	afb_req_common_reply(req, status, nparams, params);
 }
-
-void
-afb_req_common_vreply_hookable(
-	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-) {
-	char *info;
-	if (req->hookflags & afb_hook_flag_req_reply) {
-		if (fmt == NULL || vasprintf(&info, fmt, args) < 0)
-			info = NULL;
-		afb_req_common_reply_hookable(req, obj, error, info);
-		free(info);
-	}
-	else {
-		afb_req_common_vreply(req, obj, error, fmt, args);
-	}
-}
-
 
 struct afb_req_common *
 afb_req_common_addref_hookable(

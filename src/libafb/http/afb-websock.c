@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -106,7 +106,7 @@ static int headerhas(const char *header, const char *needle)
 typedef
 	void *(*wscreator_t)(
 		struct fdev *fdev,
-		struct afb_apiset *apiset, 
+		struct afb_apiset *apiset,
 		struct afb_session *session,
 		struct afb_token *token,
 		void (*cleanup)(void*),

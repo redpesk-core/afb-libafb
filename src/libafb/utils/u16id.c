@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -49,13 +49,13 @@
  * that void* pointers are correctly aligned, the array of uint16_t
  * at head is a multiple of N items, with N being a multiple of 2
  * if void* is 32 bits or 4 if void* is 64 bits.
- * 
+ *
  * The first item of the array of uint16_t is used to record the
  * upper index of valid uint16_t ids.
- * 
- * +-----+-----+-----+-----+ - - - - - - - - +-----+-----+-----+-----+ - - - - - - - - 
+ *
+ * +-----+-----+-----+-----+ - - - - - - - - +-----+-----+-----+-----+ - - - - - - - -
  * |upper| id1 | id2 | id3 |                 |         ptr1          |
- * +-----+-----+-----+-----+ - - - - - - - - +-----+-----+-----+-----+ - - - - - - - - 
+ * +-----+-----+-----+-----+ - - - - - - - - +-----+-----+-----+-----+ - - - - - - - -
  */
 
 static inline uint16_t get_capacity(uint16_t upper)
@@ -78,7 +78,7 @@ typedef struct {
 static void flatofup(flat_t *flat, void *base, uint16_t up)
 {
 	uint16_t cap, *ids;
-	
+
 	flat->upper = up;
 	flat->capacity = cap = get_capacity(up);
 	flat->ids = ids = base;

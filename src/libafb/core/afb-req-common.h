@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -25,23 +25,24 @@
 
 #include <stdarg.h>
 
-#include "afb-req-reply.h"
-
 struct json_object;
 struct afb_req_common;
 struct afb_evt;
 struct afb_cred;
 struct afb_apiset;
 struct afb_api_item;
+struct afb_dataset;
 
 struct afb_auth;
 struct afb_event_x2;
+struct afb_data_x4;
+
+#define REQ_COMMON_NPARAMS_MAX  8
+#define REQ_COMMON_NREPLIES_MAX 8
 
 struct afb_req_common_query_itf
 {
-	struct json_object *(*json)(struct afb_req_common *req);
-	struct afb_arg (*get)(struct afb_req_common *req, const char *name);
-	void (*reply)(struct afb_req_common *req, const struct afb_req_reply *reply);
+	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, const struct afb_data_x4 * const *replies);
 	void (*unref)(struct afb_req_common *req);
 	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
@@ -52,12 +53,6 @@ struct afb_req_common_query_itf
  */
 struct afb_req_common
 {
-	struct afb_session *session;	/**< session */
-	struct afb_token *token;	/**< token */
-#if WITH_CRED
-	struct afb_cred *credentials;	/**< credential */
-#endif
-
 	uint16_t refcount;		/**< current ref count */
 
 	uint16_t replied: 1,		/**< is replied? */
@@ -68,8 +63,17 @@ struct afb_req_common
 	         closed: 1,             /**< session closed */
 	         asyncount: 4;          /**< count of async items */
 
+#if WITH_AFB_HOOK
+	int hookflags;			/**< flags for hooking */
+	int hookindex;			/**< hook index of the request if hooked */
+#endif
 	void *asyncitems[7];
 
+	struct afb_session *session;	/**< session */
+	struct afb_token *token;	/**< token */
+#if WITH_CRED
+	struct afb_cred *credentials;	/**< credential */
+#endif
 	const char *apiname;
 	const char *verbname;
 
@@ -77,16 +81,21 @@ struct afb_req_common
 
 	const struct afb_req_common_query_itf *queryitf; /**< interface of req implementation functions */
 
-	struct json_object *json;	/**< the json object (or NULL) */
+	/** count of replies */
+	unsigned nparams;
 
-#if WITH_AFB_HOOK
-	int hookflags;			/**< flags for hooking */
-	int hookindex;			/**< hook index of the request if hooked */
-#endif
+	/** the replies */
+	const struct afb_data_x4 *params[REQ_COMMON_NPARAMS_MAX];
 
 #if WITH_REPLY_JOB
 	/** the reply */
-	struct afb_req_reply reply;
+	int status;
+
+	/** count of replies */
+	unsigned nreplies;
+
+	/** the replies */
+	const struct afb_data_x4 *replies[REQ_COMMON_NREPLIES_MAX];
 #endif
 };
 
@@ -116,7 +125,9 @@ afb_req_common_init(
 	struct afb_req_common *req,
 	const struct afb_req_common_query_itf *queryitf,
 	const char *apiname,
-	const char *verbname
+	const char *verbname,
+	unsigned nparams,
+	const struct afb_data_x4 * const *params
 );
 
 extern
@@ -153,6 +164,13 @@ afb_req_common_set_session(
 
 extern
 void
+afb_req_common_set_token(
+	struct afb_req_common *req,
+	struct afb_token *token
+);
+
+extern
+void
 afb_req_common_set_session_string(
 	struct afb_req_common *req,
 	const char *uuid
@@ -163,13 +181,6 @@ void
 afb_req_common_set_token_string(
 	struct afb_req_common *req,
 	const char *token
-);
-
-extern
-void
-afb_req_common_set_token(
-	struct afb_req_common *req,
-	struct afb_token *token
 );
 
 #if WITH_CRED
@@ -237,34 +248,12 @@ afb_req_common_vverbose(
 );
 
 extern
-struct json_object *
-afb_req_common_json(
-	struct afb_req_common *req
-);
-
-extern
-struct afb_arg
-afb_req_common_get(
-	struct afb_req_common *req,
-	const char *name
-);
-
-extern
 void
 afb_req_common_reply(
 	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-);
-
-extern
-void afb_req_common_vreply(
-	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
+	int status,
+	unsigned nparams,
+	const struct afb_data_x4 * const *params
 );
 
 extern
@@ -330,35 +319,12 @@ afb_req_common_has_permission(
 #if WITH_AFB_HOOK
 
 extern
-struct json_object *
-afb_req_common_json_hookable(
-	struct afb_req_common *req
-);
-
-extern
-struct afb_arg
-afb_req_common_get_hookable(
-	struct afb_req_common *req,
-	const char *name
-);
-
-extern
 void
 afb_req_common_reply_hookable(
 	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-);
-
-extern
-void
-afb_req_common_vreply_hookable(
-	struct afb_req_common *req,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
+	int status,
+	unsigned nparams,
+	const struct afb_data_x4 **params
 );
 
 extern

@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -32,12 +32,12 @@
 
 #include "wsj1/afb-wsj1.h"
 #include "wsj1/afb-ws-json1.h"
-#include "core/afb-msg-json.h"
 #include "core/afb-session.h"
+#include "core/afb-data.h"
 #include "core/afb-cred.h"
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-evt.h"
 #include "core/afb-token.h"
 #include "core/containerof.h"
@@ -53,12 +53,12 @@ struct afb_wsreq;
 /* predeclaration of websocket callbacks */
 static void aws_on_hangup_cb(void *closure, struct afb_wsj1 *wsj1);
 static void aws_on_call_cb(void *closure, const char *api, const char *verb, struct afb_wsj1_msg *msg);
-static void aws_on_push_cb(void *closure, const char *event, uint16_t eventid, struct json_object *object);
-static void aws_on_broadcast_cb(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop);
+static void aws_on_push_cb(void *closure, const struct afb_evt_pushed *event);
+static void aws_on_broadcast_cb(void *closure, const struct afb_evt_broadcasted *event);
 
 /* predeclaration of wsreq callbacks */
 static void wsreq_destroy(struct afb_req_common *comreq);
-static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply);
+static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, const struct afb_data_x4 * const *params);
 static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_evt *event);
 static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event);
 
@@ -72,10 +72,10 @@ struct afb_ws_json1
 	struct afb_token *token;
 	struct afb_evt_listener *listener;
 	struct afb_wsj1 *wsj1;
+	struct afb_apiset *apiset;
 #if WITH_CRED
 	struct afb_cred *cred;
 #endif
-	struct afb_apiset *apiset;
 };
 
 /* declaration of wsreq structure */
@@ -214,8 +214,22 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	struct afb_ws_json1 *ws = closure;
 	struct afb_wsreq *wsreq;
 	const char *tok;
+	const char *object;
+	const struct afb_data_x4 *arg;
+	size_t len;
+	int rc;
 
-	DEBUG("received websocket request for %s/%s: %s", api, verb, afb_wsj1_msg_object_s(msg));
+	object = afb_wsj1_msg_object_s(msg, &len);
+	DEBUG("received websocket request for %s/%s: %s", api, verb, object);
+
+	/* make params */
+	afb_wsj1_msg_addref(msg);
+	rc = afb_data_x4_create_set_x4(&arg, AFB_TYPE_X4_JSON, object, 1+len,
+					(void*)afb_wsj1_msg_unref, msg);
+	if (rc < 0) {
+		afb_wsj1_close(ws->wsj1, 1008, NULL);
+		return;
+	}
 
 	/* handle new tokens */
 	tok = afb_wsj1_msg_token(msg);
@@ -225,12 +239,13 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	/* allocate */
 	wsreq = calloc(1, sizeof *wsreq);
 	if (wsreq == NULL) {
+		afb_data_unref(afb_data_of_data_x4(arg));
 		afb_wsj1_close(ws->wsj1, 1008, NULL);
 		return;
 	}
 
 	/* init the context */
-	afb_req_common_init(&wsreq->comreq, &afb_ws_json1_req_common_itf, api, verb);
+	afb_req_common_init(&wsreq->comreq, &afb_ws_json1_req_common_itf, api, verb, 1, &arg);
 	afb_req_common_set_session(&wsreq->comreq, ws->session);
 	afb_req_common_set_token(&wsreq->comreq, ws->token);
 #if WITH_CRED
@@ -240,26 +255,35 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	/* fill and record the request */
 	afb_wsj1_msg_addref(msg);
 	wsreq->msgj1 = msg;
-	wsreq->comreq.json = afb_wsj1_msg_object_j(wsreq->msgj1);
 	wsreq->aws = afb_ws_json1_addref(ws);
 
 	/* emits the call */
 	afb_req_common_process(&wsreq->comreq, ws->apiset);
 }
 
-static void aws_on_event(struct afb_ws_json1 *aws, const char *event, struct json_object *object)
+static void aws_on_event(struct afb_ws_json1 *aws, const struct afb_evt_data *event)
 {
-	afb_wsj1_send_event_j(aws->wsj1, event, afb_msg_json_event(event, object));
+	int rc;
+	char *msg;
+	size_t size;
+
+	rc = afb_json_legacy_make_msg_string_event(&msg, &size, event->name, event->nparams, event->params);
+	if (rc >= 0) {
+		rc = afb_wsj1_send_event_s(aws->wsj1, event->name, msg);
+		free(msg);
+	}
+	if (rc < 0)
+		ERROR("Can't send event %s: %m", event->name);
 }
 
-static void aws_on_push_cb(void *closure, const char *event, uint16_t eventid, struct json_object *object)
+static void aws_on_push_cb(void *closure, const struct afb_evt_pushed *event)
 {
-	aws_on_event(closure, event, object);
+	aws_on_event(closure, &event->data);
 }
 
-static void aws_on_broadcast_cb(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+static void aws_on_broadcast_cb(void *closure, const struct afb_evt_broadcasted *event)
 {
-	aws_on_event(closure, event, object);
+	aws_on_event(closure, &event->data);
 }
 
 /***************************************************************
@@ -280,18 +304,20 @@ static void wsreq_destroy(struct afb_req_common *comreq)
 	free(wsreq);
 }
 
-static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
+static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, const struct afb_data_x4 * const *params)
 {
 	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
+	size_t size;
 	int rc;
-	struct json_object *msg;
+	char *msg;
 
 	/* create the reply */
-	msg = afb_msg_json_reply(reply);
-
-	rc = (reply->error ? afb_wsj1_reply_error_j : afb_wsj1_reply_ok_j)(
-			wsreq->msgj1, msg, NULL);
-	if (rc)
+	rc = afb_json_legacy_make_msg_string_reply(&msg, &size, status, nparams, params);
+	if (rc >= 0) {
+		rc = afb_wsj1_reply_s(wsreq->msgj1, msg, NULL, status < 0);
+		free(msg);
+	}
+	if (rc < 0)
 		ERROR("Can't send reply: %m");
 }
 

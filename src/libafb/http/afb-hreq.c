@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -36,9 +36,6 @@
 
 #include <microhttpd.h>
 #include <json-c/json.h>
-#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
-#define JSON_C_TO_STRING_NOSLASHESCAPE 0
-#endif
 
 #if HAVE_LIBMAGIC
 #include <magic.h>
@@ -46,13 +43,12 @@
 
 #include <afb/afb-arg.h>
 
-#include "core/afb-msg-json.h"
 #include "core/afb-session.h"
 #include "utils/locale-root.h"
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
+#include "core/afb-json-legacy.h"
 #include "core/containerof.h"
 
 #include "http/afb-method.h"
@@ -74,9 +70,6 @@ static const char short_key_for_uuid[] = "uuid";
 static const char long_key_for_token[] = "x-afb-token";
 static const char short_key_for_token[] = "token";
 
-static const char long_key_for_reqid[] = "x-afb-reqid";
-static const char short_key_for_reqid[] = "reqid";
-
 static const char key_for_bearer[] = "Bearer";
 static const char key_for_access_token[] = "access_token";
 
@@ -95,14 +88,10 @@ struct hreq_data {
 	char *path;		/* path of the file saved */
 };
 
-static struct json_object *req_json(struct afb_req_common *comreq);
-static struct afb_arg req_get(struct afb_req_common *comreq, const char *name);
-static void req_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply);
+static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies);
 static void req_destroy(struct afb_req_common *comreq);
 
 const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
-	.json = req_json,
-	.get = req_get,
 	.reply = req_reply,
 	.unref = req_destroy
 };
@@ -880,24 +869,28 @@ int afb_hreq_post_add_file(struct afb_hreq *hreq, const char *key, const char *f
 	return !size;
 }
 
-static struct afb_arg req_get(struct afb_req_common *comreq, const char *name)
+static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
 {
-	const char *value;
 	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
-	struct hreq_data *hdat = get_data(hreq, name, 0);
-	if (hdat)
-		return (struct afb_arg){
-			.name = hdat->key,
-			.value = hdat->value,
-			.path = hdat->path
-		};
+	struct MHD_Response *response;
+	char *message;
+	size_t length;
 
-	value = MHD_lookup_connection_value(hreq->connection, MHD_GET_ARGUMENT_KIND, name);
-	return (struct afb_arg){
-		.name = value == NULL ? NULL : name,
-		.value = value,
-		.path = NULL
-	};
+	/* create the reply */
+	afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
+
+	response = MHD_create_response_from_buffer(length, message, MHD_RESPMEM_MUST_FREE);
+
+	/* handle authorisation feedback */
+#if FIXME
+should use status
+	if (reply->error == afb_error_text_invalid_token)
+		afb_hreq_reply(hreq, MHD_HTTP_UNAUTHORIZED, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"invalid_token\"", NULL);
+	else if (reply->error == afb_error_text_insufficient_scope)
+		afb_hreq_reply(hreq, MHD_HTTP_FORBIDDEN, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"insufficient_scope\"", NULL);
+	else
+#endif
+		afb_hreq_reply(hreq, MHD_HTTP_OK, response, NULL);
 }
 
 static int _iterargs_(struct json_object *obj, enum MHD_ValueKind kind, const char *key, const char *value)
@@ -906,17 +899,14 @@ static int _iterargs_(struct json_object *obj, enum MHD_ValueKind kind, const ch
 	return 1;
 }
 
-static struct json_object *req_json(struct afb_req_common *comreq)
+static void make_params(struct afb_hreq *hreq)
 {
 	struct hreq_data *hdat;
 	struct json_object *obj, *val;
-	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 
-	obj = hreq->json;
-	if (obj == NULL) {
-		hreq->json = obj = json_object_new_object();
-		if (obj == NULL) {
-		} else {
+	if (hreq->comreq.params == NULL) {
+		obj = json_object_new_object();
+		if (obj != NULL) {
 			MHD_get_connection_values (hreq->connection, MHD_GET_ARGUMENT_KIND, (void*)_iterargs_, obj);
 			for (hdat = hreq->data ; hdat ; hdat = hdat->next) {
 				if (hdat->path == NULL)
@@ -932,51 +922,9 @@ static struct json_object *req_json(struct afb_req_common *comreq)
 				json_object_object_add(obj, hdat->key, val);
 			}
 		}
+		afb_json_legacy_make_data_x4_json_c(hreq->comreq.params, obj);
+		hreq->comreq.nparams = 1;
 	}
-	return obj;
-}
-
-static inline const char *get_json_string(json_object *obj)
-{
-	return json_object_to_json_string_ext(obj, JSON_C_TO_STRING_PLAIN|JSON_C_TO_STRING_NOSLASHESCAPE);
-}
-static ssize_t send_json_cb(json_object *obj, uint64_t pos, char *buf, size_t max)
-{
-	ssize_t len = stpncpy(buf, get_json_string(obj)+pos, max) - buf;
-	return len ? : (ssize_t)MHD_CONTENT_READER_END_OF_STREAM;
-}
-
-static void req_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply)
-{
-	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
-	struct json_object *sub, *jmsg;
-	const char *reqid;
-	struct MHD_Response *response;
-
-	/* create the reply */
-	jmsg = afb_msg_json_reply(reply);
-
-	/* append the req id on need */
-	reqid = afb_hreq_get_argument(hreq, long_key_for_reqid);
-	if (reqid == NULL)
-		reqid = afb_hreq_get_argument(hreq, short_key_for_reqid);
-	if (reqid != NULL && json_object_object_get_ex(jmsg, "request", &sub))
-		json_object_object_add(sub, "reqid", json_object_new_string(reqid));
-
-	response = MHD_create_response_from_callback(
-			(uint64_t)strlen(get_json_string(jmsg)),
-			SIZE_RESPONSE_BUFFER,
-			(void*)send_json_cb,
-			jmsg,
-			(void*)json_object_put);
-
-	/* handle authorisation feedback */
-	if (reply->error == afb_error_text_invalid_token)
-		afb_hreq_reply(hreq, MHD_HTTP_UNAUTHORIZED, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"invalid_token\"", NULL);
-	else if (reply->error == afb_error_text_insufficient_scope)
-		afb_hreq_reply(hreq, MHD_HTTP_FORBIDDEN, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"insufficient_scope\"", NULL);
-	else
-		afb_hreq_reply(hreq, MHD_HTTP_OK, response, NULL);
 }
 
 void afb_hreq_call(struct afb_hreq *hreq, struct afb_apiset *apiset, const char *api, size_t lenapi, const char *verb, size_t lenverb)
@@ -989,6 +937,7 @@ void afb_hreq_call(struct afb_hreq *hreq, struct afb_apiset *apiset, const char 
 	} else if (afb_hreq_init_context(hreq) < 0) {
 		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 	} else {
+		make_params(hreq);
 		afb_req_common_addref(&hreq->comreq);
 		afb_req_common_process(&hreq->comreq, apiset);
 	}
@@ -1063,7 +1012,7 @@ struct afb_hreq *afb_hreq_create()
 	struct afb_hreq *hreq = calloc(1, sizeof *hreq);
 	if (hreq) {
 		/* init the request */
-		afb_req_common_init(&hreq->comreq, &afb_hreq_req_common_query_itf, NULL, NULL);
+		afb_req_common_init(&hreq->comreq, &afb_hreq_req_common_query_itf, NULL, NULL, 0, NULL);
 		hreq->reqid = ++global_reqids;
 	}
 	return hreq;

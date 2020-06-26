@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -32,6 +32,7 @@
 #include <json-c/json.h>
 
 #include <afb/afb-event-x2.h>
+#include <afb/afb-binding-x4.h>
 
 #include "core/afb-session.h"
 #include "core/afb-cred.h"
@@ -40,7 +41,7 @@
 #include "wsapi/afb-stub-ws.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
-#include "core/afb-req-reply.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
 #include "core/afb-jobs.h"
@@ -146,7 +147,6 @@ static void server_req_destroy_cb(struct afb_req_common *comreq)
 {
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	json_object_put(comreq->json);
 	afb_req_common_cleanup(comreq);
 
 	afb_proto_ws_call_unref(wreq->call);
@@ -154,13 +154,27 @@ static void server_req_destroy_cb(struct afb_req_common *comreq)
 	free(wreq);
 }
 
-static void server_req_reply_cb(struct afb_req_common *comreq, const struct afb_req_reply *reply)
-{
+struct reply_data {
 	int rc;
-	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
+	struct afb_proto_ws_call *call;
+};
 
-	rc = afb_proto_ws_call_reply(wreq->call, reply->object, reply->error, reply->info);
-	if (rc < 0)
+static void server_req_reply_cb2(void *closure, struct json_object *object, const char *error, const char *info)
+{
+	struct reply_data *rd = closure;
+
+	rd->rc = afb_proto_ws_call_reply(rd->call, object, error, info);
+}
+
+static void server_req_reply_cb(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+{
+	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
+	struct reply_data rd;
+	int rc;
+
+	rd.call = wreq->call;
+	rc = afb_json_legacy_do_reply_json_c(&rd, status, nreplies, replies, server_req_reply_cb2);
+	if (rc < 0 || rd.rc < 0)
 		ERROR("error while sending reply");
 }
 
@@ -251,17 +265,18 @@ static int client_make_ids(struct afb_stub_ws *stubws, struct afb_proto_ws *prot
 }
 
 /* on call, propagate it to the ws service */
-static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
+static void process_cb(void * closure1, struct json_object *object, const void * closure2)
 {
 	int rc;
-	struct afb_stub_ws *stubws = closure;
+	struct afb_stub_ws *stubws = closure1;
+	struct afb_req_common *comreq = (void*)closure2; /* remove const */
 	struct afb_proto_ws *proto;
 	uint16_t sessionid;
 	uint16_t tokenid;
 
 	proto = client_get_proto(stubws);
 	if (proto == NULL) {
-		afb_req_common_reply(comreq, NULL, afb_error_text_disconnected, NULL);
+		afb_json_legacy_req_reply(comreq, NULL, afb_error_text_disconnected, NULL);
 		return;
 	}
 
@@ -271,16 +286,23 @@ static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
 		rc = afb_proto_ws_client_call(
 				proto,
 				comreq->verbname,
-				afb_req_common_json(comreq),
+				object,
 				sessionid,
 				tokenid,
 				comreq,
 				afb_req_common_on_behalf_cred_export(comreq));
 	}
 	if (rc < 0) {
-		afb_req_common_reply(comreq, NULL, afb_error_text_internal_error, "can't send message");
+		afb_json_legacy_req_reply(comreq, NULL, afb_error_text_internal_error, "can't send message");
 		afb_req_common_unref(comreq);
 	}
+}
+
+static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
+{
+	afb_json_legacy_do2_single_json_c(
+		comreq->nparams, comreq->params,
+		process_cb, closure, comreq);
 }
 
 /* get the description */
@@ -323,22 +345,38 @@ static void server_event_remove_cb(void *closure, const char *event, uint16_t ev
 	}
 }
 
-static void server_event_push_cb(void *closure, const char *event, uint16_t eventid, struct json_object *object)
+static void server_event_push_cb2(void *closure1, struct json_object *object, const void *closure2)
+{
+	struct afb_proto_ws *proto = closure1;
+	const struct afb_evt_pushed *event = closure2;
+	afb_proto_ws_server_event_push(proto, event->data.eventid, object);
+}
+
+static void server_event_push_cb(void *closure, const struct afb_evt_pushed *event)
 {
 	struct afb_stub_ws *stubws = closure;
 
-	if (stubws->proto != NULL && u16id2bool_get(stubws->event_flags, eventid))
-		afb_proto_ws_server_event_push(stubws->proto, eventid, object);
-	json_object_put(object);
+	if (stubws->proto != NULL && u16id2bool_get(stubws->event_flags, event->data.eventid))
+		afb_json_legacy_do2_single_json_c(
+				event->data.nparams, event->data.params,
+				server_event_push_cb2, stubws->proto, event);
 }
 
-static void server_event_broadcast_cb(void *closure, const char *event, struct json_object *object, const uuid_binary_t uuid, uint8_t hop)
+static void server_event_broadcast_cb2(void *closure1, struct json_object *object, const void *closure2)
+{
+	struct afb_proto_ws *proto = closure1;
+	const struct afb_evt_broadcasted *event = closure2;
+	afb_proto_ws_server_event_broadcast(proto, event->data.name, object, event->uuid, event->hop);
+}
+
+static void server_event_broadcast_cb(void *closure, const struct afb_evt_broadcasted *event)
 {
 	struct afb_stub_ws *stubws = closure;
 
 	if (stubws->proto != NULL)
-		afb_proto_ws_server_event_broadcast(stubws->proto, event, object, uuid, hop);
-	json_object_put(object);
+		afb_json_legacy_do2_single_json_c(
+			event->data.nparams, event->data.params,
+			server_event_broadcast_cb2, stubws->proto, event);
 }
 
 /*****************************************************/
@@ -347,7 +385,7 @@ static void client_on_reply_cb(void *closure, void *request, struct json_object 
 {
 	struct afb_req_common *comreq = request;
 
-	afb_req_common_reply_hookable(comreq, object, error, info);
+	afb_json_legacy_req_hooked_reply(comreq, object, error, info);
 	afb_req_common_unref(comreq);
 }
 
@@ -356,10 +394,9 @@ static void client_on_event_create_cb(void *closure, uint16_t event_id, const ch
 	struct afb_stub_ws *stubws = closure;
 	struct afb_evt *event;
 	int rc;
-	
+
 	/* check conflicts */
-	event = afb_evt_create(event_name);
-	if (event == NULL)
+	if (afb_evt_create(&event, event_name) < 0)
 		ERROR("can't create event %s, out of memory", event_name);
 	else {
 		rc = u16id2ptr_add(&stubws->event_proxies, event_id, event);
@@ -413,7 +450,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
 	if (rc >= 0 && event)
-		rc = afb_evt_push(event, data);
+		rc = afb_json_legacy_event_push(event, data);
 	else
 		ERROR("unreadable push event");
 	if (rc <= 0)
@@ -422,7 +459,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 
 static void client_on_event_broadcast_cb(void *closure, const char *event_name, struct json_object *data, const uuid_binary_t uuid, uint8_t hop)
 {
-	afb_evt_rebroadcast_name(event_name, data, uuid, hop);
+	afb_json_legacy_event_rebroadcast_name(event_name, data, uuid, hop);
 }
 
 /*****************************************************/
@@ -459,7 +496,7 @@ static void server_on_session_remove_cb(void *closure, uint16_t sessionid)
 	struct afb_stub_ws *stubws = closure;
 	struct afb_session *session;
 	int rc;
-	
+
 	rc = u16id2ptr_drop(&stubws->session_proxies, sessionid, (void**)&session);
 	if (rc == 0 && session)
 		afb_session_unref(session);
@@ -488,7 +525,7 @@ static void server_on_token_remove_cb(void *closure, uint16_t tokenid)
 	struct afb_stub_ws *stubws = closure;
 	struct afb_token *token;
 	int rc;
-	
+
 	rc = u16id2ptr_drop(&stubws->token_proxies, tokenid, (void**)&token);
 	if (rc == 0 && token)
 		afb_token_unref(token);
@@ -506,7 +543,7 @@ server_on_call_cb(
 	void *closure,
 	struct afb_proto_ws_call *call,
 	const char *verb,
-	struct json_object *args,
+	struct json_object *object,
 	uint16_t sessionid,
 	uint16_t tokenid,
 	const char *user_creds
@@ -517,6 +554,7 @@ server_on_call_cb(
 	struct afb_session *session;
 	struct afb_token *token;
 	size_t lenverb, lencreds;
+	const struct afb_data_x4 *arg;
 	int rc;
 
 	afb_stub_ws_addref(stubws);
@@ -545,11 +583,14 @@ server_on_call_cb(
 	if (lencreds)
 		user_creds = memcpy(wreq->strings + lenverb, user_creds, lencreds);
 
+	rc = afb_json_legacy_make_data_x4_json_c(&arg, object);
+	if (rc < 0)
+		goto out_of_memory2;
+
 	/* initialise */
 	wreq->stubws = stubws;
 	wreq->call = call;
-	afb_req_common_init(&wreq->comreq, &server_req_req_common_itf, stubws->apiname, wreq->strings);
-	wreq->comreq.json = args;
+	afb_req_common_init(&wreq->comreq, &server_req_req_common_itf, stubws->apiname, wreq->strings, 1, &arg);
 	afb_req_common_set_session(&wreq->comreq, session);
 	afb_req_common_set_token(&wreq->comreq, token);
 #if WITH_CRED
@@ -561,7 +602,8 @@ server_on_call_cb(
 no_session:
 	errstr = afb_error_text_unknown_session;
 out_of_memory:
-	json_object_put(args);
+	json_object_put(object);
+out_of_memory2:
 	afb_stub_ws_unref(stubws);
 	afb_proto_ws_call_reply(call, NULL, errstr, NULL);
 	afb_proto_ws_call_unref(call);

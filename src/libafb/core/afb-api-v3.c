@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -27,7 +27,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <json-c/json.h>
+//#include <json-c/json.h>
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
@@ -42,7 +42,9 @@
 #include "core/afb-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
-#include "core/afb-msg-json.h"
+#include "core/afb-data.h"
+#include "core/afb-params.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "core/afb-req-v3.h"
@@ -315,7 +317,7 @@ x3_api_new_event_x2(
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
 	struct afb_evt *evt;
 	int rc = afb_api_common_new_event(comapi, name, &evt);
-	return rc < 0 ? NULL : afb_evt_as_x2(evt);
+	return rc < 0 ? NULL : afb_evt_make_x2(evt);
 }
 
 static
@@ -327,18 +329,45 @@ x3_api_event_broadcast(
 )
 {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_event_broadcast(comapi, name, object);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, object);
+	return rc < 0 ? rc : afb_api_common_event_broadcast_x4(comapi, name, 1, &data);
+}
+
+struct x3callcb {
+	struct afb_api_x3 *apix3;
+	void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*);
+	void *closure;
+};
+
+static void x3_api_call_cb2(
+	void *closure,
+	struct json_object *object,
+	const char *error,
+	const char *info
+) {
+	struct x3callcb *cc = closure;
+
+	cc->callback(cc->closure, object, error, info, cc->apix3);
 }
 
 static void x3_api_call_cb(
 	void *closure1,
 	void *closure2,
 	void *closure3,
-	const struct afb_req_reply *reply
+	int status,
+	unsigned nreplies,
+	const struct afb_data_x4 * const *replies
 ) {
-	struct afb_api_x3 *apix3 = closure1;
-	void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*) = closure2;
-	callback(closure3, reply->object, reply->error, reply->info, apix3);
+	struct x3callcb cc;
+
+	cc.apix3 = closure1;
+	cc.callback = closure2;
+	cc.closure = closure3;
+
+	afb_json_legacy_do_reply_json_c(&cc, status, nreplies, replies, x3_api_call_cb2);
 }
 
 static void x3_api_call(
@@ -350,25 +379,44 @@ static void x3_api_call(
 	void *closure)
 {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	return afb_calls_call(api_v3_to_api_common(apiv3), api, verb, args, x3_api_call_cb, apix3, callback, closure);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc >= 0)
+		afb_calls_call_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+	else
+		callback(closure, NULL, "error", NULL, apix3);
 }
 
 static int x3_api_call_sync(
-		struct afb_api_x3 *apix3,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **object,
-		char **error,
-		char **info)
-{
+	struct afb_api_x3 *apix3,
+	const char *api,
+	const char *verb,
+	struct json_object *args,
+	struct json_object **object,
+	char **error,
+	char **info
+) {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	struct afb_req_reply reply;
-	int result;
+	const struct afb_data_x4 *data;
+	const struct afb_data_x4 *replies[3];
+	unsigned nreplies;
+	int rc, status;
 
-	result = afb_calls_call_sync(api_v3_to_api_common(apiv3), api, verb, args, &reply);
-	afb_req_reply_move_splitted(&reply, object, error, info);
-	return result;
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		*object = 0;
+		*error = strdup(afb_error_text_internal_error);
+		*info = 0;
+	}
+	else {
+		nreplies = 3;
+		rc = afb_calls_call_sync_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, &status, &nreplies, replies);
+		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
+		afb_params_unref(nreplies, replies);
+	}
+	return rc;
 }
 
 static void x3_api_legacy_call(
@@ -493,7 +541,6 @@ x3_api_event_handler_add(
 	void *closure
 ) {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-
 	return afb_api_common_event_handler_add(api_v3_to_api_common(apiv3), pattern, callback, closure);
 }
 
@@ -576,7 +623,7 @@ static struct afb_event_x2 *x3_api_hooked_new_event_x2(
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
 	struct afb_evt *evt;
 	int rc = afb_api_common_new_event_hookable(comapi, name, &evt);
-	return rc < 0 ? NULL : afb_evt_as_x2(evt);
+	return rc < 0 ? NULL : afb_evt_make_x2(evt);
 }
 
 static int x3_api_hooked_event_broadcast(
@@ -586,7 +633,11 @@ static int x3_api_hooked_event_broadcast(
 )
 {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_event_broadcast_hookable(comapi, name, object);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, object);
+	return rc < 0 ? rc : afb_api_common_event_broadcast_hookable_x4(comapi, name, 1, &data);
 }
 
 static void x3_api_hooked_call(
@@ -598,7 +649,14 @@ static void x3_api_hooked_call(
 		void *closure)
 {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	return afb_calls_call_hookable(api_v3_to_api_common(apiv3), api, verb, args, x3_api_call_cb, apix3, callback, closure);
+	const struct afb_data_x4 *data;
+	int rc;
+
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc >= 0)
+		afb_calls_call_hookable_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+	else
+		callback(closure, NULL, "error", NULL, apix3);
 }
 
 static int x3_api_hooked_call_sync(
@@ -611,13 +669,26 @@ static int x3_api_hooked_call_sync(
 		char **info)
 {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	struct afb_req_reply reply;
-	int result;
+	const struct afb_data_x4 *data;
+	const struct afb_data_x4 *replies[3];
+	unsigned nreplies;
+	int rc, status;
 
-	result = afb_calls_call_sync(api_v3_to_api_common(apiv3), api, verb, args, &reply);
-	afb_req_reply_move_splitted(&reply, object, error, info);
-	return result;
+	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	if (rc < 0) {
+		*object = 0;
+		*error = strdup("error");
+		*info = 0;
+	}
+	else {
+		nreplies = 3;
+		rc = afb_calls_call_sync_hookable_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, &status, &nreplies, replies);
+		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
+		afb_params_unref(nreplies, replies);
+	}
+	return rc;
 }
+
 
 static void x3_api_hooked_legacy_call(
 		struct afb_api_x3 *apix3,
@@ -644,9 +715,7 @@ static int x3_api_hooked_set_verbs_v2(
 		struct afb_api_x3 *api,
 		const struct afb_verb_v2 *verbs)
 {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_set_verbs_v2(api, verbs);
-	return afb_hook_api_api_set_verbs_v2(api_v3_to_api_common(apiv3), result, verbs);
+	return X_ENOTSUP;
 }
 
 static int x3_api_hooked_set_verbs(
@@ -783,24 +852,65 @@ static const struct afb_api_x3_itf hooked_api_x3_itf = {
  ******************************************************************************
  ******************************************************************************/
 
+/* handler of any events */
+static
+void
+handle_any_event_cb(
+	void *closure1,
+	struct json_object *object,
+	const void *closure2
+) {
+	struct afb_api_v3 *apiv3 = closure1;
+	const char *name = closure2;
+
+	apiv3->on_any_event_v3(api_v3_to_api_x3(apiv3), name, object);
+}
+
+/* handler of specific events */
+
+struct handle_specific_event_data
+{
+	struct afb_api_v3 *apiv3;
+	void *closure;
+	void (*callback)(void *, const char*, struct json_object*, struct afb_api_x3*);
+};
+
+static
+void
+handle_specific_event_cb(
+	void *closure1,
+	struct json_object *object,
+	const void *closure2
+) {
+	struct handle_specific_event_data *hd = closure1;
+	const char *name = closure2;
+
+	hd->callback(hd->closure, name, object, api_v3_to_api_x3(hd->apiv3));
+}
+
 /* handler of events */
 static
 void
 handle_events(
 	void *callback,
 	void *closure,
-	const char *event,
-	struct json_object *object,
+	const struct afb_evt_data *event,
 	struct afb_api_common *comapi
 ) {
-	void (*cb)(void *, const char*, struct json_object*, struct afb_api_x3*) = callback;
 	struct afb_api_v3 *apiv3 = api_common_to_afb_api_v3(comapi);
-	struct afb_api_x3 *apix3 = api_v3_to_api_x3(apiv3);
 
-	if (cb != NULL)
-		cb(closure, event, object, apix3);
-	else if (apiv3->on_any_event_v3 != NULL)
-		apiv3->on_any_event_v3(apix3, event, object);
+	if (callback != NULL) {
+		struct handle_specific_event_data hd;
+
+		hd.apiv3 = apiv3;
+		hd.closure = closure;
+		hd.callback = callback;
+
+		afb_json_legacy_do2_single_json_c(event->nparams, event->params, handle_specific_event_cb, &hd, event->name);
+	}
+	else if (apiv3->on_any_event_v3 != NULL) {
+		afb_json_legacy_do2_single_json_c(event->nparams, event->params, handle_any_event_cb, apiv3, event->name);
+	}
 }
 
 /******************************************************************************

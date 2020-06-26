@@ -10,7 +10,7 @@
  *  a written agreement between you and The IoT.bzh Company. For licensing terms
  *  and conditions see https://www.iot.bzh/terms-conditions. For further
  *  information use the contact form at https://www.iot.bzh/contact.
- * 
+ *
  * GNU General Public License Usage
  *  Alternatively, this file may be used under the terms of the GNU General
  *  Public license version 3. This license is as published by the Free Software
@@ -438,8 +438,10 @@ void afb_wsj1_msg_unref(struct afb_wsj1_msg *msg)
 	}
 }
 
-const char *afb_wsj1_msg_object_s(struct afb_wsj1_msg *msg)
+const char *afb_wsj1_msg_object_s(struct afb_wsj1_msg *msg, size_t *size)
 {
+	if (size)
+		*size = msg->object_s_length;
 	return msg->object_s;
 }
 
