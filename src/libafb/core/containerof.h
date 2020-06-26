@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include <stddef.h>
 /**
  * Macro for retrieve the pointer of a structure of 'type' having a field named 'field'
  * of address 'ptr'.

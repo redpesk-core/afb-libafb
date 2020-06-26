@@ -13,6 +13,7 @@
 #include "libafb-config.h"
 
 #include <json-c/json.h>
+#include <afb/afb-arg.h>
 
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"

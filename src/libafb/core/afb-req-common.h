@@ -24,21 +24,17 @@
 #pragma once
 
 #include <stdarg.h>
-#include <stddef.h>
-#include <afb/afb-req-x2-itf.h>
 
 #include "afb-req-reply.h"
 
 struct json_object;
-struct afb_evt_listener;
 struct afb_req_common;
 struct afb_cred;
 struct afb_apiset;
 struct afb_api_item;
+
+struct afb_auth;
 struct afb_event_x2;
-struct afb_verb_desc_v1;
-struct afb_verb_v2;
-struct afb_verb_v3;
 
 struct afb_req_common_query_itf
 {
@@ -285,32 +281,6 @@ afb_req_common_unsubscribe_event_x2(
 );
 
 extern
-void
-afb_req_common_subcall(
-	struct afb_req_common *req,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	int flags,
-	void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
-	void *closure
-);
-
-
-extern
-int
-afb_req_common_subcallsync(
-	struct afb_req_common *req,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	int flags,
-	struct json_object **object,
-	char **error,
-	char **info
-);
-
-extern
 void *
 afb_req_common_cookie(
 	struct afb_req_common *req,
@@ -461,31 +431,6 @@ extern
 struct json_object *
 afb_req_common_get_client_info_hookable(
 	struct afb_req_common *req
-);
-
-extern
-void
-afb_req_common_subcall_hookable(
-	struct afb_req_common *req,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	int flags,
-	void (*callback)(void *closure, struct json_object *object, const char *error, const char * info, struct afb_req_x2 *req),
-	void *closure
-);
-
-extern
-int
-afb_req_common_subcallsync_hookable(
-	struct afb_req_common *req,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	int flags,
-	struct json_object **object,
-	char **error,
-	char **info
 );
 
 #endif

@@ -48,8 +48,8 @@
 **********************************************/
 static
 void
-vverbose_cb(
-	CLOSURE_T *closure,
+common_api_vverbose(
+	CLOSURE_T closure,
 	int level,
 	const char *file,
 	int line,
@@ -62,31 +62,9 @@ vverbose_cb(
 }
 
 static
-struct afb_event_x2 *
-event_x2_make_cb(
-	CLOSURE_T *closure,
-	const char *name
-) {
-	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
-	return afb_api_common_event_x2_make(comapi, name);
-}
-
-static
 int
-event_broadcast_cb(
-	CLOSURE_T *closure,
-	const char *name,
-	struct json_object *object
-)
-{
-	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
-	return afb_api_common_event_broadcast(comapi, name, object);
-}
-
-static
-int
-queue_job_cb(
-	CLOSURE_T *closure,
+common_api_queue_job(
+	CLOSURE_T closure,
 	void (*callback)(int signum, void *arg),
 	void *argument,
 	void *group,
@@ -98,8 +76,8 @@ queue_job_cb(
 
 static
 int
-require_api_cb(
-	CLOSURE_T *closure,
+common_api_require_api(
+	CLOSURE_T closure,
 	const char *name,
 	int initialized
 ) {
@@ -109,8 +87,8 @@ require_api_cb(
 
 static
 int
-add_alias_cb(
-	CLOSURE_T *closure,
+common_api_add_alias(
+	CLOSURE_T closure,
 	const char *apiname,
 	const char *aliasname
 ) {
@@ -120,8 +98,8 @@ add_alias_cb(
 
 static
 void
-api_seal_cb(
-	CLOSURE_T *closure
+common_api_seal(
+	CLOSURE_T closure
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
 	afb_api_common_api_seal(comapi);
@@ -129,8 +107,8 @@ api_seal_cb(
 
 static
 int
-class_provide_cb(
-	CLOSURE_T *closure,
+common_api_class_provide(
+	CLOSURE_T closure,
 	const char *name
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
@@ -139,8 +117,8 @@ class_provide_cb(
 
 static
 int
-class_require_cb(
-	CLOSURE_T *closure,
+common_api_class_require(
+	CLOSURE_T closure,
 	const char *name
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
@@ -149,8 +127,8 @@ class_require_cb(
 
 static
 struct json_object *
-settings_cb(
-	CLOSURE_T *closure
+common_api_settings(
+	CLOSURE_T closure
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
 	return afb_api_common_settings(comapi);
@@ -162,8 +140,8 @@ settings_cb(
 #if WITH_AFB_HOOK
 static
 void
-hooked_vverbose_cb(
-	CLOSURE_T *closure,
+common_api_hooked_vverbose(
+	CLOSURE_T closure,
 	int level,
 	const char *file,
 	int line,
@@ -176,31 +154,9 @@ hooked_vverbose_cb(
 }
 
 static
-struct afb_event_x2 *
-hooked_event_x2_make_cb(
-	CLOSURE_T *closure,
-	const char *name
-) {
-	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
-	return afb_api_common_event_x2_make_hookable(comapi, name);
-}
-
-static
 int
-hooked_event_broadcast_cb(
-	CLOSURE_T *closure,
-	const char *name,
-	struct json_object *object
-)
-{
-	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
-	return afb_api_common_event_broadcast_hookable(comapi, name, object);
-}
-
-static
-int
-hooked_queue_job_cb(
-	CLOSURE_T *closure,
+common_api_hooked_queue_job(
+	CLOSURE_T closure,
 	void (*callback)(int signum, void *arg),
 	void *argument,
 	void *group,
@@ -212,8 +168,8 @@ hooked_queue_job_cb(
 
 static
 int
-hooked_require_api_cb(
-	CLOSURE_T *closure,
+common_api_hooked_require_api(
+	CLOSURE_T closure,
 	const char *name,
 	int initialized
 ) {
@@ -223,8 +179,8 @@ hooked_require_api_cb(
 
 static
 int
-hooked_add_alias_cb(
-	CLOSURE_T *closure,
+common_api_hooked_add_alias(
+	CLOSURE_T closure,
 	const char *apiname,
 	const char *aliasname
 ) {
@@ -234,8 +190,8 @@ hooked_add_alias_cb(
 
 static
 void
-hooked_api_seal_cb(
-	CLOSURE_T *closure
+common_api_hooked_seal(
+	CLOSURE_T closure
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
 	afb_api_common_api_seal_hookable(comapi);
@@ -243,8 +199,8 @@ hooked_api_seal_cb(
 
 static
 int
-hooked_class_provide_cb(
-	CLOSURE_T *closure,
+common_api_hooked_class_provide(
+	CLOSURE_T closure,
 	const char *name
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
@@ -253,8 +209,8 @@ hooked_class_provide_cb(
 
 static
 int
-hooked_class_require_cb(
-	CLOSURE_T *closure,
+common_api_hooked_class_require(
+	CLOSURE_T closure,
 	const char *name
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
@@ -263,8 +219,8 @@ hooked_class_require_cb(
 
 static
 struct json_object *
-hooked_settings_cb(
-	CLOSURE_T *closure
+common_api_hooked_settings(
+	CLOSURE_T closure
 ) {
 	struct afb_api_common *comapi = CLOSURE_TO_COMMON_API(closure);
 	return afb_api_common_settings_hookable(comapi);

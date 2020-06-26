@@ -44,8 +44,8 @@
  ******************************************************************************/
 
 static
-void req_vverbose_cb(
-	CLOSURE_T *closure,
+void common_req_vverbose(
+	CLOSURE_T closure,
 	int level,
 	const char *file,
 	int line,
@@ -58,73 +58,9 @@ void req_vverbose_cb(
 }
 
 static
-struct json_object *
-req_json_cb(
-	CLOSURE_T *closure
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_json(comreq);
-}
-
-static
-struct afb_arg
-req_get_cb(
-	CLOSURE_T *closure,
-	const char *name
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_get(comreq, name);
-}
-
-static
-void
-req_reply_cb(
-	CLOSURE_T *closure,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	afb_req_common_reply(comreq, obj, error, info);
-}
-
-static
-void
-req_vreply_cb(
-	CLOSURE_T *closure,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	afb_req_common_vreply(comreq, obj, error, fmt, args);
-}
-
-static
-int
-req_subscribe_event_x2_cb(
-	CLOSURE_T *closure,
-	struct afb_event_x2 *event
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_subscribe_event_x2(comreq, event);
-}
-
-static
-int
-req_unsubscribe_event_x2_cb(
-	CLOSURE_T *closure,
-	struct afb_event_x2 *event
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_unsubscribe_event_x2(comreq, event);
-}
-
-static
 void *
-req_cookie_cb(
-	CLOSURE_T *closure,
+common_req_cookie(
+	CLOSURE_T closure,
 	int replace,
 	void *(*create_value)(void*),
 	void (*free_value)(void*),
@@ -136,8 +72,8 @@ req_cookie_cb(
 
 static
 int
-req_session_set_LOA_cb(
-	CLOSURE_T *closure,
+common_req_session_set_LOA(
+	CLOSURE_T closure,
 	unsigned level
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
@@ -146,8 +82,8 @@ req_session_set_LOA_cb(
 
 static
 void
-req_session_close_cb(
-	CLOSURE_T *closure
+common_req_session_close(
+	CLOSURE_T closure
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
 	afb_req_common_session_close(comreq);
@@ -155,29 +91,19 @@ req_session_close_cb(
 
 static
 struct json_object *
-req_get_client_info_cb(
-	CLOSURE_T *closure
+common_req_get_client_info(
+	CLOSURE_T closure
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
 	return afb_req_common_get_client_info(comreq);
-}
-
-static
-int
-req_has_permission_cb(
-	CLOSURE_T *closure,
-	const char *permission
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_has_permission(comreq, permission);
 }
 
 /******************************************************************************/
 #if WITH_AFB_HOOK
 
 static
-void req_vverbose_hookable_cb(
-	CLOSURE_T *closure,
+void common_req_hooked_vverbose(
+	CLOSURE_T closure,
 	int level,
 	const char *file,
 	int line,
@@ -190,73 +116,9 @@ void req_vverbose_hookable_cb(
 }
 
 static
-struct json_object *
-req_json_hookable_cb(
-	CLOSURE_T *closure
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_json_hookable(comreq);
-}
-
-static
-struct afb_arg
-req_get_hookable_cb(
-	CLOSURE_T *closure,
-	const char *name
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_get_hookable(comreq, name);
-}
-
-static
-void
-req_reply_hookable_cb(
-	CLOSURE_T *closure,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	afb_req_common_reply_hookable(comreq, obj, error, info);
-}
-
-static
-void
-req_vreply_hookable_cb(
-	CLOSURE_T *closure,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	afb_req_common_vreply_hookable(comreq, obj, error, fmt, args);
-}
-
-static
-int
-req_subscribe_event_x2_hookable_cb(
-	CLOSURE_T *closure,
-	struct afb_event_x2 *event
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_subscribe_event_x2_hookable(comreq, event);
-}
-
-static
-int
-req_unsubscribe_event_x2_hookable_cb(
-	CLOSURE_T *closure,
-	struct afb_event_x2 *event
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_unsubscribe_event_x2_hookable(comreq, event);
-}
-
-static
 void *
-req_cookie_hookable_cb(
-	CLOSURE_T *closure,
+common_req_hooked_cookie(
+	CLOSURE_T closure,
 	int replace,
 	void *(*create_value)(void*),
 	void (*free_value)(void*),
@@ -268,8 +130,8 @@ req_cookie_hookable_cb(
 
 static
 int
-req_session_set_LOA_hookable_cb(
-	CLOSURE_T *closure,
+common_req_hooked_session_set_LOA(
+	CLOSURE_T closure,
 	unsigned level
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
@@ -278,8 +140,8 @@ req_session_set_LOA_hookable_cb(
 
 static
 void
-req_session_close_hookable_cb(
-	CLOSURE_T *closure
+common_req_hooked_session_close(
+	CLOSURE_T closure
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
 	afb_req_common_session_close_hookable(comreq);
@@ -287,21 +149,11 @@ req_session_close_hookable_cb(
 
 static
 struct json_object *
-req_get_client_info_hookable_cb(
-	CLOSURE_T *closure
+common_req_hooked_get_client_info(
+	CLOSURE_T closure
 ) {
 	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
 	return afb_req_common_get_client_info_hookable(comreq);
-}
-
-static
-int
-req_has_permission_hookable_cb(
-	CLOSURE_T *closure,
-	const char *permission
-) {
-	struct afb_req_common *comreq = CLOSURE_TO_REQ_COMMON(closure);
-	return afb_req_common_has_permission_hookable(comreq, permission);
 }
 
 #endif

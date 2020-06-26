@@ -44,6 +44,8 @@
 #include <magic.h>
 #endif
 
+#include <afb/afb-arg.h>
+
 #include "core/afb-msg-json.h"
 #include "core/afb-session.h"
 #include "utils/locale-root.h"

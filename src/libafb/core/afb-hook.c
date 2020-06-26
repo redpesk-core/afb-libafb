@@ -37,6 +37,7 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
+#include <afb/afb-arg.h>
 #include <afb/afb-event-x2.h>
 
 #include "core/afb-hook.h"

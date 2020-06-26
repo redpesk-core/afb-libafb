@@ -93,7 +93,7 @@ static inline struct afb_req_x2 *req_v3_to_req_x2(struct afb_req_v3 *req)
 
 /******************************************************************************/
 
-#define CLOSURE_T                       struct afb_req_x2
+#define CLOSURE_T                       struct afb_req_x2 *
 #define CLOSURE_TO_REQ_COMMON(closure)  (req_v3_from_req_x2(closure)->comreq)
 
 #include "afb-req-common.inc"
@@ -124,7 +124,7 @@ inline void afb_req_v3_unref(struct afb_req_v3 *req)
 
 static
 struct afb_req_x2 *
-req_addref_cb(
+x2_req_addref(
 	struct afb_req_x2 *xreq
 ) {
 	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
@@ -133,7 +133,7 @@ req_addref_cb(
 
 static
 void
-req_unref_cb(
+x2_req_unref(
 	struct afb_req_x2 *xreq
 ) {
 	struct afb_req_v3 *req = req_v3_from_req_x2(xreq);
@@ -156,7 +156,7 @@ void subcall_cb(
 
 static
 void
-req_subcall_cb(
+x2_req_subcall(
 	struct afb_req_x2 *xreq,
 	const char *api,
 	const char *verb,
@@ -172,7 +172,7 @@ req_subcall_cb(
 
 static
 int
-req_subcallsync_cb(
+x2_req_subcall_sync(
 	struct afb_req_x2 *xreq,
 	const char *api,
 	const char *verb,
@@ -191,8 +191,82 @@ req_subcallsync_cb(
 }
 
 static
+struct json_object *
+x2_req_json(
+	struct afb_req_x2 *reqx2
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_json(comreq);
+}
+
+static
+struct afb_arg
+x2_req_get(
+	struct afb_req_x2 *reqx2,
+	const char *name
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_get(comreq, name);
+}
+
+static
+void
+x2_req_reply(
+	struct afb_req_x2 *reqx2,
+	struct json_object *obj,
+	const char *error,
+	const char *info
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	afb_req_common_reply(comreq, obj, error, info);
+}
+
+static
+void
+x2_req_vreply(
+	struct afb_req_x2 *reqx2,
+	struct json_object *obj,
+	const char *error,
+	const char *fmt,
+	va_list args
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	afb_req_common_vreply(comreq, obj, error, fmt, args);
+}
+
+static
+int
+x2_req_subscribe_event_x2(
+	struct afb_req_x2 *reqx2,
+	struct afb_event_x2 *event
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_subscribe_event_x2(comreq, event);
+}
+
+static
+int
+x2_req_unsubscribe_event_x2(
+	struct afb_req_x2 *reqx2,
+	struct afb_event_x2 *event
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_unsubscribe_event_x2(comreq, event);
+}
+
+static
+int
+x2_req_has_permission(
+	struct afb_req_x2 *reqx2,
+	const char *permission
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_has_permission(comreq, permission);
+}
+
+static
 char *
-req_get_application_id_cb(
+x2_req_get_application_id(
 	struct afb_req_x2 *xreq
 ) {
 #if WITH_CRED
@@ -206,7 +280,7 @@ req_get_application_id_cb(
 
 static
 int
-req_get_uid_cb(
+x2_req_get_uid(
 	struct afb_req_x2 *xreq
 ) {
 #if WITH_CRED
@@ -235,7 +309,7 @@ check_permission_status_cb(
 
 static
 void
-req_check_permission_cb(
+x2_req_check_permission(
 	struct afb_req_x2 *xreq,
 	const char *permission,
 	void (*callback)(void*,int,struct afb_req_x2*),
@@ -251,71 +325,71 @@ req_check_permission_cb(
 /******************************************************************************/
 
 const struct afb_req_x2_itf req_v3_itf = {
-	.json = req_json_cb,
-	.get = req_get_cb,
+	.json = x2_req_json,
+	.get = x2_req_get,
 	.legacy_success = NULL,
 	.legacy_fail = NULL,
 	.legacy_vsuccess = NULL,
 	.legacy_vfail = NULL,
 	.legacy_context_get = NULL,
 	.legacy_context_set = NULL,
-	.addref = req_addref_cb,
-	.unref = req_unref_cb,
-	.session_close = req_session_close_cb,
-	.session_set_LOA = req_session_set_LOA_cb,
+	.addref = x2_req_addref,
+	.unref = x2_req_unref,
+	.session_close = common_req_session_close,
+	.session_set_LOA = common_req_session_set_LOA,
 	.legacy_subscribe_event_x1 = NULL,
 	.legacy_unsubscribe_event_x1 = NULL,
 	.legacy_subcall = NULL,
 	.legacy_subcallsync = NULL,
-	.vverbose = req_vverbose_cb,
+	.vverbose = common_req_vverbose,
 	.legacy_store_req = NULL,
 	.legacy_subcall_req = NULL,
-	.has_permission = req_has_permission_cb,
-	.get_application_id = req_get_application_id_cb,
-	.context_make = req_cookie_cb,
-	.subscribe_event_x2 = req_subscribe_event_x2_cb,
-	.unsubscribe_event_x2 = req_unsubscribe_event_x2_cb,
+	.has_permission = x2_req_has_permission,
+	.get_application_id = x2_req_get_application_id,
+	.context_make = common_req_cookie,
+	.subscribe_event_x2 = x2_req_subscribe_event_x2,
+	.unsubscribe_event_x2 = x2_req_unsubscribe_event_x2,
 	.legacy_subcall_request = NULL,
-	.get_uid = req_get_uid_cb,
-	.reply = req_reply_cb,
-	.vreply = req_vreply_cb,
-	.get_client_info = req_get_client_info_cb,
-	.subcall = req_subcall_cb,
-	.subcallsync = req_subcallsync_cb,
-	.check_permission = req_check_permission_cb,
+	.get_uid = x2_req_get_uid,
+	.reply = x2_req_reply,
+	.vreply = x2_req_vreply,
+	.get_client_info = common_req_get_client_info,
+	.subcall = x2_req_subcall,
+	.subcallsync = x2_req_subcall_sync,
+	.check_permission = x2_req_check_permission,
 };
 /******************************************************************************/
 #if WITH_AFB_HOOK
 
-static struct afb_req_x2 *req_addref_hookable_cb(struct afb_req_x2 *closure)
+static struct afb_req_x2 *x2_req_hooked_addref(struct afb_req_x2 *closure)
 {
 	struct afb_req_v3 *req = req_v3_from_req_x2(closure);
 	afb_hook_req_addref(req->comreq);
-	return req_addref_cb(closure);
+	return x2_req_addref(closure);
 }
 
-static void req_unref_hookable_cb(struct afb_req_x2 *closure)
+static void x2_req_hooked_unref(struct afb_req_x2 *closure)
 {
 	struct afb_req_v3 *req = req_v3_from_req_x2(closure);
 	afb_hook_req_unref(req->comreq);
-	req_unref_cb(closure);
+	x2_req_unref(closure);
 }
 
-static char *req_get_application_id_hookable_cb(struct afb_req_x2 *closure)
+static char *x2_req_hooked_get_application_id(struct afb_req_x2 *closure)
 {
 	struct afb_req_v3 *req = req_v3_from_req_x2(closure);
-	char *r = req_get_application_id_cb(closure);
+	char *r = x2_req_get_application_id(closure);
 	return afb_hook_req_get_application_id(req->comreq, r);
 }
 
-static int req_get_uid_hookable_cb(struct afb_req_x2 *closure)
+static int x2_req_hooked_get_uid(struct afb_req_x2 *closure)
 {
 	struct afb_req_v3 *req = req_v3_from_req_x2(closure);
-	int r = req_get_uid_cb(closure);
+	int r = x2_req_get_uid(closure);
 	return afb_hook_req_get_uid(req->comreq, r);
 }
 
-static void req_subcall_hookable_cb(
+static void x2_req_hooked_subcall(
 				struct afb_req_x2 *xreq,
 				const char *api,
 				const char *verb,
@@ -329,7 +403,7 @@ static void req_subcall_hookable_cb(
 	afb_calls_subcall_hookable(afb_api_v3_get_api_common(req->api), api, verb, args, subcall_cb, req, callback, closure, req->comreq, flags);
 }
 
-static int req_subcallsync_hookable_cb(
+static int x2_req_hooked_subcall_sync(
 				struct afb_req_x2 *xreq,
 				const char *api,
 				const char *verb,
@@ -348,41 +422,115 @@ static int req_subcallsync_hookable_cb(
 	return result;
 }
 
+static
+struct json_object *
+x2_req_hooked_json(
+	struct afb_req_x2 *reqx2
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_json_hookable(comreq);
+}
+
+static
+struct afb_arg
+x2_req_hooked_get(
+	struct afb_req_x2 *reqx2,
+	const char *name
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_get_hookable(comreq, name);
+}
+
+static
+void
+x2_req_hooked_reply(
+	struct afb_req_x2 *reqx2,
+	struct json_object *obj,
+	const char *error,
+	const char *info
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	afb_req_common_reply_hookable(comreq, obj, error, info);
+}
+
+static
+void
+x2_req_hooked_vreply(
+	struct afb_req_x2 *reqx2,
+	struct json_object *obj,
+	const char *error,
+	const char *fmt,
+	va_list args
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	afb_req_common_vreply_hookable(comreq, obj, error, fmt, args);
+}
+
+static
+int
+x2_req_hooked_subscribe_event_x2(
+	struct afb_req_x2 *reqx2,
+	struct afb_event_x2 *event
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_subscribe_event_x2_hookable(comreq, event);
+}
+
+static
+int
+x2_req_hooked_unsubscribe_event_x2(
+	struct afb_req_x2 *reqx2,
+	struct afb_event_x2 *event
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_unsubscribe_event_x2_hookable(comreq, event);
+}
+
+static
+int
+x2_req_hooked_has_permission(
+	struct afb_req_x2 *reqx2,
+	const char *permission
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_has_permission_hookable(comreq, permission);
+}
+
 /******************************************************************************/
 
 const struct afb_req_x2_itf req_v3_hooked_itf = {
-	.json = req_json_hookable_cb,
-	.get = req_get_hookable_cb,
+	.json = x2_req_hooked_json,
+	.get = x2_req_hooked_get,
 	.legacy_success = NULL,
 	.legacy_fail = NULL,
 	.legacy_vsuccess = NULL,
 	.legacy_vfail = NULL,
 	.legacy_context_get = NULL,
 	.legacy_context_set = NULL,
-	.addref = req_addref_hookable_cb,
-	.unref = req_unref_hookable_cb,
-	.session_close = req_session_close_hookable_cb,
-	.session_set_LOA = req_session_set_LOA_hookable_cb,
+	.addref = x2_req_hooked_addref,
+	.unref = x2_req_hooked_unref,
+	.session_close = common_req_hooked_session_close,
+	.session_set_LOA = common_req_hooked_session_set_LOA,
 	.legacy_subscribe_event_x1 = NULL,
 	.legacy_unsubscribe_event_x1 = NULL,
 	.legacy_subcall = NULL,
 	.legacy_subcallsync = NULL,
-	.vverbose = req_vverbose_hookable_cb,
+	.vverbose = common_req_hooked_vverbose,
 	.legacy_store_req = NULL,
 	.legacy_subcall_req = NULL,
-	.has_permission = req_has_permission_hookable_cb,
-	.get_application_id = req_get_application_id_hookable_cb,
-	.context_make = req_cookie_hookable_cb,
-	.subscribe_event_x2 = req_subscribe_event_x2_hookable_cb,
-	.unsubscribe_event_x2 = req_unsubscribe_event_x2_hookable_cb,
+	.has_permission = x2_req_hooked_has_permission,
+	.get_application_id = x2_req_hooked_get_application_id,
+	.context_make = common_req_hooked_cookie,
+	.subscribe_event_x2 = x2_req_hooked_subscribe_event_x2,
+	.unsubscribe_event_x2 = x2_req_hooked_unsubscribe_event_x2,
 	.legacy_subcall_request = NULL,
-	.get_uid = req_get_uid_hookable_cb,
-	.reply = req_reply_hookable_cb,
-	.vreply = req_vreply_hookable_cb,
-	.get_client_info = req_get_client_info_hookable_cb,
-	.subcall = req_subcall_hookable_cb,
-	.subcallsync = req_subcallsync_hookable_cb,
-	.check_permission = req_check_permission_cb, /* TODO */
+	.get_uid = x2_req_hooked_get_uid,
+	.reply = x2_req_hooked_reply,
+	.vreply = x2_req_hooked_vreply,
+	.get_client_info = common_req_hooked_get_client_info,
+	.subcall = x2_req_hooked_subcall,
+	.subcallsync = x2_req_hooked_subcall_sync,
+	.check_permission = x2_req_check_permission, /* TODO */
 };
 #endif
 
