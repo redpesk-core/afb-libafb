@@ -293,21 +293,21 @@ static void hook_req_session_set_LOA(void *closure, const struct afb_hookid *hoo
 					"result", result);
 }
 
-static void hook_req_subscribe(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_event_x2 *event, int result)
+static void hook_req_subscribe(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_evt *event, int result)
 {
 	hook_req(closure, hookid, req, "subscribe", "{s{ss si} si}",
 					"event",
-						"name", afb_evt_event_x2_fullname(event),
-						"id", afb_evt_event_x2_id(event),
+						"name", afb_evt_fullname(event),
+						"id", afb_evt_id(event),
 					"result", result);
 }
 
-static void hook_req_unsubscribe(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_event_x2 *event, int result)
+static void hook_req_unsubscribe(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_evt *event, int result)
 {
 	hook_req(closure, hookid, req, "unsubscribe", "{s{ss? si} si}",
 					"event",
-						"name", afb_evt_event_x2_fullname(event),
-						"id", afb_evt_event_x2_id(event),
+						"name", afb_evt_fullname(event),
+						"id", afb_evt_id(event),
 					"result", result);
 }
 
@@ -502,10 +502,10 @@ static void hook_api_vverbose(void *closure, const struct afb_hookid *hookid, co
 	free(msg);
 }
 
-static void hook_api_event_make(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct afb_event_x2 *result)
+static void hook_api_event_make(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct afb_evt *result)
 {
 	hook_api(closure, hookid, comapi, "event_make", "{ss ss si}",
-			"name", name, "event", afb_evt_event_x2_fullname(result), "id", afb_evt_event_x2_id(result));
+			"name", name, "event", afb_evt_fullname(result), "id", afb_evt_id(result));
 }
 
 static void hook_api_rootdir_get_fd(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result)
@@ -1243,7 +1243,7 @@ static void addhook(struct desc *desc, enum trace_type type)
 	}
 
 	/* attach and activate the hook */
-	afb_req_common_subscribe_event_x2(desc->context->req, afb_evt_as_x2(hook->event->evt));
+	afb_req_common_subscribe(desc->context->req, hook->event->evt);
 	trace_attach_hook(trace, hook, type);
 }
 

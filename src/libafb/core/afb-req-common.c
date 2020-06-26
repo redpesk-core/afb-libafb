@@ -896,31 +896,31 @@ void afb_req_common_vreply(
 /******************************************************************************/
 
 int
-afb_req_common_subscribe_event_x2(
+afb_req_common_subscribe(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
 	if (req->replied) {
 		ERROR("request replied, subscription impossible");
 		return X_EINVAL;
 	}
 	if (req->queryitf->subscribe)
-		return req->queryitf->subscribe(req, event);
+		return req->queryitf->subscribe(req, evt);
 	ERROR("no event listener, subscription impossible");
 	return X_ENOTSUP;
 }
 
 int
-afb_req_common_unsubscribe_event_x2(
+afb_req_common_unsubscribe(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
 	if (req->replied) {
 		ERROR("request replied, unsubscription impossible");
 		return X_EINVAL;
 	}
 	if (req->queryitf->unsubscribe)
-		return req->queryitf->unsubscribe(req, event);
+		return req->queryitf->unsubscribe(req, evt);
 	ERROR("no event listener, unsubscription impossible");
 	return X_ENOTSUP;
 }
@@ -1161,21 +1161,21 @@ afb_req_common_session_set_LOA_hookable(
 }
 
 int
-afb_req_common_subscribe_event_x2_hookable(
+afb_req_common_subscribe_hookable(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
-	int r = afb_req_common_subscribe_event_x2(req, event);
-	return afb_hook_req_subscribe(req, event, r);
+	int r = afb_req_common_subscribe(req, evt);
+	return afb_hook_req_subscribe(req, evt, r);
 }
 
 int
-afb_req_common_unsubscribe_event_x2_hookable(
+afb_req_common_unsubscribe_hookable(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
-	int r = afb_req_common_unsubscribe_event_x2(req, event);
-	return afb_hook_req_unsubscribe(req, event, r);
+	int r = afb_req_common_unsubscribe(req, evt);
+	return afb_hook_req_unsubscribe(req, evt, r);
 }
 
 void

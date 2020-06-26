@@ -239,7 +239,7 @@ struct dbus_memo {
 struct dbus_event
 {
 	struct dbus_event *next;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int id;
 	int refcount;
 };
@@ -400,7 +400,7 @@ static struct dbus_event *api_dbus_client_event_search(struct api_dbus *api, int
 	struct dbus_event *ev;
 
 	ev = api->client.events;
-	while (ev != NULL && (ev->id != id || 0 != strcmp(afb_evt_event_x2_fullname(ev->event), name)))
+	while (ev != NULL && (ev->id != id || 0 != strcmp(afb_evt_fullname(ev->event), name)))
 		ev = ev->next;
 
 	return ev;
@@ -421,7 +421,7 @@ static void api_dbus_client_event_create(struct api_dbus *api, int id, const cha
 	/* no conflict, try to add it */
 	ev = malloc(sizeof *ev);
 	if (ev != NULL) {
-		ev->event = afb_evt_event_x2_create(name);
+		ev->event = afb_evt_create(name);
 		if (ev->event == NULL)
 			free(ev);
 		else {
@@ -458,7 +458,7 @@ static void api_dbus_client_event_drop(struct api_dbus *api, int id, const char 
 	*prv = ev->next;
 
 	/* destroys the event */
-	afb_evt_event_x2_unref(ev->event);
+	afb_evt_unref(ev->event);
 	free(ev);
 }
 
@@ -480,7 +480,7 @@ static void api_dbus_client_event_push(struct api_dbus *api, int id, const char 
 	object = json_tokener_parse_verbose(data, &jerr);
 	if (jerr != json_tokener_success)
 		object = json_object_new_string(data);
-	afb_evt_event_x2_push(ev->event, object);
+	afb_evt_push(ev->event, object);
 }
 
 /* subscribes an event */
@@ -505,7 +505,7 @@ static void api_dbus_client_event_subscribe(struct api_dbus *api, int id, const 
 	}
 
 	/* subscribe the request to the event */
-	rc = afb_req_common_subscribe_event_x2(memo->comreq, ev->event);
+	rc = afb_req_common_subscribe(memo->comreq, ev->event);
 	if (rc < 0)
 		ERROR("can't subscribe: %s", strerror(-rc));
 }
@@ -532,7 +532,7 @@ static void api_dbus_client_event_unsubscribe(struct api_dbus *api, int id, cons
 	}
 
 	/* unsubscribe the request from the event */
-	rc = afb_req_common_unsubscribe_event_x2(memo->comreq, ev->event);
+	rc = afb_req_common_unsubscribe(memo->comreq, ev->event);
 	if (rc < 0)
 		ERROR("can't unsubscribe: %s", strerror(-rc));
 }
@@ -864,27 +864,27 @@ void dbus_req_raw_reply(struct afb_req_common *comreq, const struct afb_req_repl
 
 static void afb_api_dbus_server_event_send(struct origin *origin, char order, const char *event, int eventid, const char *data, uint64_t msgid);
 
-static int dbus_req_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int dbus_req_subscribe(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	uint64_t msgid;
 	int rc;
 
-	rc = afb_evt_listener_watch_x2(dreq->listener->listener, event);
+	rc = afb_evt_listener_watch_evt(dreq->listener->listener, event);
 	sd_bus_message_get_cookie(dreq->message, &msgid);
-	afb_api_dbus_server_event_send(dreq->listener->origin, 'S', afb_evt_event_x2_fullname(event), afb_evt_event_x2_id(event), "", msgid);
+	afb_api_dbus_server_event_send(dreq->listener->origin, 'S', afb_evt_fullname(event), afb_evt_id(event), "", msgid);
 	return rc;
 }
 
-static int dbus_req_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int dbus_req_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct dbus_req *dreq = containerof(struct dbus_req, comreq, comreq);
 	uint64_t msgid;
 	int rc;
 
 	sd_bus_message_get_cookie(dreq->message, &msgid);
-	afb_api_dbus_server_event_send(dreq->listener->origin, 'U', afb_evt_event_x2_fullname(event), afb_evt_event_x2_id(event), "", msgid);
-	rc = afb_evt_listener_unwatch_x2(dreq->listener->listener, event);
+	afb_api_dbus_server_event_send(dreq->listener->origin, 'U', afb_evt_fullname(event), afb_evt_id(event), "", msgid);
+	rc = afb_evt_listener_unwatch_evt(dreq->listener->listener, event);
 	return rc;
 }
 

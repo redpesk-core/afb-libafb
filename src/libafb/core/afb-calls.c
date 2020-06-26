@@ -107,16 +107,16 @@ static void req_calls_destroy_cb(struct afb_req_common *comreq)
 /**
  * handle subscribing from a call
  */
-static int req_calls_subscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int req_calls_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
 	int rc = 0, rc2;
 
 	if (req->flags & afb_req_subcall_pass_events)
-		rc = afb_req_common_subscribe_event_x2(req->caller, event);
+		rc = afb_req_common_subscribe(req->caller, event);
 
 	if (req->flags & afb_req_subcall_catch_events) {
-		rc2 = afb_api_common_subscribe_event_x2(req->comapi, event);
+		rc2 = afb_api_common_subscribe(req->comapi, event);
 		if (rc2 < 0)
 			rc = rc2;
 	}
@@ -127,16 +127,16 @@ static int req_calls_subscribe_cb(struct afb_req_common *comreq, struct afb_even
 /**
  * handle unsubscribing from a call
  */
-static int req_calls_unsubscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int req_calls_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
 	int rc = 0, rc2;
 
 	if (req->flags & afb_req_subcall_pass_events)
-		rc = afb_req_common_unsubscribe_event_x2(req->caller, event);
+		rc = afb_req_common_unsubscribe(req->caller, event);
 
 	if (req->flags & afb_req_subcall_catch_events) {
-		rc2 = afb_api_common_unsubscribe_event_x2(req->comapi, event);
+		rc2 = afb_api_common_unsubscribe(req->comapi, event);
 		if (rc2 < 0)
 			rc = rc2;
 	}

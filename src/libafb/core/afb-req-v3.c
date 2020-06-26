@@ -241,7 +241,8 @@ x2_req_subscribe_event_x2(
 	struct afb_event_x2 *event
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_subscribe_event_x2(comreq, event);
+	struct afb_evt *evt = afb_evt_of_x2(event);
+	return afb_req_common_subscribe(comreq, evt);
 }
 
 static
@@ -251,7 +252,8 @@ x2_req_unsubscribe_event_x2(
 	struct afb_event_x2 *event
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_unsubscribe_event_x2(comreq, event);
+	struct afb_evt *evt = afb_evt_of_x2(event);
+	return afb_req_common_unsubscribe(comreq, evt);
 }
 
 static
@@ -473,7 +475,8 @@ x2_req_hooked_subscribe_event_x2(
 	struct afb_event_x2 *event
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_subscribe_event_x2_hookable(comreq, event);
+	struct afb_evt *evt = afb_evt_of_x2(event);
+	return afb_req_common_subscribe_hookable(comreq, evt);
 }
 
 static
@@ -483,7 +486,8 @@ x2_req_hooked_unsubscribe_event_x2(
 	struct afb_event_x2 *event
 ) {
 	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
-	return afb_req_common_unsubscribe_event_x2_hookable(comreq, event);
+	struct afb_evt *evt = afb_evt_of_x2(event);
+	return afb_req_common_unsubscribe_hookable(comreq, evt);
 }
 
 static

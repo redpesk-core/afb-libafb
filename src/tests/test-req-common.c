@@ -58,8 +58,8 @@ void test_unref(struct afb_req_common *req)
 }
 
 struct afb_req_common *test_subscribe_req;
-struct afb_event_x2 *test_subscribe_event;
-int test_subscribe(struct afb_req_common *req, struct afb_event_x2 *event)
+struct afb_evt *test_subscribe_event;
+int test_subscribe(struct afb_req_common *req, struct afb_evt *event)
 {
 	test_subscribe_req = req;
 	test_subscribe_event = event;
@@ -67,8 +67,8 @@ int test_subscribe(struct afb_req_common *req, struct afb_event_x2 *event)
 }
 
 struct afb_req_common *test_unsubscribe_req;
-struct afb_event_x2 *test_unsubscribe_event;
-int test_unsubscribe(struct afb_req_common *req, struct afb_event_x2 *event)
+struct afb_evt *test_unsubscribe_event;
+int test_unsubscribe(struct afb_req_common *req, struct afb_evt *event)
 {
 	test_unsubscribe_req = req;
 	test_unsubscribe_event = event;

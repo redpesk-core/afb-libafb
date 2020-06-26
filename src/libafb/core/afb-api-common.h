@@ -30,6 +30,7 @@ struct afb_session;
 struct afb_evt_listener;
 struct afb_req_common;
 
+struct afb_evt;
 struct afb_event_x2;
 
 struct globset;
@@ -279,16 +280,16 @@ afb_api_common_event_handler_del(
 
 extern
 int
-afb_api_common_subscribe_event_x2(
+afb_api_common_subscribe(
 	struct afb_api_common *comapi,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 extern
 int
-afb_api_common_unsubscribe_event_x2(
+afb_api_common_unsubscribe(
 	struct afb_api_common *comapi,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 /****************************************************************************/
@@ -308,10 +309,11 @@ afb_api_common_vverbose(
 );
 
 extern
-struct afb_event_x2 *
-afb_api_common_event_x2_make(
+int
+afb_api_common_new_event(
 	const struct afb_api_common *comapi,
-	const char *name
+	const char *name,
+	struct afb_evt **evt
 );
 
 extern
@@ -388,10 +390,11 @@ afb_api_common_vverbose_hookable(
 );
 
 extern
-struct afb_event_x2 *
-afb_api_common_event_x2_make_hookable(
+int
+afb_api_common_new_event_hookable(
 	const struct afb_api_common *comapi,
-	const char *name
+	const char *name,
+	struct afb_evt **evt
 );
 
 extern

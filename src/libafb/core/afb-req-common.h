@@ -29,6 +29,7 @@
 
 struct json_object;
 struct afb_req_common;
+struct afb_evt;
 struct afb_cred;
 struct afb_apiset;
 struct afb_api_item;
@@ -42,8 +43,8 @@ struct afb_req_common_query_itf
 	struct afb_arg (*get)(struct afb_req_common *req, const char *name);
 	void (*reply)(struct afb_req_common *req, const struct afb_req_reply *reply);
 	void (*unref)(struct afb_req_common *req);
-	int (*subscribe)(struct afb_req_common *req, struct afb_event_x2 *event);
-	int (*unsubscribe)(struct afb_req_common *req, struct afb_event_x2 *event);
+	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
+	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
 };
 
 /**
@@ -268,16 +269,16 @@ void afb_req_common_vreply(
 
 extern
 int
-afb_req_common_subscribe_event_x2(
+afb_req_common_subscribe(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 extern
 int
-afb_req_common_unsubscribe_event_x2(
+afb_req_common_unsubscribe(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 extern
@@ -387,16 +388,16 @@ afb_req_common_session_set_LOA_hookable(
 
 extern
 int
-afb_req_common_subscribe_event_x2_hookable(
+afb_req_common_subscribe_hookable(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 extern
 int
-afb_req_common_unsubscribe_event_x2_hookable(
+afb_req_common_unsubscribe_hookable(
 	struct afb_req_common *req,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 );
 
 extern

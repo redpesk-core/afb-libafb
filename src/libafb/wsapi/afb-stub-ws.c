@@ -164,25 +164,25 @@ static void server_req_reply_cb(struct afb_req_common *comreq, const struct afb_
 		ERROR("error while sending reply");
 }
 
-static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	int rc;
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	rc = afb_evt_listener_watch_x2(wreq->stubws->listener, event);
+	rc = afb_evt_listener_watch_evt(wreq->stubws->listener, event);
 	if (rc >= 0)
-		rc = afb_proto_ws_call_subscribe(wreq->call,  afb_evt_event_x2_id(event));
+		rc = afb_proto_ws_call_subscribe(wreq->call,  afb_evt_id(event));
 	if (rc < 0)
 		ERROR("error while subscribing event");
 	return rc;
 }
 
-static int server_req_unsubscribe_cb(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int server_req_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	int rc;
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	rc = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_event_x2_id(event));
+	rc = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_id(event));
 	if (rc < 0)
 		ERROR("error while unsubscribing event");
 	return rc;
@@ -354,18 +354,18 @@ static void client_on_reply_cb(void *closure, void *request, struct json_object 
 static void client_on_event_create_cb(void *closure, uint16_t event_id, const char *event_name)
 {
 	struct afb_stub_ws *stubws = closure;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int rc;
 	
 	/* check conflicts */
-	event = afb_evt_event_x2_create(event_name);
+	event = afb_evt_create(event_name);
 	if (event == NULL)
 		ERROR("can't create event %s, out of memory", event_name);
 	else {
 		rc = u16id2ptr_add(&stubws->event_proxies, event_id, event);
 		if (rc < 0) {
 			ERROR("can't record event %s", event_name);
-			afb_evt_event_x2_unref(event);
+			afb_evt_unref(event);
 		}
 	}
 }
@@ -373,23 +373,23 @@ static void client_on_event_create_cb(void *closure, uint16_t event_id, const ch
 static void client_on_event_remove_cb(void *closure, uint16_t event_id)
 {
 	struct afb_stub_ws *stubws = closure;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int rc;
 
 	rc = u16id2ptr_drop(&stubws->event_proxies, event_id, (void**)&event);
 	if (rc == 0 && event)
-		afb_evt_event_x2_unref(event);
+		afb_evt_unref(event);
 }
 
 static void client_on_event_subscribe_cb(void *closure, void *request, uint16_t event_id)
 {
 	struct afb_stub_ws *stubws = closure;
 	struct afb_req_common *comreq = request;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int rc;
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
-	if (rc < 0 || !event || afb_req_common_subscribe_event_x2_hookable(comreq, event) < 0)
+	if (rc < 0 || !event || afb_req_common_subscribe_hookable(comreq, event) < 0)
 		ERROR("can't subscribe: %m");
 }
 
@@ -397,23 +397,23 @@ static void client_on_event_unsubscribe_cb(void *closure, void *request, uint16_
 {
 	struct afb_stub_ws *stubws = closure;
 	struct afb_req_common *comreq = request;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int rc;
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
-	if (rc < 0 || !event || afb_req_common_unsubscribe_event_x2_hookable(comreq, event) < 0)
+	if (rc < 0 || !event || afb_req_common_unsubscribe_hookable(comreq, event) < 0)
 		ERROR("can't unsubscribe: %m");
 }
 
 static void client_on_event_push_cb(void *closure, uint16_t event_id, struct json_object *data)
 {
 	struct afb_stub_ws *stubws = closure;
-	struct afb_event_x2 *event;
+	struct afb_evt *event;
 	int rc;
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
 	if (rc >= 0 && event)
-		rc = afb_evt_event_x2_push(event, data);
+		rc = afb_evt_push(event, data);
 	else
 		ERROR("unreadable push event");
 	if (rc <= 0)
@@ -636,8 +636,8 @@ static void release_all_tokens_cb(void*closure, uint16_t id, void *ptr)
 
 static void release_all_events_cb(void*closure, uint16_t id, void *ptr)
 {
-	struct afb_event_x2 *eventid = ptr;
-	afb_evt_event_x2_unref(eventid);
+	struct afb_evt *eventid = ptr;
+	afb_evt_unref(eventid);
 }
 
 /* disconnect */

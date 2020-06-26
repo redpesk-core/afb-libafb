@@ -59,8 +59,8 @@ static void aws_on_broadcast_cb(void *closure, const char *event, struct json_ob
 /* predeclaration of wsreq callbacks */
 static void wsreq_destroy(struct afb_req_common *comreq);
 static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_reply *reply);
-static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event);
-static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event);
+static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_evt *event);
+static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event);
 
 /* declaration of websocket structure */
 struct afb_ws_json1
@@ -295,17 +295,17 @@ static void wsreq_reply(struct afb_req_common *comreq, const struct afb_req_repl
 		ERROR("Can't send reply: %m");
 }
 
-static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 
-	return afb_evt_listener_watch_x2(wsreq->aws->listener, event);
+	return afb_evt_listener_watch_evt(wsreq->aws->listener, event);
 }
 
-static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_event_x2 *event)
+static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 
-	return afb_evt_listener_unwatch_x2(wsreq->aws->listener, event);
+	return afb_evt_listener_unwatch_evt(wsreq->aws->listener, event);
 }
 

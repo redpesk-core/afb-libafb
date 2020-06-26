@@ -313,7 +313,9 @@ x3_api_new_event_x2(
 	const char *name
 ) {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_event_x2_make(comapi, name);
+	struct afb_evt *evt;
+	int rc = afb_api_common_new_event(comapi, name, &evt);
+	return rc < 0 ? NULL : afb_evt_as_x2(evt);
 }
 
 static
@@ -572,7 +574,9 @@ static struct afb_event_x2 *x3_api_hooked_new_event_x2(
 	const char *name
 ) {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_event_x2_make_hookable(comapi, name);
+	struct afb_evt *evt;
+	int rc = afb_api_common_new_event_hookable(comapi, name, &evt);
+	return rc < 0 ? NULL : afb_evt_as_x2(evt);
 }
 
 static int x3_api_hooked_event_broadcast(

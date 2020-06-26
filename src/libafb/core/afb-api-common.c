@@ -215,20 +215,27 @@ afb_api_common_vverbose(
 	}
 }
 
-struct afb_event_x2 *
-afb_api_common_event_x2_make(
+int
+afb_api_common_new_event(
 	const struct afb_api_common *comapi,
-	const char *name
+	const char *name,
+	struct afb_evt **evt
 ) {
+	int rc;
+	struct afb_evt *e;
+
 	/* check daemon state */
 	if (comapi->state == Api_State_Pre_Init) {
 		ERROR("[API %s] Bad call to 'afb_daemon_event_make(%s)', must not be in PreInit", comapi->name, name);
-		errno = X_EINVAL;
-		return NULL;
+		rc = X_EINVAL;
+		e = NULL;
 	}
-
-	/* create the event */
-	return afb_evt_event_x2_create2(comapi->name, name);
+	else {
+		e = afb_evt_create2(comapi->name, name); /* FIXME: use ret int */
+		rc = e ? 0 : X_ENOMEM;
+	}
+	*evt = e;
+	return rc;
 }
 
 int
@@ -445,14 +452,15 @@ void afb_api_common_vverbose_hookable(
 	va_end(ap);
 }
 
-struct afb_event_x2 *
-afb_api_common_event_x2_make_hookable(
+int
+afb_api_common_new_event_hookable(
 	const struct afb_api_common *comapi,
-	const char *name
+	const char *name,
+	struct afb_evt **evt
 ) {
-	struct afb_event_x2 *r = afb_api_common_event_x2_make(comapi, name);
-	afb_hook_api_event_make(comapi, name, r);
-	return r;
+	int rc = afb_api_common_new_event(comapi, name, evt);
+	afb_hook_api_event_make(comapi, name, *evt);
+	return rc;
 }
 
 int
@@ -618,21 +626,21 @@ static int ensure_listener(struct afb_api_common *comapi)
 }
 
 int
-afb_api_common_subscribe_event_x2(
+afb_api_common_subscribe(
 	struct afb_api_common *comapi,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
 	int rc = ensure_listener(comapi);
-	return rc < 0 ? rc : afb_evt_listener_watch_x2(comapi->listener, event);
+	return rc < 0 ? rc : evt ? afb_evt_listener_watch_evt(comapi->listener, evt) : X_EINVAL;
 }
 
 int
-afb_api_common_unsubscribe_event_x2(
+afb_api_common_unsubscribe(
 	struct afb_api_common *comapi,
-	struct afb_event_x2 *event
+	struct afb_evt *evt
 ) {
 	int rc = ensure_listener(comapi);
-	return rc < 0 ? rc : afb_evt_listener_unwatch_x2(comapi->listener, event);
+	return rc < 0 ? rc : evt ? afb_evt_listener_unwatch_evt(comapi->listener, evt) : X_EINVAL;
 }
 
 int
