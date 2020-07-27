@@ -21,26 +21,16 @@
  * $RP_END_LICENSE$
  */
 
+
 #pragma once
 
-#include <string.h>
-#include "afb-data.h"
+#define afb_api_x4 afb_api_v4
+#define afb_type_x4 afb_type
+#define afb_data_x4 afb_data
+#define afb_req_x4 afb_req_v4
+#define afb_event_x4 afb_evt
 
-static inline void afb_params_addref(unsigned nparams, struct afb_data * const params[])
-{
-	while(nparams--)
-		afb_data_addref(*params++);
-}
+#define AFB_BINDING_VERSION 0
+#include <afb/afb-binding-v4.h>
 
-static inline void afb_params_unref(unsigned nparams, struct afb_data * const params[])
-{
-	while(nparams--)
-		afb_data_unref(*params++);
-}
-
-static inline void afb_params_copy(unsigned nparams, struct afb_data * const from[], struct afb_data *to[])
-{
-	if (nparams)
-		memcpy(to, from, nparams * sizeof *to);
-}
-
+extern const struct afb_binding_x4_itf afb_v4_itf;

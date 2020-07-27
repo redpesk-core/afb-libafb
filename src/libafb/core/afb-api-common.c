@@ -228,11 +228,11 @@ afb_api_common_new_event(
 }
 
 int
-afb_api_common_event_broadcast_x4(
+afb_api_common_event_broadcast(
 	const struct afb_api_common *comapi,
 	const char *name,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 ) {
 	size_t plen, nlen;
 	char *event;
@@ -254,7 +254,7 @@ afb_api_common_event_broadcast_x4(
 	memcpy(event + plen + 1, name, nlen + 1);
 
 	/* broadcast the event */
-	return afb_evt_broadcast_name_x4(event, nparams, params);
+	return afb_evt_broadcast_name_hookable(event, nparams, params);
 }
 
 int
@@ -425,7 +425,7 @@ afb_api_common_settings(
 /**********************************************
 * hooked flow
 **********************************************/
-#if WITH_AFB_HOOK
+
 void afb_api_common_vverbose_hookable(
 	const struct afb_api_common *comapi,
 	int         level,
@@ -435,11 +435,19 @@ void afb_api_common_vverbose_hookable(
 	const char *fmt,
 	va_list     args
 ) {
+#if WITH_AFB_HOOK
 	va_list ap;
-	va_copy(ap, args);
-	afb_api_common_vverbose(comapi, level, file, line, function, fmt, args);
-	afb_hook_api_vverbose(comapi, level, file, line, function, fmt, ap);
-	va_end(ap);
+	if (comapi->hookflags & afb_hook_flag_api_event_make) {
+		va_copy(ap, args);
+		afb_api_common_vverbose(comapi, level, file, line, function, fmt, args);
+		afb_hook_api_vverbose(comapi, level, file, line, function, fmt, ap);
+		va_end(ap);
+	}
+	else
+#endif
+	{
+		afb_api_common_vverbose(comapi, level, file, line, function, fmt, args);
+	}
 }
 
 int
@@ -449,24 +457,35 @@ afb_api_common_new_event_hookable(
 	struct afb_evt **evt
 ) {
 	int rc = afb_api_common_new_event(comapi, name, evt);
-	afb_hook_api_event_make(comapi, name, *evt);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_event_make)
+		afb_hook_api_event_make(comapi, name, *evt);
+#endif
 	return rc;
 }
 
 int
-afb_api_common_event_broadcast_hookable_x4(
+afb_api_common_event_broadcast_hookable(
 	const struct afb_api_common *comapi,
 	const char *name,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 ) {
 	int r;
 
-	afb_params_addref(nparams, params);
-	afb_hook_api_event_broadcast_before(comapi, name, nparams, params);
-	r = afb_api_common_event_broadcast_x4(comapi, name, nparams, params);
-	afb_hook_api_event_broadcast_after(comapi, name, nparams, params, r);
-	afb_params_unref(nparams, params);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_event_broadcast) {
+		afb_params_addref(nparams, params);
+		afb_hook_api_event_broadcast_before(comapi, name, nparams, params);
+		r = afb_api_common_event_broadcast(comapi, name, nparams, params);
+		afb_hook_api_event_broadcast_after(comapi, name, nparams, params, r);
+		afb_params_unref(nparams, params);
+	}
+	else
+#endif
+	{
+		r = afb_api_common_event_broadcast(comapi, name, nparams, params);
+	}
 	return r;
 }
 
@@ -479,19 +498,11 @@ afb_api_common_queue_job_hookable(
 	int timeout
 ) {
 	int r = afb_api_common_queue_job(comapi, callback, argument, group, timeout);
-	return afb_hook_api_queue_job(comapi, callback, argument, group, timeout, r);
-}
-
-int
-afb_api_common_require_api_hookable(
-	const struct afb_api_common *comapi,
-	const char *name,
-	int initialized
-) {
-	int result;
-	afb_hook_api_require_api(comapi, name, initialized);
-	result = afb_api_common_require_api(comapi, name, initialized);
-	return afb_hook_api_require_api_result(comapi, name, initialized, result);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_queue_job)
+		return afb_hook_api_queue_job(comapi, callback, argument, group, timeout, r);
+#endif
+	return r;
 }
 
 int
@@ -500,15 +511,43 @@ afb_api_common_add_alias_hookable(
 	const char *apiname,
 	const char *aliasname
 ) {
-	int result = afb_api_common_add_alias(comapi, apiname, aliasname);
-	return afb_hook_api_add_alias(comapi, apiname, aliasname, result);
+	int r = afb_api_common_add_alias(comapi, apiname, aliasname);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_add_alias)
+		r = afb_hook_api_add_alias(comapi, apiname, aliasname, r);
+#endif
+	return r;
+}
+
+int
+afb_api_common_require_api_hookable(
+	const struct afb_api_common *comapi,
+	const char *name,
+	int initialized
+) {
+	int r;
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_require_api) {
+		afb_hook_api_require_api(comapi, name, initialized);
+		r = afb_api_common_require_api(comapi, name, initialized);
+		r = afb_hook_api_require_api_result(comapi, name, initialized, r);
+	}
+	else
+#endif
+	{
+		r = afb_api_common_require_api(comapi, name, initialized);
+	}
+	return r;
 }
 
 void
 afb_api_common_api_seal_hookable(
 	struct afb_api_common *comapi
 ) {
-	afb_hook_api_api_seal(comapi);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_api_seal)
+		afb_hook_api_api_seal(comapi);
+#endif
 	afb_api_common_api_seal(comapi);
 }
 
@@ -517,8 +556,12 @@ afb_api_common_class_provide_hookable(
 	const struct afb_api_common *comapi,
 	const char *name
 ) {
-	int result = afb_api_common_class_provide(comapi, name);
-	return afb_hook_api_class_provide(comapi, result, name);
+	int r = afb_api_common_class_provide(comapi, name);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_class_provide)
+		r = afb_hook_api_class_provide(comapi, r, name);
+#endif
+	return r;
 }
 
 int
@@ -526,19 +569,26 @@ afb_api_common_class_require_hookable(
 	const struct afb_api_common *comapi,
 	const char *name
 ) {
-	int result = afb_api_common_class_require(comapi, name);
-	return afb_hook_api_class_require(comapi, result, name);
+	int r = afb_api_common_class_require(comapi, name);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_class_require)
+		r = afb_hook_api_class_require(comapi, r, name);
+#endif
+	return r;
 }
 
 struct json_object *
 afb_api_common_settings_hookable(
 	const struct afb_api_common *comapi
 ) {
-	struct json_object *result = afb_api_common_settings(comapi);
-	return afb_hook_api_settings(comapi, result);
+	struct json_object *r = afb_api_common_settings(comapi);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_settings)
+		r = afb_hook_api_settings(comapi, r);
+#endif
+	return r;
 }
 
-#endif
 /******************************************************************************
  ******************************************************************************
  ******************************************************************************
@@ -559,7 +609,7 @@ static void listener_of_events(void *closure, const struct afb_evt_data *event)
 
 #if WITH_AFB_HOOK
 	/* hook the event before */
-	if (comapi->hooksvc & afb_hook_flag_api_on_event)
+	if (comapi->hookflags & afb_hook_flag_api_on_event)
 		afb_hook_api_on_event_before(comapi, event->name, event->eventid, event->nparams, event->params);
 #endif
 
@@ -568,12 +618,12 @@ static void listener_of_events(void *closure, const struct afb_evt_data *event)
 	handler = comapi->event_handlers ? globset_match(comapi->event_handlers, event->name) : NULL;
 	if (handler) {
 #if WITH_AFB_HOOK
-		if (comapi->hooksvc & afb_hook_flag_api_on_event_handler)
+		if (comapi->hookflags & afb_hook_flag_api_on_event_handler)
 			afb_hook_api_on_event_handler_before(comapi, event->name, event->eventid, event->nparams, event->params, handler->pattern);
 #endif
 		comapi->onevent(handler->callback, handler->closure, event, comapi);
 #if WITH_AFB_HOOK
-		if (comapi->hooksvc & afb_hook_flag_api_on_event_handler)
+		if (comapi->hookflags & afb_hook_flag_api_on_event_handler)
 			afb_hook_api_on_event_handler_after(comapi, event->name, event->eventid, event->nparams, event->params, handler->pattern);
 #endif
 	} else {
@@ -583,7 +633,7 @@ static void listener_of_events(void *closure, const struct afb_evt_data *event)
 
 #if WITH_AFB_HOOK
 	/* hook the event after */
-	if (comapi->hooksvc & afb_hook_flag_api_on_event)
+	if (comapi->hookflags & afb_hook_flag_api_on_event)
 		afb_hook_api_on_event_after(comapi, event->name, event->eventid, event->nparams, event->params);
 #endif
 }
@@ -749,8 +799,7 @@ afb_api_common_init(
 
 #if WITH_AFB_HOOK
 	/* hooking flags */
-	comapi->hookditf = 0; /* historical Daemon InTerFace */
-	comapi->hooksvc = 0;  /* historical SerViCe interface */
+	comapi->hookflags = afb_hook_flags_api(comapi->name);
 #endif
 
 	/* settings */
@@ -796,9 +845,8 @@ int
 afb_api_common_update_hook(
 	struct afb_api_common *comapi
 ) {
-	comapi->hookditf = afb_hook_flags_api(comapi->name);
-	comapi->hooksvc = afb_hook_flags_api(comapi->name);
-	return comapi->hookditf | comapi->hooksvc;
+	comapi->hookflags = afb_hook_flags_api(comapi->name);
+	return comapi->hookflags;
 }
 #endif
 
@@ -852,7 +900,7 @@ afb_api_common_start(
 
 #if WITH_AFB_HOOK
 	/* Starts the service */
-	if (comapi->hooksvc & afb_hook_flag_api_start)
+	if (comapi->hookflags & afb_hook_flag_api_start)
 		afb_hook_api_start_before(comapi);
 #endif
 
@@ -861,7 +909,7 @@ afb_api_common_start(
 	afb_sig_monitor_run(0, do_start, &start);
 
 #if WITH_AFB_HOOK
-	if (comapi->hooksvc & afb_hook_flag_api_start)
+	if (comapi->hookflags & afb_hook_flag_api_start)
 		afb_hook_api_start_after(comapi, start.rc);
 #endif
 

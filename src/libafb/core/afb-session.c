@@ -822,8 +822,6 @@ const char *afb_session_get_language(struct afb_session *session, const char *la
 /**
  * Get the LOA value associated to session for the key
  *
- * The behaviour of this function depends on its parameters:
- *
  * @param session	the session
  * @param key		the key of the cookie
  *
@@ -852,9 +850,7 @@ int afb_session_get_loa(struct afb_session *session, const void *key)
 }
 
 /**
- * Get the LOA value associated to session for the key
- *
- * The behaviour of this function depends on its parameters:
+ * Set the LOA value associated to session for the key
  *
  * @param session	the session
  * @param key		the key of the cookie
@@ -880,7 +876,6 @@ int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 			rc = 0;
 	}
 	else {
-		rc = cookie->loa = loa;
 		rc = loa;
 		cookie->loa = (cookie->loa & COOKIESET) | loa;
 		checkcookie(cookie, prv);

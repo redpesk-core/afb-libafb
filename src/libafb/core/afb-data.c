@@ -27,15 +27,13 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <afb/afb-type-x4.h>
-#include <afb/afb-data-x4.h>
-
 #include "afb-data.h"
 #include "afb-type.h"
 #include "containerof.h"
 
+#include "utils/u16id.h"
+#include "utils/lockany.h"
 #include "sys/x-errno.h"
-#include "sys/x-mutex.h"
 
 /*****************************************************************************/
 /***    Management of data  ***/
@@ -46,272 +44,80 @@
  */
 struct afb_data
 {
-	/* as x4 */
-	struct afb_data_x4 x4;
+	/* the type */
+	struct afb_type *type;
 
-	/** type of the data */
-	const struct afb_type_x4 *type;
-
-	/** reference count */
-	uint16_t refcount;
-
-	/** cache count */
-	uint8_t cachecount;
-
-	/** size */
-	uint32_t size;
-
-	/** content */
+	/* the pointer */
 	const void *pointer;
+
+	/* the size */
+	size_t size;
 
 	/** the dispose */
 	void (*dispose)(void*);
 
 	/** closure of the dispose */
 	void *closure;
+
+	/** next conversion */
+	struct afb_data *cvt;
+
+	/** reference count and flags */
+	uint16_t ref_and_flags;
+
+	/** opaque id of the data */
+	uint16_t opaqueid;
 };
 
-/* interface x4 (but initialisation below) */
-static const struct afb_data_x4_itf x4_itf;
-
 /*****************************************************************************/
-/***    Cache of converted data  ***/
+/***    Opacifier  ***/
 /*****************************************************************************/
 
-#if !defined(CONVERT_CACHE_SIZE)
-#define CONVERT_CACHE_SIZE 16
-#endif
-#if CONVERT_CACHE_SIZE > 128
-#undef CONVERT_CACHE_SIZE
-#define CONVERT_CACHE_SIZE 128 /* limit to 128 because of link */
-#endif
+static uint16_t opaqueidgen;
+static struct u16id2ptr *opacifier;
 
-/** mutual exclusion on the cache */
-static x_mutex_t convert_cache_mutex = X_MUTEX_INITIALIZER;
+/*****************************************************************************/
+/***    Flag values  ***/
+/*****************************************************************************/
 
-/** head of the active convert cache list */
-static int8_t convert_cache_head;
+#define FLAG_IS_VOLATILE        1
+#define FLAG_IS_CONSTANT        2
+#define FLAG_IS_VALID           4
+#define FLAG_LOCK               8
+#define FLAG_IS_ETERNAL        16
+#define REF_COUNT_INCREMENT    32
 
-/** head of the unused convert cache list */
-static int8_t convert_cache_free;
+#define INITIAL_REF_AND_FLAGS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
 
-/** link list of cache */
-static int8_t convert_cache_link[CONVERT_CACHE_SIZE];
+#define _HASREF_(rf)           ((rf) >= FLAG_IS_ETERNAL)
+#define HASREF(data)           _HASREF_((data)->ref_and_flags)
 
-/** static global cache */
-static struct afb_data *convert_cache[CONVERT_CACHE_SIZE][2];
+#define ADDREF(data)           _HASREF_(__atomic_add_fetch(&data->ref_and_flags, REF_COUNT_INCREMENT, __ATOMIC_RELAXED))
+#define UNREF(data)            _HASREF_(__atomic_sub_fetch(&data->ref_and_flags, REF_COUNT_INCREMENT, __ATOMIC_RELAXED))
 
-/* increment reference count to the data */
-static inline
-void
-data_addref(
-	struct afb_data *data
-) {
-	__atomic_add_fetch(&data->refcount, 1, __ATOMIC_RELAXED);
-}
+#define TEST_FLAGS(data,flag)  (__atomic_load_n(&((data)->ref_and_flags), __ATOMIC_RELAXED) & (flag))
+#define SET_FLAGS(data,flag)   (__atomic_or_fetch(&((data)->ref_and_flags), flag, __ATOMIC_RELAXED))
+#define UNSET_FLAGS(data,flag) (__atomic_and_fetch(&((data)->ref_and_flags), ~flag, __ATOMIC_RELAXED))
 
-/** really release the data */
-static
-void
-data_free(
-	struct afb_data *data
-) {
-	if (data->dispose)
-		data->dispose(data->closure);
-	free(data);
-}
+#define ISVALID(data)          TEST_FLAGS(data,FLAG_IS_VALID)
+#define VALIDATE(data)         SET_FLAGS(data,FLAG_IS_VALID)
+#define INVALIDATE(data)       UNSET_FLAGS(data,FLAG_IS_VALID)
 
-/**
- * remove any instance of given 'data' from
- * the content of the conversion cache
- */
-static
-void
-convert_cache_clean(
-	int8_t head
-) {
-	int8_t idx;
-	struct afb_data *data;
+#define ISVOLATILE(data)       TEST_FLAGS(data,FLAG_IS_VOLATILE)
+#define SETVOLATILE(data)      SET_FLAGS(data,FLAG_IS_VOLATILE)
+#define UNSETVOLATILE(data)    UNSET_FLAGS(data,FLAG_IS_VOLATILE)
 
-	while(head >= 0) {
-		idx = head;
-		data = convert_cache[head][0] ?: convert_cache[head][1];
-		if (!data) {
-			head = convert_cache_link[idx];
-			convert_cache_link[idx] = convert_cache_free;
-			convert_cache_free = idx;
-		}
-		else {
-			while (idx >= 0) {
-				if (data == convert_cache[idx][0]) {
-					convert_cache[idx][0] = 0;
-					data->cachecount--;
-				}
-				else if (data == convert_cache[idx][1]) {
-					convert_cache[idx][1] = 0;
-					data->cachecount--;
-				}
-				idx = convert_cache_link[idx];
-			}
-			if (data->cachecount == 0 && data->refcount == 0) {
-				x_mutex_unlock(&convert_cache_mutex);
-				data_free(data);
-				x_mutex_lock(&convert_cache_mutex);
-			}
-		}
-	}
-}
+#define ISCONSTANT(data)       TEST_FLAGS(data,FLAG_IS_CONSTANT)
+#define SETCONSTANT(data)      SET_FLAGS(data,FLAG_IS_CONSTANT)
+#define UNSETCONSTANT(data)    UNSET_FLAGS(data,FLAG_IS_CONSTANT)
 
-/**
- * remove any instance of given 'data' from
- * the content of the conversion cache
- */
-static
-void
-convert_cache_remove(
-	struct afb_data *data,
-	int lazy
-) {
-	int8_t idx, *prv, cleanidx;
-	struct afb_data *x, *y;
+#define HASLOCK(data)          TEST_FLAGS(data,FLAG_LOCK)
+#define SETLOCK(data)          SET_FLAGS(data,FLAG_LOCK)
+#define UNSETLOCK(data)        UNSET_FLAGS(data,FLAG_LOCK)
 
-	cleanidx = -1;
-	prv = &convert_cache_head;
-	x_mutex_lock(&convert_cache_mutex);
-	idx = *prv;
-	if (idx != convert_cache_free) {
-		/* list initialized */
-		while (idx >= 0) {
-			x = convert_cache[idx][0];
-			y = convert_cache[idx][1];
-			if ((data != x && data != y)
-			 || (lazy && (x->refcount | y->refcount))) {
-				prv = &convert_cache_link[idx];
-			}
-			else {
-				*prv = convert_cache_link[idx];
-				convert_cache_link[idx] = cleanidx;
-				cleanidx = idx;
-			}
-			idx = *prv;
-		}
-	}
-	if (cleanidx >= 0)
-		convert_cache_clean(cleanidx);
-	x_mutex_unlock(&convert_cache_mutex);
-}
-
-/**
- * Search in the cache of converted data if the given 'data'
- * has a cached conversion to the given 'type'.
- * Returns a pointer to the conversion found or 0 if not found.
- **/
-static
-struct afb_data *
-convert_cache_search(
-	struct afb_data *data,
-	const struct afb_type_x4 *type
-) {
-	int8_t idx, *prv;
-	struct afb_data *x, *y, *r;
-
-	r = 0;
-	prv = &convert_cache_head;
-	x_mutex_lock(&convert_cache_mutex);
-	idx = *prv;
-	if (idx != convert_cache_free) {
-		/* list initialized */
-		while (idx >= 0 && !r) {
-			x = convert_cache[idx][0];
-			y = convert_cache[idx][1];
-			if (x == data && y->type == type) {
-				r = y;
-			}
-			else if (y == data && x->type == type) {
-				r = x;
-			}
-			else {
-				prv = &convert_cache_link[idx];
-				idx = *prv;
-			}
-		}
-		if (r) {
-			data_addref(r);
-			*prv = convert_cache_link[idx];
-			convert_cache_link[idx] = convert_cache_head;
-			convert_cache_head = idx;
-		}
-	}
-	x_mutex_unlock(&convert_cache_mutex);
-	return r;
-}
-
-static
-void
-convert_cache_put(
-	struct afb_data *data,
-	struct afb_data *other
-) {
-	int8_t idx, *prv;
-
-	x_mutex_lock(&convert_cache_mutex);
-	idx = convert_cache_free;
-	if (idx == convert_cache_head) {
-		/* initialize the list */
-		for (idx = 0 ; idx < CONVERT_CACHE_SIZE - 1 ; idx++)
-			convert_cache_link[idx] = (int8_t)(idx + 1);
-		convert_cache_link[idx] = -1;
-		convert_cache_head = -1;
-		idx = convert_cache_free = 0;
-	}
-	if (idx < 0) {
-		/* full cache, drop last entry */
-		prv = &convert_cache_head;
-		idx = *prv;
-		while (convert_cache_link[idx] >= 0) {
-			prv = &convert_cache_link[idx];
-			idx = *prv;
-		}
-		*prv = -1;
-		convert_cache_clean(idx);
-		idx = convert_cache_free;
-	}
-	/* add at head now */
-	convert_cache_free = convert_cache_link[idx];
-	convert_cache[idx][0] = data;
-	convert_cache[idx][1] = other;
-	convert_cache_link[idx] = convert_cache_head;
-	convert_cache_head = idx;
-	data->cachecount++;
-	other->cachecount++;
-	x_mutex_unlock(&convert_cache_mutex);
-}
-
-/* set the data */
-static
-void
-set(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	uint32_t size,
-	void (*dispose)(void*),
-	void *closure
-) {
-	/* dispose the data if any */
-	if (data->dispose)
-		data->dispose(data->closure);
-
-	/* set the values now */
-	data->type = type;
-	data->pointer = pointer;
-	data->size = size;
-	data->dispose = dispose;
-	data->closure = closure;
-
-	/* invalidate cached conversions */
-	afb_data_convert_cache_clear(data);
-}
+/*****************************************************************************/
+/***    Shared memory emulation  ***/
+/*****************************************************************************/
 
 static void share_free(void *closure)
 {
@@ -323,25 +129,206 @@ static void *share_realloc(const void *previous, size_t size)
 	return realloc((void*)previous, size ?: 1);
 }
 
-static int handles_share(struct afb_data *data)
+__attribute__((unused))
+static int share_is_owner(struct afb_data *data)
 {
-	return data->dispose == share_free;
+	return data->dispose == share_free || data->pointer == NULL;
 }
 
-const struct afb_data_x4 *afb_data_as_data_x4(struct afb_data *data)
-{
-	return &data->x4;
+/*****************************************************************************/
+/***    Internal routines  ***/
+/*****************************************************************************/
+
+/**
+ * Increment reference count of data (not null)
+ */
+static inline
+void
+data_addref(
+	struct afb_data *data
+) {
+	if (!ADDREF(data))
+		SET_FLAGS(data, FLAG_IS_ETERNAL);
 }
 
-struct afb_data *afb_data_of_data_x4(const struct afb_data_x4 *datax4)
-{
-	return containerof(struct afb_data, x4, datax4);
+/**
+ * search the conversion of data to the type
+ * and returns it or null.
+ *
+ * @param data the data whose type is searched (not NULL)
+ * @param type the type to search (not NULL)
+ *
+ * @return the found cached conversion data or NULL
+ */
+static
+struct afb_data *
+data_cvt_search(
+	struct afb_data *data,
+	struct afb_type *type
+) {
+	struct afb_data *i;
+
+	for (i = data;;) {
+		if (i->type == type)
+			return i;
+		i = i->cvt;
+		if (i == data)
+			return 0;
+	}
 }
+
+static inline
+void
+data_destroy(
+	struct afb_data *data
+) {
+	uint16_t id = data->opaqueid;
+	if (id)
+		u16id2ptr_drop(&opacifier, id, 0);
+	if (data->dispose)
+		data->dispose(data->closure);
+	free(data);
+}
+
+/**
+ * release the data if it is not latent.
+ * A data is latent if it is living
+ * or one of its conversion is living.
+ */
+static
+void
+data_release(
+	struct afb_data *data
+) {
+	int gr, r;
+	struct afb_data *i, *n, *p;
+
+	gr = HASREF(data);
+	i = data->cvt;
+	if (i != data) {
+		/* more than one element */
+		p = data;
+		for (;;) {
+			/* count global use */
+			r = HASREF(i);
+			gr += r;
+			if (r == 0) {
+				/* search if unused duplication */
+				n = i->cvt;
+				while (n != i && n->type != i->type)
+					n = n->cvt;
+				if (n != i) {
+					/* release unused duplicate */
+					p->cvt = n = i->cvt;
+					data_destroy(i);
+					/* iteration */
+					if (i == data)
+						data = n;
+					i = n;
+				}
+			}
+			if (i == data)
+				break;
+			p = i;
+			i = i->cvt;
+		}
+	}
+
+	/* is it used ? */
+	if (gr == 0) {
+		/* no more ref count on any data */
+		i = data;
+		do {
+			n = i->cvt;
+			data_destroy(i);
+			i = n;
+		} while (i != data);
+	}
+}
+
+/**
+ * invalidate any conversion of this data
+ */
+static
+void
+data_cvt_changed(
+	struct afb_data *data
+) {
+	struct afb_data *i, *p;
+
+	p = data;
+	i = p->cvt;
+	while (i != data) {
+		if (HASREF(i)) {
+			INVALIDATE(i);
+			if (i->dispose) {
+				i->dispose(i->closure);
+				i->dispose = 0;
+			}
+			p = i;
+		}
+		else {
+			p->cvt = i->cvt;
+			data_destroy(i);
+		}
+		i = p->cvt;
+	}
+}
+
+/**
+ * merge an origin and its conversion
+ */
+static
+void
+data_cvt_merge(
+	struct afb_data *origin,
+	struct afb_data *data
+) {
+	struct afb_data *i, *j;
+
+	for (i = origin; i != data && i->cvt != origin; i = i->cvt);
+	if (i != data) {
+		for (j = data; j->cvt != data; j = j->cvt);
+		i->cvt = data;
+		j->cvt = origin;
+	}
+}
+
+/**
+ * tries to ensure that data is valid
+ * returns 1 if valid or zero if it can't validate the data
+ */
+static
+int
+data_validate(
+	struct afb_data *data
+) {
+	struct afb_data *r, *i;
+
+	i = data->cvt;
+	while (!ISVALID(data) && i != data) {
+		if (!ISVALID(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
+			i = i->cvt;
+		}
+		else {
+			data->pointer = r->pointer;
+			data->size = r->size;
+			data->dispose = (void(*)(void*))afb_data_unref;
+			data->closure = r;
+			VALIDATE(data);
+		}
+	}
+	return ISVALID(data);
+}
+
+/*****************************************************************************/
+/***    Public routines  ***/
+/*****************************************************************************/
 
 int
-afb_data_create_set_x4(
+afb_data_create_raw(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	const void *pointer,
 	size_t size,
 	void (*dispose)(void*),
@@ -350,25 +337,19 @@ afb_data_create_set_x4(
 	int rc;
 	struct afb_data *data;
 
-	if (size > UINT32_MAX) {
-		*result = NULL;
-		rc = X_EINVAL;
-	}
-	else {
-		*result = data = malloc(sizeof *data);
-		if (data == NULL)
-			rc = X_ENOMEM;
-		else  {
-			data->x4.itf = &x4_itf;
-			data->type = type;
-			data->refcount = 1;
-			data->cachecount = 0;
-			data->pointer = pointer;
-			data->size = (uint32_t)size;
-			data->dispose = dispose;
-			data->closure = closure;
-			rc = 0;
-		}
+	*result = data = malloc(sizeof *data);
+	if (data == NULL)
+		rc = X_ENOMEM;
+	else  {
+		data->type = type;
+		data->pointer = pointer;
+		data->size = size;
+		data->dispose = dispose;
+		data->closure = closure;
+		data->cvt = data;
+		data->ref_and_flags = INITIAL_REF_AND_FLAGS;
+		data->opaqueid = 0;
+		rc = 0;
 	}
 	if (rc && dispose)
 		dispose(closure);
@@ -377,9 +358,9 @@ afb_data_create_set_x4(
 }
 
 int
-afb_data_create_alloc_x4(
+afb_data_create_alloc(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	void **pointer,
 	size_t size,
 	int zeroes
@@ -394,7 +375,7 @@ afb_data_create_alloc_x4(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = afb_data_create_set_x4(result, type, p, size, share_free, p);
+		rc = afb_data_create_raw(result, type, p, size, share_free, p);
 		if (rc < 0)
 			p = NULL;
 		else if (zeroes)
@@ -405,25 +386,25 @@ afb_data_create_alloc_x4(
 }
 
 int
-afb_data_create_copy_x4(
+afb_data_create_copy(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	const void *pointer,
 	size_t size
 ) {
 	int rc;
 	void *p;
 
-	rc = afb_data_create_alloc_x4(result, type, &p, size, 0);
+	rc = afb_data_create_alloc(result, type, &p, size, 0);
 	if (rc >= 0 && size)
 		memcpy(p, pointer, size);
 	return rc;
 }
 
 /* Get the typenum of the data */
-const struct afb_type_x4*
-afb_data_type_x4(
-	const struct afb_data *data
+struct afb_type*
+afb_data_type(
+	struct afb_data *data
 ) {
 	return data->type;
 }
@@ -443,170 +424,61 @@ void
 afb_data_unref(
 	struct afb_data *data
 ) {
-	if (data && !__atomic_sub_fetch(&data->refcount, 1, __ATOMIC_RELAXED)) {
-		if (data->cachecount == 0)
-			data_free(data);
-		else
-			convert_cache_remove(data, 1);
+	if (data && !UNREF(data)) {
+		data_release(data);
 	}
-}
-
-/* Clear the content of data */
-void
-afb_data_clear(
-	struct afb_data *data
-) {
-	set(data, 0, 0, 0, 0, 0);
 }
 
 /* Get the pointer. */
 const void*
-afb_data_pointer(
-	const struct afb_data *data
+afb_data_const_pointer(
+	struct afb_data *data
 ) {
-	return data->pointer;
+	return data_validate(data) ? data->pointer : NULL;
 }
 
 /* Get the size. */
 size_t
 afb_data_size(
-	const struct afb_data *data
+	struct afb_data *data
 ) {
-	return (size_t)data->size;
-}
-
-/* set the data */
-int
-afb_data_set_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size,
-	void (*dispose)(void*),
-	void *closure
-) {
-	if (size > UINT32_MAX)
-		return X_EINVAL;
-
-	set(data, type, pointer, (uint32_t)size, dispose, closure);
-	return 0;
-}
-
-/* Allocate a shareable buffer. */
-int
-afb_data_alloc_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	void **pointer,
-	size_t size,
-	int zeroes
-) {
-	void *result;
-	int rc;
-
-	if (size > UINT32_MAX) {
-		result = NULL;
-		rc = X_EINVAL;
-	}
-	else {
-		result = share_realloc(NULL, size);
-		if (result == NULL) {
-			rc = X_ENOMEM;
-		}
-		else {
-			if (zeroes && size)
-				memset(result, 0, size);
-			data->size = (uint32_t)size;
-			data->pointer = data->closure = result;
-			set(data, type, result, (uint32_t)size, share_free, result);
-		}
-		return result ? 0 : X_ENOMEM;
-	}
-	*pointer = result;
-	return rc;
-}
-
-/* Allocate a shareable buffer. */
-int
-afb_data_resize(
-	struct afb_data *data,
-	void **pointer,
-	size_t size,
-	int zeroes
-) {
-	void *result;
-	int rc;
-
-	if (size > UINT32_MAX) {
-		result = NULL;
-		rc = X_EINVAL;
-	}
-	else if (!handles_share(data)) {
-		result = NULL;
-		rc = X_EINVAL;
-	}
-	else {
-		result = share_realloc(data->pointer, size);
-		if (result == NULL) {
-			rc = X_ENOMEM;
-		}
-		else {
-			if (zeroes && size > data->size)
-				memset(data->size + (char*)result, 0, size - data->size);
-			data->size = (uint32_t)size;
-			data->pointer = data->closure = result;
-			rc = 0;
-		}
-	}
-	*pointer = result;
-	return rc;
-}
-
-/* copy data */
-int
-afb_data_copy_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size
-) {
-	void *to;
-	int rc;
-
-	rc = afb_data_alloc_x4(data, type, &to, size, 0);
-	if (rc >= 0)
-		memcpy(to, pointer, size);
-	return rc;
+	return data_validate(data) ? data->size : 0;
 }
 
 /* add conversion from other data */
 int
-afb_data_convert_to_x4(
+afb_data_convert_to(
 	struct afb_data *data,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	struct afb_data **result
 ) {
 	int rc;
 	struct afb_data *r;
 
-	/* trivial case: the data is of the expected type */
-	if (!type || type == data->type) {
+	if (!data_validate(data)) {
+		/* original data is not valid */
+		r = 0;
+		rc = -1;
+	}
+	else if (!type) {
+		/* trivial case: the data is of the expected type */
 		data_addref(data);
 		r = data;
 		rc = 0;
 	}
 	else {
 		/* search for a cached conversion */
-		r = convert_cache_search(data, type);
+		r = data_cvt_search(data, type);
 		if (r) {
 			/* found! cool */
+			data_addref(r);
 			rc = 0;
 		}
 		else {
 			/* conversion */
-			rc = afb_type_convert_data_x4(data, type, &r);
-			if (rc >= 0) {
-				convert_cache_put(data, r);
+			rc = afb_type_convert_data(data->type, data, type, &r);
+			if (rc >= 0 && !ISVOLATILE(data)) {
+				data_cvt_merge(data, r);
 				rc = 0;
 			}
 		}
@@ -615,118 +487,217 @@ afb_data_convert_to_x4(
 	return rc;
 }
 
-/* invalidate cached conversions */
-void
-afb_data_convert_cache_clear(
+/* update a data */
+int
+afb_data_update(
+	struct afb_data *data,
+	struct afb_data *value
+) {
+	if (!ISVALID(data) || afb_data_is_constant(data) || !data_validate(value)) {
+		/* can not update based on parameter state */
+		return X_EINVAL;
+	}
+
+	return afb_type_update_data(value->type, value, data->type, data);
+}
+
+
+/* opacifies the data and returns its opaque id */
+int
+afb_data_opacify(
 	struct afb_data *data
 ) {
-	convert_cache_remove(data, 0);
+	int rc;
+	uint16_t id;
+
+	/* check if already opacified */
+	id = data->opaqueid;
+	if (id != 0) {
+		return (int)id;
+	}
+
+	/* create the opacifier once (TODO: make it static) */
+	if (opacifier == NULL) {
+		rc = u16id2ptr_create(&opacifier);
+		if (rc < 0)
+			return rc;
+	}
+	else {
+		/* refuse to creatio too many ids */
+		if (u16id2ptr_count(opacifier) >= INT16_MAX)
+			return X_ECANCELED;
+	}
+
+	/* find an id */
+	for (;;) {
+		id = ++opaqueidgen;
+		if (id == 0) {
+			continue;
+		}
+		rc = u16id2ptr_add(&opacifier, id, data);
+		if (rc == 0) {
+			data->opaqueid = id;
+			return (int)id;
+		}
+		if (rc != X_EEXIST)
+			return rc;
+	}
 }
 
-/*****************************************************************************/
-/* HELPERS FOR X4 CREATION                                                   */
-/*****************************************************************************/
-
+/* get the data of the given opaque id */
 int
-afb_data_x4_create_set_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size,
-	void (*dispose)(void*),
-	void *closure
+afb_data_get_opacified(
+	int opaqueid,
+	struct afb_data **data,
+	struct afb_type **type
 ) {
-	struct afb_data *data;
 	int rc;
+	struct afb_data *d;
 
-	rc = afb_data_create_set_x4(&data, type, pointer, size, dispose, closure);
-	*result = rc < 0 ? NULL : afb_data_as_data_x4(data);
+	if (opaqueid <= 0 || opaqueid > UINT16_MAX) {
+		rc = X_EINVAL;
+	}
+	else {
+		rc = u16id2ptr_get(opacifier, (uint16_t)opaqueid, (void**)&d);
+		if (rc == 0) {
+			*data = afb_data_addref(d);
+			*type = d->type;
+		}
+	}
 	return rc;
 }
 
+/* invalidate cached conversions */
+void
+afb_data_notify_changed(
+	struct afb_data *data
+) {
+	data_cvt_changed(data);
+}
+
+/* test if constant */
 int
-afb_data_x4_create_alloc_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
-	void **pointer,
-	size_t size,
-	int zeroes
+afb_data_is_constant(
+	struct afb_data *data
 ) {
-	struct afb_data *data;
-	int rc;
-
-	rc = afb_data_create_alloc_x4(&data, type, pointer, size, zeroes);
-	*result = rc < 0 ? NULL : afb_data_as_data_x4(data);
-	return rc;
+	return ISCONSTANT(data);
 }
 
+/* set as constant */
+void
+afb_data_set_constant(
+	struct afb_data *data
+) {
+	SETCONSTANT(data);
+}
+
+/* set as not constant */
+void
+afb_data_set_not_constant(
+	struct afb_data *data
+) {
+	UNSETCONSTANT(data);
+}
+
+/* test if volatile */
 int
-afb_data_x4_create_copy_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size
+afb_data_is_volatile(
+	struct afb_data *data
 ) {
-	struct afb_data *data;
+	return ISVOLATILE(data);
+}
+
+/* set as volatile */
+void
+afb_data_set_volatile(
+	struct afb_data *data
+) {
+	SETVOLATILE(data);
+}
+
+/* set as not volatile */
+void
+afb_data_set_not_volatile(
+	struct afb_data *data
+) {
+	UNSETVOLATILE(data);
+}
+
+static struct afb_data *lockhead(struct afb_data *data)
+{
+	struct afb_data *i = data;
+	while(!HASLOCK(i)) {
+		i = i->cvt;
+		if (i == data) {
+			SETLOCK(i);
+			break;
+		}
+	}
+	return i;
+}
+
+void afb_data_lock_read(struct afb_data *data)
+{
+	lockany_lock_read(lockhead(data));
+}
+
+int afb_data_try_lock_read(struct afb_data *data)
+{
+	return lockany_try_lock_read(lockhead(data));
+}
+
+void afb_data_lock_write(struct afb_data *data)
+{
+	lockany_lock_write(lockhead(data));
+}
+
+int afb_data_try_lock_write(struct afb_data *data)
+{
+	return lockany_try_lock_write(lockhead(data));
+}
+
+void afb_data_unlock(struct afb_data *data)
+{
+	struct afb_data *head = lockhead(data);
+	if (!lockany_unlock(head))
+		UNSETLOCK(head);
+}
+
+int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
+{
 	int rc;
 
-	rc = afb_data_create_copy_x4(&data, type, pointer, size);
-	*result = rc < 0 ? NULL : afb_data_as_data_x4(data);
+	if (afb_data_is_constant(data)){
+		rc = -1;
+	}
+	else if (data_validate(data)) {
+		afb_data_notify_changed(data);
+		rc = 0;
+	}
+	else {
+		rc = -1;
+	}
+	if (pointer)
+		*pointer = rc < 0 ? NULL : (void*)data->pointer;
+	if (size)
+		*size = rc < 0 ? 0 : data->size;
 	return rc;
 }
 
-/*****************************************************************************/
-/* INTERFACE X4                                                              */
-/*****************************************************************************/
-
-static const struct afb_data_x4 *x4_addref(const struct afb_data_x4 *datax4)
+int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *size)
 {
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	afb_data_addref(data);
-	return datax4;
-}
-
-static void x4_unref(const struct afb_data_x4 *datax4)
-{
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	afb_data_unref(data);
-}
-
-static const struct afb_type_x4 *x4_type(const struct afb_data_x4 *datax4)
-{
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	return afb_data_type_x4(data);
-}
-
-static const void* x4_pointer(const struct afb_data_x4 *datax4)
-{
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	return afb_data_pointer(data);
-}
-
-static size_t x4_size(const struct afb_data_x4 *datax4)
-{
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	return afb_data_size(data);
-}
-
-static int x4_convert(const struct afb_data_x4 *datax4, const struct afb_type_x4 *type, const struct afb_data_x4 **resultx4)
-{
-	struct afb_data *data = containerof(struct afb_data, x4, datax4);
-	struct afb_data *result;
 	int rc;
 
-	rc = afb_data_convert_to_x4(data, type, &result);
-	*resultx4 = (rc < 0) ? NULL : &result->x4;
+	if (data_validate(data)) {
+		rc = 0;
+	}
+	else {
+		rc = -1;
+	}
+	if (pointer)
+		*pointer = rc < 0 ? NULL : data->pointer;
+	if (size)
+		*size = rc < 0 ? 0 : data->size;
 	return rc;
 }
-
-static const struct afb_data_x4_itf x4_itf = {
-	.addref  = x4_addref,
-	.unref   = x4_unref,
-	.type    = x4_type,
-	.pointer = x4_pointer,
-	.size    = x4_size,
-	.convert = x4_convert
-};
 

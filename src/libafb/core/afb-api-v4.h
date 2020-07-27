@@ -54,10 +54,11 @@ afb_api_v4_create(
 	enum afb_string_mode mode_path
 );
 
+extern
 int
-afb_api_v4_safe_ctlproc_x4(
+afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
-	int (*ctlproc)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t),
+	int (*ctlproc)(struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t),
 	afb_ctlid_t ctlid,
 	afb_ctlarg_t ctlarg
 );
@@ -88,22 +89,9 @@ afb_api_v4_get_api_common(
 );
 
 extern
-afb_api_x4_t
-afb_api_v4_get_api_x4(
-	struct afb_api_v4 *api
-);
-
-extern
 void
 afb_api_v4_seal(
 	struct afb_api_v4 *api
-);
-
-extern
-void
-afb_api_v4_set_verbs_v4(
-	struct afb_api_v4 *api,
-	const struct afb_verb_v4 *verbs
 );
 
 extern
@@ -112,10 +100,10 @@ afb_api_v4_add_verb(
 	struct afb_api_v4 *api,
 	const char *verb,
 	const char *info,
-	void (*callback)(afb_req_x4_t req, unsigned nparams, const struct afb_data_x4 * const *params),
+	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
 	void *vcbdata,
 	const struct afb_auth *auth,
-	uint16_t session,
+	uint32_t session,
 	int glob
 );
 
@@ -138,4 +126,207 @@ extern
 struct json_object *
 afb_api_v4_make_description_openAPIv3(
 	struct afb_api_v4 *api
+);
+
+/************************************************/
+
+extern
+int
+afb_api_v4_logmask(
+	struct afb_api_v4 *api
+);
+
+extern
+const char *
+afb_api_v4_name(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+void *
+afb_api_v4_get_userdata(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+void *
+afb_api_v4_set_userdata(
+	struct afb_api_v4 *apiv4,
+	void *value
+);
+
+/************************************************/
+
+extern
+void
+afb_api_v4_vverbose_hookable(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char *function,
+	const char *fmt,
+	va_list args
+);
+
+extern
+struct json_object *
+afb_api_v4_settings_hookable(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+int
+afb_api_v4_require_api_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int initialized
+);
+
+extern
+int
+afb_api_v4_class_provide_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name
+);
+
+extern
+int
+afb_api_v4_class_require_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name
+);
+
+extern
+int
+afb_api_v4_event_broadcast_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	unsigned nparams,
+	struct afb_data * const params[]
+);
+
+extern
+int
+afb_api_v4_new_event_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	struct afb_evt **event
+);
+
+extern
+void
+afb_api_v4_call_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[],
+	void (*callback)(
+		void *closure,
+		int status,
+		unsigned nreplies,
+		struct afb_data * const replies[],
+		struct afb_api_v4 *api),
+	void *closure
+);
+
+extern
+int
+afb_api_v4_call_sync_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[],
+	int *status,
+	unsigned *nreplies,
+	struct afb_data *replies[]
+);
+
+extern
+int
+afb_api_v4_new_api_hookable(
+	struct afb_api_v4 *apiv4,
+	struct afb_api_v4 **newapiv4,
+	const char *apiname,
+	const char *info,
+	int noconcurrency,
+	int (*mainctl)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
+	void *closure
+);
+
+extern
+int
+afb_api_v4_set_verbs_hookable(
+	struct afb_api_v4 *apiv4,
+	const struct afb_verb_v4 *verbs
+);
+
+extern
+int
+afb_api_v4_add_verb_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *verb,
+	const char *info,
+	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
+	void *vcbdata,
+	const struct afb_auth *auth,
+	uint32_t session,
+	int glob
+);
+
+extern
+void
+afb_api_v4_seal_hookable(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+int
+afb_api_v4_del_verb_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *verb,
+	void **vcbdata
+);
+
+extern
+int
+afb_api_v4_delete_api_hookable(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+int
+afb_api_v4_event_handler_add_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *pattern,
+	void (*callback)(void*,const char*,unsigned,struct afb_data * const[],struct afb_api_v4*),
+	void *closure
+);
+
+extern
+int
+afb_api_v4_event_handler_del_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *pattern,
+	void **closure
+);
+
+extern
+int
+afb_api_v4_queue_job_hookable(
+	struct afb_api_v4 *apiv4,
+	void (*callback)(int signum, void *arg),
+	void *argument,
+	void *group,
+	int timeout
+);
+
+extern
+int
+afb_api_v4_add_alias_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *aliasname
 );

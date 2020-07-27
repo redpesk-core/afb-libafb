@@ -14,93 +14,32 @@
 
 /*********************************************************************/
 
-uint8_t shares[] = {
-	AFB_TYPE_X4_LOCAL,
-	AFB_TYPE_X4_SHAREABLE,
-	AFB_TYPE_X4_STREAMABLE
-};
-
-struct afb_type_x4 type1 =
-{
-	.name = "type1",
-	.sharing = AFB_TYPE_X4_LOCAL,
-	.family = 0,
-	.closure = 0,
-	.nconverts = 0,
-	.converts = {}
-};
-
-struct afb_type_x4 type2 =
-{
-	.name = "type2",
-	.sharing = AFB_TYPE_X4_LOCAL,
-	.family = 0,
-	.closure = 0,
-	.nconverts = 0,
-	.converts = {}
-};
-
-struct afb_type_x4 type3 =
-{
-	.name = "type3",
-	.sharing = AFB_TYPE_X4_LOCAL,
-	.family = 0,
-	.closure = 0,
-	.nconverts = 0,
-	.converts = {}
-};
-
-struct afb_type_x4 type4 =
-{
-	.name = "type4",
-	.sharing = AFB_TYPE_X4_LOCAL,
-	.family = 0,
-	.closure = 0,
-	.nconverts = 0,
-	.converts = {}
-};
-
-struct afb_type_x4 type5 =
-{
-	.name = "type5",
-	.sharing = AFB_TYPE_X4_LOCAL,
-	.family = 0,
-	.closure = 0,
-	.nconverts = 0,
-	.converts = {}
-};
-
-
-afb_type_x4_t types[] = {
-	&type1,
-	&type2,
-	&type3,
-	&type4,
-	&type5
+const char *names[] = {
+	"type1",
+	"type2",
+	"type3",
+	"type4",
+	"type5"
 };
 
 START_TEST (check_type)
 {
-	int n = (int)(sizeof types / sizeof *types);
-	int i, id;
+	int n = (int)(sizeof names / sizeof *names);
+	int i;
+	int r;
+	struct afb_type *t, *T;
 
-	ck_assert(!afb_type_is_valid_id(0));
-	ck_assert(!afb_type_is_valid_id(1));
 
 	/* ensure basis */
 	for (i = 0 ; i < n ; i++) {
-		ck_assert(!afb_type_is_valid_id(afb_type_id_of_name(types[i]->name)));
-		id = i + 1;
-		ck_assert(!afb_type_is_valid_id(id));
-		ck_assert(afb_type_name_of_id(id) == NULL);
-//		ck_assert(afb_type_sharing(id) == afb_type_Process);
-		id = afb_type_register_type_x4(types[i]);
-		ck_assert(id > 0);
-		ck_assert(i + 1 == id);
-		ck_assert(id == afb_type_id_of_name(types[i]->name));
-		ck_assert(afb_type_is_valid_id(id));
-		ck_assert(afb_type_name_of_id(id) == types[i]->name);
-//		ck_assert(afb_type_sharing(id) == shares[i % ns]);
+		t = afb_type_get(names[i]);
+		ck_assert_ptr_eq(t, 0);
+		r = afb_type_register(&t, names[i], 0, 0, 0);
+		ck_assert_int_eq(r, 0);
+		ck_assert_ptr_eq(names[i], afb_type_name(t));
+		T = afb_type_get(names[i]);
+		ck_assert_ptr_ne(T, 0);
+		ck_assert_ptr_eq(T, t);
 	}
 }
 END_TEST

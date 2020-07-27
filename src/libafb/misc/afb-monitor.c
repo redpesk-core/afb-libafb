@@ -363,7 +363,7 @@ static void describe_first_api(struct desc_apis *desc)
 	if (head)
 		afb_apiset_describe(monitor_api->call_set, head->name, on_api_description, desc);
 	else {
-		afb_json_legacy_req_reply(desc->req, desc->resu, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(desc->req, desc->resu, NULL, NULL);
 		afb_req_common_unref(desc->req);
 		free(desc);
 	}
@@ -375,7 +375,7 @@ static void describe_apis(struct afb_req_common *req, struct json_object *resu, 
 
 	desc = malloc(sizeof *desc);
 	if (!desc)
-		afb_req_common_reply_out_of_memory(req);
+		afb_req_common_reply_out_of_memory_error_hookable(req);
 	else {
 		desc->req = afb_req_common_addref(req);
 		desc->resu = resu;
@@ -399,18 +399,18 @@ static void f_get_cb(void *closure, struct json_object *args)
 
 	wrap_json_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
 	if (!verbosity && !apis)
-		afb_json_legacy_req_reply(req, NULL, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
 	else {
 		r = json_object_new_object();
 		if (!r)
-			afb_req_common_reply_out_of_memory(req);
+			afb_req_common_reply_out_of_memory_error_hookable(req);
 		else {
 			if (verbosity) {
 				verbosity = get_verbosity(verbosity);
 				json_object_object_add(r, _verbosity_, verbosity);
 			}
 			if (!apis)
-				afb_json_legacy_req_reply(req, r, NULL, NULL);
+				afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
 			else
 				describe_apis(req, r, apis);
 		}
@@ -431,7 +431,7 @@ static void f_set_cb(void *closure, struct json_object *args)
 	if (verbosity)
 		set_verbosity(verbosity);
 
-	afb_json_legacy_req_reply(req, NULL, NULL, NULL);
+	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
 }
 
 static void f_set(struct afb_req_common *req)
@@ -473,7 +473,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 		if (rc)
 			goto end;
 	}
-	afb_json_legacy_req_reply(req, NULL, NULL, NULL);
+	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
 end:
 	afb_apiset_update_hooks(monitor_api->call_set, NULL);
 	afb_evt_update_hooks();
@@ -487,7 +487,7 @@ static void f_trace(struct afb_req_common *req)
 #else
 static void f_trace(struct afb_req_common *req)
 {
-	afb_json_legacy_req_reply_unavailable(req);
+	afb_json_legacy_req_reply_hookable(req, NULL, "unavailable", NULL);
 }
 #endif
 
@@ -500,7 +500,7 @@ static void f_session(struct afb_req_common *req)
 			"uuid", afb_session_uuid(req->session),
 			"timeout", afb_session_timeout(req->session),
 			"remain", afb_session_what_remains(req->session));
-	afb_json_legacy_req_reply(req, r, NULL, NULL);
+	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
 }
 
 void checkcb(void *closure, int status)
@@ -538,13 +538,13 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 		break;
 	}
 	if (fun == NULL) {
-		afb_req_common_reply_verb_unknown(req);
+		afb_req_common_reply_verb_unknown_error_hookable(req);
 	}
 	else if (auth) {
 		if (afb_req_common_async_push(req, fun) < 0)
-			afb_req_common_reply_internal_error(req);
+			afb_req_common_reply_internal_error_hookable(req);
 		else
-			afb_req_common_check_and_set_session_async(req, auth, AFB_SESSION_CHECK_X2, checkcb, req);
+			afb_req_common_check_and_set_session_async(req, auth, AFB_SESSION_CHECK, checkcb, req);
 
 	}
 	else {

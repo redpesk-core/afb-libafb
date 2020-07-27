@@ -34,6 +34,7 @@
 #include "wsj1/afb-ws-json1.h"
 #include "core/afb-session.h"
 #include "core/afb-data.h"
+#include "core/afb-type.h"
 #include "core/afb-cred.h"
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"
@@ -58,7 +59,7 @@ static void aws_on_broadcast_cb(void *closure, const struct afb_evt_broadcasted 
 
 /* predeclaration of wsreq callbacks */
 static void wsreq_destroy(struct afb_req_common *comreq);
-static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, const struct afb_data_x4 * const *params);
+static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, struct afb_data * const params[]);
 static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_evt *event);
 static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event);
 
@@ -215,7 +216,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	struct afb_wsreq *wsreq;
 	const char *tok;
 	const char *object;
-	const struct afb_data_x4 *arg;
+	struct afb_data *arg;
 	size_t len;
 	int rc;
 
@@ -224,7 +225,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 
 	/* make params */
 	afb_wsj1_msg_addref(msg);
-	rc = afb_data_x4_create_set_x4(&arg, AFB_TYPE_X4_JSON, object, 1+len,
+	rc = afb_data_create_raw(&arg, &afb_type_predefined_json, object, 1+len,
 					(void*)afb_wsj1_msg_unref, msg);
 	if (rc < 0) {
 		afb_wsj1_close(ws->wsj1, 1008, NULL);
@@ -239,7 +240,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	/* allocate */
 	wsreq = calloc(1, sizeof *wsreq);
 	if (wsreq == NULL) {
-		afb_data_unref(afb_data_of_data_x4(arg));
+		afb_data_unref(arg);
 		afb_wsj1_close(ws->wsj1, 1008, NULL);
 		return;
 	}
@@ -304,7 +305,7 @@ static void wsreq_destroy(struct afb_req_common *comreq)
 	free(wsreq);
 }
 
-static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, const struct afb_data_x4 * const *params)
+static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned nparams, struct afb_data * const params[])
 {
 	struct afb_wsreq *wsreq = containerof(struct afb_wsreq, comreq, comreq);
 	size_t size;

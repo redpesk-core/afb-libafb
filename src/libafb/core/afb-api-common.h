@@ -32,8 +32,9 @@ struct afb_req_common;
 
 struct afb_evt;
 struct afb_evt_data;
+struct afb_data;
+
 struct afb_event_x2;
-struct afb_data_x4;
 
 struct globset;
 
@@ -104,8 +105,7 @@ struct afb_api_common
 
 #if WITH_AFB_HOOK
 	/* hooking flags */
-	int hookditf; /* historical Daemon InTerFace */
-	int hooksvc;  /* historical SerViCe interface */
+	int hookflags; /* historical Daemon InTerFace */
 #endif
 };
 
@@ -294,10 +294,6 @@ afb_api_common_unsubscribe(
 	struct afb_evt *evt
 );
 
-/****************************************************************************/
-/* functions below have helpers in afb-api-common.inc                       */
-/****************************************************************************/
-
 extern
 void
 afb_api_common_vverbose(
@@ -320,11 +316,11 @@ afb_api_common_new_event(
 
 extern
 int
-afb_api_common_event_broadcast_x4(
+afb_api_common_event_broadcast(
 	const struct afb_api_common *comapi,
 	const char *name,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 );
 
 extern
@@ -379,7 +375,6 @@ afb_api_common_settings(
 	const struct afb_api_common *comapi
 );
 
-#if WITH_AFB_HOOK
 extern
 void
 afb_api_common_vverbose_hookable(
@@ -402,11 +397,11 @@ afb_api_common_new_event_hookable(
 
 extern
 int
-afb_api_common_event_broadcast_hookable_x4(
+afb_api_common_event_broadcast_hookable(
 	const struct afb_api_common *comapi,
 	const char *name,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 );
 
 extern
@@ -460,5 +455,4 @@ struct json_object *
 afb_api_common_settings_hookable(
 	const struct afb_api_common *comapi
 );
-#endif
 

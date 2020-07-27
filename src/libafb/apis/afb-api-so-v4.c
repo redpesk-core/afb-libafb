@@ -31,7 +31,8 @@
 #include <stdarg.h>
 
 #include <json-c/json.h>
-#include <afb/afb-binding-v4.h>
+
+#include "core/afb-v4.h"
 
 #include "sys/x-dynlib.h"
 #include "core/afb-apiname.h"
@@ -48,12 +49,14 @@
 static const char afb_api_so_v4_desc[] = "afbBindingV4";
 static const char afb_api_so_v4_root[] = "afbBindingV4root";
 static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
+static const char afb_api_so_v4_itf[] = "afbBindingV4itf";
+static const char afb_api_so_v4_itfptr[] = "afbBindingV4itfptr";
 
 struct args
 {
-	afb_api_x4_t *root;
+	struct afb_api_v4 **root;
 	const struct afb_binding_v4 *desc;
-	int (*mainctl)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t);
+	int (*mainctl)(struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t);
 };
 
 static int init_for_desc(struct afb_api_v4 *api, void *closure)
@@ -62,11 +65,11 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 	union afb_ctlarg ctlarg;
 	int rc;
 
-	*a->root = afb_api_v4_get_api_x4(api);
+	*a->root = api;
 	rc = afb_api_v4_set_binding_fields(api, a->desc);
 	if (rc >= 0) {
 		ctlarg.pre_init.closure = 0;
-		rc = afb_api_v4_safe_ctlproc_x4(api, a->mainctl, afb_ctlid_Pre_Init, &ctlarg);
+		rc = afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Pre_Init, &ctlarg);
 	}
 	afb_api_v4_seal(api);
 	return rc;
@@ -76,9 +79,9 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
 {
 	const struct args *a = closure;
 
-	*a->root = afb_api_v4_get_api_x4(api);
+	*a->root = api;
 	afb_api_v4_seal(api);
-	return afb_api_v4_safe_ctlproc_x4(api, a->mainctl, afb_ctlid_Root_Entry, NULL);
+	return afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Root_Entry, NULL);
 }
 
 int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
@@ -87,6 +90,8 @@ int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 	struct args a;
 	struct afb_api_v4 *api;
 	char rpath[PATH_MAX];
+	struct afb_binding_x4_itf *itf;
+	const struct afb_binding_x4_itf **itfptr;
 
 	/* retrieves important exported symbols */
 	x_dynlib_symbol(dynlib, afb_api_so_v4_desc, (void**)&a.desc);
@@ -97,6 +102,22 @@ int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 	INFO("binding [%s] looks like an AFB binding V4", path);
 
 	/* basic checks */
+	x_dynlib_symbol(dynlib, afb_api_so_v4_itf, (void**)&itf);
+	x_dynlib_symbol(dynlib, afb_api_so_v4_itfptr, (void**)&itfptr);
+	if (itf) {
+		*itf = afb_v4_itf;
+		if (itfptr)
+			*itfptr = itf;
+	}
+	else if (itfptr) {
+		*itfptr = &afb_v4_itf;
+	}
+	else {
+		ERROR("binding [%s] incomplete symbol set: %s or %s is missing",
+			path, afb_api_so_v4_itf, afb_api_so_v4_itfptr);
+		rc = X_EINVAL;
+		goto error;
+	}
 	x_dynlib_symbol(dynlib, afb_api_so_v4_root, (void**)&a.root);
 	if (!a.root) {
 		ERROR("binding [%s] incomplete symbol set: %s is missing",

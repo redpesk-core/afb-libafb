@@ -32,12 +32,12 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#include <afb/afb-type-x4.h>
-
+#include "core/afb-type.h"
 #include "core/afb-data.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
+#include "utils/jsonstr.h"
 #include "sys/x-errno.h"
 #include "sys/verbose.h"
 
@@ -48,16 +48,16 @@ static const char _success_[] = "success";
 /**********************************************************************/
 
 int
-afb_json_legacy_make_data_x4_json_c(
-	const struct afb_data_x4 **result,
+afb_json_legacy_make_data_json_c(
+	struct afb_data **result,
 	struct json_object *object
 ) {
-	return afb_data_x4_create_set_x4(result, AFB_TYPE_X4_JSON_C, object, 0, (void*)json_object_put, object);
+	return afb_data_create_raw(result, &afb_type_predefined_json_c, object, 0, (void*)json_object_put, object);
 }
 
 int
-afb_json_legacy_make_data_x4_stringz_len_mode(
-	const struct afb_data_x4 **data,
+afb_json_legacy_make_data_stringz_len_mode(
+	struct afb_data **data,
 	const char *string,
 	size_t len,
 	enum afb_string_mode mode
@@ -91,7 +91,7 @@ afb_json_legacy_make_data_x4_stringz_len_mode(
 			case Afb_String_Copy:
 				val = clo = malloc(1 + len);
 				if (clo)
-					memcpy(clo, string, len);
+					memcpy(clo, string, 1 + len);
 				else {
 					*data = NULL;
 					rc = X_ENOMEM;
@@ -100,16 +100,16 @@ afb_json_legacy_make_data_x4_stringz_len_mode(
 			}
 		}
 		if (rc == 0) {
-			rc = afb_data_x4_create_set_x4(data,
-						AFB_TYPE_X4_STRINGZ, val, 1 + len, clo ? free : 0, clo);
+			rc = afb_data_create_raw(data,
+						&afb_type_predefined_stringz, val, 1 + len, clo ? free : 0, clo);
 		}
 	}
 	return rc;
 }
 
 int
-afb_json_legacy_make_data_x4_stringz_mode(
-	const struct afb_data_x4 **data,
+afb_json_legacy_make_data_stringz_mode(
+	struct afb_data **data,
 	const char *string,
 	enum afb_string_mode mode
 ) {
@@ -117,10 +117,10 @@ afb_json_legacy_make_data_x4_stringz_mode(
 	size_t len;
 
 	if (!string)
-		rc = afb_json_legacy_make_data_x4_stringz_len_mode(data, 0, 0, Afb_String_Const);
+		rc = afb_json_legacy_make_data_stringz_len_mode(data, 0, 0, Afb_String_Const);
 	else {
 		len = strnlen(string, UINT32_MAX);
-		rc = afb_json_legacy_make_data_x4_stringz_len_mode(data, string, len, mode);
+		rc = afb_json_legacy_make_data_stringz_len_mode(data, string, len, mode);
 	}
 	return rc;
 }
@@ -131,11 +131,12 @@ afb_json_legacy_make_data_x4_stringz_mode(
  */
 static int do_single_any_json(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void*, const void*, const void*),
 	void *closure1,
 	const void *closure2,
-	const struct afb_type_x4 *type
+	struct afb_type *type,
+	const void *defval
 ) {
 	int rc;
 	struct afb_data *dobj;
@@ -144,16 +145,16 @@ static int do_single_any_json(
 	/* extract the object */
 	if (nparams < 1 || !params[0]) {
 		dobj = NULL;
-		object = (type == AFB_TYPE_X4_JSON) ? "null" : NULL;
+		object = defval;
 		rc = 0;
 	}
 	else {
-		rc = afb_data_convert_to_x4(afb_data_of_data_x4(params[0]), type, &dobj);
+		rc = afb_data_convert_to(params[0], type, &dobj);
 		if (rc >= 0)
-			object = afb_data_pointer(dobj);
+			object = afb_data_const_pointer(dobj);
 		else {
 			dobj = NULL;
-			object = type == AFB_TYPE_X4_JSON ? "null" : NULL;
+			object = defval;
 		}
 	}
 
@@ -166,6 +167,28 @@ static int do_single_any_json(
 	return rc;
 }
 
+int
+afb_json_legacy_do2_single_json_string(
+	unsigned nparams,
+	struct afb_data * const params[],
+	void (*callback)(void *closure1, const char *object, const void *closure2),
+	void *closure1,
+	const void *closure2
+) {
+	return do_single_any_json(nparams, params, (void*)callback, closure1, closure2, &afb_type_predefined_json, "null");
+}
+
+int
+afb_json_legacy_do2_single_json_c(
+	unsigned nparams,
+	struct afb_data * const params[],
+	void (*callback)(void *closure1, struct json_object *object, const void *closure2),
+	void *closure1,
+	const void *closure2
+) {
+	return do_single_any_json(nparams, params, (void*)callback, closure1, closure2,  &afb_type_predefined_json_c, NULL);
+}
+
 static void do2_to_do1(void *closure1, const void *object, const void *closure2)
 {
 	void (*f)(void*, const void*) = closure2;
@@ -175,43 +198,37 @@ static void do2_to_do1(void *closure1, const void *object, const void *closure2)
 int
 afb_json_legacy_do_single_json_string(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure, const char *object),
 	void *closure
 ) {
-	return do_single_any_json(nparams, params, do2_to_do1, closure, callback, AFB_TYPE_X4_JSON);
+	return afb_json_legacy_do2_single_json_string(nparams, params, (void*)do2_to_do1, closure, callback);
 }
 
 int
 afb_json_legacy_do_single_json_c(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure, struct json_object *object),
 	void *closure
 ) {
-	return do_single_any_json(nparams, params, do2_to_do1, closure, callback,  AFB_TYPE_X4_JSON_C);
+	return afb_json_legacy_do2_single_json_c(nparams, params, (void*)do2_to_do1, closure, callback);
+}
+
+static void get_json_object(void *closure, struct json_object *object, const void *unused)
+{
+	struct json_object **ptr = closure;
+	*ptr = json_object_get(object);
 }
 
 int
-afb_json_legacy_do2_single_json_string(
+afb_json_legacy_get_single_json_c(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
-	void (*callback)(void *closure1, const char *object, const void *closure2),
-	void *closure1,
-	const void *closure2
+	struct afb_data * const params[],
+	struct json_object **obj
 ) {
-	return do_single_any_json(nparams, params, (void*)callback, closure1, closure2, AFB_TYPE_X4_JSON);
-}
-
-int
-afb_json_legacy_do2_single_json_c(
-	unsigned nparams,
-	const struct afb_data_x4 * const *params,
-	void (*callback)(void *closure1, struct json_object *object, const void *closure2),
-	void *closure1,
-	const void *closure2
-) {
-	return do_single_any_json(nparams, params, (void*)callback, closure1, closure2,  AFB_TYPE_X4_JSON_C);
+	return afb_json_legacy_do2_single_json_c(
+			nparams, params, get_json_object, obj, 0);
 }
 
 /**********************************************************************/
@@ -226,39 +243,39 @@ do_reply_any_json(
 	void *closure,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	void (*callback)(void*, const void*, const char*, const char*),
-	const struct afb_type_x4 *type
+	struct afb_type *type
 ) {
 	struct afb_data *dobj, *derr, *dinf;
 	const char *error, *info;
 	const void *object;
 
 	/* extract the replied object */
-	if (nreplies < 1 || !replies[0] || afb_data_convert_to_x4(afb_data_of_data_x4(replies[0]), type, &dobj) < 0) {
+	if (nreplies < 1 || !replies[0] || afb_data_convert_to(replies[0], type, &dobj) < 0) {
 		dobj = NULL;
-		object = type == AFB_TYPE_X4_JSON ? "null" : NULL;
+		object = type == &afb_type_predefined_json ? "null" : NULL;
 	}
 	else {
-		object = afb_data_pointer(dobj);
+		object = afb_data_const_pointer(dobj);
 	}
 
 	/* extract the replied error */
-	if (nreplies < 2 || !replies[1] || afb_data_convert_to_x4(afb_data_of_data_x4(replies[1]), AFB_TYPE_X4_STRINGZ, &derr) < 0) {
+	if (nreplies < 2 || !replies[1] || afb_data_convert_to(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
 		derr = NULL;
 		error = NULL;
 	}
 	else {
-		error = (const char*)afb_data_pointer(derr);
+		error = (const char*)afb_data_const_pointer(derr);
 	}
 
 	/* extract the replied info */
-	if (nreplies < 3 || !replies[2] || afb_data_convert_to_x4(afb_data_of_data_x4(replies[2]), AFB_TYPE_X4_STRINGZ, &dinf) < 0) {
+	if (nreplies < 3 || !replies[2] || afb_data_convert_to(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
 		dinf = NULL;
 		info = NULL;
 	}
 	else {
-		info = (const char*)afb_data_pointer(dinf);
+		info = (const char*)afb_data_const_pointer(dinf);
 	}
 
 	/* cohercision to coherent status */
@@ -287,10 +304,10 @@ int afb_json_legacy_do_reply_json_c(
 	void *closure,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	void (*callback)(void*, struct json_object*, const char*, const char*)
 ) {
-	return do_reply_any_json(closure, status, nreplies, replies, (void*)callback, AFB_TYPE_X4_JSON_C);
+	return do_reply_any_json(closure, status, nreplies, replies, (void*)callback, &afb_type_predefined_json_c);
 }
 
 /**
@@ -301,10 +318,10 @@ int afb_json_legacy_do_reply_json_string(
 	void *closure,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	void (*callback)(void*, const char*, const char*, const char*)
 ) {
-	return do_reply_any_json(closure, status, nreplies, replies, (void*)callback, AFB_TYPE_X4_JSON);
+	return do_reply_any_json(closure, status, nreplies, replies, (void*)callback, &afb_type_predefined_json);
 }
 
 /**********************************************************************/
@@ -336,7 +353,7 @@ static void get_reply_sync_cb(
 int afb_json_legacy_get_reply_sync(
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	struct json_object **object,
 	char **error,
 	char **info
@@ -354,47 +371,47 @@ int afb_json_legacy_get_reply_sync(
 
 /**********************************************************************/
 int
-afb_json_legacy_make_reply_json_string_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_string(
+	struct afb_data *params[],
 	const char *object, void (*dobj)(void*), void *cobj,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
 ) {
 	int rc;
 
-	rc = afb_data_x4_create_set_x4(&params[0], AFB_TYPE_X4_JSON, object, SLEN(object), dobj, cobj);
+	rc = afb_data_create_raw(&params[0], &afb_type_predefined_json, object, SLEN(object), dobj, cobj);
 	if (rc >= 0) {
-		rc = afb_data_x4_create_set_x4(&params[1], AFB_TYPE_X4_STRINGZ, error, SLEN(error), derr, cerr);
+		rc = afb_data_create_raw(&params[1], &afb_type_predefined_stringz, error, SLEN(error), derr, cerr);
 		if (rc >= 0) {
-			rc = afb_data_x4_create_set_x4(&params[2], AFB_TYPE_X4_STRINGZ, info, SLEN(info), dinf, cinf);
+			rc = afb_data_create_raw(&params[2], &afb_type_predefined_stringz, info, SLEN(info), dinf, cinf);
 			if (rc < 0)
-				afb_data_unref(afb_data_of_data_x4(params[1]));
+				afb_data_unref(params[1]);
 		}
 		if (rc < 0)
-			afb_data_unref(afb_data_of_data_x4(params[0]));
+			afb_data_unref(params[0]);
 	}
 	return rc;
 }
 
 int
-afb_json_legacy_make_reply_json_c_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_c(
+	struct afb_data *params[],
 	struct json_object *object,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
 ) {
 	int rc;
 
-	rc = afb_data_x4_create_set_x4(&params[0], AFB_TYPE_X4_JSON_C, object, 0, (void*)json_object_put, object);
+	rc = afb_data_create_raw(&params[0], &afb_type_predefined_json_c, object, 0, (void*)json_object_put, object);
 	if (rc >= 0) {
-		rc = afb_data_x4_create_set_x4(&params[1], AFB_TYPE_X4_STRINGZ, error, SLEN(error), derr, cerr);
+		rc = afb_data_create_raw(&params[1], &afb_type_predefined_stringz, error, SLEN(error), derr, cerr);
 		if (rc >= 0) {
-			rc = afb_data_x4_create_set_x4(&params[2], AFB_TYPE_X4_STRINGZ, info, SLEN(info), dinf, cinf);
+			rc = afb_data_create_raw(&params[2], &afb_type_predefined_stringz, info, SLEN(info), dinf, cinf);
 			if (rc < 0)
-				afb_data_unref(afb_data_of_data_x4(params[1]));
+				afb_data_unref(params[1]);
 		}
 		if (rc < 0)
-			afb_data_unref(afb_data_of_data_x4(params[0]));
+			afb_data_unref(params[0]);
 	}
 	return rc;
 }
@@ -413,8 +430,8 @@ afb_json_legacy_make_reply_json_c_x4(
  * @return 0 in case of success or an error code negative
  */
 int
-afb_json_legacy_make_reply_json_c_mode_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_c_mode(
+	struct afb_data *params[],
 	struct json_object *object,
 	const char *error,
 	const char *info,
@@ -423,16 +440,16 @@ afb_json_legacy_make_reply_json_c_mode_x4(
 ) {
 	int rc;
 
-	rc = afb_data_x4_create_set_x4(&params[0], AFB_TYPE_X4_JSON_C, object, 0, (void*)json_object_put, object);
+	rc = afb_data_create_raw(&params[0], &afb_type_predefined_json_c, object, 0, (void*)json_object_put, object);
 	if (rc >= 0) {
-		rc = afb_json_legacy_make_data_x4_stringz_mode(&params[1], error, mode_error);
+		rc = afb_json_legacy_make_data_stringz_mode(&params[1], error, mode_error);
 		if (rc >= 0) {
-			rc = afb_json_legacy_make_data_x4_stringz_mode(&params[2], info, mode_info);
+			rc = afb_json_legacy_make_data_stringz_mode(&params[2], info, mode_info);
 			if (rc < 0)
-				afb_data_unref(afb_data_of_data_x4(params[1]));
+				afb_data_unref(params[1]);
 		}
 		if (rc < 0)
-			afb_data_unref(afb_data_of_data_x4(params[0]));
+			afb_data_unref(params[0]);
 	}
 	return rc;
 }
@@ -447,68 +464,35 @@ afb_json_legacy_make_reply_json_c_mode_x4(
  * @param info       the informative test or NULL
  */
 void
-afb_json_legacy_req_reply(
+afb_json_legacy_req_reply_hookable(
 	struct afb_req_common *comreq,
 	struct json_object *obj,
 	const char *error,
 	const char *info
 ) {
-	const struct afb_data_x4 *reply[3];
+	struct afb_data *reply[3];
 
-	afb_json_legacy_make_reply_json_c_mode_x4(reply, obj, error, info, Afb_String_Copy, Afb_String_Copy);
-	afb_req_common_reply(comreq, LEGACY_STATUS(error), 3, reply);
+	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Copy);
+	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 3, reply);
 }
 
 void
-afb_json_legacy_req_vreply(
+afb_json_legacy_req_vreply_hookable(
 	struct afb_req_common *comreq,
 	struct json_object *obj,
 	const char *error,
 	const char *fmt,
 	va_list args
 ) {
-	const struct afb_data_x4 *reply[3];
+	struct afb_data *reply[3];
 	char *info;
 
 	if (fmt == NULL || vasprintf(&info, fmt, args) < 0)
 		info = NULL;
 
-	afb_json_legacy_make_reply_json_c_mode_x4(reply, obj, error, info, Afb_String_Copy, Afb_String_Free);
-	afb_req_common_reply(comreq, LEGACY_STATUS(error), 3, reply);
-}
-
-#if WITH_AFB_HOOK
-void
-afb_json_legacy_req_hooked_reply(
-	struct afb_req_common *comreq,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-) {
-	const struct afb_data_x4 *reply[3];
-
-	afb_json_legacy_make_reply_json_c_mode_x4(reply, obj, error, info, Afb_String_Copy, Afb_String_Copy);
+	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Free);
 	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 3, reply);
 }
-
-void
-afb_json_legacy_req_hooked_vreply(
-	struct afb_req_common *comreq,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-) {
-	const struct afb_data_x4 *reply[3];
-	char *info;
-
-	if (fmt == NULL || vasprintf(&info, fmt, args) < 0)
-		info = NULL;
-
-	afb_json_legacy_make_reply_json_c_mode_x4(reply, obj, error, info, Afb_String_Copy, Afb_String_Free);
-	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 3, reply);
-}
-#endif
 
 /**************************************************************************/
 
@@ -520,11 +504,11 @@ afb_json_legacy_event_rebroadcast_name(
 	uint8_t hop
 ) {
 	int rc;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, obj);
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
 	if (rc >= 0)
-		rc = afb_evt_rebroadcast_name_x4(event, 1, &data, uuid, hop);
+		rc = afb_evt_rebroadcast_name_hookable(event, 1, &data, uuid, hop);
 	else {
 		ERROR("impossible to create the data to rebroadcast");
 	}
@@ -538,11 +522,11 @@ afb_json_legacy_event_push(
 	struct json_object *obj
 ) {
 	int rc;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, obj);
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
 	if (rc >= 0)
-		rc = afb_evt_push_x4(evt, 1, &data);
+		rc = afb_evt_push(evt, 1, &data);
 	else {
 		ERROR("impossible to create the data to push");
 	}
@@ -550,16 +534,33 @@ afb_json_legacy_event_push(
 }
 
 int
-afb_json_legacy_event_broadcast(
+afb_json_legacy_event_push_hookable(
 	struct afb_evt *evt,
 	struct json_object *obj
 ) {
 	int rc;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, obj);
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
 	if (rc >= 0)
-		rc = afb_evt_broadcast_x4(evt, 1, &data);
+		rc = afb_evt_push_hookable(evt, 1, &data);
+	else {
+		ERROR("impossible to create the data to push");
+	}
+	return rc;
+}
+
+int
+afb_json_legacy_event_broadcast_hookable(
+	struct afb_evt *evt,
+	struct json_object *obj
+) {
+	int rc;
+	struct afb_data *data;
+
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
+	if (rc >= 0)
+		rc = afb_evt_broadcast_hookable(evt, 1, &data);
 	else {
 		ERROR("impossible to create the data to broadcast");
 	}
@@ -573,11 +574,11 @@ afb_json_legacy_event_hooked_push(
 	struct json_object *obj
 ) {
 	int rc;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, obj);
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
 	if (rc >= 0)
-		rc = afb_evt_hooked_push_x4(evt, 1, &data);
+		rc = afb_evt_push_hookable(evt, 1, &data);
 	else {
 		ERROR("impossible to create the data to push");
 	}
@@ -590,11 +591,11 @@ afb_json_legacy_event_hooked_broadcast(
 	struct json_object *obj
 ) {
 	int rc;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, obj);
+	rc = afb_json_legacy_make_data_json_c(&data, obj);
 	if (rc >= 0)
-		rc = afb_evt_hooked_broadcast_x4(evt, 1, &data);
+		rc = afb_evt_broadcast_hookable(evt, 1, &data);
 	else {
 		ERROR("impossible to create the data to broadcast");
 	}
@@ -604,72 +605,19 @@ afb_json_legacy_event_hooked_broadcast(
 
 /**********************************************************************/
 
-/* returns the character for the hexadecimal digit */
-static inline char hex(int digit)
-{
-	return (char)(digit + (digit > 9 ? 'a' - 10 : '0'));
-}
-
 /*
  * escape the string for JSON in destination
  * returns pointer to the terminating null
  */
 static char *escjson_stpcpy(char *dest, const char *string)
 {
-	char c;
-	for(;;) {
-		c = *string++;
-		switch (c) {
-		case '"':
-		case '\\':
-			/* simple character escape */
-			*dest++ = '\\';
-			*dest++ = c;
-			break;
-		case 0:
-			/* end */
-			*dest = c;
-			return dest;
-		default:
-			if ((unsigned char)c >= 32)
-				/* no escape */
-				*dest++ = c;
-			else {
-				/* escape control character */
-				*dest++ = '\\';
-				*dest++ = 'u';
-				*dest++ = '0';
-				*dest++ = '0';
-				*dest++ = hex((c >> 4) & 15);
-				*dest++ = hex(c & 15);
-			}
-			break;
-		}
-	}
+	return &dest[jsonstr_string_escape_unsafe(dest, string, SIZE_MAX)];
 }
 
 /* compute the length of string as escaped for JSON */
 static size_t escjson_strlen(const char *string)
 {
-	size_t r = 0;
-	char c;
-	for(;;) {
-		c = *string++;
-		switch (c) {
-		case '"':
-		case '\\':
-			/* simple character escaping */
-			r += 2;
-			break;
-		case 0:
-			/* end */
-			return r;
-		default:
-			/* escaping control character but not hte others */
-			r += ((unsigned char)c) < 32 ? 6 : 1;
-			break;
-		}
-	}
+	return jsonstr_string_escape_length(string, SIZE_MAX);
 }
 
 /**
@@ -791,7 +739,7 @@ afb_json_legacy_make_msg_string_reply(
 	size_t *length,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 ) {
 	struct mkmsg mm;
 	int rc;
@@ -851,7 +799,7 @@ afb_json_legacy_make_msg_string_event(
 	size_t *length,
 	const char *event,
 	unsigned nparams,
-	const struct afb_data_x4 * const *params
+	struct afb_data * const params[]
 ) {
 	struct mkmsg mm;
 

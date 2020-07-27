@@ -29,9 +29,7 @@
 
 #include <json-c/json.h>
 
-#define AFB_BINDING_VERSION 0
-#include <afb/afb-binding.h>
-#include <afb/afb-binding-v4.h>
+#include "core/afb-v4.h"
 
 #include "containerof.h"
 
@@ -56,6 +54,7 @@
 #if WITH_SYSTEMD
 #include "sys/systemd.h"
 #endif
+
 #include "sys/verbose.h"
 #include "utils/globmatch.h"
 #include "utils/globset.h"
@@ -81,20 +80,21 @@ struct afb_api_v4
 	struct json_object *settings;
 
 	/* control function */
-	int (*mainctl)(afb_api_x4_t apix4, afb_ctlid_t id, afb_ctlarg_t arg);
+	int (*mainctl)(struct afb_api_v4 *apiv4, afb_ctlid_t id, afb_ctlarg_t arg);
+
+	/* userdata */
+	void *userdata;
 
 	/* verbs */
 	struct {
 		const struct afb_verb_v4 *statics;
 		struct afb_verb_v4 **dynamics;
 	} verbs;
+
 	uint16_t dyn_verb_count;
 
-	/* interface with remainers */
-	struct afb_api_x4 xapi;
-
-	/* userdata */
-	void *userdata;
+	/** mask of loging */
+	int16_t logmask;
 
 	/* strings */
 	char strings[];
@@ -107,36 +107,11 @@ static inline struct afb_api_v4 *api_common_to_afb_api_v4(const struct afb_api_c
 	return containerof(struct afb_api_v4, comapi, comapi);
 }
 
-static inline struct afb_api_v4 *api_x4_to_api_v4(afb_api_x4_t apix4)
-{
-	return containerof(struct afb_api_v4, xapi, apix4);
-}
-
-static inline afb_api_x4_t api_v4_to_api_x4(const struct afb_api_v4 *apiv4)
-{
-	return (afb_api_x4_t)&apiv4->xapi;
-}
-
-static inline struct afb_api_common *api_v4_to_api_common(const struct afb_api_v4 *apiv4)
-{
-	return (struct afb_api_common*)&apiv4->comapi; /* remove const on pupose */
-}
-
-static inline struct afb_api_common *api_x4_to_api_common(const afb_api_x4_t apix4)
-{
-	return api_v4_to_api_common(api_x4_to_api_v4(apix4));
-}
-
-static inline afb_api_x4_t api_common_to_api_x4(const struct afb_api_common *comapi)
-{
-	return api_v4_to_api_x4(api_common_to_afb_api_v4(comapi));
-}
-
 /*****************************************************************************/
 
-static inline int is_sealed(const struct afb_api_v4 *apiv4)
+static inline int is_sealed(struct afb_api_v4 *apiv4)
 {
-	return afb_api_common_is_sealed(api_v4_to_api_common(apiv4));
+	return apiv4->comapi.sealed;
 }
 
 /*****************************************************************************/
@@ -144,7 +119,7 @@ static inline int is_sealed(const struct afb_api_v4 *apiv4)
 struct safe_ctlproc_s
 {
 	struct afb_api_v4 *apiv4;
-	int (*ctlproc)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t);
+	int (*ctlproc)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
 	afb_ctlid_t ctlid;
 	afb_ctlarg_t ctlarg;
 	int result;
@@ -155,7 +130,7 @@ static void safe_ctlproc_call_cb(int sig, void *closure)
 	struct safe_ctlproc_s *scp = closure;
 
 	scp->result = sig ? X_EFAULT
-		: scp->ctlproc(api_v4_to_api_x4(scp->apiv4), scp->ctlid, scp->ctlarg);
+		: scp->ctlproc(scp->apiv4, scp->ctlid, scp->ctlarg);
 }
 
 static int safe_ctlproc_call(struct afb_api_v4 *apiv4, struct safe_ctlproc_s *scp)
@@ -169,9 +144,9 @@ static int safe_ctlproc_call(struct afb_api_v4 *apiv4, struct safe_ctlproc_s *sc
 }
 
 int
-afb_api_v4_safe_ctlproc_x4(
+afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
-	int (*ctlproc)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t),
+	int (*ctlproc)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
 	afb_ctlid_t ctlid,
 	afb_ctlarg_t ctlarg
 ) {
@@ -183,132 +158,247 @@ afb_api_v4_safe_ctlproc_x4(
 	return safe_ctlproc_call(apiv4, &scp);
 }
 
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                           C O M M O N
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
-#define CLOSURE_T                        afb_api_x4_t
-#define CLOSURE_TO_COMMON_API(closure)   api_x4_to_api_common(closure)
-#include "afb-api-common.inc"
-#undef CLOSURE_TO_COMMON_API
-#undef CLOSURE_T
-
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                           V 4    S P E C I F I C
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
 /**********************************************
-* normal flow
+* direct flow
 **********************************************/
 
-static
-const char *
-x4_api_name(
-	afb_api_x4_t apix4
+int
+afb_api_v4_logmask(
+	struct afb_api_v4 *apiv4
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
+	return apiv4->logmask;
+}
+
+const char *
+afb_api_v4_name(
+	struct afb_api_v4 *apiv4
+) {
 	return apiv4->comapi.name;
 }
 
-static
 void *
-x4_api_get_userdata(
-	afb_api_x4_t apix4
+afb_api_v4_get_userdata(
+	struct afb_api_v4 *apiv4
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
 	return apiv4->userdata;
 }
 
-static
 void *
-x4_api_set_userdata(
-	afb_api_x4_t apix4,
+afb_api_v4_set_userdata(
+	struct afb_api_v4 *apiv4,
 	void *value
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
 	void *previous = apiv4->userdata;
 	apiv4->userdata = value;
 	return previous;
 }
 
-static
-int
-x4_api_new_data_set(
-	afb_api_x4_t api,
-	afb_data_x4_t *data,
-	afb_type_x4_t type,
-	const void *pointer,
-	size_t size,
-	void (*dispose)(void*),
-	void *closure
+/**********************************************
+* hookable flow
+**********************************************/
+
+void
+afb_api_v4_vverbose_hookable(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char *function,
+	const char *fmt,
+	va_list args
 ) {
-	return afb_data_x4_create_set_x4(data, type, pointer, size, dispose, closure);
+	afb_api_common_vverbose_hookable(&apiv4->comapi, level, file, line, function, fmt, args);
 }
 
-static
 int
-x4_api_new_data_copy(
-	afb_api_x4_t api,
-	afb_data_x4_t *data,
-	afb_type_x4_t type,
-	const void *pointer,
-	size_t size
+afb_api_v4_queue_job_hookable(
+	struct afb_api_v4 *apiv4,
+	void (*callback)(int signum, void *arg),
+	void *argument,
+	void *group,
+	int timeout
 ) {
-	return afb_data_x4_create_copy_x4(data, type, pointer, size);
+	return afb_api_common_queue_job_hookable(&apiv4->comapi, callback, argument, group, timeout);
 }
 
-static
 int
-x4_api_new_data_alloc(
-	afb_api_x4_t api,
-	afb_data_x4_t *data,
-	afb_type_x4_t type,
-	void **pointer,
-	size_t size,
-	int zeroes
+afb_api_v4_require_api_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int initialized
 ) {
-	return afb_data_x4_create_alloc_x4(data, type, pointer, size, zeroes);
+	return afb_api_common_require_api_hookable(&apiv4->comapi, name, initialized);
 }
 
-static
 int
-x4_api_event_broadcast(
-	afb_api_x4_t apix4,
+afb_api_v4_add_alias_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *aliasname
+) {
+	return afb_api_common_add_alias_hookable(&apiv4->comapi, apiname, aliasname);
+}
+
+void
+afb_api_v4_seal_hookable(
+	struct afb_api_v4 *apiv4
+) {
+	afb_api_common_api_seal_hookable(&apiv4->comapi);
+}
+
+int
+afb_api_v4_class_provide_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name
+) {
+	return afb_api_common_class_provide_hookable(&apiv4->comapi, name);
+}
+
+
+int
+afb_api_v4_class_require_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *name
+) {
+	return afb_api_common_class_require_hookable(&apiv4->comapi, name);
+}
+
+struct json_object *
+afb_api_v4_settings_hookable(
+	struct afb_api_v4 *apiv4
+) {
+	return afb_api_common_settings_hookable(&apiv4->comapi);
+}
+
+int
+afb_api_v4_event_broadcast_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *name,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 ) {
-	struct afb_api_common *comapi = api_x4_to_api_common(apix4);
-	return afb_api_common_event_broadcast_x4(comapi, name, nparams, params);
+	return afb_api_common_event_broadcast_hookable(&apiv4->comapi, name, nparams, params);
 }
 
-static
 int
-x4_api_new_event(
-	afb_api_x4_t apix4,
+afb_api_v4_new_event_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *name,
-	afb_event_x4_t *event)
+	struct afb_evt **event)
 {
-	struct afb_api_common *comapi = api_x4_to_api_common(apix4);
 	struct afb_evt *evt;
 	int rc;
 
-	rc = afb_api_common_new_event(comapi, name, &evt);
-	*event = rc < 0 ? NULL : afb_evt_make_x4(evt);
+	rc = afb_api_common_new_event_hookable(&apiv4->comapi, name, &evt);
+	*event = rc < 0 ? NULL : evt;
 	return rc;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+static
+void
+call_x4_cb(
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	int status,
+	unsigned nreplies,
+	struct afb_data * const replies[]
+) {
+	struct afb_api_v4 *apiv4 = closure1;
+	void (*callback)(void*, int, unsigned, struct afb_data * const[], struct afb_api_v4*) = closure2;
+	callback(closure3, status, nreplies, replies, apiv4);
+}
+
+void
+afb_api_v4_call_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[],
+	void (*callback)(
+		void *closure,
+		int status,
+		unsigned nreplies,
+		struct afb_data * const replies[],
+		struct afb_api_v4 *api),
+	void *closure)
+{
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_call)
+		return afb_calls_call_hooking(&apiv4->comapi,
+				apiname, verbname, nparams, params,
+				call_x4_cb, apiv4, callback, closure);
+#endif
+	return afb_calls_call(&apiv4->comapi,
+				apiname, verbname, nparams, params,
+				call_x4_cb, apiv4, callback, closure);
+}
+
+int
+afb_api_v4_call_sync_hookable(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[],
+	int *status,
+	unsigned *nreplies,
+	struct afb_data *replies[]
+) {
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_callsync)
+		return afb_calls_call_sync_hooking(&apiv4->comapi,
+					apiname, verbname, nparams, params,
+					status, nreplies, replies);
+#endif
+	return afb_calls_call_sync(&apiv4->comapi,
+					apiname, verbname, nparams, params,
+					status, nreplies, replies);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static
 int
@@ -322,378 +412,166 @@ preinit_new_api(
 	return safe_ctlproc_call(apiv4, scp);
 }
 
-static
 int
-x4_api_new_api(
-	afb_api_x4_t apix4,
-	afb_api_x4_t *newapix4,
-	const char *name,
+afb_api_v4_new_api_hookable(
+	struct afb_api_v4 *apiv4,
+	struct afb_api_v4 **newapiv4,
+	const char *apiname,
 	const char *info,
 	int noconcurrency,
-	int (*mainctl)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t),
-	void *closure
-) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	struct afb_api_v4 *newapi;
+	int (*mainctl)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
+	void *closure)
+{
 	union afb_ctlarg ctlarg;
 	struct safe_ctlproc_s scp;
-	int rc;
+	int r;
+
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_new_api)
+		afb_hook_api_new_api_before(&apiv4->comapi, apiname, info, noconcurrency);
+#endif
 
 	ctlarg.pre_init.closure = closure;
 	scp.ctlproc = mainctl;
 	scp.ctlarg = &ctlarg;
-	rc = afb_api_v4_create(
-		&newapi,
+	r = afb_api_v4_create(
+		newapiv4,
 		apiv4->comapi.declare_set,
 		apiv4->comapi.call_set,
-		name, Afb_String_Copy,
+		apiname, Afb_String_Copy,
 		info, Afb_String_Copy,
 		noconcurrency,
 		mainctl ? preinit_new_api : NULL, &scp,
 		apiv4->comapi.path, Afb_String_Const);
 
-	*newapix4 = rc >= 0 ? api_v4_to_api_x4(newapi) : NULL;
-	return rc;
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_new_api)
+		r = afb_hook_api_new_api_after(&apiv4->comapi, r, apiname);
+#endif
+
+	return r;
 }
 
-static void call_x4_cb(
-	void *closure1,
-	void *closure2,
-	void *closure3,
-	int status,
-	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
-) {
-	afb_api_x4_t apix4 = closure1;
-	void (*callback)(void*, int, unsigned, const struct afb_data_x4 * const *, afb_api_x4_t) = closure2;
-	callback(closure3, status, nreplies, replies, apix4);
-}
 
-static void x4_api_call(
-	afb_api_x4_t apix4,
-	const char *apiname,
-	const char *verbname,
-	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(
-		void *closure,
-		int status,
-		unsigned nreplies,
-		const struct afb_data_x4 * const*replies,
-		afb_api_x4_t api),
-	void *closure)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	return afb_calls_call_x4(api_v4_to_api_common(apiv4),
-				apiname, verbname, nparams, params,
-				call_x4_cb, (void*)apix4, callback, closure);
-}
-
-static int x4_api_call_sync(
-	afb_api_x4_t apix4,
-	const char *apiname,
-	const char *verbname,
-	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	int *status,
-	unsigned *nreplies,
-	const struct afb_data_x4 **replies
-) {
-	return afb_calls_call_sync_x4(api_x4_to_api_common(apix4),
-					apiname, verbname, nparams, params,
-					status, nreplies, replies);
-}
-
-static
 int
-x4_api_register_type(
-	afb_api_x4_t api,
-	const struct afb_type_x4 *type
-) {
-	return afb_type_register_type_x4(type);
-}
-
-static
-int
-x4_api_set_verbs(
-	afb_api_x4_t apix4,
+afb_api_v4_set_verbs_hookable(
+	struct afb_api_v4 *apiv4,
 	const struct afb_verb_v4 *verbs
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
+	int r;
 
 	if (is_sealed(apiv4))
-		return X_EPERM;
-
-	afb_api_v4_set_verbs_v4(apiv4, verbs);
-	return 0;
+		r = X_EPERM;
+	else {
+		apiv4->verbs.statics = verbs;
+		r = 0;
+	}
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_api_set_verbs)
+		r = afb_hook_api_api_set_verbs_v4(&apiv4->comapi, r, verbs);
+#endif
+	return r;
 }
 
-static
 int
-x4_api_add_verb(
-	afb_api_x4_t apix4,
+afb_api_v4_add_verb_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *verb,
 	const char *info,
-	void (*callback)(afb_req_x4_t req, unsigned nparams, const struct afb_data_x4 * const *params),
+	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
 	void *vcbdata,
 	const struct afb_auth *auth,
 	uint32_t session,
 	int glob
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-
-	if (is_sealed(apiv4))
-		return X_EPERM;
-
-	return afb_api_v4_add_verb(apiv4, verb, info, callback, vcbdata, auth, (uint16_t)session, glob);
+	int r = afb_api_v4_add_verb(apiv4, verb, info, callback, vcbdata, auth, session, glob);
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_api_add_verb)
+		r = afb_hook_api_api_add_verb(&apiv4->comapi, r, verb, info, glob);
+#endif
+	return r;
 }
 
-static
 int
-x4_api_del_verb(
-	afb_api_x4_t apix4,
+afb_api_v4_del_verb_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *verb,
 	void **vcbdata
 ) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-
-	if (is_sealed(apiv4))
-		return X_EPERM;
-
-	return afb_api_v4_del_verb(apiv4, verb, vcbdata);
+	int r = afb_api_v4_del_verb(apiv4, verb, vcbdata);
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_api_del_verb)
+		r = afb_hook_api_api_del_verb(&apiv4->comapi, r, verb);
+#endif
+	return r;
 }
 
-static
 int
-x4_api_event_handler_add(
-	afb_api_x4_t apix4,
+afb_api_v4_delete_api_hookable(
+	struct afb_api_v4 *apiv4
+) {
+	int r;
+
+	r = is_sealed(apiv4) ? X_EPERM : 0;
+
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_delete_api)
+		r = afb_hook_api_delete_api(&apiv4->comapi, r);
+#endif
+	if (r == 0)
+		afb_api_v4_unref(apiv4);
+
+	return r;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int
+afb_api_v4_event_handler_add_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *pattern,
-	void (*callback)(void*,const char*,unsigned,const struct afb_data_x4* const*,afb_api_x4_t),
+	void (*callback)(void*,const char*,unsigned,struct afb_data * const[],struct afb_api_v4*),
 	void *closure
 ) {
-	return afb_api_common_event_handler_add(api_x4_to_api_common(apix4), pattern, callback, closure);
+	int r = afb_api_common_event_handler_add(&apiv4->comapi, pattern, callback, closure);
+
+#if WITH_AFB_HOOK
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_event_handler_add)
+		r = afb_hook_api_event_handler_add(&apiv4->comapi, r, pattern);
+#endif
+
+	return r;
 }
 
-static
 int
-x4_api_event_handler_del(
-	afb_api_x4_t apix4,
+afb_api_v4_event_handler_del_hookable(
+	struct afb_api_v4 *apiv4,
 	const char *pattern,
 	void **closure
 ) {
-	return afb_api_common_event_handler_del(api_x4_to_api_common(apix4), pattern, closure);
-}
+	int r = afb_api_common_event_handler_del(&apiv4->comapi, pattern, closure);
 
-static
-int
-x4_api_delete_api(
-	afb_api_x4_t apix4
-) {
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-
-	if (is_sealed(apiv4))
-		return X_EPERM;
-
-	afb_api_v4_unref(apiv4);
-	return 0;
-}
-
-static const struct afb_api_x4_itf api_x4_itf =
-{
-	.name = x4_api_name,
-	.get_userdata = x4_api_get_userdata,
-	.set_userdata = x4_api_set_userdata,
-
-	.vverbose = common_api_vverbose,
-
-	.settings = common_api_settings,
-
-	.require_api = common_api_require_api,
-	.class_provide = common_api_class_provide,
-	.class_require = common_api_class_require,
-
-	.queue_job = common_api_queue_job,
-
-	.new_data_set = x4_api_new_data_set,
-	.new_data_copy = x4_api_new_data_copy,
-	.new_data_alloc = x4_api_new_data_alloc,
-
-	.event_broadcast = x4_api_event_broadcast,
-	.new_event = x4_api_new_event,
-	.event_handler_add = x4_api_event_handler_add,
-	.event_handler_del = x4_api_event_handler_del,
-
-	.call = x4_api_call,
-	.call_sync = x4_api_call_sync,
-
-	.register_type = x4_api_register_type,
-	.new_api = x4_api_new_api,
-	.add_alias = common_api_add_alias,
-	.delete_api = x4_api_delete_api,
-	.set_verbs = x4_api_set_verbs,
-	.add_verb = x4_api_add_verb,
-	.del_verb = x4_api_del_verb,
-	.seal = common_api_seal,
-};
-
-/**********************************************
-* hooked flow
-**********************************************/
 #if WITH_AFB_HOOK
-static int x4_api_hooked_new_api(
-	afb_api_x4_t apix4,
-	afb_api_x4_t *newapix4,
-	const char *apiname,
-	const char *info,
-	int noconcurrency,
-	int (*mainctl)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t),
-	void *closure)
-{
-	int result;
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	struct afb_api_common *comapi = api_v4_to_api_common(apiv4);
-	afb_hook_api_new_api_before(comapi, apiname, info, noconcurrency);
-	result = x4_api_new_api(apix4, newapix4, apiname, info, noconcurrency, mainctl, closure);
-	afb_hook_api_new_api_after(comapi, result ? 0 : X_ENOMEM, apiname);
-	return result;
-}
-
-static void x4_api_hooked_call(
-	afb_api_x4_t apix4,
-	const char *apiname,
-	const char *verbname,
-	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(
-		void *closure,
-		int status,
-		unsigned nparams,
-		const struct afb_data_x4 * const*params,
-		afb_api_x4_t api),
-	void *closure)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	return afb_calls_call_hookable_x4(api_v4_to_api_common(apiv4),
-				apiname, verbname, nparams, params,
-				call_x4_cb, (void*)apix4, callback, closure);
-}
-
-static int x4_api_hooked_call_sync(
-	afb_api_x4_t apix4,
-	const char *apiname,
-	const char *verbname,
-	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	int *status,
-	unsigned *nreplies,
-	const struct afb_data_x4 **replies
-) {
-	return afb_calls_call_sync_hookable_x4(api_x4_to_api_common(apix4),
-					apiname, verbname, nparams, params,
-					status, nreplies, replies);
-}
-
-static int x4_api_hooked_set_verbs(
-	afb_api_x4_t apix4,
-	const struct afb_verb_v4 *verbs)
-{
-	int result = x4_api_set_verbs(apix4, verbs);
-	return afb_hook_api_api_set_verbs_v4(api_x4_to_api_common(apix4), result, verbs);
-}
-
-static int x4_api_hooked_add_verb(
-	afb_api_x4_t apix4,
-	const char *verb,
-	const char *info,
-	void (*callback)(afb_req_x4_t req, unsigned nparams, const struct afb_data_x4 * const *params),
-	void *vcbdata,
-	const struct afb_auth *auth,
-	uint32_t session,
-	int glob)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	int result = x4_api_add_verb(apix4, verb, info, callback, vcbdata, auth, session, glob);
-	return afb_hook_api_api_add_verb(api_v4_to_api_common(apiv4), result, verb, info, glob);
-}
-
-static int x4_api_hooked_del_verb(
-	afb_api_x4_t apix4,
-	const char *verb,
-	void **vcbdata)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	int result = x4_api_del_verb(apix4, verb, vcbdata);
-	return afb_hook_api_api_del_verb(api_v4_to_api_common(apiv4), result, verb);
-}
-
-static int x4_api_hooked_event_handler_add(
-	afb_api_x4_t apix4,
-	const char *pattern,
-	void (*callback)(void*,const char*,unsigned,const struct afb_data_x4* const*,afb_api_x4_t),
-	void *closure)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	int result = x4_api_event_handler_add(apix4, pattern, callback, closure);
-	return afb_hook_api_event_handler_add(api_v4_to_api_common(apiv4), result, pattern);
-}
-
-static int x4_api_hooked_event_handler_del(
-	afb_api_x4_t apix4,
-	const char *pattern,
-	void **closure)
-{
-	struct afb_api_v4 *apiv4 = api_x4_to_api_v4(apix4);
-	int result = x4_api_event_handler_del(apix4, pattern, closure);
-	return afb_hook_api_event_handler_del(api_v4_to_api_common(apiv4), result, pattern);
-}
-
-static int x4_api_hooked_delete_api(afb_api_x4_t api)
-{
-	struct afb_api_v4 *apiv4 = afb_api_v4_addref(api_x4_to_api_v4(api));
-	int result = x4_api_delete_api(api);
-	result = afb_hook_api_delete_api(api_v4_to_api_common(apiv4), result);
-	afb_api_v4_unref(apiv4);
-	return result;
-}
-
-static const struct afb_api_x4_itf hooked_api_x4_itf = {
-
-	.name = x4_api_name, /* FIXME hooking */
-	.get_userdata = x4_api_get_userdata, /* FIXME hooking */
-	.set_userdata = x4_api_set_userdata, /* FIXME hooking */
-
-	.vverbose = common_api_hooked_vverbose,
-
-	.settings = common_api_hooked_settings,
-
-	.require_api = common_api_hooked_require_api,
-	.class_provide = common_api_hooked_class_provide,
-	.class_require = common_api_hooked_class_require,
-
-	.queue_job = common_api_hooked_queue_job,
-
-	.register_type = x4_api_register_type, /* FIXME hooking */
-	.new_data_set = x4_api_new_data_set, /* FIXME hooking */
-	.new_data_copy = x4_api_new_data_copy, /* FIXME hooking */
-	.new_data_alloc = x4_api_new_data_alloc, /* FIXME hooking */
-
-	.event_broadcast = x4_api_event_broadcast, /* FIXME hooking */
-	.new_event = x4_api_new_event, /* FIXME hooking */
-	.event_handler_add = x4_api_hooked_event_handler_add,
-	.event_handler_del = x4_api_hooked_event_handler_del,
-
-	.call = x4_api_hooked_call,
-	.call_sync = x4_api_hooked_call_sync,
-
-	.new_api = x4_api_hooked_new_api,
-	.add_alias = common_api_hooked_add_alias,
-	.delete_api = x4_api_hooked_delete_api,
-	.set_verbs = x4_api_hooked_set_verbs,
-	.add_verb = x4_api_hooked_add_verb,
-	.del_verb = x4_api_hooked_del_verb,
-	.seal = common_api_hooked_seal,
-};
+	if (apiv4->comapi.hookflags & afb_hook_flag_api_event_handler_del)
+		r = afb_hook_api_event_handler_del(&apiv4->comapi, r, pattern);
 #endif
+
+	return r;
+
+}
+
 
 /******************************************************************************
  ******************************************************************************
@@ -714,17 +592,16 @@ handle_events(
 	const struct afb_evt_data *event,
 	struct afb_api_common *comapi
 ) {
-	void (*cb)(void *, const char*, unsigned, const struct afb_data_x4 * const*, afb_api_x4_t) = callback;
+	void (*cb)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*) = callback;
 	struct afb_api_v4 *apiv4 = api_common_to_afb_api_v4(comapi);
-	afb_api_x4_t apix4 = api_v4_to_api_x4(apiv4);
 
 	if (cb != NULL) {
-		cb(closure, event->name, event->nparams, event->params, apix4);
+		cb(closure, event->name, event->nparams, event->params, apiv4);
 	}
 	else if (apiv4->mainctl != NULL) {
 		union afb_ctlarg arg;
 		arg.orphan_event.name = event->name;
-		apiv4->mainctl(apix4, afb_ctlid_Orphan_Event, &arg);
+		apiv4->mainctl(apiv4, afb_ctlid_Orphan_Event, &arg);
 	}
 }
 
@@ -745,7 +622,7 @@ start_cb(
 ) {
 	struct afb_api_v4 *apiv4 = closure;
 	if (apiv4->mainctl)
-		return apiv4->mainctl(api_v4_to_api_x4(apiv4), afb_ctlid_Init, NULL);
+		return apiv4->mainctl(apiv4, afb_ctlid_Init, NULL);
 	return 0;
 }
 
@@ -758,7 +635,7 @@ api_service_start_cb(
 
 /* FIXME change api_common */
 	return afb_api_common_start(
-		api_v4_to_api_common(apiv4),
+		&apiv4->comapi,
 		start_cb,
 		apiv4);
 }
@@ -766,14 +643,14 @@ api_service_start_cb(
 static void api_process_cb(void *closure, struct afb_req_common *req)
 	__attribute__((alias("afb_api_v4_process_call")));
 
-int afb_api_v4_logmask_get(const struct afb_api_v4 *apiv4)
+int afb_api_v4_logmask_get(struct afb_api_v4 *apiv4)
 {
-	return apiv4->xapi.logmask;
+	return apiv4->logmask;
 }
 
 void afb_api_v4_logmask_set(struct afb_api_v4 *apiv4, int mask)
 {
-	apiv4->xapi.logmask = mask;
+	apiv4->logmask = (int16_t)mask;
 }
 
 #if WITH_AFB_HOOK
@@ -781,7 +658,7 @@ void
 afb_api_v4_update_hooks(
 	struct afb_api_v4 *apiv4
 ) {
-	apiv4->xapi.itf = afb_api_common_update_hook(api_v4_to_api_common(apiv4)) ? &hooked_api_x4_itf : &api_x4_itf;
+	afb_api_common_update_hook(&apiv4->comapi);
 }
 
 static void api_update_hooks_cb(void *closure)
@@ -879,7 +756,7 @@ afb_api_v4_process_call(
 		return;
 	}
 
-	afb_req_common_reply_verb_unknown(req);
+	afb_req_common_reply_verb_unknown_error_hookable(req);
 }
 
 static
@@ -954,7 +831,7 @@ afb_api_v4_addref(
 	struct afb_api_v4 *apiv4
 ) {
 	if (apiv4)
-		afb_api_common_incref(api_v4_to_api_common(apiv4));
+		afb_api_common_incref(&apiv4->comapi);
 	return apiv4;
 }
 
@@ -962,10 +839,10 @@ void
 afb_api_v4_unref(
 	struct afb_api_v4 *apiv4
 ) {
-	if (apiv4 && afb_api_common_decref(api_v4_to_api_common(apiv4))) {
+	if (apiv4 && afb_api_common_decref(&apiv4->comapi)) {
 		if (apiv4->comapi.name != NULL)
 			afb_apiset_del(apiv4->comapi.declare_set, apiv4->comapi.name);
-		afb_api_common_cleanup(api_v4_to_api_common(apiv4));
+		afb_api_common_cleanup(&apiv4->comapi);
 		while (apiv4->dyn_verb_count)
 			free(apiv4->verbs.dynamics[--apiv4->dyn_verb_count]);
 		free(apiv4->verbs.dynamics);
@@ -977,58 +854,46 @@ struct afb_api_common *
 afb_api_v4_get_api_common(
 	struct afb_api_v4 *apiv4
 ) {
-	return api_v4_to_api_common(apiv4);
-}
-
-afb_api_x4_t
-afb_api_v4_get_api_x4(
-	struct afb_api_v4 *apiv4
-) {
-	return api_v4_to_api_x4(apiv4);
+	return &apiv4->comapi;
 }
 
 void
 afb_api_v4_seal(
 	struct afb_api_v4 *apiv4
 ) {
-	afb_api_common_api_seal(api_v4_to_api_common(apiv4));
-}
-
-void
-afb_api_v4_set_verbs_v4(
-	struct afb_api_v4 *api,
-	const struct afb_verb_v4 *verbs
-) {
-	api->verbs.statics = verbs;
+	afb_api_common_api_seal(&apiv4->comapi);
 }
 
 int
 afb_api_v4_add_verb(
-	struct afb_api_v4 *api,
+	struct afb_api_v4 *apiv4,
 	const char *verb,
 	const char *info,
-	void (*callback)(afb_req_x4_t req, unsigned nparams, const struct afb_data_x4 * const *params),
+	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
 	void *vcbdata,
 	const struct afb_auth *auth,
-	uint16_t session,
+	uint32_t session,
 	int glob
 ) {
 	struct afb_verb_v4 *v, **vv;
 	char *txt;
 	int i;
 
-	for (i = 0 ; i < api->dyn_verb_count ; i++) {
-		v = api->verbs.dynamics[i];
+	if (is_sealed(apiv4))
+		return X_EPERM;
+
+	for (i = 0 ; i < apiv4->dyn_verb_count ; i++) {
+		v = apiv4->verbs.dynamics[i];
 		if (glob == v->glob && !namecmp(verb, v->verb)) {
 			/* refuse to redefine a dynamic verb */
 			return X_EEXIST;
 		}
 	}
 
-	vv = realloc(api->verbs.dynamics, (1 + api->dyn_verb_count) * sizeof *vv);
+	vv = realloc(apiv4->verbs.dynamics, (1 + apiv4->dyn_verb_count) * sizeof *vv);
 	if (!vv)
 		return X_ENOMEM;
-	api->verbs.dynamics = vv;
+	apiv4->verbs.dynamics = vv;
 
 	v = malloc(sizeof *v + (1 + strlen(verb)) + (info ? 1 + strlen(info) : 0));
 	if (!v)
@@ -1037,7 +902,7 @@ afb_api_v4_add_verb(
 	v->callback = callback;
 	v->vcbdata = vcbdata;
 	v->auth = auth;
-	v->session = session;
+	v->session = (uint16_t)session;
 	v->glob = !!glob;
 
 	txt = (char*)(v + 1);
@@ -1050,23 +915,26 @@ afb_api_v4_add_verb(
 		strcpy(txt, info);
 	}
 
-	api->verbs.dynamics[api->dyn_verb_count++] = v;
+	apiv4->verbs.dynamics[apiv4->dyn_verb_count++] = v;
 	return 0;
 }
 
 int
 afb_api_v4_del_verb(
-	struct afb_api_v4 *api,
+	struct afb_api_v4 *apiv4,
 	const char *verb,
 	void **vcbdata
 ) {
 	struct afb_verb_v4 *v;
 	int i;
 
-	for (i = 0 ; i < api->dyn_verb_count ; i++) {
-		v = api->verbs.dynamics[i];
+	if (is_sealed(apiv4))
+		return X_EPERM;
+
+	for (i = 0 ; i < apiv4->dyn_verb_count ; i++) {
+		v = apiv4->verbs.dynamics[i];
 		if (!namecmp(verb, v->verb)) {
-			api->verbs.dynamics[i] = api->verbs.dynamics[--api->dyn_verb_count];
+			apiv4->verbs.dynamics[i] = apiv4->verbs.dynamics[--apiv4->dyn_verb_count];
 			if (vcbdata)
 				*vcbdata = v->vcbdata;
 			free(v);
@@ -1090,7 +958,7 @@ afb_api_v4_set_binding_fields(
 	apiv4->mainctl = desc->mainctl;
 
 	rc = 0;
-	comapi = api_v4_to_api_common(apiv4);
+	comapi = &apiv4->comapi;
 	if (desc->provide_class)
 		rc =  afb_api_common_class_provide(comapi, desc->provide_class);
 	if (!rc && desc->require_class)
@@ -1181,7 +1049,7 @@ afb_api_v4_create(
 
 	/* init comapi */
 	afb_api_common_init(
-		api_v4_to_api_common(apiv4),
+		&apiv4->comapi,
 		declare_set, call_set,
 		name, mode_name == Afb_String_Free,
 		info, mode_info == Afb_String_Free,
@@ -1192,8 +1060,6 @@ afb_api_v4_create(
 	/* init xapi */
 #if WITH_AFB_HOOK
 	afb_api_v4_update_hooks(apiv4);
-#else
-	apiv4->xapi.itf = &api_x4_itf;
 #endif
 	afb_api_v4_logmask_set(apiv4, logmask);
 
@@ -1223,7 +1089,7 @@ error3:
 		afb_apiset_del(apiv4->comapi.declare_set, apiv4->comapi.name);
 	}
 error2:
-	afb_api_common_cleanup(api_v4_to_api_common(apiv4));
+	afb_api_common_cleanup(&apiv4->comapi);
 	free(apiv4);
 
 error:

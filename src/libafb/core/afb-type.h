@@ -24,53 +24,73 @@
 #pragma once
 
 struct afb_data;
+struct afb_type;
 
-struct afb_type_x4;
+typedef int (*afb_type_converter_t)(
+			void *closure,
+			struct afb_data *from,
+			struct afb_type *type,
+			struct afb_data **to);
+
+typedef int (*afb_type_updater_t)(
+			void *closure,
+			struct afb_data *from,
+			struct afb_type *type,
+			struct afb_data *to);
+
+extern int afb_type_register(struct afb_type **result, const char *name, int streamable, int shareable, int opaque);
+extern struct afb_type *afb_type_get(const char *name);
+extern const char *afb_type_name(struct afb_type *type);
+
+extern int afb_type_set_family(
+	struct afb_type *type,
+	struct afb_type *family
+);
+
+extern int afb_type_add_converter(
+	struct afb_type *fromtype,
+	struct afb_type *totype,
+	afb_type_converter_t converter,
+	void *closure
+);
+
+extern int afb_type_add_updater(
+	struct afb_type *fromtype,
+	struct afb_type *totype,
+	afb_type_updater_t updater,
+	void *closure
+);
+
+extern struct afb_type afb_type_predefined_opaque;
+extern struct afb_type afb_type_predefined_stringz;
+extern struct afb_type afb_type_predefined_json;
+extern struct afb_type afb_type_predefined_json_c;
 
 /**
- * Register a type of name and returns a numeric id for it.
- * The name is used as a unique identifier to a type.
+ * Is the given type opaque
  *
- * @param type regiter a type
+ * @param type type to test
  *
- * @return the id of the registered type if greater than zero
- * or zero if the type can't be registered.
+ * @return 1 if opaque, 0 if not
  */
-extern int afb_type_register_type_x4(const struct afb_type_x4 *type);
-
-
-/**
- * Get the name of the registered type of id
- *
- * @param id the id of the type
- *
- * @return the name if id is valid or NULL if not valid
- */
-extern const char *afb_type_name_of_id(int id);
-
-/**
- * Check if id is a valid registered type
- *
- * @param id the id to check
- *
- * @return 1 if valid or 0 if not valid
- */
-extern int afb_type_is_valid_id(int id);
-
-/**
- * Get the id of a registered name.
- *
- * @param name the unique name of the type to get
- *
- * @return the id of the registered type if greater than zero
- * or zero if the type isn't registered.
- */
-extern int afb_type_id_of_name(const char *name);
+extern int afb_type_is_opaque(struct afb_type *type);
+extern int afb_type_is_streamable(struct afb_type *type);
+extern int afb_type_is_shareable(struct afb_type *type);
 
 extern
 int
-afb_type_convert_data_x4(
+afb_type_convert_data(
+	struct afb_type *from_type,
 	struct afb_data *from_data,
-	const struct afb_type_x4 *to_type,
+	struct afb_type *to_type,
 	struct afb_data **to_data
+);
+
+extern
+int
+afb_type_update_data(
+	struct afb_type *from_type,
+	struct afb_data *from_data,
+	struct afb_type *to_type,
+	struct afb_data *to_data
 );

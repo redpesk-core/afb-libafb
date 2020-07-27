@@ -77,11 +77,14 @@ struct afb_api_v3
 	/* the common api */
 	struct afb_api_common comapi;
 
+	/* interface with remainers */
+	struct afb_api_x3 xapi;
+
 	/* start function */
-	int (*init)(struct afb_api_x3 *api);
+	int (*init)(struct afb_api_x3 *apix3);
 
 	/* event handling */
-	void (*on_any_event_v3)(struct afb_api_x3 *api, const char *event, struct json_object *object);
+	void (*on_any_event_v3)(struct afb_api_x3 *apix3, const char *event, struct json_object *object);
 
 	/* settings */
 	struct json_object *settings;
@@ -92,9 +95,6 @@ struct afb_api_v3
 		struct afb_verb_v3 **dynamics;
 	} verbs;
 	uint16_t dyn_verb_count;
-
-	/* interface with remainers */
-	struct afb_api_x3 xapi;
 
 	/* strings */
 	char strings[];
@@ -114,12 +114,12 @@ static inline struct afb_api_v3 *api_x3_to_api_v3(const struct afb_api_x3 *apix3
 
 static inline struct afb_api_x3 *api_v3_to_api_x3(const struct afb_api_v3 *apiv3)
 {
-	return (struct afb_api_x3*)&apiv3->xapi; /* remove const on pupose */
+	return (struct afb_api_x3*)&apiv3->xapi; /* remove const on purpose */
 }
 
 static inline struct afb_api_common *api_v3_to_api_common(const struct afb_api_v3 *apiv3)
 {
-	return (struct afb_api_common*)&apiv3->comapi; /* remove const on pupose */
+	return (struct afb_api_common*)&apiv3->comapi; /* remove const on purpose */
 }
 
 static inline struct afb_api_common *api_x3_to_api_common(const struct afb_api_x3 *apix3)
@@ -136,204 +136,226 @@ static inline struct afb_api_x3 *api_common_to_api_x3(const struct afb_api_commo
 
 static inline int is_sealed(const struct afb_api_v3 *apiv3)
 {
-	return afb_api_common_is_sealed(api_v3_to_api_common(apiv3));
-}
-
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                           C O M M O N
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
-#define CLOSURE_T                        struct afb_api_x3 *
-#define CLOSURE_TO_COMMON_API(closure)   api_x3_to_api_common(closure)
-#include "afb-api-common.inc"
-#undef CLOSURE_TO_COMMON_API
-#undef CLOSURE_T
-
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                           V 3    S P E C I F I C
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
-/**********************************************
-* normal flow
-**********************************************/
-static struct sd_event *x3_api_get_event_loop(struct afb_api_x3 *closure)
-{
-#if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
-	return systemd_get_event_loop();
-#else
-	return NULL;
-#endif
-}
-
-static struct sd_bus *x3_api_get_user_bus(struct afb_api_x3 *closure)
-{
-#if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
-	return systemd_get_user_bus();
-#else
-	return NULL;
-#endif
-}
-
-static struct sd_bus *x3_api_get_system_bus(struct afb_api_x3 *closure)
-{
-#if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
-	return systemd_get_system_bus();
-#else
-	return NULL;
-#endif
-}
-
-static int x3_api_rootdir_get_fd(struct afb_api_x3 *closure)
-{
-#if WITH_OPENAT
-	return afb_common_rootdir_get_fd();
-#else
-	return X_ENOTSUP;
-#endif
-}
-
-static int x3_api_rootdir_open_locale(struct afb_api_x3 *closure, const char *filename, int flags, const char *locale)
-{
-	return afb_common_rootdir_open_locale(filename, flags, locale);
+	return afb_api_common_is_sealed(&apiv3->comapi);
 }
 
 static
-struct afb_api_x3 *
-x3_api_new_api(
-	struct afb_api_x3 *closure,
-	const char *name,
-	const char *info,
-	int noconcurrency,
-	int (*preinit)(void*, struct afb_api_x3 *),
-	void *preinit_closure
-) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	struct afb_api_v3 *newapi;
-	int rc;
-
-	rc = afb_api_v3_create(
-		&newapi,
-		apiv3->comapi.declare_set,
-		apiv3->comapi.call_set,
-		name, Afb_String_Copy,
-		info, Afb_String_Copy,
-		noconcurrency,
-		NULL, NULL,
-		apiv3->comapi.path, Afb_String_Const);
-
-	if (rc >= 0 && preinit != NULL) {
-		rc = preinit(preinit_closure, api_v3_to_api_x3(newapi));
-		if (rc < 0)
-			afb_api_v3_unref(newapi);
-	}
-
-	return rc >= 0 ? api_v3_to_api_x3(newapi) : NULL;
-}
-
-/**********************************************
-* hooked flow
-**********************************************/
-#if WITH_AFB_HOOK
-static struct sd_event *x3_api_hooked_get_event_loop(struct afb_api_x3 *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	struct sd_event *r;
-
-	r = x3_api_get_event_loop(closure);
-	return afb_hook_api_get_event_loop(api_v3_to_api_common(apiv3), r);
-}
-
-static struct sd_bus *x3_api_hooked_get_user_bus(struct afb_api_x3 *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	struct sd_bus *r;
-
-	r = x3_api_get_user_bus(closure);
-	return afb_hook_api_get_user_bus(api_v3_to_api_common(apiv3), r);
-}
-
-static struct sd_bus *x3_api_hooked_get_system_bus(struct afb_api_x3 *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	struct sd_bus *r;
-
-	r = x3_api_get_system_bus(closure);
-	return afb_hook_api_get_system_bus(api_v3_to_api_common(apiv3), r);
-}
-
-static int x3_api_hooked_rootdir_get_fd(struct afb_api_x3 *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	int r = x3_api_rootdir_get_fd(closure);
-	return afb_hook_api_rootdir_get_fd(api_v3_to_api_common(apiv3), r);
-}
-
-static int x3_api_hooked_rootdir_open_locale(struct afb_api_x3 *closure, const char *filename, int flags, const char *locale)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	int r = x3_api_rootdir_open_locale(closure, filename, flags, locale);
-	return afb_hook_api_rootdir_open_locale(api_v3_to_api_common(apiv3), filename, flags, locale, r);
-}
-
-static struct afb_api_x3 *x3_api_hooked_new_api(
-		struct afb_api_x3 *closure,
-		const char *api,
-		const char *info,
-		int noconcurrency,
-		int (*preinit)(void*, struct afb_api_x3 *),
-		void *preinit_closure)
-{
-	struct afb_api_x3 *result;
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(closure);
-	afb_hook_api_new_api_before(api_v3_to_api_common(apiv3), api, info, noconcurrency);
-	result = x3_api_new_api(closure, api, info, noconcurrency, preinit, preinit_closure);
-	afb_hook_api_new_api_after(api_v3_to_api_common(apiv3), result ? 0 : X_ENOMEM, api);
-	return result;
-}
-
-#endif
-
-static
-struct afb_event_x2 *
-x3_api_new_event_x2(
+void
+x3_api_vverbose_hookable(
 	struct afb_api_x3 *apix3,
-	const char *name
+	int level,
+	const char *file,
+	int line,
+	const char *function,
+	const char *fmt,
+	va_list args
 ) {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	struct afb_evt *evt;
-	int rc = afb_api_common_new_event(comapi, name, &evt);
-	return rc < 0 ? NULL : afb_evt_make_x2(evt);
+	afb_api_common_vverbose_hookable(comapi, level, file, line, function, fmt, args);
 }
 
 static
 int
-x3_api_event_broadcast(
+x3_api_queue_job_hookable(
+	struct afb_api_x3 * apix3,
+	void (*callback)(int signum, void *arg),
+	void *argument,
+	void *group,
+	int timeout
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_queue_job_hookable(comapi, callback, argument, group, timeout);
+}
+
+static
+int
+x3_api_require_api_hookable(
+	struct afb_api_x3 * apix3,
+	const char *name,
+	int initialized
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_require_api_hookable(comapi, name, initialized);
+}
+
+static
+int
+x3_api_add_alias_hookable(
+	struct afb_api_x3 * apix3,
+	const char *apiname,
+	const char *aliasname
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_add_alias_hookable(comapi, apiname, aliasname);
+}
+
+static
+void
+x3_api_seal_hookable(
+	struct afb_api_x3 * apix3
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	afb_api_common_api_seal_hookable(comapi);
+}
+
+static
+int
+x3_api_class_provide_hookable(
+	struct afb_api_x3 * apix3,
+	const char *name
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_class_provide_hookable(comapi, name);
+}
+
+static
+int
+x3_api_class_require_hookable(
+	struct afb_api_x3 * apix3,
+	const char *name
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_class_require_hookable(comapi, name);
+}
+
+static
+struct json_object *
+x3_api_settings_hookable(
+	struct afb_api_x3 * apix3
+) {
+	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
+	return afb_api_common_settings_hookable(comapi);
+}
+
+static
+struct sd_event *
+x3_api_get_event_loop_hookable(
+	struct afb_api_x3 *apix3
+) {
+	struct sd_event *r;
+
+#if WITH_SYSTEMD
+	afb_sched_acquire_event_manager();
+	r = systemd_get_event_loop();
+#else
+	r = NULL;
+#endif
+#if WITH_AFB_HOOK
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_get_event_loop)
+		r = afb_hook_api_get_event_loop(&apiv3->comapi, r);
+#endif
+	return r;
+}
+
+static
+struct sd_bus *
+x3_api_get_user_bus_hookable(
+	struct afb_api_x3 *apix3
+) {
+	struct sd_bus *r;
+
+#if WITH_SYSTEMD
+	afb_sched_acquire_event_manager();
+	r = systemd_get_user_bus();
+#else
+	r = NULL;
+#endif
+#if WITH_AFB_HOOK
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_get_user_bus)
+		r = afb_hook_api_get_user_bus(&apiv3->comapi, r);
+#endif
+	return r;
+}
+
+static
+struct sd_bus *
+x3_api_get_system_bus_hookable(
+	struct afb_api_x3 *apix3
+) {
+	struct sd_bus *r;
+
+#if WITH_SYSTEMD
+	afb_sched_acquire_event_manager();
+	r = systemd_get_system_bus();
+#else
+	r = NULL;
+#endif
+#if WITH_AFB_HOOK
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_get_system_bus)
+		r = afb_hook_api_get_system_bus(&apiv3->comapi, r);
+#endif
+	return r;
+}
+
+static
+int
+x3_api_rootdir_get_fd_hookable(
+	struct afb_api_x3 *apix3
+) {
+	int r;
+
+#if WITH_OPENAT
+	r = afb_common_rootdir_get_fd();
+#else
+	r = X_ENOTSUP;
+#endif
+#if WITH_AFB_HOOK
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_rootdir_get_fd)
+		r = afb_hook_api_rootdir_get_fd(&apiv3->comapi, r);
+#endif
+	return r;
+}
+
+static
+int
+x3_api_rootdir_open_locale_hookable(
+	struct afb_api_x3 *apix3,
+	const char *filename,
+	int flags,
+	const char *locale
+) {
+	int r;
+
+#if WITH_OPENAT
+	r = afb_common_rootdir_open_locale(filename, flags, locale);
+#else
+	r = X_ENOTSUP;
+#endif
+#if WITH_AFB_HOOK
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_rootdir_open_locale)
+		r = afb_hook_api_rootdir_open_locale(&apiv3->comapi, filename, flags, locale, r);
+#endif
+	return r;
+}
+
+static struct afb_event_x2 *x3_api_new_event_x2_hookable(
+	struct afb_api_x3 *apix3,
+	const char *name
+) {
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	struct afb_evt *evt;
+	int rc;
+
+	rc = afb_api_common_new_event_hookable(&apiv3->comapi, name, &evt);
+	return rc < 0 ? NULL : afb_evt_make_x2(evt);
+}
+
+static int x3_api_event_broadcast_hookable(
 	struct afb_api_x3 *apix3,
 	const char *name,
 	struct json_object *object
-)
-{
-	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	const struct afb_data_x4 *data;
+) {
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	struct afb_data *data;
 	int rc;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, object);
-	return rc < 0 ? rc : afb_api_common_event_broadcast_x4(comapi, name, 1, &data);
+	rc = afb_json_legacy_make_data_json_c(&data, object);
+	return rc < 0 ? rc : afb_api_common_event_broadcast_hookable(&apiv3->comapi, name, 1, &data);
 }
 
 struct x3callcb {
@@ -359,7 +381,7 @@ static void x3_api_call_cb(
 	void *closure3,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 ) {
 	struct x3callcb cc;
 
@@ -370,56 +392,71 @@ static void x3_api_call_cb(
 	afb_json_legacy_do_reply_json_c(&cc, status, nreplies, replies, x3_api_call_cb2);
 }
 
-static void x3_api_call(
-	struct afb_api_x3 *apix3,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	void (*callback)(void*, struct json_object*, const char *error, const char *info, struct afb_api_x3*),
-	void *closure)
+static void x3_api_call_hookable(
+		struct afb_api_x3 *apix3,
+		const char *api,
+		const char *verb,
+		struct json_object *args,
+		void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*),
+		void *closure)
 {
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 	int rc;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
-	if (rc >= 0)
-		afb_calls_call_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+	rc = afb_json_legacy_make_data_json_c(&data, args);
+	if (rc >= 0) {
+#if WITH_AFB_HOOK
+		if (apiv3->comapi.hookflags & afb_hook_flag_api_callsync)
+			afb_calls_call_hooking(&apiv3->comapi, api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+		else
+#endif
+			afb_calls_call(&apiv3->comapi, api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+	}
 	else
 		callback(closure, NULL, "error", NULL, apix3);
 }
 
-static int x3_api_call_sync(
-	struct afb_api_x3 *apix3,
-	const char *api,
-	const char *verb,
-	struct json_object *args,
-	struct json_object **object,
-	char **error,
-	char **info
-) {
+static int x3_api_call_sync_hookable(
+		struct afb_api_x3 *apix3,
+		const char *api,
+		const char *verb,
+		struct json_object *args,
+		struct json_object **object,
+		char **error,
+		char **info)
+{
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	const struct afb_data_x4 *data;
-	const struct afb_data_x4 *replies[3];
+	struct afb_data *data;
+	struct afb_data *replies[3];
 	unsigned nreplies;
 	int rc, status;
 
-	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
+	rc = afb_json_legacy_make_data_json_c(&data, args);
 	if (rc < 0) {
 		*object = 0;
-		*error = strdup(afb_error_text_internal_error);
+		*error = strdup("error");
 		*info = 0;
 	}
 	else {
 		nreplies = 3;
-		rc = afb_calls_call_sync_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, &status, &nreplies, replies);
+#if WITH_AFB_HOOK
+		if (apiv3->comapi.hookflags & afb_hook_flag_api_callsync)
+		{
+			rc = afb_calls_call_sync_hooking(&apiv3->comapi, api, verb, 1, &data, &status, &nreplies, replies);
+		}
+		else
+#endif
+		{
+			rc = afb_calls_call_sync(&apiv3->comapi, api, verb, 1, &data, &status, &nreplies, replies);
+		}
 		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
 		afb_params_unref(nreplies, replies);
 	}
 	return rc;
 }
 
-static void x3_api_legacy_call(
+static void x3_api_legacy_call_hookable(
 		struct afb_api_x3 *apix3,
 		const char *api,
 		const char *verb,
@@ -432,7 +469,7 @@ static void x3_api_legacy_call(
 		callback(closure, X_ENOTSUP, NULL, apix3);
 }
 
-static int x3_api_legacy_call_sync(
+static int x3_api_legacy_call_sync_hookable(
 		struct afb_api_x3 *apix3,
 		const char *api,
 		const char *verb,
@@ -446,33 +483,86 @@ static int x3_api_legacy_call_sync(
 }
 
 static
+struct afb_api_x3 *
+x3_api_new_api_hookable(
+	struct afb_api_x3 *apix3,
+	const char *name,
+	const char *info,
+	int noconcurrency,
+	int (*preinit)(void*, struct afb_api_x3 *),
+	void *preinit_closure
+) {
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	struct afb_api_v3 *newapi;
+	int rc;
+
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_new_api)
+		afb_hook_api_new_api_before(&apiv3->comapi, name, info, noconcurrency);
+#endif
+
+	rc = afb_api_v3_create(
+		&newapi,
+		apiv3->comapi.declare_set,
+		apiv3->comapi.call_set,
+		name, Afb_String_Copy,
+		info, Afb_String_Copy,
+		noconcurrency,
+		NULL, NULL,
+		apiv3->comapi.path, Afb_String_Const);
+
+	if (rc >= 0 && preinit != NULL) {
+		rc = preinit(preinit_closure, api_v3_to_api_x3(newapi));
+		if (rc < 0)
+			afb_api_v3_unref(newapi);
+	}
+
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_new_api)
+		afb_hook_api_new_api_after(&apiv3->comapi, rc, name);
+#endif
+
+	return rc >= 0 ? api_v3_to_api_x3(newapi) : NULL;
+}
+
+static
 int
-x3_api_set_verbs_v2(
-	struct afb_api_x3 *api,
+x3_api_set_verbs_v2_hookable(
+	struct afb_api_x3 *apix3,
 	const struct afb_verb_v2 *verbs
 ) {
+	ERROR("Set verbs v2 is not supported");
 	return X_ENOTSUP;
 }
 
 static
 int
-x3_api_set_verbs(
-	struct afb_api_x3 *api,
+x3_api_set_verbs_hookable(
+	struct afb_api_x3 *apix3,
 	const struct afb_verb_v3 *verbs
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r;
 
 	if (is_sealed(apiv3))
-		return X_EPERM;
+		r = X_EPERM;
+	else {
+		afb_api_v3_set_verbs_v3(apiv3, verbs);
+		r = 0;
+	}
 
-	afb_api_v3_set_verbs_v3(apiv3, verbs);
-	return 0;
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_api_set_verbs)
+		r = afb_hook_api_api_set_verbs_v3(&apiv3->comapi, r, verbs);
+#endif
+	return r;
 }
+
 
 static
 int
-x3_api_add_verb(
-	struct afb_api_x3 *api,
+x3_api_add_verb_hookable(
+	struct afb_api_x3 *apix3,
 	const char *verb,
 	const char *info,
 	void (*callback)(struct afb_req_x2 *req),
@@ -481,366 +571,177 @@ x3_api_add_verb(
 	uint32_t session,
 	int glob
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r;
 
 	if (is_sealed(apiv3))
-		return X_EPERM;
+		r = X_EPERM;
+	else
+		r = afb_api_v3_add_verb(apiv3, verb, info, callback, vcbdata, auth, (uint16_t)session, glob);
 
-	return afb_api_v3_add_verb(apiv3, verb, info, callback, vcbdata, auth, (uint16_t)session, glob);
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_api_add_verb)
+		r = afb_hook_api_api_add_verb(&apiv3->comapi, r, verb, info, glob);
+#endif
+	return r;
 }
 
 static
 int
-x3_api_del_verb(
-	struct afb_api_x3 *api,
+x3_api_del_verb_hookable(
+	struct afb_api_x3 *apix3,
 	const char *verb,
 	void **vcbdata
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r;
 
 	if (is_sealed(apiv3))
-		return X_EPERM;
+		r = X_EPERM;
+	else
+		r = afb_api_v3_del_verb(apiv3, verb, vcbdata);
 
-	return afb_api_v3_del_verb(apiv3, verb, vcbdata);
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_api_del_verb)
+		r = afb_hook_api_api_del_verb(&apiv3->comapi, r, verb);
+#endif
+	return r;
 }
 
 static
 int
-x3_api_set_on_event(
-	struct afb_api_x3 *api,
-	void (*onevent)(struct afb_api_x3 *api, const char *event, struct json_object *object)
+x3_api_set_on_event_hookable(
+	struct afb_api_x3 *apix3,
+	void (*onevent)(struct afb_api_x3 *apix3, const char *event, struct json_object *object)
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r = 0;
+
 	apiv3->on_any_event_v3 = onevent;
-	return 0;
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_api_set_on_event)
+		r = afb_hook_api_api_set_on_event(&apiv3->comapi, r);
+#endif
+	return r;
 }
 
 static
 int
-x3_api_set_on_init(
-	struct afb_api_x3 *api,
-	int (*oninit)(struct afb_api_x3 *api)
+x3_api_set_on_init_hookable(
+	struct afb_api_x3 *apix3,
+	int (*oninit)(struct afb_api_x3 *apix3)
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r;
 
 	if (apiv3->comapi.state != Api_State_Pre_Init) {
 		ERROR("[API %s] Bad call to 'afb_api_x3_on_init', must be in PreInit", apiv3->comapi.name);
-		return X_EINVAL;
+		r = X_EINVAL;
 	}
-
-	apiv3->init  = oninit;
-	return 0;
+	else {
+		apiv3->init  = oninit;
+		r = 0;
+	}
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_api_set_on_init)
+		r = afb_hook_api_api_set_on_init(&apiv3->comapi, r);
+#endif
+	return r;
 }
 
 static
 int
-x3_api_event_handler_add(
-	struct afb_api_x3 *api,
+x3_api_event_handler_add_hookable(
+	struct afb_api_x3 *apix3,
 	const char *pattern,
 	void (*callback)(void *, const char*, struct json_object*, struct afb_api_x3*),
 	void *closure
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	return afb_api_common_event_handler_add(api_v3_to_api_common(apiv3), pattern, callback, closure);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r = afb_api_common_event_handler_add(&apiv3->comapi, pattern, callback, closure);
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_event_handler_add)
+		r = afb_hook_api_event_handler_add(&apiv3->comapi, r, pattern);
+#endif
+	return r;
 }
 
 static
 int
-x3_api_event_handler_del(
-	struct afb_api_x3 *api,
+x3_api_event_handler_del_hookable(
+	struct afb_api_x3 *apix3,
 	const char *pattern,
 	void **closure
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-
-	return afb_api_common_event_handler_del(api_v3_to_api_common(apiv3), pattern, closure);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r = afb_api_common_event_handler_del(&apiv3->comapi, pattern, closure);
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_event_handler_del)
+		r = afb_hook_api_event_handler_del(&apiv3->comapi, r, pattern);
+#endif
+	return r;
 }
-
 static
 int
-x3_api_delete_api(
-	struct afb_api_x3 *api
+x3_api_delete_api_hookable(
+	struct afb_api_x3 *apix3
 ) {
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
+	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
+	int r;
 
 	if (is_sealed(apiv3))
-		return X_EPERM;
-
-	afb_api_v3_unref(apiv3);
-	return 0;
+		r = X_EPERM;
+	else
+		r = 0;
+#if WITH_AFB_HOOK
+	if (apiv3->comapi.hookflags & afb_hook_flag_api_delete_api)
+		r = afb_hook_api_delete_api(&apiv3->comapi, r);
+#endif
+	if (r == 0)
+		afb_api_v3_unref(apiv3);
+	return r;
 }
 
 static const struct afb_api_x3_itf api_x3_itf = {
 
-	.vverbose = (void*)common_api_vverbose,
+	.vverbose = (void*)x3_api_vverbose_hookable,
 
-	.get_event_loop = x3_api_get_event_loop,
-	.get_user_bus = x3_api_get_user_bus,
-	.get_system_bus = x3_api_get_system_bus,
-	.rootdir_get_fd = x3_api_rootdir_get_fd,
-	.rootdir_open_locale = x3_api_rootdir_open_locale,
-	.queue_job = common_api_queue_job,
+	.get_event_loop = x3_api_get_event_loop_hookable,
+	.get_user_bus = x3_api_get_user_bus_hookable,
+	.get_system_bus = x3_api_get_system_bus_hookable,
+	.rootdir_get_fd = x3_api_rootdir_get_fd_hookable,
+	.rootdir_open_locale = x3_api_rootdir_open_locale_hookable,
+	.queue_job = x3_api_queue_job_hookable,
 
-	.require_api = common_api_require_api,
-	.add_alias = common_api_add_alias,
+	.require_api = x3_api_require_api_hookable,
+	.add_alias = x3_api_add_alias_hookable,
 
-	.event_broadcast = x3_api_event_broadcast,
-	.event_make = x3_api_new_event_x2,
+	.event_broadcast = x3_api_event_broadcast_hookable,
+	.event_make = x3_api_new_event_x2_hookable,
 
-	.legacy_call = x3_api_legacy_call,
-	.legacy_call_sync = x3_api_legacy_call_sync,
+	.legacy_call = x3_api_legacy_call_hookable,
+	.legacy_call_sync = x3_api_legacy_call_sync_hookable,
 
-	.api_new_api = x3_api_new_api,
-	.api_set_verbs_v2 = x3_api_set_verbs_v2,
-	.api_add_verb = x3_api_add_verb,
-	.api_del_verb = x3_api_del_verb,
-	.api_set_on_event = x3_api_set_on_event,
-	.api_set_on_init = x3_api_set_on_init,
-	.api_seal = common_api_seal,
-	.api_set_verbs_v3 = x3_api_set_verbs,
-	.event_handler_add = x3_api_event_handler_add,
-	.event_handler_del = x3_api_event_handler_del,
+	.api_new_api = x3_api_new_api_hookable,
+	.api_set_verbs_v2 = x3_api_set_verbs_v2_hookable,
+	.api_add_verb = x3_api_add_verb_hookable,
+	.api_del_verb = x3_api_del_verb_hookable,
+	.api_set_on_event = x3_api_set_on_event_hookable,
+	.api_set_on_init = x3_api_set_on_init_hookable,
+	.api_seal = x3_api_seal_hookable,
+	.api_set_verbs_v3 = x3_api_set_verbs_hookable,
+	.event_handler_add = x3_api_event_handler_add_hookable,
+	.event_handler_del = x3_api_event_handler_del_hookable,
 
-	.call = x3_api_call,
-	.call_sync = x3_api_call_sync,
+	.call = x3_api_call_hookable,
+	.call_sync = x3_api_call_sync_hookable,
 
-	.class_provide = common_api_class_provide,
-	.class_require = common_api_class_require,
+	.class_provide = x3_api_class_provide_hookable,
+	.class_require = x3_api_class_require_hookable,
 
-	.delete_api = x3_api_delete_api,
-	.settings = common_api_settings,
+	.delete_api = x3_api_delete_api_hookable,
+	.settings = x3_api_settings_hookable,
 };
-
-/**********************************************
-* hooked flow
-**********************************************/
-#if WITH_AFB_HOOK
-
-static struct afb_event_x2 *x3_api_hooked_new_event_x2(
-	struct afb_api_x3 *apix3,
-	const char *name
-) {
-	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	struct afb_evt *evt;
-	int rc = afb_api_common_new_event_hookable(comapi, name, &evt);
-	return rc < 0 ? NULL : afb_evt_make_x2(evt);
-}
-
-static int x3_api_hooked_event_broadcast(
-	struct afb_api_x3 *apix3,
-	const char *name,
-	struct json_object *object
-)
-{
-	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	const struct afb_data_x4 *data;
-	int rc;
-
-	rc = afb_json_legacy_make_data_x4_json_c(&data, object);
-	return rc < 0 ? rc : afb_api_common_event_broadcast_hookable_x4(comapi, name, 1, &data);
-}
-
-static void x3_api_hooked_call(
-		struct afb_api_x3 *apix3,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, struct json_object*, const char*, const char*, struct afb_api_x3*),
-		void *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	const struct afb_data_x4 *data;
-	int rc;
-
-	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
-	if (rc >= 0)
-		afb_calls_call_hookable_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
-	else
-		callback(closure, NULL, "error", NULL, apix3);
-}
-
-static int x3_api_hooked_call_sync(
-		struct afb_api_x3 *apix3,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **object,
-		char **error,
-		char **info)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
-	const struct afb_data_x4 *data;
-	const struct afb_data_x4 *replies[3];
-	unsigned nreplies;
-	int rc, status;
-
-	rc = afb_json_legacy_make_data_x4_json_c(&data, args);
-	if (rc < 0) {
-		*object = 0;
-		*error = strdup("error");
-		*info = 0;
-	}
-	else {
-		nreplies = 3;
-		rc = afb_calls_call_sync_hookable_x4(api_v3_to_api_common(apiv3), api, verb, 1, &data, &status, &nreplies, replies);
-		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
-		afb_params_unref(nreplies, replies);
-	}
-	return rc;
-}
-
-
-static void x3_api_hooked_legacy_call(
-		struct afb_api_x3 *apix3,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		void (*callback)(void*, int, struct json_object*, struct afb_api_x3*),
-		void *closure)
-{
-	return x3_api_legacy_call(apix3, api, verb, args, callback, closure);
-}
-
-static int x3_api_hooked_legacy_call_sync(
-		struct afb_api_x3 *apix3,
-		const char *api,
-		const char *verb,
-		struct json_object *args,
-		struct json_object **result)
-{
-	return x3_api_legacy_call_sync(apix3, api, verb, args, result);
-}
-
-static int x3_api_hooked_set_verbs_v2(
-		struct afb_api_x3 *api,
-		const struct afb_verb_v2 *verbs)
-{
-	return X_ENOTSUP;
-}
-
-static int x3_api_hooked_set_verbs(
-		struct afb_api_x3 *api,
-		const struct afb_verb_v3 *verbs)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_set_verbs(api, verbs);
-	return afb_hook_api_api_set_verbs_v3(api_v3_to_api_common(apiv3), result, verbs);
-}
-
-static int x3_api_hooked_add_verb(
-		struct afb_api_x3 *api,
-		const char *verb,
-		const char *info,
-		void (*callback)(struct afb_req_x2 *req),
-		void *vcbdata,
-		const struct afb_auth *auth,
-		uint32_t session,
-		int glob)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_add_verb(api, verb, info, callback, vcbdata, auth, session, glob);
-	return afb_hook_api_api_add_verb(api_v3_to_api_common(apiv3), result, verb, info, glob);
-}
-
-static int x3_api_hooked_del_verb(
-		struct afb_api_x3 *api,
-		const char *verb,
-		void **vcbdata)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_del_verb(api, verb, vcbdata);
-	return afb_hook_api_api_del_verb(api_v3_to_api_common(apiv3), result, verb);
-}
-
-static int x3_api_hooked_api_set_on_event(
-		struct afb_api_x3 *api,
-		void (*onevent)(struct afb_api_x3 *api, const char *event, struct json_object *object))
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_set_on_event(api, onevent);
-	return afb_hook_api_api_set_on_event(api_v3_to_api_common(apiv3), result);
-}
-
-static int x3_api_hooked_api_set_on_init(
-		struct afb_api_x3 *api,
-		int (*oninit)(struct afb_api_x3 *api))
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_set_on_init(api, oninit);
-	return afb_hook_api_api_set_on_init(api_v3_to_api_common(apiv3), result);
-}
-
-static int x3_api_hooked_event_handler_add(
-		struct afb_api_x3 *api,
-		const char *pattern,
-		void (*callback)(void *, const char*, struct json_object*, struct afb_api_x3*),
-		void *closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_event_handler_add(api, pattern, callback, closure);
-	return afb_hook_api_event_handler_add(api_v3_to_api_common(apiv3), result, pattern);
-}
-
-static int x3_api_hooked_event_handler_del(
-		struct afb_api_x3 *api,
-		const char *pattern,
-		void **closure)
-{
-	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(api);
-	int result = x3_api_event_handler_del(api, pattern, closure);
-	return afb_hook_api_event_handler_del(api_v3_to_api_common(apiv3), result, pattern);
-}
-
-static int x3_api_hooked_delete_api(struct afb_api_x3 *api)
-{
-	struct afb_api_v3 *apiv3 = afb_api_v3_addref(api_x3_to_api_v3(api));
-	int result = x3_api_delete_api(api);
-	result = afb_hook_api_delete_api(api_v3_to_api_common(apiv3), result);
-	afb_api_v3_unref(apiv3);
-	return result;
-}
-
-static const struct afb_api_x3_itf hooked_api_x3_itf = {
-
-	.vverbose = common_api_hooked_vverbose,
-
-	.get_event_loop = x3_api_hooked_get_event_loop,
-	.get_user_bus = x3_api_hooked_get_user_bus,
-	.get_system_bus = x3_api_hooked_get_system_bus,
-	.rootdir_get_fd = x3_api_hooked_rootdir_get_fd,
-	.rootdir_open_locale = x3_api_hooked_rootdir_open_locale,
-	.queue_job = common_api_hooked_queue_job,
-
-	.require_api = common_api_hooked_require_api,
-	.add_alias = common_api_hooked_add_alias,
-
-	.event_broadcast = x3_api_hooked_event_broadcast,
-	.event_make = x3_api_hooked_new_event_x2,
-
-	.legacy_call = x3_api_hooked_legacy_call,
-	.legacy_call_sync = x3_api_hooked_legacy_call_sync,
-
-	.api_new_api = x3_api_hooked_new_api,
-	.api_set_verbs_v2 = x3_api_hooked_set_verbs_v2,
-	.api_add_verb = x3_api_hooked_add_verb,
-	.api_del_verb = x3_api_hooked_del_verb,
-	.api_set_on_event = x3_api_hooked_api_set_on_event,
-	.api_set_on_init = x3_api_hooked_api_set_on_init,
-	.api_seal = common_api_hooked_seal,
-	.api_set_verbs_v3 = x3_api_hooked_set_verbs,
-	.event_handler_add = x3_api_hooked_event_handler_add,
-	.event_handler_del = x3_api_hooked_event_handler_del,
-
-	.call = x3_api_hooked_call,
-	.call_sync = x3_api_hooked_call_sync,
-
-	.class_provide = common_api_hooked_class_provide,
-	.class_require = common_api_hooked_class_require,
-
-	.delete_api = x3_api_hooked_delete_api,
-	.settings = common_api_hooked_settings,
-};
-#endif
 
 /******************************************************************************
  ******************************************************************************
@@ -931,7 +832,7 @@ api_service_start_cb(
 	struct afb_api_v3 *apiv3 = closure;
 
 	return afb_api_common_start(
-		api_v3_to_api_common(apiv3),
+		&apiv3->comapi,
 		(int(*)(void*))apiv3->init,
 		api_v3_to_api_x3(apiv3));
 }
@@ -954,7 +855,7 @@ void
 afb_api_v3_update_hooks(
 	struct afb_api_v3 *apiv3
 ) {
-	apiv3->xapi.itf = afb_api_common_update_hook(api_v3_to_api_common(apiv3)) ? &hooked_api_x3_itf : &api_x3_itf;
+	afb_api_common_update_hook(&apiv3->comapi);
 }
 
 static void api_update_hooks_cb(void *closure)
@@ -1052,7 +953,7 @@ afb_api_v3_process_call(
 		return;
 	}
 
-	afb_req_common_reply_verb_unknown(req);
+	afb_req_common_reply_verb_unknown_error_hookable(req);
 }
 
 static
@@ -1127,7 +1028,7 @@ afb_api_v3_addref(
 	struct afb_api_v3 *apiv3
 ) {
 	if (apiv3)
-		afb_api_common_incref(api_v3_to_api_common(apiv3));
+		afb_api_common_incref(&apiv3->comapi);
 	return apiv3;
 }
 
@@ -1135,10 +1036,10 @@ void
 afb_api_v3_unref(
 	struct afb_api_v3 *apiv3
 ) {
-	if (apiv3 && afb_api_common_decref(api_v3_to_api_common(apiv3))) {
+	if (apiv3 && afb_api_common_decref(&apiv3->comapi)) {
 		if (apiv3->comapi.name != NULL)
 			afb_apiset_del(apiv3->comapi.declare_set, apiv3->comapi.name);
-		afb_api_common_cleanup(api_v3_to_api_common(apiv3));
+		afb_api_common_cleanup(&apiv3->comapi);
 		while (apiv3->dyn_verb_count)
 			free(apiv3->verbs.dynamics[--apiv3->dyn_verb_count]);
 		free(apiv3->verbs.dynamics);
@@ -1150,7 +1051,7 @@ struct afb_api_common *
 afb_api_v3_get_api_common(
 	struct afb_api_v3 *apiv3
 ) {
-	return api_v3_to_api_common(apiv3);
+	return &apiv3->comapi;
 }
 
 struct afb_api_x3 *
@@ -1164,7 +1065,7 @@ void
 afb_api_v3_seal(
 	struct afb_api_v3 *apiv3
 ) {
-	afb_api_common_api_seal(api_v3_to_api_common(apiv3));
+	afb_api_common_api_seal(&apiv3->comapi);
 }
 
 void
@@ -1261,11 +1162,11 @@ afb_api_v3_set_binding_fields(
 	apiv3->on_any_event_v3 =  desc->onevent;
 	apiv3->init = desc->init;
 	if (desc->provide_class)
-		rc =  afb_api_common_class_provide(api_v3_to_api_common(apiv3), desc->provide_class);
+		rc =  afb_api_common_class_provide(&apiv3->comapi, desc->provide_class);
 	if (!rc && desc->require_class)
-		rc =  afb_api_common_class_require(api_v3_to_api_common(apiv3), desc->require_class);
+		rc =  afb_api_common_class_require(&apiv3->comapi, desc->require_class);
 	if (!rc && desc->require_api)
-		rc =  afb_api_common_require_api(api_v3_to_api_common(apiv3), desc->require_api, 0);
+		rc =  afb_api_common_require_api(&apiv3->comapi, desc->require_api, 0);
 	return rc;
 }
 
@@ -1380,7 +1281,7 @@ afb_api_v3_create(
 
 	/* init comapi */
 	afb_api_common_init(
-		api_v3_to_api_common(apiv3),
+		&apiv3->comapi,
 		declare_set, call_set,
 		name, mode_name == Afb_String_Free,
 		info, mode_info == Afb_String_Free,
@@ -1390,11 +1291,7 @@ afb_api_v3_create(
 
 	/* init xapi */
 	apiv3->xapi.apiname = apiv3->comapi.name;
-#if WITH_AFB_HOOK
-	afb_api_v3_update_hooks(apiv3);
-#else
 	apiv3->xapi.itf = &api_x3_itf;
-#endif
 	afb_api_v3_logmask_set(apiv3, logmask);
 
 	/* declare the api */
@@ -1423,7 +1320,7 @@ error3:
 		afb_apiset_del(apiv3->comapi.declare_set, apiv3->comapi.name);
 	}
 error2:
-	afb_api_common_cleanup(api_v3_to_api_common(apiv3));
+	afb_api_common_cleanup(&apiv3->comapi);
 	free(apiv3);
 
 error:

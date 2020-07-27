@@ -37,13 +37,11 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#define AFB_BINDING_VERSION 0
-#include <afb/afb-binding.h>
-
 #include "core/afb-hook.h"
 #include "core/afb-hook-flags.h"
 #include "core/afb-cred.h"
 #include "core/afb-data.h"
+#include "core/afb-type.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
@@ -128,24 +126,24 @@ struct afb_trace
 /*****  utility functions                                                  *****/
 /*******************************************************************************/
 
-static struct json_object *json_object_of_data_x4(const struct afb_data_x4 *data)
+static struct json_object *json_object_of_data_x4(struct afb_data *data)
 {
 	int rc;
 	struct afb_data *item;
 	struct json_object *result;
 
-	rc = afb_data_convert_to_x4(afb_data_of_data_x4(data), AFB_TYPE_X4_JSON_C, &item);
+	rc = afb_data_convert_to(data, &afb_type_predefined_json_c, &item);
 	if (rc < 0)
 		result = NULL;
 	else {
-		result = (struct json_object*)afb_data_pointer(item);
+		result = (struct json_object*)afb_data_const_pointer(item);
 		result = json_object_get(result);
 		afb_data_unref(item);
 	}
 	return result;
 }
 
-static struct json_object *json_object_of_dataset(unsigned count, const struct afb_data_x4 * const *dataset)
+static struct json_object *json_object_of_dataset(unsigned count, struct afb_data * const dataset[])
 {
 	unsigned i;
 	struct json_object *result;
@@ -295,7 +293,7 @@ static void hook_req_get(void *closure, const struct afb_hookid *hookid, const s
 						"path", arg.path);
 }
 
-static void hook_req_reply(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_req_reply(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nparams, struct afb_data * const params[])
 {
 	hook_req(closure, hookid, req, "reply", "{si sO?}",
 						"status", status,
@@ -342,7 +340,7 @@ static void hook_req_unsubscribe(void *closure, const struct afb_hookid *hookid,
 					"result", result);
 }
 
-static void hook_req_subcall(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_req_subcall(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
 	hook_req(closure, hookid, req, "subcall", "{ss? ss? sO?}",
 					"api", api,
@@ -350,14 +348,14 @@ static void hook_req_subcall(void *closure, const struct afb_hookid *hookid, con
 					"params", json_object_of_dataset(nparams, params));
 }
 
-static void hook_req_subcall_result(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+static void hook_req_subcall_result(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	hook_req(closure, hookid, req, "subcall_result", "{si sO?}",
 					"status", status,
 					"reply", json_object_of_dataset(nreplies, replies));
 }
 
-static void hook_req_subcallsync(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_req_subcallsync(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
 	hook_req(closure, hookid, req, "subcallsync", "{ss? ss? sO?}",
 					"api", api,
@@ -365,7 +363,7 @@ static void hook_req_subcallsync(void *closure, const struct afb_hookid *hookid,
 					"params", json_object_of_dataset(nparams, params));
 }
 
-static void hook_req_subcallsync_result(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result, int *status, unsigned *nreplies, const struct afb_data_x4 * const *replies)
+static void hook_req_subcallsync_result(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result, int *status, unsigned *nreplies, struct afb_data * const replies[])
 {
 	hook_req(closure, hookid, req, "subcallsync_result",  "{si si sO?}",
 					"result", result,
@@ -478,13 +476,13 @@ static void hook_api(void *closure, const struct afb_hookid *hookid, const struc
 	va_end(ap);
 }
 
-static void hook_api_event_broadcast_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_api_event_broadcast_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, struct afb_data * const params[])
 {
 	hook_api(closure, hookid, comapi, "event_broadcast_before", "{ss sO?}",
 			"name", name, "data", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_event_broadcast_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, const struct afb_data_x4 * const *params, int result)
+static void hook_api_event_broadcast_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, struct afb_data * const params[], int result)
 {
 	hook_api(closure, hookid, comapi, "event_broadcast_after", "{ss sO? si}",
 			"name", name, "data", json_object_of_dataset(nparams, params), "result", result);
@@ -611,37 +609,37 @@ static void hook_api_start_after(void *closure, const struct afb_hookid *hookid,
 	hook_api(closure, hookid, comapi, "start_after", "{si}", "result", status);
 }
 
-static void hook_api_on_event_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evtid, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_api_on_event_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evtid, unsigned nparams, struct afb_data * const params[])
 {
 	hook_api(closure, hookid, comapi, "on_event_before", "{ss si sO*}",
 			"event", event, "id", evtid, "data", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_on_event_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evtid, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_api_on_event_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evtid, unsigned nparams, struct afb_data * const params[])
 {
 	hook_api(closure, hookid, comapi, "on_event_after", "{ss si sO?}",
 			"event", event, "id", evtid, "data", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_call(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_api_call(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
 	hook_api(closure, hookid, comapi, "call", "{ss ss sO?}",
 			"api", api, "verb", verb, "params", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_call_result(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+static void hook_api_call_result(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	hook_api(closure, hookid, comapi, "call_result", "{si sO?}",
 			"status", status, "reply", json_object_of_dataset(nreplies, replies));
 }
 
-static void hook_api_callsync(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_api_callsync(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
 	hook_api(closure, hookid, comapi, "callsync", "{ss ss sO?}",
 			"api", api, "verb", verb, "params", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_callsync_result(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, int *status, unsigned *nreplies, const struct afb_data_x4 * const *replies)
+static void hook_api_callsync_result(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, int *status, unsigned *nreplies, struct afb_data * const replies[])
 {
 	hook_api(closure, hookid, comapi, "callsync_result", "{si si sO?}",
 			"result", result, "status", *status, "reply", json_object_of_dataset(*nreplies, replies));
@@ -719,13 +717,13 @@ static void hook_api_delete_api(void *closure, const struct afb_hookid *hookid, 
 	hook_api(closure, hookid, comapi, "delete_api", "{si}",  "status", result);
 }
 
-static void hook_api_on_event_handler_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, unsigned nparams, const struct afb_data_x4 * const *params, const char *pattern)
+static void hook_api_on_event_handler_before(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, unsigned nparams, struct afb_data * const params[], const char *pattern)
 {
 	hook_api(closure, hookid, comapi, "on_event_handler.before",
 		"{ss ss sO?}", "pattern", pattern, "event", event, "data", json_object_of_dataset(nparams, params));
 }
 
-static void hook_api_on_event_handler_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, unsigned nparams, const struct afb_data_x4 * const *params, const char *pattern)
+static void hook_api_on_event_handler_after(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int event_x2, unsigned nparams, struct afb_data * const params[], const char *pattern)
 {
 	hook_api(closure, hookid, comapi, "on_event_handler.after",
 		"{ss ss sO?}", "pattern", pattern, "event", event, "data", json_object_of_dataset(nparams, params));
@@ -798,23 +796,23 @@ static void hook_evt_create(void *closure, const struct afb_hookid *hookid, cons
 	hook_evt(closure, hookid, evt, id, "create", NULL);
 }
 
-static void hook_evt_push_before(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_evt_push_before(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[])
 {
 	hook_evt(closure, hookid, evt, id, "push_before", "{sO*}", "data", json_object_of_dataset(nparams, params));
 }
 
 
-static void hook_evt_push_after(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, const struct afb_data_x4 * const *params, int result)
+static void hook_evt_push_after(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[], int result)
 {
 	hook_evt(closure, hookid, evt, id, "push_after", "{sO* si}", "data", json_object_of_dataset(nparams, params), "result", result);
 }
 
-static void hook_evt_broadcast_before(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, const struct afb_data_x4 * const *params)
+static void hook_evt_broadcast_before(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[])
 {
 	hook_evt(closure, hookid, evt, id, "broadcast_before", "{sO*}", "data", json_object_of_dataset(nparams, params));
 }
 
-static void hook_evt_broadcast_after(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, const struct afb_data_x4 * const *params, int result)
+static void hook_evt_broadcast_after(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[], int result)
 {
 	hook_evt(closure, hookid, evt, id, "broadcast_after", "{sO* si}", "data", json_object_of_dataset(nparams, params), "result", result);
 }
@@ -1549,7 +1547,7 @@ int afb_trace_add(struct afb_req_common *req, struct json_object *args, struct a
 	if (!context.errors)
 		return 0;
 
-	afb_json_legacy_req_reply(req, NULL, "error-detected", context.errors);
+	afb_json_legacy_req_reply_hookable(req, NULL, "error-detected", context.errors);
 	free(context.errors);
 	return -1;
 }
@@ -1583,7 +1581,7 @@ int afb_trace_drop(struct afb_req_common *req, struct json_object *args, struct 
 			"uuid", &uuids);
 
 	if (rc < 0 || !(events || tags || uuids)) {
-		afb_json_legacy_req_reply(req, NULL, "error-detected", "bad drop arguments");
+		afb_json_legacy_req_reply_hookable(req, NULL, "error-detected", "bad drop arguments");
 		return -1;
 	}
 
@@ -1605,7 +1603,7 @@ int afb_trace_drop(struct afb_req_common *req, struct json_object *args, struct 
 	if (!context.errors)
 		return 0;
 
-	afb_json_legacy_req_reply(req, NULL, "error-detected", context.errors);
+	afb_json_legacy_req_reply_hookable(req, NULL, "error-detected", context.errors);
 	free(context.errors);
 	return -1;
 }

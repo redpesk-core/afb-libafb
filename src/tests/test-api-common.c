@@ -81,8 +81,7 @@ START_TEST (test_init)
 #endif
 
 #if WITH_AFB_HOOK
-	ck_assert_int_eq(0, comapi->hookditf);
-	ck_assert_int_eq(0, comapi->hooksvc);
+	ck_assert_int_eq(0, comapi->hookflags);
 #endif
 
 	ck_assert_int_eq(0, comapi->sealed);

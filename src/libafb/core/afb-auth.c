@@ -27,7 +27,7 @@
 
 #include <json-c/json.h>
 #include <afb/afb-auth.h>
-#include <afb/afb-session-x2.h>
+#include <afb/afb-session.h>
 
 #include "core/afb-auth.h"
 
@@ -102,17 +102,14 @@ struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t sessi
 {
 	struct json_object *result = NULL;
 
-	if (session & AFB_SESSION_CLOSE_X2)
+	if (session & AFB_SESSION_CLOSE)
 		result = addperm_key_valstr(result, "session", "close");
 
-	if (session & AFB_SESSION_CHECK_X2)
+	if (session & AFB_SESSION_CHECK)
 		result = addperm_key_valstr(result, "session", "check");
 
-	if (session & AFB_SESSION_REFRESH_X2)
-		result = addperm_key_valstr(result, "token", "refresh");
-
-	if (session & AFB_SESSION_LOA_MASK_X2)
-		result = addperm_key_valint(result, "LOA", session & AFB_SESSION_LOA_MASK_X2);
+	if (session & AFB_SESSION_LOA_MASK)
+		result = addperm_key_valint(result, "LOA", session & AFB_SESSION_LOA_MASK);
 
 	if (auth)
 		result = addauth(result, auth);

@@ -25,19 +25,18 @@
 
 struct afb_api_common;
 struct afb_req_common;
-struct afb_dataset;
-struct afb_data_x4;
+struct afb_data;
 
 /******************************************************************************/
 extern
 void
-afb_calls_call_x4(
+afb_calls_call(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
+	struct afb_data * const params[],
+	void (*callback)(void*, void*, void*, int, unsigned, struct afb_data * const[]),
 	void *closure1,
 	void *closure2,
 	void *closure3
@@ -45,26 +44,26 @@ afb_calls_call_x4(
 
 extern
 int
-afb_calls_call_sync_x4(
+afb_calls_call_sync(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
+	struct afb_data * const params[],
 	int *status,
 	unsigned *nreplies,
-	const struct afb_data_x4 **replies
+	struct afb_data *replies[]
 );
 
 extern
 void
-afb_calls_subcall_x4(
+afb_calls_subcall(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
+	struct afb_data * const params[],
+	void (*callback)(void*, void*, void*, int, unsigned, struct afb_data * const[]),
 	void *closure1,
 	void *closure2,
 	void *closure3,
@@ -74,15 +73,15 @@ afb_calls_subcall_x4(
 
 extern
 int
-afb_calls_subcall_sync_x4(
+afb_calls_subcall_sync(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
+	struct afb_data * const params[],
 	int *status,
 	unsigned *nreplies,
-	const struct afb_data_x4 **replies,
+	struct afb_data *replies[],
 	struct afb_req_common *comreq,
 	int flags
 );
@@ -91,13 +90,13 @@ afb_calls_subcall_sync_x4(
 #if WITH_AFB_HOOK
 extern
 void
-afb_calls_call_hookable_x4(
+afb_calls_call_hooking(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
+	struct afb_data * const params[],
+	void (*callback)(void*, void*, void*, int, unsigned, struct afb_data * const[]),
 	void *closure1,
 	void *closure2,
 	void *closure3
@@ -105,26 +104,26 @@ afb_calls_call_hookable_x4(
 
 extern
 int
-afb_calls_call_sync_hookable_x4(
+afb_calls_call_sync_hooking(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
+	struct afb_data * const params[],
 	int *status,
 	unsigned *nreplies,
-	const struct afb_data_x4 **replies
+	struct afb_data *replies[]
 );
 
 extern
 void
-afb_calls_subcall_hookable_x4(
+afb_calls_subcall_hooking(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
-	void (*callback)(void*, void*, void*, int, unsigned, const struct afb_data_x4 * const*),
+	struct afb_data * const params[],
+	void (*callback)(void*, void*, void*, int, unsigned, struct afb_data * const[]),
 	void *closure1,
 	void *closure2,
 	void *closure3,
@@ -134,15 +133,15 @@ afb_calls_subcall_hookable_x4(
 
 extern
 int
-afb_calls_subcall_sync_hookable_x4(
+afb_calls_subcall_sync_hooking(
 	struct afb_api_common *comapi,
 	const char *api,
 	const char *verb,
 	unsigned nparams,
-	const struct afb_data_x4 * const*params,
+	struct afb_data * const params[],
 	int *status,
 	unsigned *nreplies,
-	const struct afb_data_x4 **replies,
+	struct afb_data *replies[],
 	struct afb_req_common *comreq,
 	int flags
 );

@@ -143,7 +143,7 @@ INSTALL(FILES
 	DESTINATION
 		${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
-CONFIGURE_FILE(libafb.pc.in libafb-static.pc @ONLY)
+CONFIGURE_FILE(libafb-static.pc.in libafb-static.pc @ONLY)
 INSTALL(FILES
 		${CMAKE_CURRENT_BINARY_DIR}/libafb-static.pc
 	DESTINATION

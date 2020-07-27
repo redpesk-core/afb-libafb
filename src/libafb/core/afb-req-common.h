@@ -31,18 +31,17 @@ struct afb_evt;
 struct afb_cred;
 struct afb_apiset;
 struct afb_api_item;
-struct afb_dataset;
+struct afb_data;
 
 struct afb_auth;
 struct afb_event_x2;
-struct afb_data_x4;
 
 #define REQ_COMMON_NPARAMS_MAX  8
 #define REQ_COMMON_NREPLIES_MAX 8
 
 struct afb_req_common_query_itf
 {
-	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, const struct afb_data_x4 * const *replies);
+	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[]);
 	void (*unref)(struct afb_req_common *req);
 	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
@@ -85,7 +84,7 @@ struct afb_req_common
 	unsigned nparams;
 
 	/** the replies */
-	const struct afb_data_x4 *params[REQ_COMMON_NPARAMS_MAX];
+	struct afb_data *params[REQ_COMMON_NPARAMS_MAX];
 
 #if WITH_REPLY_JOB
 	/** the reply */
@@ -95,27 +94,27 @@ struct afb_req_common
 	unsigned nreplies;
 
 	/** the replies */
-	const struct afb_data_x4 *replies[REQ_COMMON_NREPLIES_MAX];
+	struct afb_data *replies[REQ_COMMON_NREPLIES_MAX];
 #endif
 };
 
 /* initialisation and processing of req */
 
-extern int afb_req_common_reply_out_of_memory(struct afb_req_common *req);
+extern int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_internal_error(struct afb_req_common *req);
+extern int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_unavailable(struct afb_req_common *req);
+extern int afb_req_common_reply_unavailable_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_api_unknown(struct afb_req_common *req);
+extern int afb_req_common_reply_api_unknown_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_api_bad_state(struct afb_req_common *req);
+extern int afb_req_common_reply_api_bad_state_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_verb_unknown(struct afb_req_common *req);
+extern int afb_req_common_reply_verb_unknown_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_invalid_token(struct afb_req_common *req);
+extern int afb_req_common_reply_invalid_token_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_insufficient_scope(struct afb_req_common *req, const char *scope);
+extern int afb_req_common_reply_insufficient_scope_error_hookable(struct afb_req_common *req, const char *scope);
 
 extern const char *afb_req_common_on_behalf_cred_export(struct afb_req_common *req);
 
@@ -127,7 +126,17 @@ afb_req_common_init(
 	const char *apiname,
 	const char *verbname,
 	unsigned nparams,
-	const struct afb_data_x4 * const *params
+	struct afb_data * const params[]
+);
+
+extern
+void
+afb_req_common_prepare_forwarding(
+	struct afb_req_common *req,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[]
 );
 
 extern
@@ -236,27 +245,6 @@ afb_req_common_unref(
 );
 
 extern
-void
-afb_req_common_vverbose(
-	struct afb_req_common *req,
-	int level,
-	const char *file,
-	int line,
-	const char *func,
-	const char *fmt,
-	va_list args
-);
-
-extern
-void
-afb_req_common_reply(
-	struct afb_req_common *req,
-	int status,
-	unsigned nparams,
-	const struct afb_data_x4 * const *params
-);
-
-extern
 int
 afb_req_common_subscribe(
 	struct afb_req_common *req,
@@ -270,53 +258,7 @@ afb_req_common_unsubscribe(
 	struct afb_evt *evt
 );
 
-extern
-void *
-afb_req_common_cookie(
-	struct afb_req_common *req,
-	void *(*maker)(void*),
-	void (*freeer)(void*),
-	void *closure,
-	int replace
-);
-
-extern
-int
-afb_req_common_session_set_LOA(
-	struct afb_req_common *req,
-	unsigned level
-);
-
-extern
-void
-afb_req_common_session_close(
-	struct afb_req_common *req
-);
-
-extern
-struct json_object *
-afb_req_common_get_client_info(
-	struct afb_req_common *req
-);
-
-void
-afb_req_common_check_permission(
-	struct afb_req_common *req,
-	const char *permission,
-	void (*callback)(void *, int),
-	void *closure
-);
-
-extern
-int
-afb_req_common_has_permission(
-	struct afb_req_common *req,
-	const char *permission
-);
-
 /******************************************************************************/
-
-#if WITH_AFB_HOOK
 
 extern
 void
@@ -324,7 +266,7 @@ afb_req_common_reply_hookable(
 	struct afb_req_common *req,
 	int status,
 	unsigned nparams,
-	const struct afb_data_x4 **params
+	struct afb_data * const params[]
 );
 
 extern
@@ -385,6 +327,17 @@ afb_req_common_has_permission_hookable(
 );
 
 extern
+void
+afb_req_common_check_permission_hookable(
+	struct afb_req_common *req,
+	const char *permission,
+	void (*callback)(void*,int,void*,void*),
+	void *closure1,
+	void *closure2,
+	void *closure3
+);
+
+extern
 void *
 afb_req_common_cookie_hookable(
 	struct afb_req_common *req,
@@ -399,7 +352,5 @@ struct json_object *
 afb_req_common_get_client_info_hookable(
 	struct afb_req_common *req
 );
-
-#endif
 
 /******************************************************************************/

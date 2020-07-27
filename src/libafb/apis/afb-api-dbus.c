@@ -33,8 +33,6 @@
 #include <systemd/sd-bus.h>
 
 #include <afb/afb-event-x2.h>
-#include <afb/afb-data-x4.h>
-#include <afb/afb-type-x4.h>
 
 #include "core/afb-session.h"
 #include "core/afb-json-legacy.h"
@@ -42,6 +40,7 @@
 #include "core/afb-apiset.h"
 #include "apis/afb-api-dbus.h"
 #include "core/afb-cred.h"
+#include "core/afb-type.h"
 #include "core/afb-data.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
@@ -295,7 +294,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	int rc;
 	struct dbus_memo *memo;
 	const char *json, *error, *info;
-	const struct afb_data_x4 *params[3];
+	struct afb_data *params[3];
 
 	/* retrieve the recorded data */
 	memo = userdata;
@@ -304,22 +303,22 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	rc = sd_bus_message_read(message, "sss", &json, &error, &info);
 	if (rc < 0) {
 		/* failing to have the answer */
-		afb_req_common_reply_internal_error(memo->comreq);
+		afb_req_common_reply_internal_error_hookable(memo->comreq);
 	} else {
 		/* build the reply */
 		json = *json ? json : 0;
 		error = *error ? error : 0;
 		info = *info ? info : 0;
 		sd_bus_message_ref(sd_bus_message_ref(sd_bus_message_ref(message)));
-		rc = afb_json_legacy_make_reply_json_string_x4(params,
+		rc = afb_json_legacy_make_reply_json_string(params,
 				json, (void*)sd_bus_message_unref, message,
 				error, (void*)sd_bus_message_unref, message,
 				info, (void*)sd_bus_message_unref, message);
 		if (rc < 0) {
 			/* failing to have the answer */
-			afb_req_common_reply_internal_error(memo->comreq);
+			afb_req_common_reply_internal_error_hookable(memo->comreq);
 		} else {
-			afb_req_common_reply(memo->comreq, LEGACY_STATUS(error), 3, params);
+			afb_req_common_reply_hookable(memo->comreq, LEGACY_STATUS(error), 3, params);
 		}
 	}
 	api_dbus_client_memo_destroy(memo);
@@ -341,7 +340,7 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 	/* create the recording data */
 	memo = api_dbus_client_memo_make(api, comreq);
 	if (memo == NULL) {
-		afb_req_common_reply_out_of_memory(memo->comreq);
+		afb_req_common_reply_out_of_memory_error_hookable(memo->comreq);
 		return;
 	}
 
@@ -354,11 +353,11 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 	creds = afb_req_common_on_behalf_cred_export(comreq) ?: "";
 	uuid = afb_session_uuid(comreq->session);
 	if (comreq->nparams < 1
-	 || afb_data_convert_to_x4(afb_data_of_data_x4(comreq->params[0]), AFB_TYPE_X4_JSON, &arg) < 0) {
-		 json = "null";
+	 || afb_data_convert_to(comreq->params[0], &afb_type_predefined_json, &arg) < 0) {
+		json = "null";
 	}
 	else {
-		json = afb_data_pointer(arg);
+		json = afb_data_const_pointer(arg);
 	}
 	rc = sd_bus_message_append(msg, "ssus", json, uuid, 0, creds);
 	if (rc < 0)
@@ -376,7 +375,7 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 error:
 	/* if there was an error report it directly */
 	errno = -rc;
-	afb_req_common_reply_internal_error(memo->comreq);
+	afb_req_common_reply_internal_error_hookable(memo->comreq);
 	api_dbus_client_memo_destroy(memo);
 end:
 	afb_data_unref(arg);
@@ -386,7 +385,7 @@ end:
 /* receives broadcasted events */
 static int api_dbus_client_on_broadcast_event(sd_bus_message *m, void *userdata, sd_bus_error *ret_error)
 {
-	const struct afb_data_x4 *param;
+	struct afb_data *param;
 	const char *event, *data;
 	const unsigned char *uuid;
 	size_t szuuid;
@@ -397,10 +396,11 @@ static int api_dbus_client_on_broadcast_event(sd_bus_message *m, void *userdata,
 		ERROR("unreadable broadcasted event");
 	else {
 		data = *data ? data : "null";
-		rc = afb_data_x4_create_set_x4(&param, AFB_TYPE_X4_JSON, data, 1+strlen(data),
+		rc = afb_data_create_raw(&param, &afb_type_predefined_json, data, 1+strlen(data),
 						(void*)sd_bus_message_unref, sd_bus_message_ref(m));
-		if (rc >= 0)
-			afb_evt_rebroadcast_name_x4(event, 1, &param, uuid, hop);
+		if (rc >= 0) {
+			afb_evt_rebroadcast_name_hookable(event, 1, &param, uuid, hop);
+		}
 	}
 	return 1;
 }
@@ -476,7 +476,7 @@ static void api_dbus_client_event_drop(struct api_dbus *api, int id, const char 
 static void api_dbus_client_event_push(struct api_dbus *api, int id, const char *name, const char *data, sd_bus_message *m)
 {
 	int rc;
-	const struct afb_data_x4 *param;
+	struct afb_data *param;
 	struct dbus_event *ev;
 
 	/* retrieves the event */
@@ -487,10 +487,11 @@ static void api_dbus_client_event_push(struct api_dbus *api, int id, const char 
 	}
 
 	data = *data ? data : "null";
-	rc = afb_data_x4_create_set_x4(&param, AFB_TYPE_X4_JSON, data, 1+strlen(data),
+	rc = afb_data_create_raw(&param, &afb_type_predefined_json, data, 1+strlen(data),
 					(void*)sd_bus_message_unref, sd_bus_message_ref(m));
-	if (rc >= 0)
-		afb_evt_push_x4(ev->event, 1, &param);
+	if (rc >= 0) {
+		afb_evt_push(ev->event, 1, &param);
+	}
 }
 
 /* subscribes an event */
@@ -862,7 +863,7 @@ void dbus_req_raw_reply_cb(void *closure, const char *object, const char *error,
 		ERROR("sending the reply failed");
 }
 
-void dbus_req_raw_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+void dbus_req_raw_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	afb_json_legacy_do_reply_json_string(comreq, status, nreplies, replies, dbus_req_raw_reply_cb);
 }
@@ -986,7 +987,7 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 	struct api_dbus *api = userdata;
 	uint32_t flags;
 	struct listener *listener;
-	const struct afb_data_x4 *arg;
+	struct afb_data *arg;
 	struct afb_session *session;
 
 	/* check the interface */
@@ -1013,7 +1014,7 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 	if (listener == NULL)
 		goto out_of_memory;
 
-	rc = afb_data_x4_create_set_x4(&arg, AFB_TYPE_X4_JSON, request, 1+strlen(request),
+	rc = afb_data_create_raw(&arg, &afb_type_predefined_json, request, 1+strlen(request),
 					(void*)sd_bus_message_unref, sd_bus_message_ref(message));
 	if (rc < 0)
 		goto out_of_memory;

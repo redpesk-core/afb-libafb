@@ -91,10 +91,10 @@ async_cb_status_final(
 
 static int reply_error2(struct afb_req_common *req, int status, const char *text, const char *arg)
 {
-	const struct afb_data_x4 *reply[3];
+	struct afb_data *reply[3];
 
 	/* FIXME */
-	afb_json_legacy_make_reply_json_c_x4(reply, 0, text, 0, 0, arg, 0, 0);
+	afb_json_legacy_make_reply_json_c(reply, 0, text, 0, 0, arg, 0, 0);
 	afb_req_common_reply_hookable(req, status, 3, reply);
 	return status;
 }
@@ -104,42 +104,42 @@ static int reply_error(struct afb_req_common *req, int status, const char *text)
 	return reply_error2(req, status, text, NULL);
 }
 
-int afb_req_common_reply_out_of_memory(struct afb_req_common *req)
+int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
 
-int afb_req_common_reply_internal_error(struct afb_req_common *req)
+int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
 
-int afb_req_common_reply_unavailable(struct afb_req_common *req)
+int afb_req_common_reply_unavailable_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_ENOMEM, afb_error_text_not_available);
 }
 
-int afb_req_common_reply_api_unknown(struct afb_req_common *req)
+int afb_req_common_reply_api_unknown_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_EINVAL, afb_error_text_unknown_api);
 }
 
-int afb_req_common_reply_api_bad_state(struct afb_req_common *req)
+int afb_req_common_reply_api_bad_state_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_EINVAL, afb_error_text_not_available);
 }
 
-int afb_req_common_reply_verb_unknown(struct afb_req_common *req)
+int afb_req_common_reply_verb_unknown_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_EINVAL, afb_error_text_unknown_verb);
 }
 
-int afb_req_common_reply_invalid_token(struct afb_req_common *req)
+int afb_req_common_reply_invalid_token_error_hookable(struct afb_req_common *req)
 {
 	return reply_error(req, X_EPERM, afb_error_text_invalid_token);
 }
 
-int afb_req_common_reply_insufficient_scope(struct afb_req_common *req, const char *scope)
+int afb_req_common_reply_insufficient_scope_error_hookable(struct afb_req_common *req, const char *scope)
 {
 	return reply_error2(req, X_EPERM, afb_error_text_insufficient_scope, scope);
 }
@@ -185,6 +185,25 @@ afb_req_common_async_push2(
 	return 1;
 }
 
+int
+afb_req_common_async_push3(
+	struct afb_req_common *req,
+	void *value1,
+	void *value2,
+	void *value3
+) {
+	unsigned i = req->asyncount;
+
+	if (i + 2 >= (sizeof req->asyncitems / sizeof req->asyncitems[0]))
+		return 0;
+
+	req->asyncitems[i] = value1;
+	req->asyncitems[i + 1] = value2;
+	req->asyncitems[i + 2] = value3;
+	req->asyncount = (uint16_t)((i + 3) & 15);
+	return 1;
+}
+
 void*
 afb_req_common_async_pop(
 	struct afb_req_common *req
@@ -206,11 +225,26 @@ afb_req_common_init(
 	const char *apiname,
 	const char *verbname,
 	unsigned nparams,
-	const struct afb_data_x4 * const *params
+	struct afb_data * const params[]
 ) {
 	memset(req, 0, sizeof *req);
 	req->refcount = 1;
 	req->queryitf = queryitf;
+	req->apiname = apiname;
+	req->verbname = verbname;
+	req->nparams = nparams;
+	memcpy(req->params, params, nparams * sizeof *params);
+}
+
+void
+afb_req_common_prepare_forwarding(
+	struct afb_req_common *req,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[]
+) {
+	afb_params_unref(req->nparams, req->params);
 	req->apiname = apiname;
 	req->verbname = verbname;
 	req->nparams = nparams;
@@ -306,7 +340,7 @@ static void req_common_process_async_cb(int signum, void *arg)
 	if (signum != 0) {
 		/* emit the error (assumes that hooking is initialised) */
 		ERROR("received signal %d (%s) when processing request", signum, strsignal(signum));
-		afb_req_common_reply_internal_error(req);
+		afb_req_common_reply_internal_error_hookable(req);
 	} else {
 		/* invoke api call method to process the x2 */
 		api = req->api;
@@ -325,7 +359,7 @@ static void req_common_process_api(struct afb_req_common *req, int timeout)
 	if (rc < 0) {
 		/* TODO: allows or not to proccess it directly as when no threading? (see above) */
 		ERROR("can't process job with threads: %s", strerror(-rc));
-		afb_req_common_reply_internal_error(req);
+		afb_req_common_reply_internal_error_hookable(req);
 		afb_req_common_unref(req);
 	}
 }
@@ -350,10 +384,10 @@ static void req_common_process_internal(struct afb_req_common *req, struct afb_a
 		req_common_process_api(req, afb_apiset_timeout_get(apiset));
 	}
 	else if (rc == X_ENOENT) {
-		afb_req_common_reply_api_unknown(req);
+		afb_req_common_reply_api_unknown_error_hookable(req);
 	}
 	else {
-		afb_req_common_reply_api_bad_state(req);
+		afb_req_common_reply_api_bad_state_error_hookable(req);
 	}
 	afb_req_common_unref(req);
 }
@@ -396,7 +430,7 @@ process_on_behalf_cb(
 		req_common_process_internal(req, apiset);
 	}
 	else {
-		afb_req_common_reply_insufficient_scope(req, NULL);
+		afb_req_common_reply_insufficient_scope_error_hookable(req, NULL);
 		afb_cred_unref(cred);
 		afb_req_common_unref(req);
 	}
@@ -437,10 +471,10 @@ afb_req_common_process_on_behalf(
 		afb_cred_unref(cred);
 	}
 	else {
-		afb_req_common_check_permission(req, afb_permission_on_behalf_credential, process_on_behalf_cb, req);
+		afb_perm_check_req_async(req, afb_permission_on_behalf_credential, process_on_behalf_cb, req);
 		return;
 	}
-	afb_req_common_reply_internal_error(req);
+	afb_req_common_reply_internal_error_hookable(req);
 	afb_req_common_unref(req);
 #endif
 }
@@ -499,7 +533,7 @@ static void check_and_set_final(
 ) {
 	if (status <= 0) {
 		/* TODO FIXME report consistent error: scope/invalid... */
-		afb_req_common_reply_insufficient_scope(req, NULL);
+		afb_req_common_reply_insufficient_scope_error_hookable(req, NULL);
 	}
 	async_cb_status_final(req, status);
 }
@@ -589,7 +623,7 @@ again:
 		break;
 
 	case afb_auth_Permission:
-		afb_req_common_check_permission(req, auth->text, check_and_set_auth_async_cb, req);
+		afb_perm_check_req_async(req, auth->text, check_and_set_auth_async_cb, req);
 		return;
 
 	case afb_auth_Or:
@@ -638,7 +672,7 @@ afb_req_common_check_and_set_session_async(
 	}
 	else if (req->asyncount != 0 || !async_cb_status_set(req, callback, closure)) {
 		/* can't prepare async */
-		afb_req_common_reply_internal_error(req);
+		afb_req_common_reply_internal_error_hookable(req);
 		callback(closure, X_EBUSY);
 	}
 	else if (!sessionflags) {
@@ -647,9 +681,9 @@ afb_req_common_check_and_set_session_async(
 	}
 	else {
 		/* check of session flags */
-		if (sessionflags & AFB_SESSION_CLOSE_X2)
+		if (sessionflags & AFB_SESSION_CLOSE)
 			req->closing = 1;
-		loa = (int)(sessionflags & AFB_SESSION_LOA_MASK_X2);
+		loa = (int)(sessionflags & AFB_SESSION_LOA_MASK);
 		if (loa && afb_session_get_loa(req->session, req->api) < loa) {
 			/* invalidated LOA */
 			check_and_set_final(req, 0);
@@ -680,6 +714,20 @@ afb_req_common_addref(
 	return req;
 }
 
+struct afb_req_common *
+afb_req_common_addref_hookable(
+	struct afb_req_common *req
+)
+#if !WITH_AFB_HOOK
+	__attribute__((alias("afb_req_common_addref")));
+#else
+{
+	if (req->hookflags & afb_hook_flag_req_addref)
+		afb_hook_req_addref(req);
+	return afb_req_common_addref(req);
+}
+#endif
+
 void
 afb_req_common_unref(
 	struct afb_req_common *req
@@ -695,7 +743,7 @@ afb_req_common_unref(
 			}
 		}
 #if WITH_AFB_HOOK
-		if (req->hookflags)
+		if (req->hookflags & afb_hook_flag_req_end)
 			afb_hook_req_end(req);
 #endif
 		req->queryitf->unref(req);
@@ -703,17 +751,38 @@ afb_req_common_unref(
 }
 
 void
-afb_req_common_vverbose(
+afb_req_common_unref_hookable(
+	struct afb_req_common *req
+)
+#if !WITH_AFB_HOOK
+	__attribute__((alias("afb_req_common_unref")));
+#else
+{
+	if (req->hookflags & afb_hook_flag_req_unref)
+		afb_hook_req_unref(req);
+	afb_req_common_unref(req);
+}
+#endif
+
+/******************************************************************************/
+void
+afb_req_common_vverbose_hookable(
 	struct afb_req_common *req,
-	int level,
-	const char *file,
+	int level, const char *file,
 	int line,
 	const char *func,
 	const char *fmt,
 	va_list args
 ) {
 	char *p;
-
+#if WITH_AFB_HOOK
+	va_list ap;
+	if (req->hookflags & afb_hook_flag_req_vverbose) {
+		va_copy(ap, args);
+		afb_hook_req_vverbose(req, level, file, line, func, fmt, ap);
+		va_end(ap);
+	}
+#endif
 	if (!fmt || vasprintf(&p, fmt, args) < 0)
 		vverbose(level, file, line, func, fmt, args);
 	else {
@@ -721,6 +790,7 @@ afb_req_common_vverbose(
 		free(p);
 	}
 }
+
 
 /******************************************************************************/
 
@@ -745,7 +815,7 @@ do_reply(
 	struct afb_req_common *req,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 ) {
 	req->status = status;
 	req->nreplies = nreplies;
@@ -764,7 +834,7 @@ do_reply(
 	struct afb_req_common *req,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 ) {
 	req->queryitf->reply(req, status, nreplies, replies);
 	afb_params_unref(nreplies, replies);
@@ -781,12 +851,16 @@ do_reply(
  * @param replies   the data of the reply (can be NULL if nreplies is zero)
  */
 void
-afb_req_common_reply(
+afb_req_common_reply_hookable(
 	struct afb_req_common *req,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 ) {
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_reply)
+		afb_hook_req_reply(req, status, nreplies, replies);
+#endif
 	if (req->replied) {
 		/* it is an error to reply more than one time */
 		ERROR("reply called more than one time!!");
@@ -817,6 +891,19 @@ afb_req_common_subscribe(
 }
 
 int
+afb_req_common_subscribe_hookable(
+	struct afb_req_common *req,
+	struct afb_evt *evt
+) {
+	int r = afb_req_common_subscribe(req, evt);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_subscribe)
+		r = afb_hook_req_subscribe(req, evt, r);
+#endif
+	return r;
+}
+
+int
 afb_req_common_unsubscribe(
 	struct afb_req_common *req,
 	struct afb_evt *evt
@@ -831,36 +918,63 @@ afb_req_common_unsubscribe(
 	return X_ENOTSUP;
 }
 
+int
+afb_req_common_unsubscribe_hookable(
+	struct afb_req_common *req,
+	struct afb_evt *evt
+) {
+	int r = afb_req_common_unsubscribe(req, evt);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_unsubscribe)
+		r = afb_hook_req_unsubscribe(req, evt, r);
+#endif
+	return r;
+}
+
 /******************************************************************************/
 
 void *
-afb_req_common_cookie(
+afb_req_common_cookie_hookable(
 	struct afb_req_common *req,
 	void *(*maker)(void*),
 	void (*freeer)(void*),
 	void *closure,
 	int replace
 ) {
-	return afb_session_cookie(req->session, req->api, maker, freeer, closure, replace);
+	void *r = afb_session_cookie(req->session, req->api, maker, freeer, closure, replace);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_context_make)
+		r = afb_hook_req_context_make(req, replace, maker, freeer, closure, r);
+#endif
+	return r;
 }
 
 int
-afb_req_common_session_set_LOA(
+afb_req_common_session_set_LOA_hookable(
 	struct afb_req_common *req,
 	unsigned level
 ) {
-	return afb_session_set_loa(req->session, req->api, (int)level);
+	int r = afb_session_set_loa(req->session, req->api, (int)level);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_session_set_LOA)
+		r = afb_hook_req_session_set_LOA(req, level, r);
+#endif
+	return r;
 }
 
 void
-afb_req_common_session_close(
+afb_req_common_session_close_hookable(
 	struct afb_req_common *req
 ) {
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_session_close)
+		afb_hook_req_session_close(req);
+#endif
 	req->closing = 1;
 }
 
 struct json_object *
-afb_req_common_get_client_info(
+afb_req_common_get_client_info_hookable(
 	struct afb_req_common *req
 ) {
 	struct json_object *r = json_object_new_object();
@@ -879,18 +993,87 @@ afb_req_common_get_client_info(
 		json_object_object_add(r, "uuid", json_object_new_string(afb_session_uuid(req->session)?:""));
 		json_object_object_add(r, "LOA", json_object_new_int(afb_session_get_loa(req->session, req->api)));
 	}
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_get_client_info)
+		r = afb_hook_req_get_client_info(req, r);
+#endif
 	return r;
 }
 
+static
 void
-afb_req_common_check_permission(
+check_permission_hookable_reply(
+	struct afb_req_common *req,
+	int status,
+	void (*callback)(void*,int,void*,void*),
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	const char *permission
+) {
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_has_permission) {
+		afb_hook_req_has_permission(req, permission, status);
+	}
+#endif
+	callback(closure1, status, closure2, closure3);
+	afb_req_common_unref(req);
+}
+
+struct ck_perm_s
+{
+	struct afb_req_common *req;
+	const char *permission;
+	void (*callback)(void*,int,void*,void*);
+	void *closure1;
+	void *closure2;
+	void *closure3;
+};
+
+static
+void
+check_permission_hookable_cb(
+	void *closure,
+	int status
+) {
+	struct ck_perm_s *cps = closure;
+
+	check_permission_hookable_reply(cps->req, status, cps->callback,
+		cps->closure1, cps->closure2, cps->closure3, cps->permission);
+	free(cps);
+}
+
+void
+afb_req_common_check_permission_hookable(
 	struct afb_req_common *req,
 	const char *permission,
-	void (*callback)(void *, int),
-	void *closure
+	void (*callback)(void*,int,void*,void*),
+	void *closure1,
+	void *closure2,
+	void *closure3
 ) {
-	afb_perm_check_req_async(req, permission, callback, closure);
+	struct ck_perm_s *cps;
+
+	afb_req_common_addref(req);
+	cps = malloc(sizeof *cps);
+	if (!cps)
+		check_permission_hookable_reply(req, X_ENOMEM, callback,
+			closure1, closure2, closure3,permission);
+	else {
+		cps->req = req;
+		cps->permission = permission;
+		cps->callback = callback;
+		cps->closure1 = closure1;
+		cps->closure2 = closure2;
+		cps->closure3 = closure3;
+		afb_perm_check_req_async(req, permission,
+			check_permission_hookable_cb, cps);
+	}
 }
+
+
+
+
 
 struct has_permission_s
 {
@@ -921,7 +1104,7 @@ has_permission_job_cb(
 	struct has_permission_s *hasp = closure;
 
 	if (signum) {
-		hasp->rc = EINTR;
+		hasp->rc = X_EINTR;
 		afb_sched_leave(schedlock);
 	}
 	else {
@@ -931,7 +1114,7 @@ has_permission_job_cb(
 }
 
 int
-afb_req_common_has_permission(
+afb_req_common_has_permission_hookable(
 	struct afb_req_common *req,
 	const char *permission
 ) {
@@ -943,118 +1126,9 @@ afb_req_common_has_permission(
 	rc = afb_sched_enter(NULL, 0, has_permission_job_cb, &hasp);
 	if (rc == 0)
 		rc = hasp.rc;
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_has_permission)
+		rc = afb_hook_req_has_permission(req, permission, rc);
+#endif
 	return rc;
 }
-
-/******************************************************************************/
-#if WITH_AFB_HOOK
-
-void
-afb_req_common_reply_hookable(
-	struct afb_req_common *req,
-	int status,
-	unsigned nparams,
-	const struct afb_data_x4 **params
-) {
-	if (req->hookflags & afb_hook_flag_req_reply)
-		afb_hook_req_reply(req, status, nparams, params);
-	afb_req_common_reply(req, status, nparams, params);
-}
-
-struct afb_req_common *
-afb_req_common_addref_hookable(
-	struct afb_req_common *req
-) {
-	afb_hook_req_addref(req);
-	return afb_req_common_addref(req);
-}
-
-void
-afb_req_common_unref_hookable(
-	struct afb_req_common *req
-) {
-	afb_hook_req_unref(req);
-	afb_req_common_unref(req);
-}
-
-void
-afb_req_common_session_close_hookable(
-	struct afb_req_common *req
-) {
-	afb_hook_req_session_close(req);
-	afb_req_common_session_close(req);
-}
-
-int
-afb_req_common_session_set_LOA_hookable(
-	struct afb_req_common *req,
-	unsigned level
-) {
-	int r = afb_req_common_session_set_LOA(req, level);
-	return afb_hook_req_session_set_LOA(req, level, r);
-}
-
-int
-afb_req_common_subscribe_hookable(
-	struct afb_req_common *req,
-	struct afb_evt *evt
-) {
-	int r = afb_req_common_subscribe(req, evt);
-	return afb_hook_req_subscribe(req, evt, r);
-}
-
-int
-afb_req_common_unsubscribe_hookable(
-	struct afb_req_common *req,
-	struct afb_evt *evt
-) {
-	int r = afb_req_common_unsubscribe(req, evt);
-	return afb_hook_req_unsubscribe(req, evt, r);
-}
-
-void
-afb_req_common_vverbose_hookable(
-	struct afb_req_common *req,
-	int level, const char *file,
-	int line,
-	const char *func,
-	const char *fmt,
-	va_list args
-) {
-	va_list ap;
-	va_copy(ap, args);
-	afb_req_common_vverbose(req, level, file, line, func, fmt, args);
-	afb_hook_req_vverbose(req, level, file, line, func, fmt, ap);
-	va_end(ap);
-}
-
-int
-afb_req_common_has_permission_hookable(
-	struct afb_req_common *req,
-	const char *permission
-) {
-	int r = afb_req_common_has_permission(req, permission);
-	return afb_hook_req_has_permission(req, permission, r);
-}
-
-void *
-afb_req_common_cookie_hookable(
-	struct afb_req_common *req,
-	void *(*maker)(void*),
-	void (*freeer)(void*),
-	void *closure,
-	int replace
-) {
-	void *result = afb_req_common_cookie(req, maker, freeer, closure, replace);
-	return afb_hook_req_context_make(req, replace, maker, freeer, closure, result);
-}
-
-struct json_object *
-afb_req_common_get_client_info_hookable(
-	struct afb_req_common *req
-) {
-	struct json_object *r = afb_req_common_get_client_info(req);
-	return afb_hook_req_get_client_info(req, r);
-}
-
-#endif

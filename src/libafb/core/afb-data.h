@@ -24,24 +24,7 @@
 #pragma once
 
 struct afb_data;
-struct afb_data_x4;
-struct afb_type_x4;
-
-/**
- */
-extern
-const struct afb_data_x4*
-afb_data_as_data_x4(
-	struct afb_data *data
-);
-
-/**
- */
-extern
-struct afb_data*
-afb_data_of_data_x4(
-	const struct afb_data_x4 *datax4
-);
+struct afb_type;
 
 /**
  *  Allocates a new data without type
@@ -52,9 +35,9 @@ afb_data_of_data_x4(
  */
 extern
 int
-afb_data_create_set_x4(
+afb_data_create_raw(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	const void *pointer,
 	size_t size,
 	void (*dispose)(void*),
@@ -63,9 +46,9 @@ afb_data_create_set_x4(
 
 extern
 int
-afb_data_create_alloc_x4(
+afb_data_create_alloc(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	void **pointer,
 	size_t size,
 	int zeroes
@@ -73,14 +56,12 @@ afb_data_create_alloc_x4(
 
 extern
 int
-afb_data_create_copy_x4(
+afb_data_create_copy(
 	struct afb_data **result,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	const void *pointer,
 	size_t size
 );
-
-
 
 /**
  * Get the typenum of the data
@@ -90,9 +71,9 @@ afb_data_create_copy_x4(
  * @return the typenum of the data
  */
 extern
-const struct afb_type_x4 *
-afb_data_type_x4(
-	const struct afb_data *data
+struct afb_type *
+afb_data_type(
+	struct afb_data *data
 );
 
 /**
@@ -120,17 +101,6 @@ afb_data_unref(
 );
 
 /**
- * Clear the content of data, releasing memory and calling cleaners
- *
- * @param data the data to clear
- */
-extern
-void
-afb_data_clear(
-	struct afb_data *data
-);
-
-/**
  * Get the pointer of the data
  *
  * @param data the data
@@ -139,8 +109,8 @@ afb_data_clear(
  */
 extern
 const void*
-afb_data_pointer(
-	const struct afb_data *data
+afb_data_const_pointer(
+	struct afb_data *data
 );
 
 /**
@@ -153,92 +123,9 @@ afb_data_pointer(
 extern
 size_t
 afb_data_size(
-	const struct afb_data *data
+	struct afb_data *data
 );
 
-/**
- * set the data
- *
- * @param data    the data to set
- * @param type    the type x4
- * @param pointer pointer to the data
- * @param size    size of the data
- * @param dispose a function to call to release the data (can be NULL)
- * @param closure parameter to give to the function 'dispose'
- *
- * @return 0 in case of success or a negative number indicating the error
- */
-extern
-int
-afb_data_set_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size,
-	void (*dispose)(void*),
-	void *closure
-);
-
-/**
- * Allocate a shareable buffer. Also allows to resize
- * a previously allocated buffer.
- *
- * @param data    the data
- * @param type    the type x4
- * @param pointer where to store base address of the allocated memory
- * @param size    the size to (re)alloc
- * @param zeroes  put zeroes in allocated memory
- *
- * @return 0 if success or a negative error code
- */
-extern
-int
-afb_data_alloc_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	void **pointer,
-	size_t size,
-	int zeroes
-);
-
-/**
- * Allocate a shareable buffer. Also allows to resize
- * a previously allocated buffer.
- *
- * @param data the data
- * @param pointer where to store base address of the allocated memory
- * @param size the size to (re)alloc
- * @param zeroes put zeroes in allocated memory
- *
- * @return 0 if success or a negative error code
- */
-extern
-int
-afb_data_resize(
-	struct afb_data *data,
-	void **pointer,
-	size_t size,
-	int zeroes
-);
-
-/**
- * Allocate shareable memory and copy data to it
- *
- * @param data    the data to set
-	const struct afb_type_x4 *type,
- * @param pointer pointer to the data
- * @param size    size of the data
- *
- * @return 0 in case of success or a negative number indicating the error
- */
-extern
-int
-afb_data_copy_x4(
-	struct afb_data *data,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size
-);
 
 /**
  * Convert to an other data (possibly return a cached conversion)
@@ -250,10 +137,18 @@ afb_data_copy_x4(
  */
 extern
 int
-afb_data_convert_to_x4(
+afb_data_convert_to(
 	struct afb_data *data,
-	const struct afb_type_x4 *type,
+	struct afb_type *type,
 	struct afb_data **result
+);
+
+/* update a data */
+extern
+int
+afb_data_update(
+	struct afb_data *data,
+	struct afb_data *value
 );
 
 /**
@@ -263,37 +158,104 @@ afb_data_convert_to_x4(
  */
 extern
 void
-afb_data_convert_cache_clear(
+afb_data_notify_changed(
 	struct afb_data *data
 );
 
+/* test if constant */
 extern
 int
-afb_data_x4_create_set_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size,
-	void (*dispose)(void*),
-	void *closure
+afb_data_is_constant(
+	struct afb_data *data
 );
+
+/* set as constant */
+extern
+void
+afb_data_set_constant(
+	struct afb_data *data
+);
+
+/* set as not constant */
+extern
+void
+afb_data_set_not_constant(
+	struct afb_data *data
+);
+
+/* test if volatile */
+extern
+int
+afb_data_is_volatile(
+	struct afb_data *data
+);
+
+/* set as volatile */
+extern
+void
+afb_data_set_volatile(
+	struct afb_data *data
+);
+
+/* set as not volatile */
+extern
+void
+afb_data_set_not_volatile(
+	struct afb_data *data
+);
+
+/* opacifies the data and returns its opaque id */
+extern
+int
+afb_data_opacify(
+	struct afb_data *data
+);
+
+/* get the data of the given opaque id */
+extern
+int
+afb_data_get_opacified(
+	int opaqueid,
+	struct afb_data **data,
+	struct afb_type **type
+);
+
 
 extern
 int
-afb_data_x4_create_alloc_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
+afb_data_get_mutable(
+	struct afb_data *data,
 	void **pointer,
-	size_t size,
-	int zeroes
-);
+	size_t *size);
 
 extern
 int
-afb_data_x4_create_copy_x4(
-	const struct afb_data_x4 **result,
-	const struct afb_type_x4 *type,
-	const void *pointer,
-	size_t size
-);
+afb_data_get_constant(
+	struct afb_data *data,
+	const void **pointer,
+	size_t *size);
 
+extern
+void
+afb_data_lock_read(
+	struct afb_data *data);
+
+extern
+int
+afb_data_try_lock_read(
+	struct afb_data *data);
+
+extern
+void
+afb_data_lock_write(
+	struct afb_data *data);
+
+extern
+int
+afb_data_try_lock_write(
+	struct afb_data *data);
+
+extern
+void
+afb_data_unlock(
+	struct afb_data *data);

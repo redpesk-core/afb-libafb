@@ -9,7 +9,7 @@
 
 
 #include <afb/afb-auth.h>
-#include <afb/afb-session-x2.h>
+#include <afb/afb-session.h>
 
 #include "libafb-config.h"
 
@@ -101,84 +101,84 @@ START_TEST (test)
 		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, true ] }"
+		    "false",
+		    "{ \"session\": \"check\" }",
+		    "{ \"LOA\": 2 }",
+		    "{ \"permission\": \"urn:test\" }",
+		    "{ \"anyOf\": [ true, false ] }",
+		    "{ \"allOf\": [ true, false ] }",
+		    "{ \"not\": true }",
+		    "true"
 		},
 		{
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 1 }, true ] }"
+		    "{ \"allOf\": [ { \"LOA\": 1 }, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, true, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 1 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 2 }, true ] }"
+		    "{ \"allOf\": [ { \"LOA\": 2 }, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, true, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 2 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"token\": \"refresh\" }, { \"LOA\": 3 }, true ] }"
+		    "{ \"allOf\": [ { \"LOA\": 3 }, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, true, false ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"LOA\": 3 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"check\" }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
 		},
 		{
 		    "{ \"allOf\": [ { \"session\": \"close\" }, false ] }",
@@ -261,84 +261,84 @@ START_TEST (test)
 		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 1 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 2 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
 		},
 		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"token\": \"refresh\" }, { \"LOA\": 3 }, true ] }"
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
+		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
 		}
     };
 

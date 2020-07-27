@@ -166,7 +166,7 @@ static void server_req_reply_cb2(void *closure, struct json_object *object, cons
 	rd->rc = afb_proto_ws_call_reply(rd->call, object, error, info);
 }
 
-static void server_req_reply_cb(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+static void server_req_reply_cb(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 	struct reply_data rd;
@@ -276,7 +276,7 @@ static void process_cb(void * closure1, struct json_object *object, const void *
 
 	proto = client_get_proto(stubws);
 	if (proto == NULL) {
-		afb_json_legacy_req_reply(comreq, NULL, afb_error_text_disconnected, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_disconnected, NULL);
 		return;
 	}
 
@@ -293,7 +293,7 @@ static void process_cb(void * closure1, struct json_object *object, const void *
 				afb_req_common_on_behalf_cred_export(comreq));
 	}
 	if (rc < 0) {
-		afb_json_legacy_req_reply(comreq, NULL, afb_error_text_internal_error, "can't send message");
+		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_internal_error, "can't send message");
 		afb_req_common_unref(comreq);
 	}
 }
@@ -385,7 +385,7 @@ static void client_on_reply_cb(void *closure, void *request, struct json_object 
 {
 	struct afb_req_common *comreq = request;
 
-	afb_json_legacy_req_hooked_reply(comreq, object, error, info);
+	afb_json_legacy_req_reply_hookable(comreq, object, error, info);
 	afb_req_common_unref(comreq);
 }
 
@@ -450,7 +450,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
 	if (rc >= 0 && event)
-		rc = afb_json_legacy_event_push(event, data);
+		rc = afb_json_legacy_event_push_hookable(event, data);
 	else
 		ERROR("unreadable push event");
 	if (rc <= 0)
@@ -554,7 +554,7 @@ server_on_call_cb(
 	struct afb_session *session;
 	struct afb_token *token;
 	size_t lenverb, lencreds;
-	const struct afb_data_x4 *arg;
+	struct afb_data *arg;
 	int rc;
 
 	afb_stub_ws_addref(stubws);
@@ -583,9 +583,11 @@ server_on_call_cb(
 	if (lencreds)
 		user_creds = memcpy(wreq->strings + lenverb, user_creds, lencreds);
 
-	rc = afb_json_legacy_make_data_x4_json_c(&arg, object);
-	if (rc < 0)
+	rc = afb_json_legacy_make_data_json_c(&arg, object);
+	if (rc < 0) {
+		free(wreq);
 		goto out_of_memory2;
+	}
 
 	/* initialise */
 	wreq->stubws = stubws;

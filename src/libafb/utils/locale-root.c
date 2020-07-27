@@ -262,7 +262,7 @@ static int add_search_list(char *list, int llen, int off, const char *item, int 
 	char c;
 	int i, j;
 
-	/* remove any leading dash */
+	/* remove any tailing dash */
 	while(ilen && item[ilen - 1] == '-')
 		ilen--;
 
@@ -699,7 +699,7 @@ static char *resolve_list(struct locale_root *root, const char *filename, const 
 	struct iter iter;
 
 	return iter_list_init(&iter, filename, root, list, llen)
-		? iter_resolve(&iter) : NULL;
+		? NULL : iter_resolve(&iter);
 }
 
 static char *resolve_search(struct locale_root *root, const char *filename, struct locale_search *search)

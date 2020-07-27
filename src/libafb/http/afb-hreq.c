@@ -88,7 +88,7 @@ struct hreq_data {
 	char *path;		/* path of the file saved */
 };
 
-static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies);
+static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[]);
 static void req_destroy(struct afb_req_common *comreq);
 
 const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
@@ -869,7 +869,7 @@ int afb_hreq_post_add_file(struct afb_hreq *hreq, const char *key, const char *f
 	return !size;
 }
 
-static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 	struct MHD_Response *response;
@@ -922,7 +922,7 @@ static void make_params(struct afb_hreq *hreq)
 				json_object_object_add(obj, hdat->key, val);
 			}
 		}
-		afb_json_legacy_make_data_x4_json_c(hreq->comreq.params, obj);
+		afb_json_legacy_make_data_json_c(hreq->comreq.params, obj);
 		hreq->comreq.nparams = 1;
 	}
 }

@@ -23,24 +23,8 @@
 
 #pragma once
 
-#include <string.h>
-#include "afb-data.h"
-
-static inline void afb_params_addref(unsigned nparams, struct afb_data * const params[])
-{
-	while(nparams--)
-		afb_data_addref(*params++);
-}
-
-static inline void afb_params_unref(unsigned nparams, struct afb_data * const params[])
-{
-	while(nparams--)
-		afb_data_unref(*params++);
-}
-
-static inline void afb_params_copy(unsigned nparams, struct afb_data * const from[], struct afb_data *to[])
-{
-	if (nparams)
-		memcpy(to, from, nparams * sizeof *to);
-}
-
+extern void lockany_lock_read(const void *item);
+extern int lockany_try_lock_read(const void *item);
+extern void lockany_lock_write(const void *item);
+extern int lockany_try_lock_write(const void *item);
+extern int lockany_unlock(const void *item);

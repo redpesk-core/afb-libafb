@@ -29,5 +29,5 @@ URL: @PROJECT_URL@
 
 Requires: @LIBAFBDEPS@
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
-Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafb-static
+Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafb-static -lrt -lpthread -ldl -lmagic
 

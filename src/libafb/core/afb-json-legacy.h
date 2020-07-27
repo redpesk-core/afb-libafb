@@ -24,11 +24,8 @@
 #pragma once
 
 struct json_object;
-struct afb_data_x4;
-struct afb_type_x4;
 
 #include <afb/afb-arg.h>
-#include <afb/afb-type-x4.h>
 
 #include "../core/afb-string-mode.h"
 #include "../core/afb-req-common.h"
@@ -42,8 +39,8 @@ struct afb_type_x4;
 
 extern
 int
-afb_json_legacy_make_data_x4_json_c(
-	const struct afb_data_x4 **result,
+afb_json_legacy_make_data_json_c(
+	struct afb_data **result,
 	struct json_object *object
 );
 
@@ -52,7 +49,7 @@ extern
 int
 afb_json_legacy_do_single_json_string(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure, const char *object),
 	void *closure
 );
@@ -61,7 +58,7 @@ extern
 int
 afb_json_legacy_do_single_json_c(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure, struct json_object *object),
 	void *closure
 );
@@ -70,7 +67,7 @@ extern
 int
 afb_json_legacy_do2_single_json_string(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure1, const char *object, const void *closure2),
 	void *closure1,
 	const void *closure2
@@ -80,10 +77,18 @@ extern
 int
 afb_json_legacy_do2_single_json_c(
 	unsigned nparams,
-	const struct afb_data_x4 * const *params,
+	struct afb_data * const params[],
 	void (*callback)(void *closure1, struct json_object *object, const void *closure2),
 	void *closure1,
 	const void *closure2
+);
+
+extern
+int
+afb_json_legacy_get_single_json_c(
+	unsigned nparams,
+	struct afb_data * const params[],
+	struct json_object **obj
 );
 
 /**********************************************************************/
@@ -93,7 +98,7 @@ afb_json_legacy_do_reply_json_c(
 	void *closure,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	void (*callback)(void*, struct json_object*, const char*, const char*)
 );
 
@@ -103,7 +108,7 @@ afb_json_legacy_do_reply_json_string(
 	void *closure,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	void (*callback)(void*, const char*, const char*, const char*)
 );
 
@@ -112,7 +117,7 @@ int
 afb_json_legacy_get_reply_sync(
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies,
+	struct afb_data * const replies[],
 	struct json_object **object,
 	char **error,
 	char **info
@@ -122,8 +127,8 @@ afb_json_legacy_get_reply_sync(
 
 extern
 int
-afb_json_legacy_make_reply_json_string_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_string(
+	struct afb_data *params[],
 	const char *object, void (*dobj)(void*), void *cobj,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
@@ -131,8 +136,8 @@ afb_json_legacy_make_reply_json_string_x4(
 
 extern
 int
-afb_json_legacy_make_reply_json_c_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_c(
+	struct afb_data *params[],
 	struct json_object *object,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
@@ -140,8 +145,8 @@ afb_json_legacy_make_reply_json_c_x4(
 
 extern
 int
-afb_json_legacy_make_reply_json_c_mode_x4(
-	const struct afb_data_x4 **params,
+afb_json_legacy_make_reply_json_c_mode(
+	struct afb_data *params[],
 	struct json_object *object,
 	const char *error,
 	const char *info,
@@ -153,7 +158,7 @@ afb_json_legacy_make_reply_json_c_mode_x4(
 
 extern
 void
-afb_json_legacy_req_reply(
+afb_json_legacy_req_reply_hookable(
 	struct afb_req_common *comreq,
 	struct json_object *obj,
 	const char *error,
@@ -162,34 +167,13 @@ afb_json_legacy_req_reply(
 
 extern
 void
-afb_json_legacy_req_vreply(
+afb_json_legacy_req_vreply_hookable(
 	struct afb_req_common *comreq,
 	struct json_object *obj,
 	const char *error,
 	const char *fmt,
 	va_list args
 );
-
-#if WITH_AFB_HOOK
-extern
-void
-afb_json_legacy_req_hooked_reply(
-	struct afb_req_common *comreq,
-	struct json_object *obj,
-	const char *error,
-	const char *info
-);
-
-extern
-void
-afb_json_legacy_req_hooked_vreply(
-	struct afb_req_common *comreq,
-	struct json_object *obj,
-	const char *error,
-	const char *fmt,
-	va_list args
-);
-#endif
 
 /**********************************************************************/
 
@@ -211,26 +195,17 @@ afb_json_legacy_event_push(
 
 extern
 int
-afb_json_legacy_event_broadcast(
-	struct afb_evt *evt,
-	struct json_object *obj
-);
-
-#if WITH_AFB_HOOK
-extern
-int
-afb_json_legacy_event_hooked_push(
+afb_json_legacy_event_push_hookable(
 	struct afb_evt *evt,
 	struct json_object *obj
 );
 
 extern
 int
-afb_json_legacy_event_hooked_broadcast(
+afb_json_legacy_event_broadcast_hookable(
 	struct afb_evt *evt,
 	struct json_object *obj
 );
-#endif
 
 /**********************************************************************/
 extern
@@ -240,7 +215,7 @@ afb_json_legacy_make_msg_string_reply(
 	size_t *length,
 	int status,
 	unsigned nreplies,
-	const struct afb_data_x4 * const *replies
+	struct afb_data * const replies[]
 );
 
 extern
@@ -250,6 +225,6 @@ afb_json_legacy_make_msg_string_event(
 	size_t *length,
 	const char *event,
 	unsigned nparams,
-	const struct afb_data_x4 * const *params
+	struct afb_data * const params[]
 );
 

@@ -25,8 +25,8 @@ struct afb_req_common *test_reply_req;
 int test_reply_status;
 struct afb_dataset *test_reply_reply;
 unsigned test_reply_nreplies;
-const struct afb_data_x4 * const *test_reply_replies;
-void test_reply(struct afb_req_common *req, int status, unsigned nreplies, const struct afb_data_x4 * const *replies)
+struct afb_data * const *test_reply_replies;
+void test_reply(struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	test_reply_req = req;
 	test_reply_status = status;

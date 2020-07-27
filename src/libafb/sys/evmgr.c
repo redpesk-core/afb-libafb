@@ -195,8 +195,8 @@ static int sig_create(struct evmgr *evmgr)
 	/* creates the eventfd for waking up polls */
 	efd = eventfd(0, EFD_CLOEXEC|EFD_SEMAPHORE);
 	if (efd < 0) {
-		ERROR("can't make eventfd for events");
 		rc = -errno;
+		ERROR("can't make eventfd for events");
 		goto error;
 	}
 

@@ -324,7 +324,7 @@ static void process_cb(void *closure, struct json_object *args)
 	const char *api, *verb, *uuid;
 	struct afb_session *session;
 	const struct afb_api_item *xapi;
-	const struct afb_data_x4 *data;
+	struct afb_data *data;
 	int rc;
 #if WITH_AFB_TRACE
 	struct json_object *drop, *add;
@@ -334,7 +334,7 @@ static void process_cb(void *closure, struct json_object *args)
 	i = (int)(sizeof verbs / sizeof *verbs);
 	while(--i >= 0 && namecmp(verbs[i], comreq->verbname));
 	if (i < 0) {
-		afb_req_common_reply_verb_unknown(comreq);
+		afb_req_common_reply_verb_unknown_error_hookable(comreq);
 		return;
 	}
 
@@ -352,26 +352,26 @@ static void process_cb(void *closure, struct json_object *args)
 		if (wrap_json_unpack(args, "s", &uuid))
 			wrap_json_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
-			afb_json_legacy_req_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			session = afb_session_search(uuid);
 			if (!session)
-				afb_json_legacy_req_reply(comreq, NULL, afb_error_text_unknown_session, NULL);
+				afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_unknown_session, NULL);
 			else {
 				afb_session_close(session);
 				afb_session_unref(session);
 				afb_session_purge();
-				afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
+				afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
 			}
 		}
 		break;
 	case Slist:
 		list = json_object_new_object();
 		afb_session_foreach(slist, list);
-		afb_json_legacy_req_reply(comreq, list, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, list, NULL, NULL);
 		break;
 	case Config:
-		afb_json_legacy_req_reply(comreq, json_object_get(global.config), NULL, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, json_object_get(global.config), NULL, NULL);
 		break;
 	case Trace:
 #if WITH_AFB_TRACE
@@ -390,23 +390,23 @@ static void process_cb(void *closure, struct json_object *args)
 			if (rc)
 				return;
 		}
-		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
 #else
-		afb_req_common_reply_unavailable(comreq);
+		afb_req_common_reply_unavailable_error_hookable(comreq);
 #endif
 		break;
 	case Do:
 		sub = NULL;
 		if (wrap_json_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
-			afb_json_legacy_req_reply(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_invalid_request, NULL);
 		else {
 			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);
 			if (rc < 0)
-				afb_req_common_reply_api_unknown(comreq);
+				afb_req_common_reply_api_unknown_error_hookable(comreq);
 			else {
-				rc = afb_json_legacy_make_data_x4_json_c(&data, json_object_get(sub));
+				rc = afb_json_legacy_make_data_json_c(&data, json_object_get(sub));
 				if (rc < 0)
-					afb_req_common_reply_internal_error(comreq);
+					afb_req_common_reply_internal_error_hookable(comreq);
 				else {
 #if WITH_CRED
 					afb_req_common_set_cred(comreq, NULL);
@@ -425,17 +425,17 @@ static void process_cb(void *closure, struct json_object *args)
 		break;
 #if WITH_AFB_DEBUG
 	case Wait:
-		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
 		afb_debug_wait("supervisor");
 		break;
 	case Break:
-		afb_json_legacy_req_reply(comreq, NULL, NULL, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
 		afb_debug_break("supervisor");
 		break;
 #else
 	case Wait:
 	case Break:
-		afb_req_common_reply_unavailable(comreq);
+		afb_req_common_reply_unavailable_error_hookable(comreq);
 		break;
 #endif
 	}
