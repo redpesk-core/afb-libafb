@@ -168,6 +168,52 @@ START_TEST (check_convert)
 }
 END_TEST
 
+START_TEST (check_cache)
+{
+	int rc;
+	struct afb_data *data, *convertedData, *convertedDataBis;
+	afb_type_x4_t t1 = &type1;
+	afb_type_x4_t t2 = &type2;
+
+	gmask = 0;
+
+	// create data
+	rc = afb_data_create_set_x4(&data, t1, 0, 0, cvdrop, i2p(p2i(t1->closure) * 10));
+
+	// make a first convertion
+	rc = afb_data_convert_to_x4(data, t2, &convertedData);
+
+	// check that the convertion went wel
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(gmask, 12);
+
+	gmask = 0;
+
+	// Chechk that un referencing the data doesn't deleat it
+	afb_data_unref(convertedData);
+	ck_assert_int_eq(gmask, 0);
+
+	// check that remaking the same convertion with a different variable
+	// on the output doesn't generate a new conversation but just point
+	// to the previously generated result meaning that the convertion
+	// has correctly been stored in the cache
+	rc = afb_data_convert_to_x4(data, t2, &convertedDataBis);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(gmask, 0);
+	ck_assert_ptr_eq(convertedData, convertedDataBis);
+
+	// free the cache corresponding to data and check if unreferencing
+	// data and it's tonvertion result activate the actual deletion of them
+	afb_data_convert_cache_clear(data);
+	afb_data_unref(convertedData);
+	ck_assert_int_eq(gmask, 2);
+	gmask = 0;
+	afb_data_unref(data);
+	ck_assert_int_eq(gmask, p2i(t1->closure) * 10);
+
+}
+END_TEST
+
 /*********************************************************************/
 
 static Suite *suite;
@@ -192,5 +238,6 @@ int main(int ac, char **av)
 		addtcase("afb-data");
 			addtest(check_data);
 			addtest(check_convert);
+			addtest(check_cache);
 	return !!srun();
 }
