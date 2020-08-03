@@ -23,11 +23,42 @@
 
 #pragma once
 
+/**
+ * initialise signal monitoring
+ *
+ * @param enable non 0 to activate active signal monitoring
+ *
+ * @return 0 in case of success
+ */
 extern int afb_sig_monitor_init(int enable);
+
+/**
+ * Remove time out of the current thread
+ */
 extern void afb_sig_monitor_clean_timeouts();
+
+/**
+ * Creates a timer for the current thread
+ *
+ * @return  0 in case of success
+ */
 extern int afb_sig_monitor_init_timeouts();
 
+/**
+ * Run a job with signal monitoring if it has been set up perviously,
+ * else just run the job with signal O for default action.
+ *
+ * @param timeout   timeout for the job in secondes
+ *
+ * @param function  the job to run as void callback function
+ *
+ * @param arg       the arguments to pass to the job
+ */
 extern void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *arg);
 
+
+/**
+ * Dumps the current stack
+ */
 extern void afb_sig_monitor_dumpstack();
 
