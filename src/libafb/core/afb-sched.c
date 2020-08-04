@@ -434,7 +434,7 @@ int afb_sched_leave(struct afb_sched_lock *afb_sched_lock)
  * @param arg      The second argument for 'callback'
  * @return 0 in case of success or -1 in case of error
  */
-int afb_sched_call_job(
+int afb_sched_call_job_sync(
 		const void *group,
 		int timeout,
 		void (*callback)(int, void*),
