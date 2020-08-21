@@ -499,6 +499,41 @@ struct evmgr *afb_sched_acquire_event_manager()
 	return evmgr;
 }
 
+/* a null exit handler */
+static void null_exit_handler() {}
+
+/**
+ * Exit jobs threads and call handler if not NULL.
+ */
+static void exit_threads(void (*handler)())
+{
+	struct thread *t;
+
+	/* set the handler */
+	exit_handler = handler;
+
+	/* stops the threads */
+	t = threads;
+	while (t) {
+		t->stop = 1;
+		t = t->next;
+	}
+
+	/* wake up the threads */
+	evloop_wakeup();
+	x_cond_broadcast(&cond);
+}
+
+/**
+ * Exit jobs threads and call handler if not NULL.
+ */
+void afb_sched_exit(void (*handler)())
+{
+	x_mutex_lock(&mutex);
+	exit_threads(handler ?: null_exit_handler);
+	x_mutex_unlock(&mutex);
+}
+
 /**
  * Enter the jobs processing loop.
  * @param allowed_count Maximum count of thread for jobs including this one
@@ -542,6 +577,7 @@ int afb_sched_start(
 		rc = start_one_thread();
 		if (rc != 0) {
 			ERROR("Not all threads can be started");
+			exit_threads(null_exit_handler);
 			goto error;
 		}
 		launched++;
@@ -556,43 +592,13 @@ int afb_sched_start(
 	thread_main();
 	rc = 0;
 error:
+	allowed_thread_count = 0;
 	x_mutex_unlock(&mutex);
 	if (exit_handler) {
 		exit_handler();
 		exit_handler = NULL;
 	}
 	return rc;
-}
-
-/* a null exit handler */
-static void null_exit_handler() {}
-
-/**
- * Exit jobs threads and call handler if not NULL.
- */
-void afb_sched_exit(void (*handler)())
-{
-	struct thread *t;
-
-	/* request all threads to stop */
-	x_mutex_lock(&mutex);
-
-	/* set the handler */
-	exit_handler = handler ?: null_exit_handler;
-
-	/* stops the threads */
-	t = threads;
-	while (t) {
-		t->stop = 1;
-		t = t->next;
-	}
-
-	/* wake up the threads */
-	evloop_wakeup();
-	x_cond_broadcast(&cond);
-
-	/* leave */
-	x_mutex_unlock(&mutex);
 }
 
 /**
