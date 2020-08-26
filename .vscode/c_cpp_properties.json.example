@@ -1,0 +1,10 @@
+{
+    "configurations": [
+      {
+        "name": "afbenv",
+        "includePath": ["/usr/local/include", "${workspaceFolder}/src/libafb", "${workspaceFolder}/src/libafb", "${workspaceFolder}/../local/include", "${workspaceFolder}/build/src"]
+      }
+    ],
+    "version": 4
+}
+
