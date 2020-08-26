@@ -92,11 +92,11 @@ static int load_binding(const char *path, int force, struct afb_apiset *declare_
 	/* try the version 4 */
 	rc = afb_api_so_v4_add(path, &dynlib, declare_set, call_set);
 	if (rc < 0)
-		/* error when loading a valid v3 binding */
+		/* error when loading a valid v4 binding */
 		goto error2;
 
 	if (rc)
-		return 0; /* yes version 3 */
+		return 0; /* yes version 4 */
 
 	/* try the version 3 */
 	rc = afb_api_so_v3_add(path, &dynlib, declare_set, call_set);
