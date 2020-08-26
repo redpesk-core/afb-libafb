@@ -9,7 +9,7 @@
             "name": "test (gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/src/tests/test-sched",
+            "program": "${workspaceFolder}/build/src/tests/test-afb-auth",
             "args": [
             ],
             "stopAtEntry": false,
