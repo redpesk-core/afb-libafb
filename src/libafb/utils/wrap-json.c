@@ -1232,7 +1232,7 @@ int wrap_json_cmp(struct json_object *x, struct json_object *y)
 }
 
 /**
- * Searchs wether 'x' equals 'y'
+ * Searchs whether 'x' equals 'y'
  *
  * @param x first object to compare
  * @param y second object to compare
