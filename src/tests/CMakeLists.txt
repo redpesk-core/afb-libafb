@@ -26,6 +26,8 @@ pkg_check_modules(check check)
 
 set(CMAKE_BUILD_TYPE "DEBUG")
 
+add_definitions(-D_GNU_SOURCE)
+
 macro(addtest name)
 	add_executable(test-${name} test-${name}.c)
 	target_include_directories(test-${name} PRIVATE ${INCLUDE_DIRS} ${check_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../libafb)
