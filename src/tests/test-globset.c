@@ -21,8 +21,6 @@
  * $RP_END_LICENSE$
  */
 
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <string.h>
 
