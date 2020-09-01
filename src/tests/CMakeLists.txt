@@ -53,3 +53,5 @@ if(check_FOUND)
 else(check_FOUND)
 	MESSAGE(WARNING "check not found! no test!")
 endif(check_FOUND)
+
+add_subdirectory(bugs)
