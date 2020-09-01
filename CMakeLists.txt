@@ -127,7 +127,7 @@ endif()
 set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
 set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
 set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
-set(CMAKE_C_FLAGS_CCOV         "-g -O1 --coverage")
+set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
 
 ###########################################################################
 
