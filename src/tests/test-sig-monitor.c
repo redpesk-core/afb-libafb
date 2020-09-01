@@ -77,8 +77,10 @@ void test_job(int sig, void * arg){
 	}
 	pthread_mutex_unlock(&mutex);
 
-	// make sure that backup_timeout thread is done
-	pthread_join(thread, NULL);
+	if(p2i(arg)){
+		// make sure that backup_timeout thread is done
+		pthread_join(thread, NULL);
+	}
 }
 
 void observe(int loglevel, const char *file, int line, const char *function, const char *fmt, va_list args){
@@ -96,7 +98,7 @@ START_TEST (run_test)
 	fprintf(stderr,"\n*************** run_test ***************\n");
 
 	// activate signal monitoring
-    ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
+	ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
 
 	// check that sig_monitor correctly run a job
 	afb_sig_monitor_run(0, test_job, i2p(0));
