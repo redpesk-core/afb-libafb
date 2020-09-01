@@ -27,7 +27,13 @@
 #if WITH_DYNAMIC_BINDING
 
 struct afb_apiset;
-
+/**
+ * @param   path        path to binding
+ * @param   dynlib      binding dynamic library
+ * @param   declare_set 
+ * @param   call_set
+ * @return  1 in case of success
+ */
 extern int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set);
 
 #endif
