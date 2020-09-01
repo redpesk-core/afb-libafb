@@ -24,8 +24,6 @@
 
 pkg_check_modules(check check)
 
-set(CMAKE_BUILD_TYPE "DEBUG")
-
 add_definitions(-D_GNU_SOURCE)
 
 macro(addtest name)
