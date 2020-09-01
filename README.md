@@ -53,7 +53,7 @@ mkdir build
 cd build
 CMAKE_BUILD_TYPE=COVERAGE ../mkbuild.sh -f
 make test
-lcov --capture --directory . --exlude '/usr/*' --output-file coverage.info
+lcov --capture --directory . --exclude '/usr/*' --output-file coverage.info
 genhtml coverage.info --output-directory coverage_report
 xdg-open ./coverage_report/index.html
 ```
