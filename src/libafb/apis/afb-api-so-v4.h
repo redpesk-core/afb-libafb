@@ -30,7 +30,7 @@ struct afb_apiset;
 /**
  * @param   path        path to binding
  * @param   dynlib      binding dynamic library
- * @param   declare_set 
+ * @param   declare_set
  * @param   call_set
  * @return  1 in case of success
  */

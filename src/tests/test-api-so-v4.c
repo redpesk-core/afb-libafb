@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <check.h>
 
@@ -13,8 +14,8 @@
 #include "core/afb-sig-monitor.h"
 
 #define BUG_OFFSET 11
-#define PATH_BUF_SIZE 100
-#define TEST_LIB_PATH "src/tests/libhello.so"
+#define PATH_BUF_SIZE 200
+#define TEST_LIB_PATH "libhello.so"
 
 typedef struct{
 	int nb;
@@ -22,6 +23,40 @@ typedef struct{
 	struct afb_apiset * declare_set;
 	struct afb_apiset * call_set;
 } bgTest;
+
+/*********************************************************************/
+
+int getpath(char buffer[PATH_BUF_SIZE], const char *base, int ival)
+{
+	static const char *paths[] = { "test-bindings/", "tests/", "src/", "build/", NULL };
+
+	int rc;
+	int len;
+	int lenp;
+	const char **pp = paths;
+
+
+	len = snprintf(buffer, PATH_BUF_SIZE, base, ival);
+	ck_assert_int_ge(len, 0);
+	rc = access(buffer, F_OK);
+	while (rc < 0 && *pp) {
+		lenp = (int)strlen(*pp);
+		if (lenp + len + 1 > PATH_BUF_SIZE)
+			break;
+		memmove(buffer + lenp, buffer, len + 1);
+		memcpy(buffer, *pp, lenp);
+		pp++;
+		len += lenp;
+		rc = access(buffer, F_OK);
+	}
+	if (rc == 0)
+		fprintf(stderr, "FOUND %s for %s/%d\n", buffer, base, ival);
+	else
+		fprintf(stderr, "Cna't find file %s/%d\n", base, ival);
+	return rc;
+}
+
+/*********************************************************************/
 
 void bug_test(int sig, void * arg){
 
@@ -33,13 +68,13 @@ void bug_test(int sig, void * arg){
 	if(sig == 0)
 	{
 		fprintf(stderr, "\n************* test on bug%d *************\n", bgArg->nb);
-		
-		ck_assert_int_ge(snprintf(test_buglib_path, PATH_BUF_SIZE, "src/tests/bugs/libbug%d.so", bgArg->nb), 0);
-		
+
+		getpath(test_buglib_path, "libbug%d.so", bgArg->nb);
+
 		// load the binding dynamic library
 		r = x_dynlib_open (test_buglib_path, &dynlib, 0, 0);
 		ck_assert_int_eq(r, 0);
-		
+
 		// try to add binding api
 		r = afb_api_so_v4_add(test_buglib_path, &dynlib, bgArg->declare_set, bgArg->call_set);
 		fprintf(stderr,"tset bug%d done with result %d and sig %d\n", bgArg->nb, r, sig);
@@ -56,17 +91,19 @@ START_TEST (test)
 	int r, i;
 	const char ** apinames;
 	x_dynlib_t dynlib;
-    struct afb_apiset * declare_set, * call_set;
+	struct afb_apiset * declare_set, * call_set;
+	char test_path[PATH_BUF_SIZE];
 
 	// load the binding dynamic library
-	r = x_dynlib_open (TEST_LIB_PATH, &dynlib, 0, 0);
+	getpath(test_path, TEST_LIB_PATH, 0);
+	r = x_dynlib_open (test_path, &dynlib, 0, 0);
 	ck_assert_int_eq(r, 0);
 
 	declare_set = afb_apiset_create("toto", 1);
 	call_set = afb_apiset_create("tata", 1);
 
 	// add binding api
-    r = afb_api_so_v4_add("", &dynlib, declare_set, call_set);
+	r = afb_api_so_v4_add("", &dynlib, declare_set, call_set);
 	ck_assert_int_eq(r, 1);
 
 	// check that the api apears in the loaded apis
