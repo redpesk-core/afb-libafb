@@ -21,7 +21,7 @@
 #define i2p(x)  ((void*)((intptr_t)(x)))
 #define p2i(x)  ((int)((intptr_t)(x)))
 
-int gval;
+volatile int gval;
 
 void test_job(int sig, void * arg){
 	fprintf(stderr, "test job received sig %d with arg %d\n", sig, p2i(arg));
@@ -76,13 +76,13 @@ START_TEST (timeout)
 	struct afb_job *job;
 
 	r = afb_sig_monitor_init(1);
-    ck_assert_int_eq(r, 0);
+	ck_assert_int_eq(r, 0);
 	// check that a job get killed if it goes over it's timeout
 	r = afb_jobs_queue(NULL, 1, timeout_test_job, i2p(3));
 	ck_assert_int_eq(r,0);
 	job = afb_jobs_dequeue();
 	afb_jobs_run(job);
-	// if gval = -2 it means that the job has been run onece and have been killed
+	// if gval = -2 it means that the job has been run once and have been killed
 	ck_assert_int_eq(gval, -2);
 
 }
