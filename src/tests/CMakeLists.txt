@@ -61,6 +61,7 @@ if(check_FOUND)
 		COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial" "${CMAKE_CURRENT_BINARY_DIR}/cynagoraTest.initial"
 		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial
 	)
+	addtest(afb-calls)
 else(check_FOUND)
 	MESSAGE(WARNING "check not found! no test!")
 endif(check_FOUND)
