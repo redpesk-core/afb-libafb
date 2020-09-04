@@ -112,7 +112,6 @@ void preparDemonCynagora(){
 }
 
 void startDemonCynagora(){
-
 	if(!pathReady) preparDemonCynagora();
 
 	gpid = fork();

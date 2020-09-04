@@ -90,6 +90,7 @@ void test_job(int sig, void* arg){
         }
         // if this job is the last one relese the other jobs
         else{
+            fprintf(stderr, "***** Realease waiting jobs ! *****\n");
             gval.lastJob = TRUE;
         }
     }
@@ -325,6 +326,7 @@ void test_start_sched_adapt(int sig, void * arg){
 
         // wait for jobs to end
         r = TRUE;
+        fprintf(stderr, "WAITING for jobs to end ! (pending jobs = %d)\n", afb_jobs_get_pending_count());
         while(r){
             pthread_mutex_lock(&gval.mutex);
             if(gval.runingJobs <= 0 && gval.lastJob) r = FALSE;
@@ -353,7 +355,6 @@ START_TEST(test_sched_adapt){
     struct evmgr * ev;
 
     fprintf(stderr, "\n***********************test_sched_adapt***********************\n");
-
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
     ev = afb_sched_acquire_event_manager();
