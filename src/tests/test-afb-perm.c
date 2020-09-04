@@ -20,9 +20,10 @@
 
 
 #define BUF_SIZE 1024
-#define TOKEN_NAME "Test Token"
-#define SESSION_NAME "session"
+#define SESSION_NAME "testSession"
 #define TEST_LOA 1
+#define GOOD_TOKEN "goodToken"
+#define BAD_TOKEN "badToken"
 
 
 int val, done;
@@ -246,27 +247,27 @@ START_TEST (test)
 }
 END_TEST
 
-void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth){
+void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, char * token, char * session, int sessionflag){
 	
 	uid_t uid = 1;
 	gid_t gid = 1;
 	pid_t pid = 1;
 
 	afb_req_common_init(req, &test_queryitf, "api", "verb", 0, NULL);
-	afb_req_common_set_session_string(req, SESSION_NAME);
-	afb_req_common_set_token_string(req, TOKEN_NAME);
+	afb_req_common_set_session_string(req, session);
+	if(token) afb_req_common_set_token_string(req, token);
 
 	ck_assert_int_eq(afb_cred_create(&req->credentials, uid, gid, pid, gpath), 0);
 
 	val = done = 0;
-	afb_req_common_check_and_set_session_async(req, auth, 0, testCB, NULL);
+	afb_req_common_check_and_set_session_async(req, auth, sessionflag, testCB, NULL);
 	waiteForCB();
 	ck_assert_int_eq(done, 1);
 
 }
 
-// /*********************************************************************/
-// /* Test with session set */
+/*********************************************************************/
+/* Test with session set */
 START_TEST (testRecCommonPerm)
 {
 	
@@ -283,17 +284,27 @@ START_TEST (testRecCommonPerm)
     first.type = afb_auth_Yes;
     next.type = afb_auth_No;
 
-
 	fprintf(stderr, "\n#### starting cynagora server ####\n");
 	startDemonCynagora();
 
 	/* check for no perm */
 	fprintf(stderr, "\n****** afb_auth_No ******\n");
 	auth.type = afb_auth_No;
-	test_rec_common_perm(&req1, &auth);
+	test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 	ck_assert_int_eq(val, 0);
 
-	
+	/* check for token */
+	fprintf(stderr, "\n****** afb_auth_Token ******\n");
+	auth.type = afb_auth_Token;
+	//Good
+	fprintf(stderr, "good token  :\n");
+	test_rec_common_perm(&req1, &auth, GOOD_TOKEN, SESSION_NAME, 0);
+	ck_assert_int_eq(val, 1);
+	// Bad
+	fprintf(stderr, "bad token  :\n");
+	test_rec_common_perm(&req1, &auth, BAD_TOKEN, SESSION_NAME, 0);
+	ck_assert_int_eq(val, 0);
+
 	/* check for LOA */
 	fprintf(stderr, "\n****** afb_auth_LOA ******\n");
 	auth.type = afb_auth_LOA;
@@ -301,7 +312,7 @@ START_TEST (testRecCommonPerm)
 	for(i=0; i<=3; i++){
 		fprintf(stderr, "LOA %d for %d :\n", i, TEST_LOA);
 		auth.loa = i;
-		test_rec_common_perm(&req1, &auth);
+		test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 		if(i<2)ck_assert_int_eq(val, 1);
 		else ck_assert_int_eq(val, 0);
 	}
@@ -313,14 +324,14 @@ START_TEST (testRecCommonPerm)
 	// good
 	fprintf(stderr, "good perm :\n");
 	auth.text = "perm";
-	test_rec_common_perm(&req1, &auth);
+	test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 	ck_assert_int_eq(val, 1);
 	// bad
 	fprintf(stderr, "bad perm :\n");
 	auth.text = "noPerm";
-	test_rec_common_perm(&req1, &auth);
+	test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 	ck_assert_int_eq(val, 0);
-
+	
 
 	/* check for "or" conditional Permission */
 	fprintf(stderr, "\n****** afb_auth_Or ******\n");
@@ -329,7 +340,7 @@ START_TEST (testRecCommonPerm)
 	auth.first = &first;
 	for(first.type=afb_auth_No; first.type<=afb_auth_Yes; first.type+=afb_auth_Yes){
 		fprintf(stderr, "first %d | next %d :\n", !!first.type, !!next.type);
-		test_rec_common_perm(&req1, &auth);
+		test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 		ck_assert_int_eq(val, first.type || next.type);
 	}
 
@@ -339,7 +350,7 @@ START_TEST (testRecCommonPerm)
 	next.type = afb_auth_Yes;
 	for(first.type=afb_auth_No; first.type<=afb_auth_Yes; first.type+=afb_auth_Yes){
 		fprintf(stderr, "first %d | next %d :\n", !!first.type, !!next.type);
-		test_rec_common_perm(&req1, &auth);
+		test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 		ck_assert_int_eq(val, first.type && next.type);
 	}
 
@@ -348,7 +359,7 @@ START_TEST (testRecCommonPerm)
 	auth.type = afb_auth_Not;
 	for(first.type=afb_auth_No; first.type<=afb_auth_Yes; first.type+=afb_auth_Yes){
 		fprintf(stderr, "first %d | next %d :\n", !!first.type, !!next.type);
-		test_rec_common_perm(&req1, &auth);
+		test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 		ck_assert_int_eq(val, !first.type);
 	}
 
@@ -359,10 +370,43 @@ START_TEST (testRecCommonPerm)
 	for(first.type=afb_auth_No; first.type<=afb_auth_Yes; first.type+=afb_auth_Yes){
 		for(next.type=afb_auth_No; next.type<=afb_auth_Yes; next.type+=afb_auth_Yes){
 			fprintf(stderr, "first %d | next %d :\n", !!first.type, !!next.type);
-			test_rec_common_perm(&req1, &auth);
+			test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 			ck_assert_int_eq(val, 1);
 		}
 	}
+
+	/* check for sessions */
+	fprintf(stderr, "\n**** session ****\n");
+	// Session and LOA
+	// auth.type = afb_auth_LOA;
+	// auth.loa = 1;
+	ck_assert_int_ge(afb_req_common_session_set_LOA_hookable(&req1, 1),0);
+	for(i=1; i<=3; i++){
+		fprintf(stderr, "sessionflag %d and LOA1 :\n", i);
+		//auth.text = "perm";
+		test_rec_common_perm(&req1, NULL, NULL, SESSION_NAME, i);
+		ck_assert_int_eq(val, i<2);
+	}
+	//good session and no auth
+	fprintf(stderr, "no auth good session name\n");
+	test_rec_common_perm(&req1, NULL, NULL, SESSION_NAME, 4);
+	ck_assert_int_eq(val, 1);
+
+	//bad session and no auth
+	fprintf(stderr, "no auth bad session name\n");
+	test_rec_common_perm(&req1, NULL, NULL, "badSession", 4);
+	ck_assert_int_eq(val, 0);
+
+	auth.type = afb_auth_Yes;
+	//good session valid auth
+	fprintf(stderr, "valid auth good session name\n");
+	test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 4);
+	ck_assert_int_eq(val, 1);
+
+	//bad session and valid auth
+	fprintf(stderr, "valid auth bad session name\n");
+	test_rec_common_perm(&req1, &auth, NULL, "badSession", 16);
+	ck_assert_int_eq(val, 0);
 
 	fprintf(stderr, "\n#### stoping cynagora server ####\n");
 	stopDemonCynagora();
