@@ -84,8 +84,9 @@ static struct u16id2ptr *opacifier;
 #define FLAG_IS_CONSTANT        2
 #define FLAG_IS_VALID           4
 #define FLAG_IS_LOCKED          8
-#define FLAG_IS_ETERNAL        16
-#define REF_COUNT_INCREMENT    32
+#define FLAG_IS_ALIAS          16
+#define FLAG_IS_ETERNAL        32
+#define REF_COUNT_INCREMENT    64
 
 #define INITIAL_REF_AND_FLAGS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
 
@@ -114,6 +115,10 @@ static struct u16id2ptr *opacifier;
 #define IS_LOCKED(data)        TEST_FLAGS(data,FLAG_IS_LOCKED)
 #define SET_LOCKED(data)       SET_FLAGS(data,FLAG_IS_LOCKED)
 #define UNSET_LOCKED(data)     UNSET_FLAGS(data,FLAG_IS_LOCKED)
+
+#define IS_ALIAS(data)         TEST_FLAGS(data,FLAG_IS_ALIAS)
+#define SET_ALIAS(data)        SET_FLAGS(data,FLAG_IS_ALIAS)
+#define UNSET_ALIAS(data)      UNSET_FLAGS(data,FLAG_IS_ALIAS)
 
 /*****************************************************************************/
 /***    Shared memory emulation  ***/
@@ -295,6 +300,19 @@ data_cvt_merge(
 }
 
 /**
+ * unalias the data
+ */
+static
+struct afb_data *
+data_unaliased(
+	struct afb_data *data
+) {
+	while(IS_ALIAS(data))
+		data = (struct afb_data*)data->closure;
+	return data;
+}
+
+/**
  * tries to ensure that data is valid
  * returns 1 if valid or zero if it can't validate the data
  */
@@ -307,7 +325,7 @@ data_validate(
 
 	i = data->cvt;
 	while (!IS_VALID(data) && i != data) {
-		if (!IS_VALID(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
+		if (!IS_VALID(i) || IS_ALIAS(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
 			i = i->cvt;
 		}
 		else {
@@ -401,6 +419,33 @@ afb_data_create_copy(
 	return rc;
 }
 
+int
+afb_data_create_alias(
+	struct afb_data **result,
+	struct afb_type *type,
+	struct afb_data *other
+) {
+	int rc;
+	struct afb_data *data;
+
+	*result = data = malloc(sizeof *data);
+	if (data == NULL)
+		rc = X_ENOMEM;
+	else  {
+		data->type = type;
+		data->pointer = 0;
+		data->size = 0;
+		data->cvt = data;
+		data->ref_and_flags = INITIAL_REF_AND_FLAGS | FLAG_IS_ALIAS;
+		data->opaqueid = 0;
+		data->dispose = (void(*)(void*))afb_data_unref;
+		data->closure = other;
+		data_addref(other);
+		rc = 0;
+	}
+	return rc;
+}
+
 /* Get the typenum of the data */
 struct afb_type*
 afb_data_type(
@@ -434,6 +479,7 @@ const void*
 afb_data_const_pointer(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	return data_validate(data) ? data->pointer : NULL;
 }
 
@@ -442,6 +488,7 @@ size_t
 afb_data_size(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	return data_validate(data) ? data->size : 0;
 }
 
@@ -667,7 +714,7 @@ int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 {
 	int rc;
 
-	if (afb_data_is_constant(data)){
+	if (afb_data_is_constant(data) || IS_ALIAS(data)){
 		rc = -1;
 	}
 	else if (data_validate(data)) {
@@ -688,6 +735,7 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 {
 	int rc;
 
+	data = data_unaliased(data);
 	if (data_validate(data)) {
 		rc = 0;
 	}

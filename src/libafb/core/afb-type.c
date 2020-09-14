@@ -280,9 +280,7 @@ operate(
 		type = family;
 		if (type == to_type && kind == Convert) {
 			/* implicit conversion to an ancestor of the family */
-			rc = afb_data_create_raw(to_data, type,
-				afb_data_const_pointer(from_data), afb_data_size(from_data),
-				(void(*)(void*))afb_data_unref, afb_data_addref(from_data));
+			rc = afb_data_create_alias(to_data, type, from_data);
 			return rc;
 		}
 	}

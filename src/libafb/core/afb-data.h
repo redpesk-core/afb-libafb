@@ -63,6 +63,14 @@ afb_data_create_copy(
 	size_t size
 );
 
+extern
+int
+afb_data_create_alias(
+	struct afb_data **result,
+	struct afb_type *type,
+	struct afb_data *other
+);
+
 /**
  * Get the typenum of the data
  *
