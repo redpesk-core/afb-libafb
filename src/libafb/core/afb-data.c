@@ -83,7 +83,7 @@ static struct u16id2ptr *opacifier;
 #define FLAG_IS_VOLATILE        1
 #define FLAG_IS_CONSTANT        2
 #define FLAG_IS_VALID           4
-#define FLAG_LOCK               8
+#define FLAG_IS_LOCKED          8
 #define FLAG_IS_ETERNAL        16
 #define REF_COUNT_INCREMENT    32
 
@@ -99,21 +99,21 @@ static struct u16id2ptr *opacifier;
 #define SET_FLAGS(data,flag)   (__atomic_or_fetch(&((data)->ref_and_flags), flag, __ATOMIC_RELAXED))
 #define UNSET_FLAGS(data,flag) (__atomic_and_fetch(&((data)->ref_and_flags), ~flag, __ATOMIC_RELAXED))
 
-#define ISVALID(data)          TEST_FLAGS(data,FLAG_IS_VALID)
-#define VALIDATE(data)         SET_FLAGS(data,FLAG_IS_VALID)
-#define INVALIDATE(data)       UNSET_FLAGS(data,FLAG_IS_VALID)
+#define IS_VALID(data)         TEST_FLAGS(data,FLAG_IS_VALID)
+#define SET_VALID(data)        SET_FLAGS(data,FLAG_IS_VALID)
+#define UNSET_VALID(data)      UNSET_FLAGS(data,FLAG_IS_VALID)
 
-#define ISVOLATILE(data)       TEST_FLAGS(data,FLAG_IS_VOLATILE)
-#define SETVOLATILE(data)      SET_FLAGS(data,FLAG_IS_VOLATILE)
-#define UNSETVOLATILE(data)    UNSET_FLAGS(data,FLAG_IS_VOLATILE)
+#define IS_VOLATILE(data)      TEST_FLAGS(data,FLAG_IS_VOLATILE)
+#define SET_VOLATILE(data)     SET_FLAGS(data,FLAG_IS_VOLATILE)
+#define UNSET_VOLATILE(data)   UNSET_FLAGS(data,FLAG_IS_VOLATILE)
 
-#define ISCONSTANT(data)       TEST_FLAGS(data,FLAG_IS_CONSTANT)
-#define SETCONSTANT(data)      SET_FLAGS(data,FLAG_IS_CONSTANT)
-#define UNSETCONSTANT(data)    UNSET_FLAGS(data,FLAG_IS_CONSTANT)
+#define IS_CONSTANT(data)      TEST_FLAGS(data,FLAG_IS_CONSTANT)
+#define SET_CONSTANT(data)     SET_FLAGS(data,FLAG_IS_CONSTANT)
+#define UNSET_CONSTANT(data)   UNSET_FLAGS(data,FLAG_IS_CONSTANT)
 
-#define HASLOCK(data)          TEST_FLAGS(data,FLAG_LOCK)
-#define SETLOCK(data)          SET_FLAGS(data,FLAG_LOCK)
-#define UNSETLOCK(data)        UNSET_FLAGS(data,FLAG_LOCK)
+#define IS_LOCKED(data)        TEST_FLAGS(data,FLAG_IS_LOCKED)
+#define SET_LOCKED(data)       SET_FLAGS(data,FLAG_IS_LOCKED)
+#define UNSET_LOCKED(data)     UNSET_FLAGS(data,FLAG_IS_LOCKED)
 
 /*****************************************************************************/
 /***    Shared memory emulation  ***/
@@ -260,7 +260,7 @@ data_cvt_changed(
 	i = p->cvt;
 	while (i != data) {
 		if (HASREF(i)) {
-			INVALIDATE(i);
+			UNSET_VALID(i);
 			if (i->dispose) {
 				i->dispose(i->closure);
 				i->dispose = 0;
@@ -306,8 +306,8 @@ data_validate(
 	struct afb_data *r, *i;
 
 	i = data->cvt;
-	while (!ISVALID(data) && i != data) {
-		if (!ISVALID(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
+	while (!IS_VALID(data) && i != data) {
+		if (!IS_VALID(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
 			i = i->cvt;
 		}
 		else {
@@ -315,10 +315,10 @@ data_validate(
 			data->size = r->size;
 			data->dispose = (void(*)(void*))afb_data_unref;
 			data->closure = r;
-			VALIDATE(data);
+			SET_VALID(data);
 		}
 	}
-	return ISVALID(data);
+	return IS_VALID(data);
 }
 
 /*****************************************************************************/
@@ -477,7 +477,7 @@ afb_data_convert_to(
 		else {
 			/* conversion */
 			rc = afb_type_convert_data(data->type, data, type, &r);
-			if (rc >= 0 && !ISVOLATILE(data)) {
+			if (rc >= 0 && !IS_VOLATILE(data)) {
 				data_cvt_merge(data, r);
 				rc = 0;
 			}
@@ -493,7 +493,7 @@ afb_data_update(
 	struct afb_data *data,
 	struct afb_data *value
 ) {
-	if (!ISVALID(data) || afb_data_is_constant(data) || !data_validate(value)) {
+	if (!IS_VALID(data) || afb_data_is_constant(data) || !data_validate(value)) {
 		/* can not update based on parameter state */
 		return X_EINVAL;
 	}
@@ -580,7 +580,7 @@ int
 afb_data_is_constant(
 	struct afb_data *data
 ) {
-	return ISCONSTANT(data);
+	return IS_CONSTANT(data);
 }
 
 /* set as constant */
@@ -588,7 +588,7 @@ void
 afb_data_set_constant(
 	struct afb_data *data
 ) {
-	SETCONSTANT(data);
+	SET_CONSTANT(data);
 }
 
 /* set as not constant */
@@ -596,7 +596,7 @@ void
 afb_data_set_not_constant(
 	struct afb_data *data
 ) {
-	UNSETCONSTANT(data);
+	UNSET_CONSTANT(data);
 }
 
 /* test if volatile */
@@ -604,7 +604,7 @@ int
 afb_data_is_volatile(
 	struct afb_data *data
 ) {
-	return ISVOLATILE(data);
+	return IS_VOLATILE(data);
 }
 
 /* set as volatile */
@@ -612,7 +612,7 @@ void
 afb_data_set_volatile(
 	struct afb_data *data
 ) {
-	SETVOLATILE(data);
+	SET_VOLATILE(data);
 }
 
 /* set as not volatile */
@@ -620,16 +620,16 @@ void
 afb_data_set_not_volatile(
 	struct afb_data *data
 ) {
-	UNSETVOLATILE(data);
+	UNSET_VOLATILE(data);
 }
 
 static struct afb_data *lockhead(struct afb_data *data)
 {
 	struct afb_data *i = data;
-	while(!HASLOCK(i)) {
+	while(!IS_LOCKED(i)) {
 		i = i->cvt;
 		if (i == data) {
-			SETLOCK(i);
+			SET_LOCKED(i);
 			break;
 		}
 	}
@@ -660,7 +660,7 @@ void afb_data_unlock(struct afb_data *data)
 {
 	struct afb_data *head = lockhead(data);
 	if (!lockany_unlock(head))
-		UNSETLOCK(head);
+		UNSET_LOCKED(head);
 }
 
 int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
@@ -700,4 +700,3 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 		*size = rc < 0 ? 0 : data->size;
 	return rc;
 }
-
