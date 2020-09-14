@@ -77,3 +77,14 @@ extern size_t jsonstr_string_escape(char *dest, size_t destlenmax, const char *s
  */
 extern size_t jsonstr_string_escape_unsafe(char *dest, const char *string, size_t stringlenmax);
 
+/**
+ * test if a string is a valid json utf8 stream.
+ *
+ * @param string        the string to be tested
+ * @param stringlenmax  maximum length of the string to test
+ * @param size          if not NULL, the consumed size until status
+ *
+ * @return 0 if the string is not a valid JSON or otherwise 1
+ */
+extern int jsonstr_test(const char *string, size_t stringlenmax, size_t *size);
+
