@@ -103,7 +103,7 @@ START_TEST (test)
 	call_set = afb_apiset_create("tata", 1);
 
 	// add binding api
-	r = afb_api_so_v4_add("", &dynlib, declare_set, call_set);
+	r = afb_api_so_v4_add(test_path, &dynlib, declare_set, call_set);
 	ck_assert_int_eq(r, 1);
 
 	// check that the api apears in the loaded apis

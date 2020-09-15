@@ -18,7 +18,7 @@ static const struct afb_verb_v4 verbs[]= {
   { .verb="hello",        .callback=hello }
 };
 
-const struct afb_binding_v4 afbBindingV4 = {
+const struct afb_binding_v4 afbBindingExport = {
 	.api = APINAME,
 	.specification = NULL,
 	.verbs = verbs,
