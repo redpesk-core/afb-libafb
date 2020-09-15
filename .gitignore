@@ -2,3 +2,4 @@ docs/
 build/
 doxygen-output/
 .vscode/*.json
+*.swp
