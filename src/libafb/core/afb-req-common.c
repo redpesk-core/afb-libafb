@@ -522,7 +522,7 @@ afb_req_common_has_loa(
 	struct afb_req_common *req,
 	int value
 ) {
-	return value && afb_session_get_loa(req->session, req->api) >= value;
+	return value <= 0 || afb_session_get_loa(req->session, req->api) >= value;
 }
 
 /******************************************************************************/
