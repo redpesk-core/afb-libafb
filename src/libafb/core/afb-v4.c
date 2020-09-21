@@ -29,6 +29,7 @@
 #include "afb-req-v4.h"
 #include "afb-evt.h"
 #include "afb-type.h"
+#include "afb-type-predefined.h"
 #include "afb-api-v4.h"
 
 /* avoid use of afb_data_action_x4_t in header afb_data */

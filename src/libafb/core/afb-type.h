@@ -61,11 +61,6 @@ extern int afb_type_add_updater(
 	void *closure
 );
 
-extern struct afb_type afb_type_predefined_opaque;
-extern struct afb_type afb_type_predefined_stringz;
-extern struct afb_type afb_type_predefined_json;
-extern struct afb_type afb_type_predefined_json_c;
-
 /**
  * Is the given type opaque
  *

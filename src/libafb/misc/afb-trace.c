@@ -42,6 +42,7 @@
 #include "core/afb-cred.h"
 #include "core/afb-data.h"
 #include "core/afb-type.h"
+#include "core/afb-type-predefined.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"

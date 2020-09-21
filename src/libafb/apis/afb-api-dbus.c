@@ -41,6 +41,7 @@
 #include "apis/afb-api-dbus.h"
 #include "core/afb-cred.h"
 #include "core/afb-type.h"
+#include "core/afb-type-predefined.h"
 #include "core/afb-data.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
