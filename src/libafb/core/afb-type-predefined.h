@@ -23,9 +23,17 @@
 
 #pragma once
 
+struct afb_type;
+
+/*****************************************************************************/
+
+extern const char afb_type_predefined_prefix[];
+
 /*****************************************************************************/
 
 extern struct afb_type afb_type_predefined_opaque;
 extern struct afb_type afb_type_predefined_stringz;
 extern struct afb_type afb_type_predefined_json;
 extern struct afb_type afb_type_predefined_json_c;
+
+/*****************************************************************************/

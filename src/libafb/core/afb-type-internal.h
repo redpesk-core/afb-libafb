@@ -32,13 +32,16 @@
 enum opkind
 {
 	/** describes an operation of conversion to an other type */
-	Convert,
+	Convert_To,
+
+	/** describes an operation of conversion from an other type */
+	Convert_From,
 
 	/** describe an operation of update to some type */
-	Update,
+	Update_To,
 
-	/** set the family hierachy */
-	Family
+	/** describe an operation of update from some type */
+	Update_From
 };
 
 /**
@@ -46,17 +49,14 @@ enum opkind
  */
 struct opdesc
 {
-	/** link to the next operation for the same type */
-	struct opdesc *next;
-
 	/** kind of the operation descibed: family, convert or update */
 	enum opkind kind;
 
 	/** target type if convert or update or fimly type */
 	struct afb_type *type;
 
-	/** closure to converter or updater */
-	void *closure;
+	/** link to the next operation for the same type */
+	struct opdesc *next;
 
 	union {
 		/** converter function if kind is convert */
@@ -68,6 +68,9 @@ struct opdesc
 		/** any */
 		void *callback;
 	};
+
+	/** closure to converter or updater */
+	void *closure;
 };
 
 /**
@@ -84,6 +87,9 @@ struct afb_type
 	/** operations */
 	struct opdesc *operations;
 
+	/** link to direct ancestor of family */
+	struct afb_type *family;
+
 	/** flags */
 	uint16_t flags;
 };
@@ -93,6 +99,7 @@ struct afb_type
 #define FLAG_IS_SHAREABLE        1
 #define FLAG_IS_STREAMABLE       2
 #define FLAG_IS_OPAQUE           4
+#define FLAG_IS_PREDEFINED       8
 
 #define INITIAL_FLAGS            0
 
@@ -111,6 +118,10 @@ struct afb_type
 #define IS_OPAQUE(type)          TEST_FLAGS(type,FLAG_IS_OPAQUE)
 #define SET_OPAQUE(type)         SET_FLAGS(type,FLAG_IS_OPAQUE)
 #define UNSET_OPAQUE(type)       UNSET_FLAGS(type,FLAG_IS_OPAQUE)
+
+#define IS_PREDEFINED(type)      TEST_FLAGS(type,FLAG_IS_PREDEFINED)
+#define SET_PREDEFINED(type)     SET_FLAGS(type,FLAG_IS_PREDEFINED)
+#define UNSET_PREDEFINED(type)   UNSET_FLAGS(type,FLAG_IS_PREDEFINED)
 
 /*****************************************************************************/
 

@@ -19,6 +19,8 @@
 #define p2i(x)  ((int)((intptr_t)(x)))
 
 int gmask;
+int cvtmask;
+int dropmask;
 
 void dor(void *p)
 {
@@ -33,43 +35,34 @@ void dand(void *p)
 static void cvdrop(void *p)
 {
 	gmask += p2i(p);
+	dropmask += p2i(p);
 }
 
-static int type1_to_type2(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
+static int t2t(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
 {
-	gmask = gmask * 100 + 12;
-	ck_assert_int_eq(0, afb_data_create_raw(to, type, 0, 0, cvdrop, i2p(2)));
+	int c = p2i(closure);
+	gmask = gmask * 100 + c;
+	cvtmask = cvtmask * 100 + c;
+	ck_assert_int_eq(0, afb_data_create_raw(to, type, 0, 0, cvdrop, i2p(c % 10)));
 	return 0;
 }
 
-static int type2_to_type1(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
-{
-	gmask = gmask * 100 + 21;
-	ck_assert_int_eq(0, afb_data_create_raw(to, type, 0, 0, cvdrop, i2p(1)));
-	return 0;
-}
-
-static int type2_to_type3(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
-{
-	gmask = gmask * 100 + 23;
-	ck_assert_int_eq(0, afb_data_create_raw(to, type, 0, 0, cvdrop, i2p(3)));
-	return 0;
-}
-
-static int type3_to_type2(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
-{
-	gmask = gmask * 100 + 32;
-	ck_assert_int_eq(0, afb_data_create_raw(to, type, 0, 0, cvdrop, i2p(2)));
-	return 0;
-}
 
 static struct afb_type *type1, *type2, *type3;
+
+static struct afb_type *type5;
+
+static struct afb_type *type7, *type8, *type9;
 
 static
 void
 init_types()
 {
 	int rc;
+
+	/* needed when CK_FORK=no */
+	if (type1 && afb_type_get("type1") == type1)
+		return;
 
 	rc = afb_type_register(&type1, "type1", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
@@ -80,16 +73,64 @@ init_types()
 	rc = afb_type_register(&type3, "type3", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_type_add_converter(type1, type2, type1_to_type2, i2p(2));
+	rc = afb_type_register(&type5, "type5", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_type_add_converter(type2, type1, type2_to_type1, i2p(2));
+	rc = afb_type_register(&type7, "type7", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_type_add_converter(type3, type2, type3_to_type2, i2p(2));
+	rc = afb_type_register(&type8, "type8", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_type_add_converter(type2, type3, type2_to_type3, i2p(2));
+	rc = afb_type_register(&type9, "type9", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type1, type2, t2t, i2p(12));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type2, type1, t2t, i2p(21));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type3, type2, t2t, i2p(32));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type2, type3, t2t, i2p(23));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type1, type5, t2t, i2p(15));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type2, type5, t2t, i2p(25));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type3, type5, t2t, i2p(35));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type1, t2t, i2p(51));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type2, t2t, i2p(52));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type3, t2t, i2p(53));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type7, type5, t2t, i2p(75));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type8, type5, t2t, i2p(85));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type9, type5, t2t, i2p(95));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type7, t2t, i2p(57));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type8, t2t, i2p(58));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type5, type9, t2t, i2p(59));
 	ck_assert_int_eq(rc, 0);
 }
 
@@ -120,31 +161,34 @@ END_TEST
 /*********************************************************************/
 /* checking computation of converters using hypercube geometry */
 
-static void tconv(struct afb_type *from, struct afb_type *to, int sig)
+static void tconv(struct afb_type *from, struct afb_type *to, int cvt, int drop)
 {
 	int rc;
 	struct afb_data *dfrom, *dto;
 
 	fprintf(stderr, "testing conversion from %s to %s\n", afb_type_name(from), afb_type_name(to));
-	rc = afb_data_create_raw(&dfrom, from, 0, 0, cvdrop, i2p(sig - (sig % 10)));
+	for(rc = cvt; rc >= 10 ; rc /=10);
+	rc = afb_data_create_raw(&dfrom, from, 0, 0, cvdrop, i2p(rc));
 	ck_assert_int_eq(rc, 0);
-	gmask = 0;
+	gmask = cvtmask = dropmask = 0;
 	rc = afb_data_convert_to(dfrom, to, &dto);
 	ck_assert_int_eq(rc, 0);
-	ck_assert_int_eq(gmask, sig);
-	gmask = 0;
+	ck_assert_int_eq(cvtmask, cvt);
 	afb_data_unref(dfrom);
 	afb_data_unref(dto);
-	ck_assert_int_eq(gmask, sig);
+	ck_assert_int_eq(dropmask, drop);
 }
 
 START_TEST (check_convert)
 {
 	init_types();
-	tconv(type1, type2, 12);
-	tconv(type2, type1, 21);
-	tconv(type2, type3, 23);
-	tconv(type3, type2, 32);
+	tconv(type1, type2, 12, 3);
+	tconv(type2, type1, 21, 3);
+	tconv(type2, type3, 23, 5);
+	tconv(type3, type2, 32, 5);
+	tconv(type1, type7, 1557, 13);
+	tconv(type2, type8, 2558, 15);
+	tconv(type3, type9, 3559, 17);
 }
 END_TEST
 

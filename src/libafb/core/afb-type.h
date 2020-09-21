@@ -40,7 +40,7 @@ typedef int (*afb_type_updater_t)(
 
 extern int afb_type_register(struct afb_type **result, const char *name, int streamable, int shareable, int opaque);
 extern struct afb_type *afb_type_get(const char *name);
-extern const char *afb_type_name(struct afb_type *type);
+extern const char *afb_type_name(const struct afb_type *type);
 
 extern int afb_type_set_family(
 	struct afb_type *type,
@@ -68,9 +68,9 @@ extern int afb_type_add_updater(
  *
  * @return 1 if opaque, 0 if not
  */
-extern int afb_type_is_opaque(struct afb_type *type);
-extern int afb_type_is_streamable(struct afb_type *type);
-extern int afb_type_is_shareable(struct afb_type *type);
+extern int afb_type_is_opaque(const struct afb_type *type);
+extern int afb_type_is_streamable(const struct afb_type *type);
+extern int afb_type_is_shareable(const struct afb_type *type);
 
 extern
 int

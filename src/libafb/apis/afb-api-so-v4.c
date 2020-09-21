@@ -56,7 +56,7 @@ struct args
 {
 	struct afb_api_v4 **root;
 	const struct afb_binding_v4 *desc;
-	int (*mainctl)(struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t);
+	int (*mainctl)(const struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t);
 };
 
 static int init_for_desc(struct afb_api_v4 *api, void *closure)

@@ -343,7 +343,7 @@ static void call_checked_v4(void *closure, int status)
 		reqv4->verb->callback(
 			reqv4,
 			reqv4->comreq->nparams,
-			reqv4->comreq->params
+			(const struct afb_data * const*)reqv4->comreq->params
 			);
 	afb_req_v4_unref(reqv4);
 }

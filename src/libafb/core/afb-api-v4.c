@@ -80,7 +80,7 @@ struct afb_api_v4
 	struct json_object *settings;
 
 	/* control function */
-	int (*mainctl)(struct afb_api_v4 *apiv4, afb_ctlid_t id, afb_ctlarg_t arg);
+	int (*mainctl)(const struct afb_api_v4 *apiv4, afb_ctlid_t id, afb_ctlarg_t arg);
 
 	/* userdata */
 	void *userdata;
@@ -119,7 +119,7 @@ static inline int is_sealed(struct afb_api_v4 *apiv4)
 struct safe_ctlproc_s
 {
 	struct afb_api_v4 *apiv4;
-	int (*ctlproc)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
+	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
 	afb_ctlid_t ctlid;
 	afb_ctlarg_t ctlarg;
 	int result;
@@ -146,7 +146,7 @@ static int safe_ctlproc_call(struct afb_api_v4 *apiv4, struct safe_ctlproc_s *sc
 int
 afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
-	int (*ctlproc)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
+	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
 	afb_ctlid_t ctlid,
 	afb_ctlarg_t ctlarg
 ) {
@@ -419,7 +419,7 @@ afb_api_v4_new_api_hookable(
 	const char *apiname,
 	const char *info,
 	int noconcurrency,
-	int (*mainctl)(struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
+	int (*mainctl)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
 	void *closure)
 {
 	union afb_ctlarg ctlarg;
@@ -478,7 +478,7 @@ afb_api_v4_add_verb_hookable(
 	struct afb_api_v4 *apiv4,
 	const char *verb,
 	const char *info,
-	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
+	void (*callback)(const struct afb_req_v4 *req, unsigned nparams, const struct afb_data * const params[]),
 	void *vcbdata,
 	const struct afb_auth *auth,
 	uint32_t session,
@@ -869,7 +869,7 @@ afb_api_v4_add_verb(
 	struct afb_api_v4 *apiv4,
 	const char *verb,
 	const char *info,
-	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
+	void (*callback)(const struct afb_req_v4 *req, unsigned nparams, const struct afb_data * const params[]),
 	void *vcbdata,
 	const struct afb_auth *auth,
 	uint32_t session,

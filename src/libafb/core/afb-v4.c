@@ -87,10 +87,19 @@ x4_api_type_register(
 	const char *name,
 	afb_type_flags_x4_t flags
 ) {
-	return afb_type_register(type, name,
+	int i = 0;
+	while (afb_type_predefined_prefix[i] && afb_type_predefined_prefix[i] == name[i])
+		i++;
+	if (afb_type_predefined_prefix[i]) {
+		return afb_type_register(type, name,
 			flags & Afb_Type_Flags_x4_Streamable,
 			flags & Afb_Type_Flags_x4_Streamable,
 			flags & Afb_Type_Flags_x4_Opaque);
+	}
+	else {
+		*type = 0;
+		return -1;
+	}
 }
 
 static
@@ -103,6 +112,36 @@ x4_api_type_lookup(
 }
 
 
+/***********************************************************
+ * Hack to avoid work to cast from not const to const */
+
+#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
+
+/* From the alternatives to that single line above,
+ * the possibilities are:
+ *
+ *   - Manage const/not const in bindings
+ *      PRO  - cleaner
+ *           - compiler check of types
+ *      CONS - should have 2 typedefs or 0 instead of one
+ *           - implies that some opaque are writable
+ *           - implies complexity of internal of the binder
+ *
+ *   - Use alias attributes
+ *      PRO  - cleaner
+ *      CONS - actually a kind of convertion from incompatible pointers
+ *           - use of 2 names for a single function
+ *           - not verified by compiler
+ *
+ *   - Introduce wrapper functions
+ *      PRO  - cleaner
+ *           - compiler check of types
+ *      CONS - implies explicit casts in these functions
+ *           - use of 2 names for a single function
+ *           - introduce at least a jump
+ */
+
+/**********************************************************/
 
 const struct afb_binding_x4_itf afb_v4_itf = {
 

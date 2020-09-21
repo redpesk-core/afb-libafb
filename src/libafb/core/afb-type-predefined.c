@@ -21,6 +21,14 @@
  * $RP_END_LICENSE$
  */
 
+/*
+ * Predefined types declared in constant initialized memory
+ * It can then take placr in some read only memory.
+ * For convenience, the symbols are exported as writeable
+ * but the program takes care of the flag FLAG_IS_PREDEFINED
+ * to avoid modifying such read only data.
+ */
+
 #include "libafb-config.h"
 
 #include <stdlib.h>
@@ -42,6 +50,14 @@
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
+
+#if !defined(AFB_PREFIX_PREDEF_TYPE)
+#  define AFB_PREFIX_PREDEF_TYPE "afb:"
+#endif
+
+/*****************************************************************************/
+
+const char afb_type_predefined_prefix[] = AFB_PREFIX_PREDEF_TYPE;
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -75,7 +91,7 @@ opaque_from_string(
 	else {
 		rc = afb_data_get_opacified(opaqueid, &found, &otype);
 		if (rc >= 0) {
-			if (type == afb_data_type(found))
+			if (type == otype)
 				*out = found;
 			else {
 				afb_data_unref(found);
@@ -352,137 +368,137 @@ static int convert_json_c_to_opaque(
 /*****************************************************************************/
 /*****************************************************************************/
 
+#define PREDEFINED_TYPE(x) \
+		extern struct afb_type __attribute__((alias("predefined_" #x))) afb_type_predefined_##x;  \
+		static const struct afb_type predefined_##x =
+
 /*****************************************************************************/
 /* PREDEFINED OPAQUE */
 
-static struct opdesc opcvt_opaque_to_stringz =
+static const struct opdesc opcvt_opaque_to_stringz =
 	{
 		.next = 0,
-		.kind = Convert,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_stringz,
 		.closure = 0,
 		.converter = convert_opaque_to_stringz
 	};
 
-static struct opdesc opcvt_opaque_to_json_string =
+static const struct opdesc opcvt_opaque_to_json_string =
 	{
-		.next = &opcvt_opaque_to_stringz,
-		.kind = Convert,
+		.next = (struct opdesc*)&opcvt_opaque_to_stringz,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_json,
 		.closure = 0,
 		.converter = convert_opaque_to_json_string
 	};
 
-static struct opdesc opcvt_opaque_to_json_c =
+static const struct opdesc opcvt_opaque_to_json_c =
 	{
-		.next = &opcvt_opaque_to_json_string,
-		.kind = Convert,
+		.next = (struct opdesc*)&opcvt_opaque_to_json_string,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_json_c,
 		.closure = 0,
 		.converter = convert_opaque_to_json_c
 	};
 
-struct afb_type afb_type_predefined_opaque =
+PREDEFINED_TYPE(opaque)
 	{
-		.name = "afb:OPAQUE",
+		.name = AFB_PREFIX_PREDEF_TYPE"OPAQUE",
 		.next = 0,
-		.operations = &opcvt_opaque_to_json_c,
-		.flags = FLAG_IS_OPAQUE
+		.operations = (struct opdesc*)&opcvt_opaque_to_json_c,
+		.family = 0,
+		.flags = FLAG_IS_PREDEFINED | FLAG_IS_OPAQUE
 	};
 
 /*****************************************************************************/
 /* PREDEFINED STRINGZ */
 
-static struct opdesc opcvt_stringz_to_opaque =
+static const struct opdesc opcvt_stringz_to_opaque =
 	{
 		.next = 0,
-		.kind = Convert,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_opaque,
 		.closure = 0,
 		.converter = convert_stringz_to_opaque
 	};
 
-static struct opdesc opcvt_stringz_to_json_string =
+static const struct opdesc opcvt_stringz_to_json_string =
 	{
-		.next = &opcvt_stringz_to_opaque,
-		.kind = Convert,
+		.next = (struct opdesc*)&opcvt_stringz_to_opaque,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_json,
 		.closure = 0,
 		.converter = convert_stringz_to_json_string
 	};
 
-struct afb_type afb_type_predefined_stringz =
+PREDEFINED_TYPE(stringz)
 	{
-		.name = "afb:STRINGZ",
-		.next = &afb_type_predefined_opaque,
-		.operations = &opcvt_stringz_to_json_string,
-		.flags = FLAG_IS_STREAMABLE
+		.name = AFB_PREFIX_PREDEF_TYPE"STRINGZ",
+		.next = (struct afb_type*)&afb_type_predefined_opaque,
+		.operations = (struct opdesc*)&opcvt_stringz_to_json_string,
+		.family = 0,
+		.flags = FLAG_IS_PREDEFINED | FLAG_IS_STREAMABLE
 	};
 
 /*****************************************************************************/
 /* PREDEFINED JSON */
 
-static struct opdesc opfamily_json_string =
+static const struct opdesc opcvt_json_string_to_opaque =
 	{
 		.next = 0,
-		.kind = Family,
-		.type = &afb_type_predefined_stringz
-	};
-
-static struct opdesc opcvt_json_string_to_opaque =
-	{
-		.next = &opfamily_json_string,
-		.kind = Convert,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_opaque,
 		.converter = convert_json_string_to_opaque
 	};
 
-static struct opdesc opcvt_json_string_to_json_c =
+static const struct opdesc opcvt_json_string_to_json_c =
 	{
-		.next = &opcvt_json_string_to_opaque,
-		.kind = Convert,
+		.next = (struct opdesc*)&opcvt_json_string_to_opaque,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_json_c,
 		.converter = convert_json_string_to_json_c
 	};
 
-struct afb_type afb_type_predefined_json =
+PREDEFINED_TYPE(json)
 	{
-		.name = "afb:JSON",
-		.next = &afb_type_predefined_stringz,
-		.operations = &opcvt_json_string_to_json_c,
-		.flags = FLAG_IS_STREAMABLE
+		.name = AFB_PREFIX_PREDEF_TYPE"JSON",
+		.next = (struct afb_type*)&afb_type_predefined_stringz,
+		.operations = (struct opdesc*)&opcvt_json_string_to_json_c,
+		.family = &afb_type_predefined_stringz,
+		.flags = FLAG_IS_PREDEFINED | FLAG_IS_STREAMABLE
 	};
 
 /*****************************************************************************/
 /* PREDEFINED JSON-C */
 
-static struct opdesc opcvt_json_c_to_opaque =
+static const struct opdesc opcvt_json_c_to_opaque =
 	{
 		.next = 0,
-		.kind = Convert,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_opaque,
 		.converter = convert_json_c_to_opaque
 	};
 
-static struct opdesc opcvt_json_c_to_json_string =
+static const struct opdesc opcvt_json_c_to_json_string =
 	{
-		.next = &opcvt_json_c_to_opaque,
-		.kind = Convert,
+		.next = (struct opdesc*)&opcvt_json_c_to_opaque,
+		.kind = Convert_To,
 		.type = &afb_type_predefined_json,
 		.converter = convert_json_c_to_json_string
 	};
 
-struct afb_type afb_type_predefined_json_c =
+PREDEFINED_TYPE(json_c)
 	{
-		.name = "afb:JSON-C",
-		.next = &afb_type_predefined_json,
-		.operations = &opcvt_json_c_to_json_string,
-		.flags = 0
+		.name = AFB_PREFIX_PREDEF_TYPE"JSON-C",
+		.next = (struct afb_type*)&afb_type_predefined_json,
+		.operations = (struct opdesc*)&opcvt_json_c_to_json_string,
+		.flags = FLAG_IS_PREDEFINED
 	};
 
 /*****************************************************************************/
 /* set the head of predefineds */
 
 extern struct afb_type
-	__attribute__((alias("afb_type_predefined_json_c")))
-		_afb_type_head_of_predefineds_;
+		__attribute__((alias("afb_type_predefined_json_c")))
+			_afb_type_head_of_predefineds_;

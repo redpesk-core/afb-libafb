@@ -109,6 +109,7 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 				SET_SHAREABLE(type);
 			}
 			type->operations = 0;
+			type->family = 0;
 			type->flags = 0;
 			type->next = known_types;
 			known_types = type;
@@ -129,24 +130,45 @@ struct afb_type *afb_type_get(const char *name)
 	return type;
 }
 
-const char *afb_type_name(struct afb_type *type)
+const char *afb_type_name(const struct afb_type *type)
 {
 	return type->name;
 }
 
-int afb_type_is_streamable(struct afb_type *type)
+int afb_type_is_streamable(const struct afb_type *type)
 {
 	return IS_STREAMABLE(type);
 }
 
-int afb_type_is_shareable(struct afb_type *type)
+int afb_type_is_shareable(const struct afb_type *type)
 {
 	return IS_SHAREABLE(type);
 }
 
-int afb_type_is_opaque(struct afb_type *type)
+int afb_type_is_opaque(const struct afb_type *type)
 {
 	return IS_OPAQUE(type);
+}
+
+/**
+ * Search in the operation list the operation matching the given kind and type.
+ *
+ * @param odsc   list of operation to be searched
+ * @param kind   the kind of operation searched
+ * @param type   the type searched
+ *
+ * @return the found operation or NULL
+ */
+static
+struct opdesc *
+searchop(
+	struct opdesc *odsc,
+	enum opkind kind,
+	const struct afb_type *type
+) {
+	while (odsc && (odsc->kind != kind || odsc->type != type))
+		odsc = odsc->next;
+	return odsc;
 }
 
 static
@@ -156,49 +178,115 @@ operate(
 	struct afb_data *from_data,
 	struct afb_type *to_type,
 	struct afb_data **to_data,
-	enum opkind kind
+	int convert
 ) {
 	int rc;
-	struct opdesc *odsc;
-	struct afb_type *type, *family;
+	struct opdesc *odsc, *op;
+	struct afb_type *type, *t;
+	struct afb_data *xdata;
 
-	/* iterate the family */
+	/* Search direct conversion */
 	type = from_type;
 	while (type) {
-		family = 0;
-		/* inspect operations */
-		for (odsc = type->operations; odsc; odsc = odsc->next) {
-			if (odsc->kind == Family) {
-				/* record the family */
-				family = odsc->type;
-			}
-			else if (odsc->kind == kind && odsc->type == to_type) {
-				/* operation for the destination type */
-				if (odsc->kind == Convert) {
-					/* conversion case */
-					rc = odsc->converter(odsc->closure, from_data, to_type, to_data);
-					if (rc >= 0) {
-						return rc;
-					}
-				} else {
-					/* update case */
-					rc = odsc->updater(odsc->closure, from_data, to_type, *to_data);
-					if (rc >= 0) {
-						return rc;
-					}
-				}
-			}
+		/* search forward */
+		odsc = searchop(type->operations, convert ? Convert_To : Update_To, to_type);
+		if (odsc) {
+			rc = convert
+				? odsc->converter(odsc->closure, from_data, to_type, to_data)
+				: odsc->updater(odsc->closure, from_data, to_type, *to_data);
+			if (rc >= 0)
+				return rc;
+		}
+		/* search backward */
+		odsc = searchop(to_type->operations, convert ? Convert_From : Update_From, type);
+		if (odsc) {
+			rc = convert
+				? odsc->converter(odsc->closure, from_data, to_type, to_data)
+				: odsc->updater(odsc->closure, from_data, to_type, *to_data);
+			if (rc >= 0)
+				return rc;
 		}
 		/* not found, try an ancestor if one exists */
-		type = family;
-		if (type == to_type && kind == Convert) {
+		type = type->family;
+		if (type == to_type && convert) {
 			/* implicit conversion to an ancestor of the family */
 			rc = afb_data_create_alias(to_data, type, from_data);
 			return rc;
 		}
 	}
-	/* no operation found or succesful */
-	if (kind == Convert)
+	/* Fast search of indirect conversion */
+	type = from_type;
+	while (type) {
+		/* search forward */
+		for (op = type->operations ; op ; op = op->next) {
+			if (op->kind != Convert_To)
+				continue;
+			odsc = convert
+				? (searchop(to_type->operations, Convert_From, op->type)
+					?: searchop(op->type->operations, Convert_To, to_type))
+				: (searchop(to_type->operations, Update_From, op->type)
+					?: searchop(op->type->operations, Update_To, to_type));
+			if (!odsc)
+				continue;
+			rc = op->converter(op->closure, from_data, op->type, &xdata);
+			if (rc < 0)
+				continue;
+			rc = convert
+				? odsc->converter(odsc->closure, xdata, to_type, to_data)
+				: odsc->updater(odsc->closure, xdata, to_type, *to_data);
+			afb_data_unref(xdata);
+			if (rc >= 0)
+				return rc;
+		}
+		/* search backward */
+		for (op = to_type->operations ; op ; op = op->next) {
+			if (convert) {
+				if (op->kind != Convert_From)
+					continue;
+				odsc = searchop(op->type->operations, Convert_From, type);
+			} else {
+				if (op->kind != Update_From)
+					continue;
+				odsc = searchop(op->type->operations, Convert_From, type);
+			}
+			if (!odsc)
+				continue;
+			rc = odsc->converter(odsc->closure, from_data, op->type, &xdata);
+			if (rc < 0)
+				continue;
+			rc = convert
+				? op->converter(op->closure, xdata, to_type, to_data)
+				: op->updater(op->closure, xdata, to_type, *to_data);
+			afb_data_unref(xdata);
+			if (rc >= 0)
+				return rc;
+		}
+		type = type->family;
+	}
+	/* Long search of indirect conversion */
+	for (type = known_types ; type ; type = type->next) {
+		for (t = from_type; t && t != type; t = t->family);
+		if (t || type == to_type)
+			continue;
+		op = searchop(type->operations, Convert_From, from_type);
+		if (!op)
+			continue;
+		odsc = searchop(type->operations, convert ? Convert_To : Update_To, to_type);
+		if (!odsc)
+			continue;
+		rc = op->converter(op->closure, from_data, type, &xdata);
+		if (rc < 0)
+			continue;
+		rc = convert
+			? odsc->converter(odsc->closure, xdata, to_type, to_data)
+			: odsc->updater(odsc->closure, xdata, to_type, *to_data);
+		afb_data_unref(xdata);
+		if (rc >= 0)
+			return rc;
+	}
+
+	/* nothing found */
+	if (convert)
 		*to_data = 0;
 	return X_ENOENT;
 }
@@ -211,7 +299,7 @@ afb_type_update_data(
 	struct afb_type *to_type,
 	struct afb_data *to_data
 ) {
-	return operate(from_type, from_data, to_type, &to_data, Update);
+	return operate(from_type, from_data, to_type, &to_data, 0);
 }
 
 int
@@ -221,7 +309,7 @@ afb_type_convert_data(
 	struct afb_type *to_type,
 	struct afb_data **to_data
 ) {
-	return operate(from_type, from_data, to_type, to_data, Convert);
+	return operate(from_type, from_data, to_type, to_data, 1);
 }
 
 static
@@ -258,7 +346,8 @@ int afb_type_set_family(
 	struct afb_type *type,
 	struct afb_type *family
 ) {
-	return add_op(type, Family, family, 0, 0);
+	type->family = family;
+	return 0;
 }
 
 int afb_type_add_converter(
@@ -267,7 +356,11 @@ int afb_type_add_converter(
 	afb_type_converter_t converter,
 	void *closure
 ) {
-	return add_op(type, Convert, totype, converter, closure);
+	if (!IS_PREDEFINED(type))
+		return add_op(type, Convert_To, totype, converter, closure);
+	if (!IS_PREDEFINED(totype))
+		return add_op(totype, Convert_From, type, converter, closure);
+	return X_EINVAL;
 }
 
 int afb_type_add_updater(
@@ -276,6 +369,10 @@ int afb_type_add_updater(
 	afb_type_updater_t updater,
 	void *closure
 ) {
-	return add_op(type, Update, totype, updater, closure);
+	if (!IS_PREDEFINED(type))
+		return add_op(type, Update_To, totype, updater, closure);
+	if (!IS_PREDEFINED(totype))
+		return add_op(totype, Update_From, type, updater, closure);
+	return X_EINVAL;
 }
 
