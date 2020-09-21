@@ -74,25 +74,33 @@ int getpath(char buffer[BUF_SIZE], const char *base)
 }
 
 void preparDemonCynagora(){
-	sprintf(gpath, "%s/%d", getcwd(cwd, sizeof(cwd)), (int)getpid());
-	sprintf(env, "CYNAGORA_SOCKET_CHECK=unix:%s/cynagora.check", gpath);
+	char *p;
+	int r;
+	
+	p = getcwd(cwd, sizeof(cwd));
+	ck_assert_ptr_ne(p, 0);
+	r = snprintf(gpath, sizeof gpath, "%s/%d", cwd, (int)getpid());
+	ck_assert_int_lt(r, (int)(sizeof gpath));
+	r = snprintf(env, sizeof env, "CYNAGORA_SOCKET_CHECK=unix:%s/cynagora.check", gpath);
+	ck_assert_int_lt(r, (int)(sizeof env));
 	putenv(env);
 	pathReady = 1;
 }
 
 void startDemonCynagora(){
-	
+
 	if(!pathReady) preparDemonCynagora();
 
 	gpid = fork();
 	ck_assert_int_ge(gpid,0);
 
 	if(gpid == 0){
-		int i;
+		int i, r;
 		char path[1024];
 		char cynagoraInitF[1024];
 		getpath(path, "cynagoraTest.initial");
-		sprintf(cynagoraInitF, "%s/%s", cwd, path);
+		r = snprintf(cynagoraInitF, sizeof cynagoraInitF, "%s/%s", cwd, path);
+		ck_assert_int_lt(r, (int)(sizeof cynagoraInitF));
 		char * argv[] = {
 			"cynagorad",
 			"--dbdir",
@@ -119,14 +127,17 @@ void startDemonCynagora(){
 }
 
 void stopDemonCynagora(){
-	int a;
+	int a, r;
 	char cmd[1024];
 
 	kill(gpid, 9);
 	waitpid(gpid, &a, 0);
 
-	sprintf(cmd, "rm -rf %s", gpath);
-	ck_assert_int_eq(system(cmd), 0);
+	r = snprintf(cmd, sizeof cmd, "rm -rf %s", gpath);
+	ck_assert_int_lt(r, (int)(sizeof cmd));
+
+	r = system(cmd);
+	ck_assert_int_eq(r, 0);
 }
 
 /*********************************************************************/
