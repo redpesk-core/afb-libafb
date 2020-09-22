@@ -185,25 +185,6 @@ afb_req_common_async_push2(
 	return 1;
 }
 
-int
-afb_req_common_async_push3(
-	struct afb_req_common *req,
-	void *value1,
-	void *value2,
-	void *value3
-) {
-	unsigned i = req->asyncount;
-
-	if (i + 2 >= (sizeof req->asyncitems / sizeof req->asyncitems[0]))
-		return 0;
-
-	req->asyncitems[i] = value1;
-	req->asyncitems[i + 1] = value2;
-	req->asyncitems[i + 2] = value3;
-	req->asyncount = (uint16_t)((i + 3) & 15);
-	return 1;
-}
-
 void*
 afb_req_common_async_pop(
 	struct afb_req_common *req
