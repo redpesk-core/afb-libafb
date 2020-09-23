@@ -115,16 +115,37 @@ static inline int is_sealed(struct afb_api_v4 *apiv4)
 }
 
 /*****************************************************************************/
+#if !defined(APIV4_SAFE_CTLPROC_TIME)
+# define APIV4_SAFE_CTLPROC_TIME 60
+#endif
 
+/**
+ * structure used to safely call control proc (mostly mainctl).
+ */
 struct safe_ctlproc_s
 {
+	/** api of the call */
 	struct afb_api_v4 *apiv4;
-	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
+
+	/** the identification of the control */
 	afb_ctlid_t ctlid;
+
+	/** the argument of the control */
 	afb_ctlarg_t ctlarg;
+
+	/** the control proc */
+	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
+
+	/** the result of the call */
 	int result;
 };
 
+/**
+ * The secured callback (@see afb_sig_monitor_run)
+ *
+ * @param sig      0 on normal flow or the signal number if interrupted
+ * @param closure  a pointer to a safe_ctlproc_s structure
+ */
 static void safe_ctlproc_call_cb(int sig, void *closure)
 {
 	struct safe_ctlproc_s *scp = closure;
@@ -133,16 +154,20 @@ static void safe_ctlproc_call_cb(int sig, void *closure)
 		: scp->ctlproc(scp->apiv4, scp->ctlid, scp->ctlarg);
 }
 
-static int safe_ctlproc_call(struct afb_api_v4 *apiv4, struct safe_ctlproc_s *scp)
+/**
+ * Wrapper for calling afb_sig_monitor_run and returning the result
+ *
+ * @param scp  description of the safe call to perform
+ *
+ * @result the result of the call
+ */
+static int safe_ctlproc_call(struct safe_ctlproc_s *scp)
 {
-	if (!scp->ctlproc)
-		return 0;
-
-	scp->apiv4 = apiv4;
-	afb_sig_monitor_run(60, safe_ctlproc_call_cb, scp);
+	afb_sig_monitor_run(APIV4_SAFE_CTLPROC_TIME, safe_ctlproc_call_cb, scp);
 	return scp->result;
 }
 
+/* Call safely the ctlproc with the given parameters */
 int
 afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
@@ -152,10 +177,14 @@ afb_api_v4_safe_ctlproc(
 ) {
 	struct safe_ctlproc_s scp;
 
-	scp.ctlproc = ctlproc;
+	if (!ctlproc)
+		return 0;
+
+	scp.apiv4 = apiv4;
 	scp.ctlid = ctlid;
 	scp.ctlarg = ctlarg;
-	return safe_ctlproc_call(apiv4, &scp);
+	scp.ctlproc = ctlproc;
+	return safe_ctlproc_call(&scp);
 }
 
 /**********************************************
@@ -174,6 +203,20 @@ afb_api_v4_name(
 	struct afb_api_v4 *apiv4
 ) {
 	return apiv4->comapi.name;
+}
+
+const char *
+afb_api_v4_info(
+	struct afb_api_v4 *apiv4
+) {
+	return apiv4->comapi.info;
+}
+
+const char *
+afb_api_v4_path(
+	struct afb_api_v4 *apiv4
+) {
+	return apiv4->comapi.path;
 }
 
 void *
@@ -294,19 +337,6 @@ afb_api_v4_new_event_hookable(
 	return rc;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 static
 void
 call_x4_cb(
@@ -370,36 +400,15 @@ afb_api_v4_call_sync_hookable(
 					status, nreplies, replies);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Callback for calling preinitialization function of a new api
+ * The new api is received in parameter.
+ *
+ * @param apiv4    the new api
+ * @param closure  a pointer to the safe_ctlproc_s structure to use
+ *
+ * @return a negative value on error or else a positive or null value
+ */
 static
 int
 preinit_new_api(
@@ -407,9 +416,11 @@ preinit_new_api(
 	void *closure
 ) {
 	struct safe_ctlproc_s *scp = closure;
+
+	/* set the mainctl of the fresh api to the one to call */
 	apiv4->mainctl = scp->ctlproc;
-	scp->ctlid = afb_ctlid_Pre_Init;
-	return safe_ctlproc_call(apiv4, scp);
+	scp->apiv4 = apiv4;
+	return safe_ctlproc_call(scp);
 }
 
 int
@@ -432,8 +443,10 @@ afb_api_v4_new_api_hookable(
 #endif
 
 	ctlarg.pre_init.closure = closure;
+	ctlarg.pre_init.path = apiv4->comapi.path;
 	scp.ctlproc = mainctl;
 	scp.ctlarg = &ctlarg;
+	scp.ctlid = afb_ctlid_Pre_Init;
 	r = afb_api_v4_create(
 		newapiv4,
 		apiv4->comapi.declare_set,
@@ -523,20 +536,6 @@ afb_api_v4_delete_api_hookable(
 
 	return r;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int
 afb_api_v4_event_handler_add_hookable(

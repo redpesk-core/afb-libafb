@@ -38,27 +38,58 @@
 #include "core/afb-apiname.h"
 #include "core/afb-string-mode.h"
 #include "apis/afb-api-so-v4.h"
+#include "core/afb-api-common.h"
 #include "core/afb-api-v4.h"
 #include "core/afb-apiset.h"
 #include "sys/x-realpath.h"
 #include "sys/verbose.h"
 
-/*
+/*********************************************************
  * names of symbols
+ ********************************************************/
+
+/**
+ * Name of the structure describing statically the binding: "afbBindingV4"
  */
 static const char afb_api_so_v4_desc[] = "afbBindingV4";
+
+/**
+ * Name of the pointer for the root api: "afbBindingV4root"
+ */
 static const char afb_api_so_v4_root[] = "afbBindingV4root";
+
+/**
+ * Name of the entry function for dynamic bindings: "afbBindingV4entry"
+ */
 static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
+
+/**
+ * Name of the structure to init for callbacks: "afbBindingV4itf"
+ */
 static const char afb_api_so_v4_itf[] = "afbBindingV4itf";
+
+/**
+ * Name of the pointer to init to structure of callbacks: "afbBindingV4itfptr"
+ */
 static const char afb_api_so_v4_itfptr[] = "afbBindingV4itfptr";
 
+/**
+ * tiny structure for handling arguments of callbacks
+ */
 struct args
 {
+	/** root api of the loaded binding */
 	struct afb_api_v4 **root;
+
+	/** descriptor of the binding for static api */
 	const struct afb_binding_v4 *desc;
+
+	/** main control routine */
 	int (*mainctl)(const struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t);
 };
 
+/**
+ */
 static int init_for_desc(struct afb_api_v4 *api, void *closure)
 {
 	const struct args *a = closure;
@@ -69,6 +100,7 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 	rc = afb_api_v4_set_binding_fields(api, a->desc);
 	if (rc >= 0) {
 		ctlarg.pre_init.closure = 0;
+		ctlarg.pre_init.path = afb_api_v4_path(api);
 		rc = afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Pre_Init, &ctlarg);
 	}
 	afb_api_v4_seal(api);
@@ -78,10 +110,12 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 static int init_for_root(struct afb_api_v4 *api, void *closure)
 {
 	const struct args *a = closure;
+	union afb_ctlarg ctlarg;
 
 	*a->root = api;
 	afb_api_v4_seal(api);
-	return afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Root_Entry, NULL);
+	ctlarg.root_entry.path = afb_api_v4_path(api);
+	return afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Root_Entry, &ctlarg);
 }
 
 int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)

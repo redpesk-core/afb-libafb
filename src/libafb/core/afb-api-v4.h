@@ -54,6 +54,16 @@ afb_api_v4_create(
 	enum afb_string_mode mode_path
 );
 
+/**
+ * Call safely the ctlproc with the given parameters
+ *
+ * @param apiv4    the api to pass to the ctlproc
+ * @param ctlproc  the ctlproc to call
+ * @param ctlid    the ctlid to pass to the ctlproc
+ * @param ctlarg   the ctlarg to pass to the ctlproc
+ *
+ * @return a negative value on error or else a positive or null value
+ */
 extern
 int
 afb_api_v4_safe_ctlproc(
@@ -139,6 +149,18 @@ afb_api_v4_logmask(
 extern
 const char *
 afb_api_v4_name(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+const char *
+afb_api_v4_info(
+	struct afb_api_v4 *apiv4
+);
+
+extern
+const char *
+afb_api_v4_path(
 	struct afb_api_v4 *apiv4
 );
 
