@@ -12,6 +12,7 @@ static int mainctl(afb_api_x4_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg){
 }
 static void hello(afb_req_t request, unsigned nparams, afb_data_t const *params){
     fprintf(stderr, "Hello !");
+    afb_req_reply(request, 0, 0, NULL);
 }
 
 static const struct afb_verb_v4 verbs[]= {
