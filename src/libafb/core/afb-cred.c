@@ -209,8 +209,9 @@ int afb_cred_import(struct afb_cred **cred, const char *string)
 {
 	int rc, uid, gid, pid, pos;
 
+	pos = -1;
 	rc = sscanf(string, import_format, &uid, &gid, &pid, &pos);
-	if (rc != 3) {
+	if (rc != 3 || pos < 0) {
 		*cred = NULL;
 		return X_EINVAL;
 

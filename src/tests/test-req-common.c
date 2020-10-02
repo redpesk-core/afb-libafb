@@ -179,13 +179,13 @@ START_TEST (session)
 	ck_assert_int_ge(afb_req_common_session_set_LOA_hookable(req, 2), 0);
 	// show_session(req->session);
 	ck_assert_int_eq(afb_session_get_loa(req->session, NULL), 2);
-	
+
 	afb_req_common_session_close_hookable(req);
 	// show_session(req->session);
 	ck_assert_int_eq(req->closing,1);
 
 	fprintf(stderr, "afb_req_common_get_client_info_hookable returned %s\n", json_object_to_json_string(afb_req_common_get_client_info_hookable(req)));
-	
+
 	afb_req_common_unref(req);
 }
 END_TEST
@@ -204,7 +204,7 @@ START_TEST (prepare_forwarding)
 
 	// show_req(req);
 	fprintf(stderr, "\n### Prepare forwarding...\n");
-	
+
 	rc = afb_type_register(&type1, "type1", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 	dataChecksum = 0;
@@ -233,7 +233,7 @@ START_TEST(push_and_pop)
 	struct afb_req_common *req = &comreq;
 
 	int rc, i;
-	
+
 	fprintf(stderr, "\n### Push/Pop Requests...\n");
 
 	fprintf(stderr, "push request 1\n");
@@ -375,9 +375,9 @@ START_TEST(process_on_behalf)
 	gApiVal = 0;
 
 
-	fprintf(stderr, "afb_req_common_process_on_behalf wiht \"1:1:1\" credantial char : \n");
+	fprintf(stderr, "afb_req_common_process_on_behalf with \"1:1:1\" credential char : \n");
 	//sprintf(buf, "%x:%x:%x-%n", uid, gid, pid, NULL);
-	afb_req_common_process_on_behalf(req, test_apiset, "1:1:1");
+	afb_req_common_process_on_behalf(req, test_apiset, "1:1:1-User::App::LABEL");
 	ck_assert_ptr_nonnull(req->credentials);
 	ck_assert_int_eq((int)req->credentials->uid, 1);
 	ck_assert_int_eq((int)req->credentials->gid, 1);
@@ -389,7 +389,7 @@ START_TEST(process_on_behalf)
 		wrap_json_equal(
 			res,
 			json_tokener_parse(
-				"{ \"uid\": 1, \"gid\": 1, \"pid\": 1, \"user\": \"1\", \"label\": \"1:1:1\", \"id\": \"1\" }"
+				"{ \"uid\": 1, \"gid\": 1, \"pid\": 1, \"user\": \"1\", \"label\": \"User::App::LABEL\", \"id\": \"LABEL\" }"
 			)
 		),
 		1
@@ -433,7 +433,7 @@ START_TEST(errors)
 
 	fprintf(stderr, "\n### Errors\n");
 
-	
+
 		afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
 r = afb_req_common_reply_out_of_memory_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_out_of_memory_error_hookable returned %d\n", r);
@@ -541,13 +541,13 @@ START_TEST (subscribe)
 END_TEST
 
 void test_check_perm(int sig, void * arg){
-	
+
 	struct afb_req_common * req = (struct afb_req_common *)arg;
 	int r = 0;
-	
+
 	fprintf(stderr, "Entered test_check_perm with sig %d\n", sig);
 	ck_assert_int_eq(sig, 0);
-	
+
 	r = afb_req_common_has_permission_hookable(req, "perm");
 	fprintf(stderr, "afb_req_common_has_permission_hookable returned %d\n", r);
 	ck_assert_int_eq(r,1);
@@ -575,7 +575,7 @@ START_TEST(check_perm)
 
     ev = afb_sched_acquire_event_manager();
     ck_assert(ev != NULL);
-	
+
 	gval = 0;
 	ck_assert_int_eq(afb_sched_start(10, 1, 10, test_check_perm, &req),0);
 	ck_assert_int_eq(gval, 1);
