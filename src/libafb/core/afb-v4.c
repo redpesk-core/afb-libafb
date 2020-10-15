@@ -143,7 +143,7 @@ x4_api_type_lookup(
 
 /**********************************************************/
 
-const struct afb_binding_x4_itf afb_v4_itf = {
+const struct afb_binding_x4r1_itf afb_v4_itf = {
 
 /*-- DATA ------------------------------------------*/
 
@@ -237,3 +237,67 @@ const struct afb_binding_x4_itf afb_v4_itf = {
 /*-- AFTERWARD ------------------------------------------*/
 
 };
+
+#if WITH_DYNAMIC_BINDING
+
+#include "sys/x-dynlib.h"
+
+/**********************************************************/
+
+/**
+ * Name of the structure of callbacks
+ */
+static const char afb_api_so_v4r1_itf[] = "afbBindingV4r1_itf";
+
+/**
+ * Name of the pointer to the structure of callbacks
+ */
+static const char afb_api_so_v4r1_itfptr[] = "afbBindingV4r1_itfptr";
+
+/**
+ * Name of the structure describing statically the binding: "afbBindingV4"
+ */
+static const char afb_api_so_v4_desc[] = "afbBindingV4";
+
+/**
+ * Name of the pointer for the root api: "afbBindingV4root"
+ */
+static const char afb_api_so_v4_root[] = "afbBindingV4root";
+
+/**
+ * Name of the entry function for dynamic bindings: "afbBindingV4entry"
+ */
+static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
+
+
+void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, afb_api_x4_t rootapi)
+{
+	struct afb_binding_x4r1_itf *itf1;
+	const struct afb_binding_x4r1_itf **itfptr1;
+
+	/* retrieves important exported symbols */
+	x_dynlib_symbol(dynlib, afb_api_so_v4_root, (void**)&info->root);
+	x_dynlib_symbol(dynlib, afb_api_so_v4_desc, (void**)&info->desc);
+	x_dynlib_symbol(dynlib, afb_api_so_v4_entry, (void**)&info->mainctl);
+
+	/* retrieves interfaces */
+	info->itfrev = 0;
+	x_dynlib_symbol(dynlib, afb_api_so_v4r1_itf, (void**)&itf1);
+	x_dynlib_symbol(dynlib, afb_api_so_v4r1_itfptr, (void**)&itfptr1);
+	if (itf1) {
+		info->itfrev = 1;
+		*itf1 = afb_v4_itf;
+		if (itfptr1)
+			*itfptr1 = itf1;
+	}
+	else if (itfptr1) {
+		info->itfrev = 1;
+		*itfptr1 = &afb_v4_itf;
+	}
+
+	/* set the root api */
+	if (rootapi && info->root)
+		*info->root = rootapi;
+}
+
+#endif

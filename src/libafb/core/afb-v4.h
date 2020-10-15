@@ -33,4 +33,28 @@
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding-v4.h>
 
-extern const struct afb_binding_x4_itf afb_v4_itf;
+#if WITH_DYNAMIC_BINDING
+
+#include "sys/x-dynlib.h"
+
+struct afb_v4_dynlib_info
+{
+	/** root api */
+	afb_api_x4_t *root;
+
+	/** descriptor of the binding for static api */
+	const struct afb_binding_v4 *desc;
+
+	/** main control routine */
+	int (*mainctl)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t);
+
+	/** revision of the interface (0 if no interface found) */
+	short itfrev;
+
+	/** the revision */
+	short revision;
+};
+
+extern void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, afb_api_x4_t rootapi);
+
+#endif

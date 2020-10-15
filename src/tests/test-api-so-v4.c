@@ -60,6 +60,8 @@ int getpath(char buffer[PATH_BUF_SIZE], const char *base, int ival)
 
 void bug_test(int sig, void * arg){
 
+#if WITH_DYNAMIC_BINDING
+
 	bgTest * bgArg = arg;
 	char test_buglib_path[PATH_BUF_SIZE];
 	x_dynlib_t dynlib;
@@ -82,12 +84,15 @@ void bug_test(int sig, void * arg){
 		// check that adding the bug api returned the correct error code
 		ck_assert_int_eq(r, bgArg->expected_result);
 	}
+#endif
 }
 
 /*********************************************************************/
 /* Test adding a minimal binding api */
 START_TEST (test)
 {
+#if WITH_DYNAMIC_BINDING
+
 	int r, i;
 	const char ** apinames;
 	x_dynlib_t dynlib;
@@ -116,6 +121,7 @@ START_TEST (test)
 		i++;
 	}
 	ck_assert_int_eq(r, 1);
+#endif
 }
 END_TEST
 
@@ -123,6 +129,8 @@ END_TEST
 /* Test a set of known bugs */
 START_TEST (dirty_test)
 {
+#if WITH_DYNAMIC_BINDING
+
 	bgTest bugArg;
 	const int suposed_result[] = {
 		/*bug11*/	-14,
@@ -149,6 +157,7 @@ START_TEST (dirty_test)
 		bugArg.expected_result = suposed_result[bugArg.nb-BUG_OFFSET];
 		afb_sig_monitor_run(0, bug_test, &bugArg);
 	}
+#endif
 }
 END_TEST
 

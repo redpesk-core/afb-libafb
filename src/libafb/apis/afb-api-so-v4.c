@@ -44,57 +44,13 @@
 #include "sys/x-realpath.h"
 #include "sys/verbose.h"
 
-/*********************************************************
- * names of symbols
- ********************************************************/
-
-/**
- * Name of the structure describing statically the binding: "afbBindingV4"
- */
-static const char afb_api_so_v4_desc[] = "afbBindingV4";
-
-/**
- * Name of the pointer for the root api: "afbBindingV4root"
- */
-static const char afb_api_so_v4_root[] = "afbBindingV4root";
-
-/**
- * Name of the entry function for dynamic bindings: "afbBindingV4entry"
- */
-static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
-
-/**
- * Name of the structure to init for callbacks: "afbBindingV4itf"
- */
-static const char afb_api_so_v4_itf[] = "afbBindingV4itf";
-
-/**
- * Name of the pointer to init to structure of callbacks: "afbBindingV4itfptr"
- */
-static const char afb_api_so_v4_itfptr[] = "afbBindingV4itfptr";
-
-/**
- * tiny structure for handling arguments of callbacks
- */
-struct args
-{
-	/** root api of the loaded binding */
-	struct afb_api_v4 **root;
-
-	/** descriptor of the binding for static api */
-	const struct afb_binding_v4 *desc;
-
-	/** main control routine */
-	int (*mainctl)(const struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t);
-};
-
 /**
  * Initialisation of the binding when a description
  * of the root api is given: afbBindingV4 exists.
  */
 static int init_for_desc(struct afb_api_v4 *api, void *closure)
 {
-	const struct args *a = closure;
+	const struct afb_v4_dynlib_info *a = closure;
 	union afb_ctlarg ctlarg;
 	int rc;
 
@@ -121,7 +77,7 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
  */
 static int init_for_root(struct afb_api_v4 *api, void *closure)
 {
-	const struct args *a = closure;
+	const struct afb_v4_dynlib_info *a = closure;
 	union afb_ctlarg ctlarg;
 
 	/* set the root of the binding */
@@ -148,43 +104,29 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
 int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
 {
 	int rc;
-	struct args a;
+	struct afb_v4_dynlib_info a;
 	struct afb_api_v4 *api;
 	char rpath[PATH_MAX];
-	struct afb_binding_x4_itf *itf;
-	const struct afb_binding_x4_itf **itfptr;
 
 	/* retrieves important exported symbols */
-	x_dynlib_symbol(dynlib, afb_api_so_v4_desc, (void**)&a.desc);
-	x_dynlib_symbol(dynlib, afb_api_so_v4_entry, (void**)&a.mainctl);
+	afb_v4_connect_dynlib(dynlib, &a, 0);
+
+	/* check if V4 compatible */
 	if (!a.desc && !a.mainctl)
 		return 0;
 
 	INFO("binding [%s] looks like an AFB binding V4", path);
 
-	/* retrieves interfaces */
-	x_dynlib_symbol(dynlib, afb_api_so_v4_itf, (void**)&itf);
-	x_dynlib_symbol(dynlib, afb_api_so_v4_itfptr, (void**)&itfptr);
-	if (itf) {
-		*itf = afb_v4_itf;
-		if (itfptr)
-			*itfptr = itf;
-	}
-	else if (itfptr) {
-		*itfptr = &afb_v4_itf;
-	}
-	else {
-		ERROR("binding [%s] incomplete symbol set: %s or %s is missing",
-			path, afb_api_so_v4_itf, afb_api_so_v4_itfptr);
+	/* check interface */
+	if (!a.itfrev) {
+		ERROR("binding [%s] incomplete symbol set: interface is missing", path);
 		rc = X_EINVAL;
 		goto error;
 	}
 
-	/* retrieves the root api */
-	x_dynlib_symbol(dynlib, afb_api_so_v4_root, (void**)&a.root);
+	/* check root api */
 	if (!a.root) {
-		ERROR("binding [%s] incomplete symbol set: %s is missing",
-			path, afb_api_so_v4_root);
+		ERROR("binding [%s] incomplete symbol set: root is missing", path);
 		rc = X_EINVAL;
 		goto error;
 	}
@@ -206,16 +148,14 @@ int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 		if (!a.mainctl)
 			a.mainctl = a.desc->mainctl;
 		else if (a.desc->mainctl) {
-			ERROR("binding [%s] clash: you can't define %s and %s.preinit, choose only one",
-				path, afb_api_so_v4_entry, afb_api_so_v4_desc);
+			ERROR("binding [%s] clash of entries", path);
 			rc = X_EINVAL;
 			goto error;
 		}
 	} else {
 		/* check validity of the root routine */
 		if (!a.mainctl) {
-			ERROR("binding [%s] incomplete symbol set: %s is missing",
-				path, afb_api_so_v4_entry);
+			ERROR("binding [%s] incomplete symbol set: root entry is missing", path);
 			rc = X_EINVAL;
 			goto error;
 		}
