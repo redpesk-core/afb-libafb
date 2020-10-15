@@ -43,9 +43,9 @@ extern int afb_session_init(int max_session_count, int timeout);
 extern void afb_session_purge();
 extern void afb_session_foreach(void (*callback)(void *closure, struct afb_session *session), void *closure);
 
-extern struct afb_session *afb_session_create (int timeout);
+extern int afb_session_create (struct afb_session **session, int timeout);
+extern int afb_session_get (struct afb_session **session, const char *uuid, int timeout, int *created);
 extern struct afb_session *afb_session_search (const char *uuid);
-extern struct afb_session *afb_session_get (const char *uuid, int timeout, int *created);
 extern const char *afb_session_uuid (struct afb_session *session);
 extern uint16_t afb_session_id (struct afb_session *session);
 
@@ -62,8 +62,8 @@ extern int afb_session_what_remains(struct afb_session *session);
 extern int afb_session_set_language(struct afb_session *session, const char *lang);
 extern const char *afb_session_get_language(struct afb_session *session, const char *lang);
 
-extern void *afb_session_cookie(struct afb_session *session, const void *key, void *(*makecb)(void *closure), void (*freecb)(void *item), void *closure, enum afb_session_cookie_operator oper);
-extern void *afb_session_get_cookie(struct afb_session *session, const void *key);
+extern int afb_session_cookie(struct afb_session *session, const void *key, void **cookie, void *(*makecb)(void *closure), void (*freecb)(void *item), void *closure, enum afb_session_cookie_operator oper);
+extern int afb_session_get_cookie(struct afb_session *session, const void *key, void **cookie);
 extern int afb_session_set_cookie(struct afb_session *session, const void *key, void *value, void (*freecb)(void*));
 
 extern int afb_session_get_loa(struct afb_session *session, const void *key);

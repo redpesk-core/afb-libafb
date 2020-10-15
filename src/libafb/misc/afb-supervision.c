@@ -183,7 +183,7 @@ static void try_connect_supervisor()
 
 	/* negotiation */
 	NOTICE("connecting to supervisor %s", supervisor_socket_path);
-	do { srd = read(fd, &initiator, sizeof initiator); } while(srd < 0 && errno == -X_EINTR);
+	do { srd = read(fd, &initiator, sizeof initiator); } while(srd < 0 && errno == EINTR);
 	if (srd < 0) {
 		ERROR("Can't read supervisor %s: %m", supervisor_socket_path);
 		goto end2;
@@ -406,7 +406,7 @@ static void process_cb(void *closure, struct json_object *args)
 			else {
 				rc = afb_json_legacy_make_data_json_c(&data, json_object_get(sub));
 				if (rc < 0)
-					afb_req_common_reply_internal_error_hookable(comreq);
+					afb_req_common_reply_internal_error_hookable(comreq, rc);
 				else {
 #if WITH_CRED
 					afb_req_common_set_cred(comreq, NULL);

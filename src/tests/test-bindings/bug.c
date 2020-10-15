@@ -72,7 +72,7 @@ const afb_binding_t afbBindingExport = {
 #include <afb/afb-binding.h>
 
 int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg)
-	{ errno = EAGAIN; return -1; }
+	{ return -EAGAIN; }
 #endif
 /**************************************************************************/
 #if defined(BUG18) /* preinit fails */
@@ -82,8 +82,7 @@ int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg)
 
 static int err()
 {
-	errno = EAGAIN;
-	return -1;
+	return -EAGAIN;
 }
 
 const afb_binding_t afbBindingExport = {
@@ -100,7 +99,6 @@ const afb_binding_t afbBindingExport = {
 
 static int bug()
 {
-	errno = 0;
 	return ((int(*)())(intptr_t)0)();
 }
 
@@ -118,8 +116,7 @@ const afb_binding_t afbBindingExport = {
 
 static int err()
 {
-	errno = EAGAIN;
-	return -1;
+	return -EAGAIN;
 }
 
 const afb_binding_t afbBindingExport = {
@@ -136,7 +133,6 @@ const afb_binding_t afbBindingExport = {
 
 static int bug()
 {
-	errno = 0;
 	return ((int(*)())(intptr_t)0)();
 }
 

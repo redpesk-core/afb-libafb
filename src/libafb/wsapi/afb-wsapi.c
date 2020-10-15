@@ -42,6 +42,7 @@
 #include "wsapi/afb-wsapi.h"
 #include "sys/fdev.h"
 #include "sys/verbose.h"
+#include "sys/x-errno.h"
 
 /******** implementation of internal binder protocol per api **************/
 /*
@@ -366,8 +367,7 @@ static int proto_write(struct afb_wsapi *wsapi, struct writebuf *wb)
 	pthread_mutex_lock(&wsapi->mutex);
 	ws = wsapi->ws;
 	if (ws == NULL) {
-		errno = EPIPE;
-		rc = -1;
+		rc = X_EPIPE;
 	} else {
 		rc = afb_ws_binary_v(ws, wb->iovec, wb->iovcount);
 		if (rc > 0)
@@ -1163,9 +1163,7 @@ int afb_wsapi_create(struct afb_wsapi **wsapi, struct fdev *fdev, const struct a
 	struct afb_wsapi *wsa;
 
 	wsa = calloc(1, sizeof *wsa);
-	if (wsa == NULL)
-		errno = ENOMEM;
-	else {
+	if (wsa != NULL) {
 		wsa->refcount = 1;
 		wsa->version = WSAPI_VERSION_UNSET;
 		wsa->closure = closure;
@@ -1183,7 +1181,7 @@ int afb_wsapi_create(struct afb_wsapi **wsapi, struct fdev *fdev, const struct a
 		free(wsa);
 	}
 	*wsapi = NULL;
-	return -1;
+	return X_ENOMEM;
 }
 
 int afb_wsapi_initiate(struct afb_wsapi *wsapi)

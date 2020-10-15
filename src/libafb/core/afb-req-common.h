@@ -102,7 +102,7 @@ struct afb_req_common
 
 extern int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req);
 
-extern int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req);
+extern int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req, int error);
 
 extern int afb_req_common_reply_unavailable_error_hookable(struct afb_req_common *req);
 
@@ -179,14 +179,14 @@ afb_req_common_set_token(
 );
 
 extern
-void
+int
 afb_req_common_set_session_string(
 	struct afb_req_common *req,
 	const char *uuid
 );
 
 extern
-void
+int
 afb_req_common_set_token_string(
 	struct afb_req_common *req,
 	const char *token

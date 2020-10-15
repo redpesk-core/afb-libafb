@@ -936,8 +936,7 @@ int afb_evt_listener_unwatch_evt(struct afb_evt_listener *listener, struct afb_e
 		watch = *pwatch;
 		if (!watch) {
 			x_rwlock_unlock(&listener->rwlock);
-			errno = ENOENT;
-			return -1;
+			return X_ENOENT;
 		}
 		if (evt == watch->evt) {
 			*pwatch = watch->next_by_listener;
@@ -965,8 +964,7 @@ int afb_evt_listener_unwatch_id(struct afb_evt_listener *listener, uint16_t even
 		watch = *pwatch;
 		if (!watch) {
 			x_rwlock_unlock(&listener->rwlock);
-			errno = ENOENT;
-			return -1;
+			return X_ENOENT;
 		}
 		evt = watch->evt;
 		if (evt->id == eventid) {

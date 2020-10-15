@@ -263,22 +263,23 @@ static void session_update_expiration(struct afb_session *session, time_t now)
  * Add it to the set of sessions
  * Return the created session
  */
-static struct afb_session *session_add(const char *uuid, int timeout, time_t now, uint8_t hashidx)
+static int session_add(struct afb_session **res, const char *uuid, int timeout, time_t now, uint8_t hashidx)
 {
 	struct afb_session *session;
+	int rc;
 
 	/* check arguments */
 	if (!AFB_SESSION_TIMEOUT_IS_VALID(timeout)
 	 || (uuid && strlen(uuid) >= sizeof session->uuid)) {
-		errno = X_EINVAL;
-		return NULL;
+		*res = NULL;
+		return X_EINVAL;
 	}
 
 	/* allocates a new one */
 	session = calloc(1, sizeof *session);
 	if (session == NULL) {
-		errno = X_ENOMEM;
-		return NULL;
+		*res = NULL;
+		return X_ENOMEM;
 	}
 
 	/* initialize */
@@ -292,16 +293,19 @@ static struct afb_session *session_add(const char *uuid, int timeout, time_t now
 		session->id = ++sessions.genid;
 
 	/* add */
-	if (sessionset_add(session, hashidx)) {
+	rc = sessionset_add(session, hashidx);
+	if (rc < 0) {
 		free(session);
-		return NULL;
+		*res = NULL;
+		return rc;
 	}
 
 #if WITH_AFB_HOOK
 	afb_hook_session_create(session);
 #endif
 
-	return session;
+	*res = session;
+	return 0;
 }
 
 /* Remove expired sessions and return current time (now) */
@@ -402,9 +406,9 @@ struct afb_session *afb_session_search (const char *uuid)
 /**
  * Creates a new session with 'timeout'
  */
-struct afb_session *afb_session_create (int timeout)
+int afb_session_create (struct afb_session **session, int timeout)
 {
-	return afb_session_get(NULL, timeout, NULL);
+	return afb_session_get(session, NULL, timeout, NULL);
 }
 
 /**
@@ -433,19 +437,20 @@ int afb_session_what_remains(struct afb_session *session)
 }
 
 /* This function will return exiting session or newly created session */
-struct afb_session *afb_session_get (const char *uuid, int timeout, int *created)
+int afb_session_get (struct afb_session **psession, const char *uuid, int timeout, int *created)
 {
 	uuid_stringz_t _uuid_;
 	uint8_t hashidx;
 	struct afb_session *session;
 	time_t now;
-	int c;
+	int c, rc;
 
 	/* cleaning */
 	sessionset_lock();
 	now = sessionset_cleanup(0);
 
 	/* search for an existing one not too old */
+	c = 1;
 	if (!uuid) {
 		hashidx = sessionset_make_uuid(_uuid_);
 		uuid = _uuid_;
@@ -455,19 +460,22 @@ struct afb_session *afb_session_get (const char *uuid, int timeout, int *created
 		if (session) {
 			/* session found */
 			afb_session_addref(session);
-			c = 0;
-			goto end;
+			rc = c = 0;
 		}
 	}
-	/* create the session */
-	session = session_add(uuid, timeout, now, hashidx);
-	c = 1;
-end:
+
+	/* create the session if needed */
+	if (c) {
+		rc = session_add(&session, uuid, timeout, now, hashidx);
+		if (rc < 0)
+			c = 0;
+	}
+
 	sessionset_unlock();
 	if (created)
 		*created = c;
-
-	return session;
+	*psession = session;
+	return rc;
 }
 
 /* increase the use count on 'session' (can be NULL) */
@@ -637,26 +645,29 @@ static void checkcookie(struct cookie *cookie, struct cookie **prv)
  *
  * @param session	the session
  * @param key		the key of the cookie
+ * @param cookieval     where to store the cookie value
  * @param makecb	the creation function or NULL
  * @param freecb	the release function or NULL
  * @param closure	an argument for makecb or the value if makecb==NULL
  * @param operation	operation to perform
  *
- * @return the value of the cookie
+ * @return 0 if cookie existed, 1 if created, a negative number on error
  *
  * The 'key' is a pointer and compared as pointers.
  *
  * For getting the current value of the cookie:
  *
- *   afb_session_cookie(session, key, NULL, NULL, NULL, 0)
+ *   afb_session_cookie(session, key, &value, NULL, NULL, NULL, 0)
  *
  * For storing the value of the cookie
  *
- *   afb_session_cookie(session, key, NULL, NULL, value, 1)
+ *   afb_session_cookie(session, key, NULL, NULL, NULL, value, 1)
  */
-void *afb_session_cookie(
+
+int afb_session_cookie(
 	struct afb_session *session,
 	const void *key,
+	void **cookieval,
 	void *(*makecb)(void *closure),
 	void (*freecb)(void *item),
 	void *closure,
@@ -669,6 +680,7 @@ void *afb_session_cookie(
 	/* lock session */
 	session_lock(session);
 
+	/* should create? */
 	switch(operation) {
 	case Afb_Session_Cookie_Init:
 	case Afb_Session_Cookie_Set:
@@ -682,12 +694,10 @@ void *afb_session_cookie(
 		break;
 	}
 
-	/* search for the cookie of 'key' */
+	/* search for the cookie of 'key' and create it if needed */
 	rc = getcookie(session, key, mk, &cookie, &prv);
 	if (rc < 0) {
 		/* no cookie found or creation impossible */
-		if (mk)
-			errno = -rc; /* can't create it */
 		value = NULL;
 	}
 	else if (rc) {
@@ -740,19 +750,23 @@ void *afb_session_cookie(
 				cookie->loa &= MASKLOA;
 			}
 			checkcookie(cookie, prv);
-			/*@fallthrough@*/
-		default:
 			value = NULL;
 			break;
 		case Afb_Session_Cookie_Exists:
 			value = (cookie->loa & COOKIESET) ? (void*)(intptr_t)1 : NULL;
+			break;
+		default:
+			value = NULL;
+			rc = X_EINVAL;
 			break;
 		}
 	}
 
 	/* unlock the session and return the value */
 	session_unlock(session);
-	return value;
+	if (cookieval)
+		*cookieval = value;
+	return rc;
 }
 
 /**
@@ -763,9 +777,9 @@ void *afb_session_cookie(
  *
  * @return the data staored for the key or NULL if the key isn't found
  */
-void *afb_session_get_cookie(struct afb_session *session, const void *key)
+int afb_session_get_cookie(struct afb_session *session, const void *key, void **cookie)
 {
-	return afb_session_cookie(session, key, NULL, NULL, NULL, Afb_Session_Cookie_Get);
+	return afb_session_cookie(session, key, cookie, NULL, NULL, NULL, Afb_Session_Cookie_Get);
 }
 
 /**
@@ -781,7 +795,7 @@ void *afb_session_get_cookie(struct afb_session *session, const void *key)
  */
 int afb_session_set_cookie(struct afb_session *session, const void *key, void *value, void (*freecb)(void*))
 {
-	return -(value != afb_session_cookie(session, key, NULL, freecb, value, Afb_Session_Cookie_Set));
+	return afb_session_cookie(session, key, NULL, NULL, freecb, value, Afb_Session_Cookie_Set);
 }
 
 /**

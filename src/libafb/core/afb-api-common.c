@@ -136,7 +136,7 @@ session_get_common()
 	/* session shared with other exports */
 	result = common_session;
 	if (result == NULL) {
-		result = afb_session_create (0);
+		afb_session_create (&result, 0);
 		common_session = result;
 	}
 
@@ -241,8 +241,7 @@ afb_api_common_event_broadcast(
 	if (comapi->state == Api_State_Pre_Init) {
 		ERROR("[API %s] Bad call to 'afb_daemon_event_broadcast(%s)', must not be in PreInit",
 			comapi->name, name);
-		errno = X_EINVAL;
-		return 0;
+		return X_EINVAL;
 	}
 
 	/* makes the event name */

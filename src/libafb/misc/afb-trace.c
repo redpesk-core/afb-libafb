@@ -1145,14 +1145,15 @@ static void *session_open(void *closure)
 static struct afb_session *trace_get_session_by_uuid(struct afb_trace *trace, const char *uuid, int alloc)
 {
 	struct cookie cookie;
+	int rc;
 
 	if (!alloc)
 		cookie.session = afb_session_search(uuid);
 	else {
-		cookie.session = afb_session_get(uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
-		if (cookie.session) {
+		rc = afb_session_get(&cookie.session, uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
+		if (rc >= 0) {
 			cookie.trace = trace;
-			afb_session_cookie(cookie.session, cookie.trace, session_open, session_closed, &cookie, 0);
+			afb_session_cookie(cookie.session, cookie.trace, NULL, session_open, session_closed, &cookie, 0);
 		}
 	}
 	return cookie.session;

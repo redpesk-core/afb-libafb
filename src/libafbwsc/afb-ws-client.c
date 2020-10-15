@@ -157,7 +157,7 @@ static const char *send_request(int fd, const char **protocols, const char *path
 		return NULL;
 
 	/* send the request */
-	do { rc = (int)write(fd, request, length); } while(rc < 0 && errno == -X_EINTR);
+	do { rc = (int)write(fd, request, length); } while(rc < 0 && errno == EINTR);
 	free(request);
 	return rc < 0 ? NULL : ack;
 }
@@ -169,7 +169,7 @@ static int receive_line(int fd, char *line, int size)
 	for(;;) {
 		if (length >= size)
 			return X_EMSGSIZE;
-		do { rc = (int)read(fd, line + length, 1); } while (rc < 0 && errno == -X_EINTR);
+		do { rc = (int)read(fd, line + length, 1); } while (rc < 0 && errno == EINTR);
 		if (rc < 0)
 			return -1;
 		if (line[length] == '\r')
@@ -245,11 +245,11 @@ static int receive_response(int fd, const char **protocols, const char *ack)
 
 	/* skips the remaining of the message */
 	while (clen >= sizeof line) {
-		while (read(fd, line, sizeof line) < 0 && errno == -X_EINTR);
+		while (read(fd, line, sizeof line) < 0 && errno == EINTR);
 		clen -= sizeof line;
 	}
 	if (clen > 0) {
-		while (read(fd, line, len) < 0 && errno == -X_EINTR);
+		while (read(fd, line, len) < 0 && errno == EINTR);
 	}
 	if (haserr != 0 || result < 0)
 		goto abort;

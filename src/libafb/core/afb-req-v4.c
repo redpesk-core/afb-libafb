@@ -358,7 +358,7 @@ void afb_req_v4_process(
 
 	reqv4 = malloc(sizeof *reqv4);
 	if (reqv4 == NULL) {
-		afb_req_common_reply_internal_error_hookable(comreq);
+		afb_req_common_reply_out_of_memory_error_hookable(comreq);
 	}
 	else {
 		reqv4->comreq = afb_req_common_addref(comreq);

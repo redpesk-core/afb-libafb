@@ -109,7 +109,7 @@ int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req
 	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
 
-int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req)
+int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req, int error)
 {
 	return reply_error(req, X_ENOMEM, afb_error_text_internal_error);
 }
@@ -244,16 +244,18 @@ afb_req_common_set_session(
 	afb_session_unref(osession);
 }
 
-void
+int
 afb_req_common_set_session_string(
 	struct afb_req_common *req,
 	const char *string
 ) {
 	struct afb_session *osession;
+	int rc;
 
 	osession = req->session;
-	req->session = afb_session_get(string, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
+	rc = afb_session_get(&req->session, string, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
 	afb_session_unref(osession);
+	return rc;
 }
 
 void
@@ -268,16 +270,18 @@ afb_req_common_set_token(
 	afb_token_unref(otoken);
 }
 
-void
+int
 afb_req_common_set_token_string(
 	struct afb_req_common *req,
 	const char *string
 ) {
 	struct afb_token *otoken;
+	int rc;
 
 	otoken = req->token;
-	afb_token_get(&req->token, string);
+	rc = afb_token_get(&req->token, string);
 	afb_token_unref(otoken);
+	return rc;
 }
 
 #if WITH_CRED
@@ -321,7 +325,7 @@ static void req_common_process_async_cb(int signum, void *arg)
 	if (signum != 0) {
 		/* emit the error (assumes that hooking is initialised) */
 		ERROR("received signal %d (%s) when processing request", signum, strsignal(signum));
-		afb_req_common_reply_internal_error_hookable(req);
+		afb_req_common_reply_internal_error_hookable(req, X_EINTR);
 	} else {
 		/* invoke api call method to process the x2 */
 		api = req->api;
@@ -340,7 +344,7 @@ static void req_common_process_api(struct afb_req_common *req, int timeout)
 	if (rc < 0) {
 		/* TODO: allows or not to proccess it directly as when no threading? (see above) */
 		ERROR("can't process job with threads: %s", strerror(-rc));
-		afb_req_common_reply_internal_error_hookable(req);
+		afb_req_common_reply_internal_error_hookable(req, rc);
 		afb_req_common_unref(req);
 	}
 }
@@ -450,12 +454,13 @@ afb_req_common_process_on_behalf(
 	else if (afb_req_common_async_push2(req, apiset, cred) == 0) {
 		ERROR("internal error when importing creds");
 		afb_cred_unref(cred);
+		rc = X_EOVERFLOW;
 	}
 	else {
 		afb_perm_check_req_async(req, afb_permission_on_behalf_credential, process_on_behalf_cb, req);
 		return;
 	}
-	afb_req_common_reply_internal_error_hookable(req);
+	afb_req_common_reply_internal_error_hookable(req, rc);
 	afb_req_common_unref(req);
 #endif
 }
@@ -653,7 +658,7 @@ afb_req_common_check_and_set_session_async(
 	}
 	else if (req->asyncount != 0 || !async_cb_status_set(req, callback, closure)) {
 		/* can't prepare async */
-		afb_req_common_reply_internal_error_hookable(req);
+		afb_req_common_reply_internal_error_hookable(req, X_EBUSY);
 		callback(closure, X_EBUSY);
 	}
 	else if (!sessionflags) {
@@ -922,7 +927,8 @@ afb_req_common_cookie_hookable(
 	void *closure,
 	int replace
 ) {
-	void *r = afb_session_cookie(req->session, req->api, maker, freeer, closure, replace);
+	void *r;
+	afb_session_cookie(req->session, req->api, &r, maker, freeer, closure, replace);
 #if WITH_AFB_HOOK
 	if (req->hookflags & afb_hook_flag_req_context_make)
 		r = afb_hook_req_context_make(req, replace, maker, freeer, closure, r);

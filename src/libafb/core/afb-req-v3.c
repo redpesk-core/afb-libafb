@@ -539,14 +539,14 @@ void afb_req_v3_process(
 
 	req = malloc(sizeof *req);
 	if (req == NULL) {
-		afb_req_common_reply_internal_error_hookable(comreq);
+		afb_req_common_reply_out_of_memory_error_hookable(comreq);
 		return;
 	}
 
 	rc = afb_json_legacy_get_single_json_c(comreq->nparams, comreq->params, &req->json);
 	if (rc < 0) {
 		free(req);
-		afb_req_common_reply_internal_error_hookable(comreq);
+		afb_req_common_reply_internal_error_hookable(comreq, rc);
 		return;
 	}
 

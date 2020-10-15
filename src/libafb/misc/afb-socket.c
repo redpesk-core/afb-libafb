@@ -281,14 +281,12 @@ static int open_l4(const char *spec, int server)
 	port = strchr(spec, ':');
 	slash = strchr(spec, '/');
 	if (port && slash && slash < port) {
-		errno = EINVAL;
-		return -1;
+		return X_EINVAL;
 	}
 	if (port) {
 		rc = atoi(port + 1);
 		if (rc <= 0 && rc > UINT16_MAX) {
-			errno = EINVAL;
-			return -1;
+			return X_EINVAL;
 		}
 		portnum = (unsigned short)rc;
 		length = port - spec;
@@ -299,8 +297,7 @@ static int open_l4(const char *spec, int server)
 
 	/* check the length */
 	if (length >= sizeof addr.name) {
-		errno = ENAMETOOLONG;
-		return -1;
+		return X_ENAMETOOLONG;
 	}
 
 	/* create a  socket */

@@ -97,16 +97,17 @@ struct api_dbus
  * is established for either emiting/receiving on 'path' being of length
  * 'pathlen'.
  */
-static struct api_dbus *make_api_dbus_3(int system, const char *path, size_t pathlen)
+static int make_api_dbus_3(struct api_dbus **papi, int system, const char *path, size_t pathlen)
 {
 	struct api_dbus *api;
 	struct sd_bus *sdbus;
 	char *ptr;
+	int rc;
 
 	/* allocates the structure */
 	api = calloc(1, sizeof *api + 1 + pathlen + pathlen);
 	if (api == NULL) {
-		errno = ENOMEM;
+		rc = X_ENOMEM;
 		goto error;
 	}
 
@@ -119,12 +120,12 @@ static struct api_dbus *make_api_dbus_3(int system, const char *path, size_t pat
 	/* api name is at the end of the path */
 	api->api = strrchr(api->path, '/');
 	if (api->api == NULL) {
-		errno = EINVAL;
+		rc = X_EINVAL;
 		goto error2;
 	}
 	api->api++;
 	if (!afb_apiname_is_valid(api->api)) {
-		errno = EINVAL;
+		rc = X_EINVAL;
 		goto error2;
 	}
 
@@ -144,12 +145,14 @@ static struct api_dbus *make_api_dbus_3(int system, const char *path, size_t pat
 		goto error2;
 
 	api->sdbus = sdbus;
-	return api;
+	*papi = api;
+	return 0;
 
 error2:
 	free(api);
 error:
-	return NULL;
+	*papi = NULL;
+	return rc;
 }
 
 /*
@@ -158,7 +161,7 @@ error:
  * is established for either emiting/receiving on 'path'.
  * If 'path' is not absolute, it is prefixed with DEFAULT_PATH_PREFIX.
  */
-static struct api_dbus *make_api_dbus_2(int system, const char *path)
+static int make_api_dbus_2(struct api_dbus **papi, int system, const char *path)
 {
 	size_t len;
 	char *ptr;
@@ -166,13 +169,13 @@ static struct api_dbus *make_api_dbus_2(int system, const char *path)
 	/* check the length of the path */
 	len = strlen(path);
 	if (len == 0) {
-		errno = EINVAL;
-		return NULL;
+		*papi = NULL;
+		return X_EINVAL;
 	}
 
 	/* if the path is absolute, creation now */
 	if (path[0] == '/')
-		return make_api_dbus_3(system, path, len);
+		return make_api_dbus_3(papi, system, path, len);
 
 	/* compute the path prefixed with DEFAULT_PATH_PREFIX */
 	assert(strlen(DEFAULT_PATH_PREFIX) > 0);
@@ -182,7 +185,7 @@ static struct api_dbus *make_api_dbus_2(int system, const char *path)
 	strcpy(stpcpy(ptr, DEFAULT_PATH_PREFIX), path);
 
 	/* creation for prefixed path */
-	return make_api_dbus_3(system, ptr, len);
+	return make_api_dbus_3(papi, system, ptr, len);
 }
 
 /*
@@ -194,7 +197,7 @@ static struct api_dbus *make_api_dbus_2(int system, const char *path)
  * If remaining 'path' is not absolute, it is prefixed with
  * DEFAULT_PATH_PREFIX.
  */
-static struct api_dbus *make_api_dbus(const char *path)
+static int make_api_dbus(struct api_dbus **papi, const char *path)
 {
 	const char *ptr;
 	size_t preflen;
@@ -202,19 +205,19 @@ static struct api_dbus *make_api_dbus(const char *path)
 	/* retrieves the prefix "scheme-like" part */
 	ptr = strchr(path, ':');
 	if (ptr == NULL)
-		return make_api_dbus_2(0, path);
+		return make_api_dbus_2(papi, 0, path);
 
 	/* check the prefix part */
 	preflen = (size_t)(ptr - path);
 	if (strncmp(path, "system", preflen) == 0)
-		return make_api_dbus_2(1, ptr + 1);
+		return make_api_dbus_2(papi, 1, ptr + 1);
 
 	if (strncmp(path, "user", preflen) == 0)
-		return make_api_dbus_2(0, ptr + 1);
+		return make_api_dbus_2(papi, 0, ptr + 1);
 
 	/* TODO: connect to a foreign D-Bus? */
-	errno = EINVAL;
-	return NULL;
+	*papi = NULL;
+	return X_EINVAL;
 }
 
 static void destroy_api_dbus(struct api_dbus *api)
@@ -304,7 +307,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	rc = sd_bus_message_read(message, "sss", &json, &error, &info);
 	if (rc < 0) {
 		/* failing to have the answer */
-		afb_req_common_reply_internal_error_hookable(memo->comreq);
+		afb_req_common_reply_internal_error_hookable(memo->comreq, rc);
 	} else {
 		/* build the reply */
 		json = *json ? json : 0;
@@ -317,7 +320,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 				info, (void*)sd_bus_message_unref, message);
 		if (rc < 0) {
 			/* failing to have the answer */
-			afb_req_common_reply_internal_error_hookable(memo->comreq);
+			afb_req_common_reply_internal_error_hookable(memo->comreq, rc);
 		} else {
 			afb_req_common_reply_hookable(memo->comreq, LEGACY_STATUS(error), 3, params);
 		}
@@ -375,8 +378,7 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 
 error:
 	/* if there was an error report it directly */
-	errno = -rc;
-	afb_req_common_reply_internal_error_hookable(memo->comreq);
+	afb_req_common_reply_internal_error_hookable(memo->comreq, rc);
 	api_dbus_client_memo_destroy(memo);
 end:
 	afb_data_unref(arg);
@@ -613,11 +615,9 @@ int afb_api_dbus_add_client(const char *path, struct afb_apiset *declare_set, st
 	char *match;
 
 	/* create the dbus client api */
-	api = make_api_dbus(path);
-	if (api == NULL) {
-		rc = X_ENOMEM;
+	rc = make_api_dbus(&api, path);
+	if (rc < 0)
 		goto error;
-	}
 
 	/* connect to broadcasted events */
 	rc = asprintf(&match, "type='signal',path='%s',interface='%s',member='broadcast'", api->path, api->name);
@@ -738,9 +738,7 @@ static struct origin *afb_api_dbus_server_origin_get(struct api_dbus *api, const
 
 	/* not found, create it */
 	origin = malloc(strlen(sender) + 1 + sizeof *origin);
-	if (origin == NULL)
-		errno = ENOMEM;
-	else {
+	if (origin != NULL) {
 		origin->api = api;
 		origin->refcount = 1;
 		strcpy(origin->name, sender);
@@ -813,7 +811,6 @@ static void *afb_api_dbus_server_listener_make(void *closure)
 
 static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, const char *sender, struct afb_session *session)
 {
-	struct listener *listener;
 	struct origin *origin;
 
 	/* get the origin */
@@ -821,9 +818,7 @@ static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, c
 	if (origin == NULL)
 		return NULL;
 
-	listener = afb_session_cookie(session, origin, afb_api_dbus_server_listener_make, afb_api_dbus_server_listener_free, origin, Afb_Session_Cookie_Init);
-	if (listener == NULL)
-		errno = ENOMEM;
+	afb_session_cookie(session, origin, NULL, afb_api_dbus_server_listener_make, afb_api_dbus_server_listener_free, origin, Afb_Session_Cookie_Init);
 	afb_api_dbus_server_origin_unref(origin);
 	return NULL;
 }
@@ -1009,7 +1004,7 @@ static int api_dbus_server_on_object_called(sd_bus_message *message, void *userd
 		sd_bus_reply_method_errorf(message, SD_BUS_ERROR_INVALID_SIGNATURE, "invalid signature");
 		goto error;
 	}
-	session = afb_session_get(uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
+	rc = afb_session_get(&session, uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
 	/* get the listener */
 	listener = afb_api_dbus_server_listener_get(api, sd_bus_message_get_sender(message), dreq->comreq.session);
 	if (listener == NULL)
@@ -1049,11 +1044,9 @@ int afb_api_dbus_add_server(const char *path, struct afb_apiset *declare_set, st
 	struct api_dbus *api;
 
 	/* get the dbus api object connected */
-	api = make_api_dbus(path);
-	if (api == NULL) {
-		rc = X_ENOMEM;
+	rc = make_api_dbus(&api, path);
+	if (rc < 0)
 		goto error;
-	}
 
 	/* request the service object name */
 	rc = sd_bus_request_name(api->sdbus, api->name, 0);

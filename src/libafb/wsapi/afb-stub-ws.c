@@ -469,9 +469,9 @@ static struct afb_session *server_add_session(struct afb_stub_ws *stubws, uint16
 	struct afb_session *session;
 	int rc, created;
 
-	session = afb_session_get(sessionstr, AFB_SESSION_TIMEOUT_DEFAULT, &created);
-	if (session == NULL)
-		ERROR("can't create session %s, out of memory", sessionstr);
+	rc = afb_session_get(&session, sessionstr, AFB_SESSION_TIMEOUT_DEFAULT, &created);
+	if (rc < 0)
+		ERROR("can't create session %s", sessionstr);
 	else {
 		afb_session_set_autoclose(session, 1);
 		rc = u16id2ptr_add(&stubws->session_proxies, sessionid, session);

@@ -161,11 +161,14 @@ START_TEST (session)
 {
 	struct afb_req_common *req = &comreq;
 	struct afb_session *sess;
+	int r;
 
 	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
 
 	// test on session
-	sess = afb_session_create(0);
+	r = afb_session_create(&sess, 0);
+	ck_assert_int_eq(r, 0);
+	ck_assert_ptr_ne(sess, 0);
 
 	afb_req_common_set_session(req, sess);
 	ck_assert_ptr_eq(req->session, sess);
@@ -440,7 +443,7 @@ r = afb_req_common_reply_out_of_memory_error_hookable(req);
 	ck_assert_int_eq(r, -12);
 
 		afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
-r = afb_req_common_reply_internal_error_hookable(req);
+r = afb_req_common_reply_internal_error_hookable(req, -1);
 	fprintf(stderr, "afb_req_common_reply_internal_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,-12);
 

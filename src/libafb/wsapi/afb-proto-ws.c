@@ -429,8 +429,7 @@ static int proto_write(struct afb_proto_ws *protows, struct writebuf *wb)
 	x_mutex_lock(&protows->mutex);
 	ws = protows->ws;
 	if (ws == NULL) {
-		errno = EPIPE;
-		rc = -1;
+		rc = X_EPIPE;
 	} else {
 		rc = afb_ws_binary_v(ws, wb->iovec, wb->iovcount);
 		if (rc > 0)
@@ -831,7 +830,7 @@ int afb_proto_ws_client_call(
 	x_mutex_lock(&protows->mutex);
 	if (protows->idcount >= ACTIVE_ID_MAX) {
 		pthread_mutex_unlock(&protows->mutex);
-		errno = EBUSY;
+		rc = X_EBUSY;
 		goto clean;
 	}
 	protows->idcount++;

@@ -471,10 +471,9 @@ void afb_apiset_onlack_set(struct afb_apiset *set, int (*callback)(void*, struct
  * @param set the api set
  * @param name the name of the api to add (have to survive, not copied!)
  * @param api the api
- * @returns 0 in case of success or -1 in case
- * of error with errno set:
- *   - EEXIST if name already registered
- *   - ENOMEM when out of memory
+ * @returns 0 in case of success or a negative number in case of error:
+ *   - X_EEXIST if name already registered
+ *   - X_ENOMEM when out of memory
  */
 int afb_apiset_add(struct afb_apiset *set, const char *name, struct afb_api_item api)
 {
@@ -526,11 +525,10 @@ oom:
  * @params set the api set
  * @param name the name of the api to alias
  * @param alias the aliased name to add to the api of name
- * @returns 0 in case of success or -1 in case
- * of error with errno set:
- *   - ENOENT if the api doesn't exist
- *   - EEXIST if name (of alias) already registered
- *   - ENOMEM when out of memory
+ * @returns 0 in case of success or a negative number in case of error:
+ *   - X_ENOENT if the api doesn't exist
+ *   - X_EEXIST if name already registered
+ *   - X_ENOMEM when out of memory
  */
 int afb_apiset_add_alias(struct afb_apiset *set, const char *name, const char *alias)
 {
@@ -824,27 +822,6 @@ static int start_api(struct api_desc *api)
 	if (rc == 0)
 		INFO("API %s started", api->name);
 	return rc;
-}
-
-/**
- * Get from the 'set' the API of 'name' in 'api'
- * @param set the set of API
- * @param name the name of the API to get
- * @param rec if not zero look also recursively in subsets
- * @return a pointer to the API item in case of success or NULL in case of error
- */
-const struct afb_api_item *afb_apiset_lookup_started(struct afb_apiset *set, const char *name, int rec)
-{
-	struct api_desc *desc;
-	int rc;
-
-	desc = lookup(set, name, rec);
-	if (!desc) {
-		errno = ENOENT;
-		return NULL;
-	}
-	rc = start_api(desc);
-	return rc ? &desc->api : NULL;
 }
 
 /**

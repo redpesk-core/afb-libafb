@@ -461,7 +461,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 	struct json_object *drop = NULL;
 	struct afb_trace *trace;
 
-	trace = afb_session_cookie(req->session, _monitor_, context_create, context_destroy, req, Afb_Session_Cookie_Init);
+	afb_session_cookie(req->session, _monitor_, (void**)&trace, context_create, context_destroy, req, Afb_Session_Cookie_Init);
 	wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 	if (add) {
 		rc = afb_trace_add(req, add, trace);
@@ -542,7 +542,7 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	}
 	else if (auth) {
 		if (afb_req_common_async_push(req, fun) < 0)
-			afb_req_common_reply_internal_error_hookable(req);
+			afb_req_common_reply_internal_error_hookable(req, X_EOVERFLOW);
 		else
 			afb_req_common_check_and_set_session_async(req, auth, AFB_SESSION_CHECK, checkcb, req);
 

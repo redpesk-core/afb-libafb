@@ -345,9 +345,9 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 	for (;;) {
 		rc = writev(ws->fd, iov2, iovcnt);
 		if (rc < 0) {
-			if (errno == -X_EINTR)
+			if (errno == EINTR)
 				continue;
-			if (errno != -X_EAGAIN)
+			if (errno != EAGAIN)
 				return -1;
 		} else {
 			dsz -= rc;
@@ -384,7 +384,7 @@ static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt)
 	ssize_t rc;
 	do {
 		rc = readv(ws->fd, iov, iovcnt);
-	} while(rc == -1 && errno == -X_EINTR);
+	} while(rc == -1 && errno == EINTR);
 	if (rc == 0)
 		rc = X_EPIPE;
 	else if (rc < 0)

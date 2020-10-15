@@ -136,7 +136,7 @@ struct fdev *fdev_select_add(struct fdev_select *fdev_select, int fd)
 	struct fdev *fdev;
 
 	if (fd < 0 || fd >= FD_SETSIZE) {
-		errno = -X_EINVAL;
+		errno = EINVAL;
 		return 0;
 	}
 
