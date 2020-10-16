@@ -46,7 +46,7 @@ struct afb_v4_dynlib_info
 	const struct afb_binding_v4 *desc;
 
 	/** main control routine */
-	int (*mainctl)(afb_api_x4_t, afb_ctlid_t, afb_ctlarg_t);
+	afb_api_callback_x4_t mainctl;
 
 	/** revision of the interface (0 if no interface found) */
 	short itfrev;

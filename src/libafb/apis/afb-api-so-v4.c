@@ -61,7 +61,6 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 	rc = afb_api_v4_set_binding_fields(api, a->desc);
 	if (rc >= 0 && a->mainctl) {
 		/* call the pre init routine safely */
-		ctlarg.pre_init.closure = 0;
 		ctlarg.pre_init.path = afb_api_v4_path(api);
 		rc = afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Pre_Init, &ctlarg);
 	}

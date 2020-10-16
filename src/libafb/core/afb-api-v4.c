@@ -80,7 +80,7 @@ struct afb_api_v4
 	struct json_object *settings;
 
 	/* control function */
-	int (*mainctl)(const struct afb_api_v4 *apiv4, afb_ctlid_t id, afb_ctlarg_t arg);
+	afb_api_callback_x4_t mainctl;
 
 	/* userdata */
 	void *userdata;
@@ -133,8 +133,11 @@ struct safe_ctlproc_s
 	/** the argument of the control */
 	afb_ctlarg_t ctlarg;
 
+	/** the userdata */
+	void *userdata;
+
 	/** the control proc */
-	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t);
+	afb_api_callback_x4_t ctlproc;
 
 	/** the result of the call */
 	int result;
@@ -151,7 +154,7 @@ static void safe_ctlproc_call_cb(int sig, void *closure)
 	struct safe_ctlproc_s *scp = closure;
 
 	scp->result = sig ? X_EFAULT
-		: scp->ctlproc(scp->apiv4, scp->ctlid, scp->ctlarg);
+		: scp->ctlproc(scp->apiv4, scp->ctlid, scp->ctlarg, scp->userdata);
 }
 
 /**
@@ -171,7 +174,7 @@ static int safe_ctlproc_call(struct safe_ctlproc_s *scp)
 int
 afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
-	int (*ctlproc)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
+	afb_api_callback_x4_t ctlproc,
 	afb_ctlid_t ctlid,
 	afb_ctlarg_t ctlarg
 ) {
@@ -183,6 +186,7 @@ afb_api_v4_safe_ctlproc(
 	scp.apiv4 = apiv4;
 	scp.ctlid = ctlid;
 	scp.ctlarg = ctlarg;
+	scp.userdata = apiv4->userdata;
 	scp.ctlproc = ctlproc;
 	return safe_ctlproc_call(&scp);
 }
@@ -418,7 +422,10 @@ preinit_new_api(
 	struct safe_ctlproc_s *scp = closure;
 
 	/* set the mainctl of the fresh api to the one to call */
+	apiv4->userdata = scp->userdata;
 	apiv4->mainctl = scp->ctlproc;
+	if (!scp->ctlproc)
+		return 0;
 	scp->apiv4 = apiv4;
 	return safe_ctlproc_call(scp);
 }
@@ -430,9 +437,9 @@ afb_api_v4_new_api_hookable(
 	const char *apiname,
 	const char *info,
 	int noconcurrency,
-	int (*mainctl)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
-	void *closure)
-{
+	afb_api_callback_x4_t mainctl,
+	void *userdata
+) {
 	union afb_ctlarg ctlarg;
 	struct safe_ctlproc_s scp;
 	int r;
@@ -442,11 +449,11 @@ afb_api_v4_new_api_hookable(
 		afb_hook_api_new_api_before(&apiv4->comapi, apiname, info, noconcurrency);
 #endif
 
-	ctlarg.pre_init.closure = closure;
 	ctlarg.pre_init.path = apiv4->comapi.path;
-	scp.ctlproc = mainctl;
-	scp.ctlarg = &ctlarg;
 	scp.ctlid = afb_ctlid_Pre_Init;
+	scp.ctlarg = &ctlarg;
+	scp.userdata = userdata;
+	scp.ctlproc = mainctl;
 	r = afb_api_v4_create(
 		newapiv4,
 		apiv4->comapi.declare_set,
@@ -454,7 +461,7 @@ afb_api_v4_new_api_hookable(
 		apiname, Afb_String_Copy,
 		info, Afb_String_Copy,
 		noconcurrency,
-		mainctl ? preinit_new_api : NULL, &scp,
+		preinit_new_api, &scp,
 		apiv4->comapi.path, Afb_String_Const);
 
 #if WITH_AFB_HOOK
@@ -600,7 +607,7 @@ handle_events(
 	else if (apiv4->mainctl != NULL) {
 		union afb_ctlarg arg;
 		arg.orphan_event.name = event->name;
-		apiv4->mainctl(apiv4, afb_ctlid_Orphan_Event, &arg);
+		apiv4->mainctl(apiv4, afb_ctlid_Orphan_Event, &arg, apiv4->userdata);
 	}
 }
 
@@ -621,7 +628,7 @@ start_cb(
 ) {
 	struct afb_api_v4 *apiv4 = closure;
 	if (apiv4->mainctl)
-		return apiv4->mainctl(apiv4, afb_ctlid_Init, NULL);
+		return apiv4->mainctl(apiv4, afb_ctlid_Init, NULL, apiv4->userdata);
 	return 0;
 }
 

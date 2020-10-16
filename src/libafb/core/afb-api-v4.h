@@ -68,7 +68,7 @@ extern
 int
 afb_api_v4_safe_ctlproc(
 	struct afb_api_v4 *apiv4,
-	int (*ctlproc)(const struct afb_api_v4 *, afb_ctlid_t, afb_ctlarg_t),
+	afb_api_callback_x4_t ctlproc,
 	afb_ctlid_t ctlid,
 	afb_ctlarg_t ctlarg
 );
@@ -274,8 +274,8 @@ afb_api_v4_new_api_hookable(
 	const char *apiname,
 	const char *info,
 	int noconcurrency,
-	int (*mainctl)(const struct afb_api_v4*, afb_ctlid_t, afb_ctlarg_t),
-	void *closure
+	afb_api_callback_x4_t mainctl,
+	void *userdata
 );
 
 extern

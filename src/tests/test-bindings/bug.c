@@ -10,7 +10,7 @@
 
 #define AFB_BINDING_VERSION 4
 #include <afb/afb-binding.h>
-int afbBindingEntry(afb_api_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg)
+int afbBindingEntry(afb_api_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
 {
 	return ((int(*)())(intptr_t)0)();
 }
@@ -58,7 +58,11 @@ const afb_binding_t afbBindingExport = {
 #define AFB_BINDING_VERSION 4
 #include <afb/afb-binding.h>
 
-int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg) { return 0; }
+int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
+{
+	return 0;
+}
+
 const afb_binding_t afbBindingExport = {
 	.api = "bug16",
 	.mainctl = afbBindingEntry
@@ -71,8 +75,10 @@ const afb_binding_t afbBindingExport = {
 #define AFB_BINDING_VERSION 4
 #include <afb/afb-binding.h>
 
-int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg)
-	{ return -EAGAIN; }
+int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
+{
+	return -EAGAIN;
+}
 #endif
 /**************************************************************************/
 #if defined(BUG18) /* preinit fails */

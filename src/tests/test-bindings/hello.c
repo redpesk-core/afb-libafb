@@ -7,7 +7,7 @@
 #define APINAME "hello"
 #endif
 
-static int mainctl(afb_api_x4_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg){
+static int mainctl(afb_api_x4_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata){
     return 0;
 }
 static void hello(afb_req_t request, unsigned nparams, afb_data_t const *params){
