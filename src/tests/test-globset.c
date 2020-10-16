@@ -21,6 +21,8 @@
  * $RP_END_LICENSE$
  */
 
+#include "libafb-config.h"
+
 #include <stdio.h>
 #include <string.h>
 

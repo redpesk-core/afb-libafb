@@ -21,7 +21,7 @@
  * $RP_END_LICENSE$
  */
 
-#define _GNU_SOURCE
+#include "libafb-config.h"
 
 #include <stdlib.h>
 #include <string.h>
