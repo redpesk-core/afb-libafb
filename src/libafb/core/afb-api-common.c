@@ -898,11 +898,11 @@ afb_api_common_start(
 	comapi->state = Api_State_Init;
 
 #if WITH_AFB_HOOK
-	/* Starts the service */
 	if (comapi->hookflags & afb_hook_flag_api_start)
 		afb_hook_api_start_before(comapi);
 #endif
 
+	/* Monitor start of the service */
 	start.startcb = startcb;
 	start.closure = closure;
 	afb_sig_monitor_run(0, do_start, &start);

@@ -27,7 +27,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "utils/wrap-json.h"
+#include "wrap-json.h"
 
 #define STACKCOUNT  32
 #define STRCOUNT    8

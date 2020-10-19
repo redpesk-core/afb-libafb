@@ -35,7 +35,7 @@
 
 #if WITH_DYNAMIC_BINDING
 
-#include "sys/x-dynlib.h"
+#include "../sys/x-dynlib.h"
 
 struct afb_v4_dynlib_info
 {
