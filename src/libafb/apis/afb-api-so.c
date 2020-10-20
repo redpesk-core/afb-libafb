@@ -36,6 +36,7 @@
 #include "apis/afb-api-so-v4.h"
 #include "sys/verbose.h"
 #include "core/afb-sig-monitor.h"
+#include "utils/path-search.h"
 
 struct safe_dlopen
 {
@@ -124,49 +125,49 @@ int afb_api_so_add_binding(const char *path, struct afb_apiset *declare_set, str
 }
 
 #if WITH_DIRENT
-static int adddirs(char path[PATH_MAX], size_t end, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops)
+
+/**
+ * internal structure for keeping parameters of load across callbacks
+ */
+struct search
 {
-	DIR *dir;
-	struct dirent *dent;
-	struct stat st;
-	size_t len;
-	int rc = 0;
+	/** the declare set */
+	struct afb_apiset *declare_set;
+	/** the call set */
+	struct afb_apiset *call_set;
+	/** are failures fatal? */
+	int failstops;
+	/** final status */
+	int status;
+};
 
-	/* open the DIR now */
-	dir = opendir(path);
-	if (dir == NULL) {
-		ERROR("can't scan binding directory %s, %m", path);
-		return -errno;
-	}
-	INFO("Scanning dir=[%s] for bindings", path);
+/**
+ * callback of files
+ */
+static int processfiles(void *closure, struct path_search_item *item)
+{
+	int rc;
+	struct search *s = closure;
 
-	/* scan each entry */
-	if (end)
-		path[end++] = '/';
-	for (;;) {
-		errno = 0;
-		dent = readdir(dir);
-		if (dent == NULL) {
-			if (errno != 0)
-				ERROR("read error while scanning directory %.*s: %m", (int)(end - 1), path);
-			break;
-		}
+	/* only try files having ".so" extension */
+	if (item->namelen < 3 || memcmp(&item->name[item->namelen - 3], ".so", 4))
+		return 0;
 
-		/* get the name and inspect dereferenced link instead of the directory entry */
-		len = strlen(dent->d_name);
-		if (len + end >= PATH_MAX) {
-			ERROR("path too long while scanning bindings for %.*s%s", (int)end, path, dent->d_name);
-			continue;
-		}
-		memcpy(&path[end], dent->d_name, len+1);
-		rc = stat(path, &st);
-		if (rc < 0) {
-			ERROR("getting status of %s failed: %m", path);
-			continue;
-		}
-		else if (S_ISDIR(st.st_mode)) {
-			/* case of directories */
-			if (dent->d_name[0] == '.') {
+	/* try to get it as a binding */
+	rc = load_binding(item->path, 0, s->declare_set, s->call_set);
+	if (rc >= 0 || !s->failstops)
+		return 0; /* got it or fails ignored */
+
+	/* report the error and tell to stop exploration of files */
+	s->status = rc;
+	return 1;
+}
+
+/**
+ * function to filter out the directories that must not be entered
+ */
+static int filterdirs(void *closure, struct path_search_item *item)
+{
 /*
 Exclude from the search of bindings any
 directory starting with a dot (.) by default.
@@ -196,89 +197,39 @@ had a .debug/binding.so file attached. Opening that
 debug file made dlopen crashing.
 See https://sourceware.org/bugzilla/show_bug.cgi?id=22101
  */
+	int result;
 #if !defined(AFB_API_SO_ACCEPT_DOT_PREFIXED_DIRS) /* not defined by default */
-				continue; /* ignore any directory beginning with a dot */
+	/* ignore any directory beginning with a dot */
+	result = item->name[0] != '.';
+#elif  !defined(AFB_API_SO_ACCEPT_DOT_DEBUG_DIRS) /* not defined by default */
+	/* ignore directories '.debug' */
+	result = strcmp(item->name, ".debug") != 0;
 #else
-				if (len == 1)
-					continue; /* . */
-				if (dent->d_name[1] == '.' && len == 2)
-					continue; /* .. */
-#if !defined(AFB_API_SO_ACCEPT_DOT_DEBUG_DIRS) /* not defined by default */
-				if (len == 6
-				 && dent->d_name[1] == 'd'
-				 && dent->d_name[2] == 'e'
-				 && dent->d_name[3] == 'b'
-				 && dent->d_name[4] == 'u'
-				 && dent->d_name[5] == 'g')
-					continue; /* .debug */
+	result = 1;
 #endif
-#endif
-			}
-			rc = adddirs(path, end+len, declare_set, call_set, failstops);
-		} else if (S_ISREG(st.st_mode)) {
-			/* case of files */
-			if (memcmp(&dent->d_name[len - 3], ".so", 4))
-				continue;
-			rc = load_binding(path, 0, declare_set, call_set);
-		}
-		if (rc < 0 && failstops) {
-			closedir(dir);
-			return rc;
-		}
-	}
-	closedir(dir);
-	return 0;
+	if (result)
+		INFO("Scanning dir=[%s] for bindings", item->path);
+	return result;
 }
 
-int afb_api_so_add_directory(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops)
+int afb_api_so_add_path_search(struct path_search *pathsearch, struct afb_apiset *declare_set, struct afb_apiset *call_set, int failstops)
 {
-	size_t length;
-	char buffer[PATH_MAX];
-
-	length = strlen(path);
-	if (length >= sizeof(buffer)) {
-		ERROR("path too long %lu [%.99s...]", (unsigned long)length, path);
-		return X_ENAMETOOLONG;
-	}
-
-	memcpy(buffer, path, length + 1);
-	return adddirs(buffer, length, declare_set, call_set, failstops);
-}
-
-int afb_api_so_add_path(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops)
-{
-	struct stat st;
-	int rc;
-
-	rc = stat(path, &st);
-	if (rc < 0) {
-		ERROR("Invalid binding path [%s]: %m", path);
-		return -errno;
-	}
-	if (S_ISDIR(st.st_mode))
-		rc = afb_api_so_add_directory(path, declare_set, call_set, failstops);
-	else if (strstr(path, ".so"))
-		rc = load_binding(path, 0, declare_set, call_set);
-	else
-		INFO("not a binding [%s], skipped", path);
-	return rc;
+	struct search s = { .declare_set = declare_set, .call_set = call_set, .failstops = failstops, .status = 0 };
+	path_search_filter(pathsearch, PATH_SEARCH_FILE|PATH_SEARCH_RECURSIVE|PATH_SEARCH_FLEXIBLE, processfiles, &s, filterdirs);
+	return s.status;
 }
 
 int afb_api_so_add_pathset(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops)
 {
-	static char sep[] = ":";
-	char *ps, *p;
 	int rc;
+	struct path_search *ps;
 
-	ps = strdupa(pathset);
-	for (;;) {
-		p = strsep(&ps, sep);
-		if (!p)
-			return 0;
-		rc = afb_api_so_add_path(p, declare_set, call_set, failstops);
-		if (rc < 0)
-			return rc;
+	rc = path_search_make_dirs(&ps, pathset);
+	if (rc >= 0) {
+		rc = afb_api_so_add_path_search(ps, declare_set, call_set, failstops);
+		path_search_unref(ps);
 	}
+	return rc;
 }
 
 int afb_api_so_add_pathset_fails(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set)
