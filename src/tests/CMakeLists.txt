@@ -48,19 +48,20 @@ if(check_FOUND)
 	addtest(sig-monitor)
 	addtest(sched)
 	addtest(afb-auth)
-	addtest(api-so-v4)
-	addtest(afb-perm)
 	addtest(path-search)
 	addtest(expand-vars)
+
+	add_subdirectory(test-bindings)
+	addtest(api-so-v4)
+
+	addtest(afb-perm)
+	add_dependencies(test-afb-perm cynagoraInit)
+	add_custom_target(cynagoraInit
+		SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial
+		COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial" "${CMAKE_CURRENT_BINARY_DIR}/cynagoraTest.initial"
+		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial
+	)
 else(check_FOUND)
 	MESSAGE(WARNING "check not found! no test!")
 endif(check_FOUND)
 
-add_subdirectory(test-bindings)
-
-add_dependencies(test-afb-perm cynagoraInit)
-add_custom_target(cynagoraInit
-	SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial
-	COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial" "${CMAKE_CURRENT_BINARY_DIR}/cynagoraTest.initial"
-	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cynagoraTest.initial
-)
