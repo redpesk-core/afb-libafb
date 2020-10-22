@@ -45,7 +45,7 @@
 #include "core/afb-params.h"
 #include "core/afb-session.h"
 #include "misc/afb-supervision.h"
-#include "misc/afs-supervision.h"
+#include "misc/afb-supervisor.h"
 #include "wsapi/afb-stub-ws.h"
 #if WITH_AFB_DEBUG
 #include "misc/afb-debug.h"
@@ -61,13 +61,13 @@
 #include "utils/namecmp.h"
 
 /* api and apiset name */
-static const char supervision_apiname[] = AFS_SUPERVISION_APINAME;
+static const char supervision_apiname[] = AFB_SUPERVISION_APINAME;
 #if WITH_AFB_TRACE
-static const char supervisor_apiname[] = AFS_SUPERVISOR_APINAME;
+static const char supervisor_apiname[] = AFB_SUPERVISOR_APINAME;
 #endif
 
 /* path of the supervision socket */
-static const char supervisor_socket_path[] = AFS_SUPERVISION_SOCKET;
+static const char supervisor_socket_path[] = AFB_SUPERVISOR_SOCKET;
 
 /* mutual exclusion */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
@@ -158,7 +158,7 @@ static void try_connect_supervisor()
 {
 	int fd;
 	ssize_t srd;
-	struct afs_supervision_initiator initiator;
+	struct afb_supervisor_initiator initiator;
 	struct fdev *fdev;
 
 	/* get the mutex */
@@ -196,7 +196,7 @@ static void try_connect_supervisor()
 		ERROR("Bad interface of supervisor %s", supervisor_socket_path);
 		goto end2;
 	}
-	if (strcmp(initiator.interface, AFS_SUPERVISION_INTERFACE_1)) {
+	if (strcmp(initiator.interface, AFB_SUPERVISOR_INTERFACE_1)) {
 		ERROR("Unknown interface %s for supervisor %s", initiator.interface, supervisor_socket_path);
 		goto end2;
 	}

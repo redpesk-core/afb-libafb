@@ -31,25 +31,25 @@
  * anyone to create a such socket and usurpate the
  * supervisor.
  */
-#if !defined(AFS_SUPERVISION_SOCKET)
-#  define AFS_SUPERVISION_SOCKET "@urn:AGL:afs:supervision:socket" /* abstract */
+#if !defined(AFB_SUPERVISOR_SOCKET)
+#  define AFB_SUPERVISOR_SOCKET "@urn:AGL:afs:supervision:socket" /* abstract */
 #endif
 
 /*
  * generated using
- * uuid -v 5 ns:URL urn:AGL:afs:supervision:interface:1
+ * uuid -v 5 ns:URL urn:AGL:afb:supervisor:interface:1
  */
-#define AFS_SUPERVISION_INTERFACE_1 "86040e8d-eee5-5900-a129-3edb8da3ed46"
+#define AFB_SUPERVISOR_INTERFACE_1 "ba348c19-6f81-51a1-a032-93408252e6cf"
 
 
 /**
  * packet initially sent by monitor at start
  */
-struct afs_supervision_initiator
+struct afb_supervisor_initiator
 {
 	char interface[37];	/**< zero terminated interface uuid */
 	char extra[27];		/**< zero terminated extra computed here to be 64-37 */
 };
 
-#define AFS_SUPERVISION_APINAME      "."
-#define AFS_SUPERVISOR_APINAME       "supervisor"
+#define AFB_SUPERVISION_APINAME      "."
+#define AFB_SUPERVISOR_APINAME       "supervisor"
