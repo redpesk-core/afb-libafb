@@ -27,7 +27,7 @@ pkg_check_modules(check check)
 macro(addtest name)
 	add_executable(test-${name} test-${name}.c)
 	target_include_directories(test-${name} PRIVATE ${INCLUDE_DIRS} ${check_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../libafb)
-	target_link_libraries(test-${name} libafbsta ${link_libraries}  ${check_LDFLAGS})
+	target_link_libraries(test-${name} libafbsta ${ldflags}  ${check_LDFLAGS})
 	add_test(NAME ${name} COMMAND test-${name} ${ARGN})
 endmacro(addtest)
 
