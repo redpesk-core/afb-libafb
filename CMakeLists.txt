@@ -49,7 +49,6 @@ include(CTest)
 
 ###########################################################################
 # possible settings
-option(LIBAFB_DEVEL               "Activates development features"         OFF)
 option(WITH_SYSTEMD               "Require use of libsystemd"              ON)
 option(WITHOUT_CYNAGORA           "Forbids use of cynagora"                OFF)
 option(WITHOUT_TESTS              "Avoid compiling tests"                  OFF)
