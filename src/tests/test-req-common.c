@@ -232,8 +232,13 @@ START_TEST (prepare_forwarding)
 	// show_req(req);
 	fprintf(stderr, "\n### Prepare forwarding...\n");
 
-	rc = afb_type_register(&type1, "type1", 0, 0, 0);
-	ck_assert_int_eq(rc, 0);
+	type1 = afb_type_get("type1");
+	if(!type1){
+		rc = afb_type_register(&type1, "type1", 0, 0, 0);
+		fprintf(stderr, "afb_type_register returned : %d\n", rc);
+		ck_assert_int_eq(rc, 0);
+	}
+
 	dataChecksum = 0;
 	for(j=1; j<=NB_DATA; j++){
 		gval = 0;
@@ -324,7 +329,12 @@ START_TEST (process)
 
 	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
 
-	rc = afb_type_register(&type1, "type1", 0, 0, 0);
+	type1 = afb_type_get("type1");
+	if(!type1){
+		rc = afb_type_register(&type1, "type1", 0, 0, 0);
+		fprintf(stderr, "afb_type_register returned : %d\n", rc);
+		ck_assert_int_eq(rc, 0);
+	}
 
 	for(i=1; i<=NB_DATA; i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
@@ -383,7 +393,12 @@ START_TEST(process_on_behalf)
 
 	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
 
-	rc = afb_type_register(&type1, "type1", 0, 0, 0);
+	type1 = afb_type_get("type1");
+	if(!type1){
+		rc = afb_type_register(&type1, "type1", 0, 0, 0);
+		fprintf(stderr, "afb_type_register returned : %d\n", rc);
+		ck_assert_int_eq(rc, 0);
+	}
 
 	for(i=1; i<=NB_DATA; i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
@@ -609,6 +624,81 @@ START_TEST(check_perm)
 
 }
 END_TEST
+
+START_TEST(replay)
+{
+	struct afb_req_common *req = &comreq;
+	struct afb_type *type1;
+	struct afb_data *data[REQ_COMMON_NREPLIES_MAX+NB_DATA];
+	int rc, i;
+	int dataChecksum = 0;
+
+	fprintf(stderr, "\n### reply\n");
+
+	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
+
+	type1 = afb_type_get("type1");
+	if(!type1){
+		rc = afb_type_register(&type1, "type1", 0, 0, 0);
+		fprintf(stderr, "afb_type_register returned : %d\n", rc);
+		ck_assert_int_eq(rc, 0);
+	}
+
+	fprintf(stderr, "------\ntest that memory get allocated when replay require more than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NREPLIES_MAX);
+
+	for (i=1; i<=REQ_COMMON_NREPLIES_MAX+NB_DATA; i++){
+		fprintf(stderr, "creating data with closure = %d\n", i);
+		rc = afb_data_create_raw(&data[i-1], type1, NULL, 0, dataClosureCB, i2p(i));
+		ck_assert_int_eq(rc, 0);
+		dataChecksum += i;
+	}
+
+	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NREPLIES_MAX+NB_DATA, data);
+
+	ck_assert_ptr_ne(req->replies, req->local_replies);
+
+	i=0;
+	gval = 0;
+
+	// Process jobs manually as scheduler is not running
+	while (afb_jobs_get_pending_count() > 0){
+		i++;
+		fprintf(stderr, "processing job %d\n", i);
+		afb_jobs_run(afb_jobs_dequeue());
+	}
+	ck_assert_int_eq(i, 1);
+	ck_assert_int_eq(gval, dataChecksum);
+
+	fprintf(stderr, "------\ntest that the static buffer is used when replay require les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NREPLIES_MAX);
+
+	req->replied = 0;
+	dataChecksum = 0;
+
+	for (i=1; i<=REQ_COMMON_NREPLIES_MAX; i++){
+		fprintf(stderr, "creating data with closure = %d\n", i);
+		rc = afb_data_create_raw(&data[i-1], type1, NULL, 0, dataClosureCB, i2p(i));
+		ck_assert_int_eq(rc, 0);
+		dataChecksum += i;
+	}
+
+	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NREPLIES_MAX, data);
+
+	ck_assert_ptr_eq(req->replies, req->local_replies);
+
+	i=0;
+	gval = 0;
+
+	// Process jobs manually as scheduler is not running
+	while (afb_jobs_get_pending_count() > 0){
+		i++;
+		fprintf(stderr, "processing job %d\n", i);
+		afb_jobs_run(afb_jobs_dequeue());
+	}
+	ck_assert_int_eq(i, 1);
+	ck_assert_int_eq(gval, dataChecksum);
+
+}
+END_TEST
 /*********************************************************************/
 
 static Suite *suite;
@@ -640,5 +730,6 @@ int main(int ac, char **av)
 			addtest(errors);
 			addtest(subscribe);
 			addtest(check_perm);
+			addtest(replay);
 	return !!srun();
 }

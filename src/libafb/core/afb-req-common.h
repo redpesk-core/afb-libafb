@@ -80,11 +80,12 @@ struct afb_req_common
 
 	const struct afb_req_common_query_itf *queryitf; /**< interface of req implementation functions */
 
-	/** count of replies */
+	/** count of parammeters */
 	unsigned nparams;
 
-	/** the replies */
-	struct afb_data *params[REQ_COMMON_NPARAMS_MAX];
+	/** the parammeters */
+	struct afb_data **params;
+	struct afb_data *local_params[REQ_COMMON_NPARAMS_MAX];
 
 #if WITH_REPLY_JOB
 	/** the reply */
@@ -94,7 +95,9 @@ struct afb_req_common
 	unsigned nreplies;
 
 	/** the replies */
-	struct afb_data *replies[REQ_COMMON_NREPLIES_MAX];
+	struct afb_data **replies;
+	struct afb_data *local_replies[REQ_COMMON_NREPLIES_MAX];
+
 #endif
 };
 

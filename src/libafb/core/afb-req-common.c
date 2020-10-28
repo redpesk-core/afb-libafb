@@ -214,6 +214,17 @@ afb_req_common_init(
 	req->apiname = apiname;
 	req->verbname = verbname;
 	req->nparams = nparams;
+	if (nparams > REQ_COMMON_NPARAMS_MAX) {
+		req->params = malloc(nparams * sizeof *params);
+		if (!req->params) {
+			ERROR("fail to allocate memory for params");
+			req->params = req->local_params;
+			afb_params_unref(nparams-REQ_COMMON_NPARAMS_MAX, &params[REQ_COMMON_NPARAMS_MAX]);
+			nparams = REQ_COMMON_NPARAMS_MAX;
+		}
+	}
+	else
+		req->params = req->local_params;
 	memcpy(req->params, params, nparams * sizeof *params);
 }
 
@@ -226,9 +237,22 @@ afb_req_common_prepare_forwarding(
 	struct afb_data * const params[]
 ) {
 	afb_params_unref(req->nparams, req->params);
+	if (req->params != req->local_params)
+		free(req->params);
 	req->apiname = apiname;
 	req->verbname = verbname;
 	req->nparams = nparams;
+	if (nparams > REQ_COMMON_NPARAMS_MAX) {
+		req->params = malloc(nparams * sizeof *params);
+		if (!req->params) {
+			ERROR("fail to allocate memory for params");
+			req->params = req->local_params;
+			afb_params_unref(nparams-REQ_COMMON_NPARAMS_MAX, &params[REQ_COMMON_NPARAMS_MAX]);
+			nparams = REQ_COMMON_NPARAMS_MAX;
+		}
+	}
+	else
+		req->params = req->local_params;
 	memcpy(req->params, params, nparams * sizeof *params);
 }
 
@@ -303,6 +327,8 @@ afb_req_common_cleanup(
 	struct afb_req_common *req
 ) {
 	afb_params_unref(req->nparams, req->params);
+	if (req->params != req->local_params)
+		free(req->params);
 	if (req->session && req->closing)
 		afb_session_drop_key(req->session, req->api);
 	afb_req_common_set_session(req, NULL);
@@ -792,6 +818,8 @@ reply_job(
 	if (!signum)
 		req->queryitf->reply(req, req->status, req->nreplies, req->replies);
 	afb_params_unref(req->nreplies, req->replies);
+	if(req->replies != req->local_replies)
+		free(req->replies);
 	afb_req_common_unref(req);
 }
 
@@ -805,6 +833,17 @@ do_reply(
 ) {
 	req->status = status;
 	req->nreplies = nreplies;
+	if (nreplies > REQ_COMMON_NREPLIES_MAX) {
+		req->replies = malloc(nreplies * sizeof *replies);
+		if (!req->replies) {
+			ERROR("fail to allocate memory for replies");
+			req->replies = req->local_replies;
+			afb_params_unref(nreplies-REQ_COMMON_NREPLIES_MAX, &replies[REQ_COMMON_NREPLIES_MAX]);
+			nreplies = REQ_COMMON_NREPLIES_MAX;
+		}
+	}
+	else
+		req->replies = req->local_replies;
 	afb_params_copy(nreplies, replies, req->replies);
 
 	afb_req_common_addref(req);
