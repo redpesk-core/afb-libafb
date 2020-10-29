@@ -100,7 +100,7 @@ int getpath(char buffer[BUF_SIZE], const char *base)
 void preparDemonCynagora(){
 	char *p;
 	int r;
-	
+
 	p = getcwd(cwd, sizeof(cwd));
 	ck_assert_ptr_ne(p, 0);
 	r = snprintf(gpath, sizeof gpath, "%s/%d", cwd, (int)getpid());
@@ -283,7 +283,7 @@ START_TEST (test)
 END_TEST
 
 void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, char * token, char * session, int sessionflag){
-	
+
 	uid_t uid = 1;
 	gid_t gid = 1;
 	pid_t pid = 1;
@@ -305,7 +305,7 @@ void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, c
 /* Test with session set */
 START_TEST (testRecCommonPerm)
 {
-	
+
 	signal(SIGPIPE, SIG_IGN);
 
 	fprintf(stderr, "\n------------- test_rec_common_perm -------------\n");
@@ -352,7 +352,7 @@ START_TEST (testRecCommonPerm)
 		else ck_assert_int_eq(val, 0);
 	}
 
-	
+
 	/* check for text Permission */
 	fprintf(stderr, "\n****** afb_auth_Permission ******\n");
 	auth.type = afb_auth_Permission;
@@ -366,7 +366,7 @@ START_TEST (testRecCommonPerm)
 	auth.text = "noPerm";
 	test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 	ck_assert_int_eq(val, 0);
-	
+
 
 	/* check for "or" conditional Permission */
 	fprintf(stderr, "\n****** afb_auth_Or ******\n");
@@ -455,7 +455,7 @@ static TCase *tcase;
 
 void mksuite(const char *name) { suite = suite_create(name); }
 void addtcase(const char *name) { tcase = tcase_create(name); suite_add_tcase(suite, tcase); }
-void addtest(TFun fun) { tcase_add_test(tcase, fun); }
+#define addtest(test) tcase_add_test(tcase, test)
 int srun()
 {
 	int nerr;

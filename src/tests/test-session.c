@@ -297,7 +297,7 @@ START_TEST (check_drop)
 
 	/* set a cookie */
 	freecookie_got = NULL;
-	afb_session_cookie(s, key, (void**)&p, NULL, freecookie, check_drop, Afb_Session_Cookie_Set);
+	afb_session_cookie(s, key, (void**)&p, NULL, freecookie, (void*)check_drop, Afb_Session_Cookie_Set);
 	ck_assert(p == check_drop);
 	ck_assert(freecookie_got == NULL);
 
@@ -439,7 +439,7 @@ static TCase *tcase;
 
 void mksuite(const char *name) { suite = suite_create(name); }
 void addtcase(const char *name) { tcase = tcase_create(name); suite_add_tcase(suite, tcase); }
-void addtest(TFun fun) { tcase_add_test(tcase, fun); }
+#define addtest(test) tcase_add_test(tcase, test)
 int srun()
 {
 	int nerr;

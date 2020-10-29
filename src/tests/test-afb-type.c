@@ -77,7 +77,7 @@ static TCase *tcase;
 
 void mksuite(const char *name) { suite = suite_create(name); }
 void addtcase(const char *name) { tcase = tcase_create(name); suite_add_tcase(suite, tcase); tcase_set_timeout(tcase, 120); }
-void addtest(TFun fun) { tcase_add_test(tcase, fun); }
+#define addtest(test) tcase_add_test(tcase, test)
 int srun()
 {
 	int nerr;
