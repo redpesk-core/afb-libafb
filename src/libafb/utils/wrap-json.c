@@ -22,15 +22,12 @@
  $RP_END_LICENSE$
 */
 
-#include "libafb-config.h"
-
 #include <string.h>
 #include <limits.h>
 
 #include "wrap-json.h"
 
 #define STACKCOUNT  32
-#define STRCOUNT    8
 
 static const char ignore_all[] = " \t\n\r,:";
 static const char pack_accept_arr[] = "][{snbiIfoOyY";
@@ -250,20 +247,21 @@ static inline const char *skip(const char *d)
 int wrap_json_vpack(struct json_object **result, const char *desc, va_list args)
 {
 	/* TODO: the case of structs with key being single char should be optimized */
-	int nstr, notnull, nullable, rc;
-	size_t sz, dsz, ssz;
-	char *s;
+	int notnull, nullable, rc, init;
+	size_t sz, ssz, nsz;
+	char *s, *sa;
 	char c;
-	const char *d;
+	const char *d, *sv;
 	char buffer[256];
 	struct { const uint8_t *in; size_t insz; char *out; size_t outsz; } bytes;
-	struct { const char *str; size_t sz; } strs[STRCOUNT];
+	struct { const char *str; size_t sz; } str;
 	struct { struct json_object *cont, *key; const char *acc; char type; } stack[STACKCOUNT], *top;
 	struct json_object *obj;
 
 	ssz = sizeof buffer;
 	s = buffer;
 	top = stack;
+	sa = NULL;
 	top->key = NULL;
 	top->cont = NULL;
 	top->acc = pack_accept_any;
@@ -283,48 +281,56 @@ int wrap_json_vpack(struct json_object **result, const char *desc, va_list args)
 		case 's':
 			nullable = 0;
 			notnull = 0;
-			nstr = 0;
 			sz = 0;
+			sv = 0;
 			for (;;) {
-				strs[nstr].str = va_arg(args, const char*);
-				if (strs[nstr].str)
-					notnull = 1;
+				str.str = va_arg(args, const char*);
 				if (*d == '?') {
 					d = skip(d + 1);
 					nullable = 1;
 				}
 				switch(*d) {
-				case '%': strs[nstr].sz = va_arg(args, size_t); d = skip(d + 1); break;
-				case '#': strs[nstr].sz = (size_t)va_arg(args, int); d = skip(d + 1); break;
-				default: strs[nstr].sz = strs[nstr].str ? strlen(strs[nstr].str) : 0; break;
+				case '%': str.sz = va_arg(args, size_t); d = skip(d + 1); break;
+				case '#': str.sz = (size_t)va_arg(args, int); d = skip(d + 1); break;
+				default: str.sz = str.str ? strlen(str.str) : 0; break;
 				}
-				sz += strs[nstr++].sz;
+				if (str.str) {
+					notnull = 1;
+					nsz = sz + str.sz;
+					if (!sv)
+						sv = str.str;
+					else {
+						init = sv != s;
+						if (nsz > ssz) {
+							ssz += ssz;
+							if (ssz < nsz)
+								ssz = nsz;
+							s = realloc(sa, ssz);
+							if (!s)
+								goto out_of_memory;
+							if (!sa)
+								memcpy(s, buffer, sz);
+							sa = s;
+						}
+						if (init)
+							memcpy(s, sv, sz);
+						memcpy(&s[sz], str.str, str.sz);
+						sv = s;
+					}
+					sz = nsz;
+				}
 				if (*d == '?') {
 					d = skip(d + 1);
 					nullable = 1;
 				}
 				if (*d != '+')
 					break;
-				if (nstr >= STRCOUNT)
-					goto too_long;
 				d = skip(d + 1);
 			}
 			if (*d == '*')
 				nullable = 1;
 			if (notnull) {
-				if (sz > ssz) {
-					ssz += ssz;
-					if (ssz < sz)
-						ssz = sz;
-					s = alloca(sz);
-				}
-				dsz = sz;
-				while (nstr) {
-					nstr--;
-					dsz -= strs[nstr].sz;
-					memcpy(&s[dsz], strs[nstr].str, strs[nstr].sz);
-				}
-				obj = json_object_new_string_len(s, (int)sz);
+				obj = json_object_new_string_len(sv, (int)sz);
 				if (!obj)
 					goto out_of_memory;
 			} else if (nullable)
@@ -426,6 +432,7 @@ int wrap_json_vpack(struct json_object **result, const char *desc, va_list args)
 			if (*d)
 				goto invalid_character;
 			*result = obj;
+			free(sa);
 			return 0;
 		case ']':
 			if (obj || *d != '*')
@@ -470,9 +477,6 @@ out_of_memory:
 invalid_character:
 	rc = wrap_json_error_invalid_character;
 	goto error;
-too_long:
-	rc = wrap_json_error_too_long;
-	goto error;
 too_deep:
 	rc = wrap_json_error_too_deep;
 	goto error;
@@ -492,6 +496,7 @@ error:
 	} while (--top >= stack);
 	*result = NULL;
 	rc = rc | (int)((d - desc) << 4);
+	free(sa);
 	return -rc;
 }
 
@@ -1357,6 +1362,24 @@ int main()
 	P("s#", buffer, 4);
 	P("s%", buffer, (size_t)4);
 	P("s++", "te", "st", "ing");
+	P("s+++++++++++++++",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	);
 	P("s#+#+", "test", 1, "test", 2, "test");
 	P("s%+%+", "test", (size_t)1, "test", (size_t)2, "test");
 	P("{}", 1.0);
