@@ -115,7 +115,7 @@ extern void verbose_inc();
 extern void verbose_clear();
 extern void verbose_add(int level);
 extern void verbose_sub(int level);
-extern void verbose_colorize();
+extern void verbose_colorize(int value);
 extern int verbose_is_colorized();
 
 extern int verbose_level_of_name(const char *name);
@@ -133,8 +133,8 @@ extern int verbosity_to_mask(int verbo);
 #define COLOR_CRITICAL	"\x1B[41m"
 #define COLOR_ERROR	"\x1B[91m"
 #define COLOR_WARNING	"\x1B[93m"
-#define COLOR_NOTICE	"\x1B[94m"
-#define COLOR_INFO	"\x1B[96m"
+#define COLOR_NOTICE	"\x1B[96m"
+#define COLOR_INFO	"\x1B[94m"
 #define COLOR_DEBUG	"\x1B[95m"
 #define COLOR_API	"\x1B[1m"
 #define COLOR_FILE	"\x1B[90m"

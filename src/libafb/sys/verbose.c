@@ -59,6 +59,8 @@ static const char *names[] = {
 
 static const char asort[] = { 1, 2, 7, 0, 3, 6, 5, 4 };
 
+static int colorize;
+
 int logmask = DEFAULT_LOGMASK | MINIMAL_LOGMASK;
 
 void (*verbose_observer)(int loglevel, const char *file, int line, const char *function, const char *fmt, va_list args);
@@ -88,6 +90,8 @@ void verbose_set_name(const char *name, int authority)
 	openlog(name, LOG_PERROR, authority ? LOG_AUTH : LOG_USER);
 }
 
+static int is_tty() { return 0; }
+
 #elif defined(VERBOSE_WITH_SYSTEMD)
 
 #define SD_JOURNAL_SUPPRESS_LOCATION
@@ -115,6 +119,8 @@ void verbose_set_name(const char *name, int authority)
 	appname = name;
 	appauthority = authority;
 }
+
+static int is_tty() { return 0; }
 
 #else
 
@@ -151,33 +157,40 @@ static const char *prefixes_colorized[] = {
 	"<7> " COLOR_DEBUG	"DEBUG"		COLOR_DEFAULT
 };
 
-static int colorize = 0;
-
 static int tty;
 
 static const char chars[] = { '\n', '?', ':', ' ', '[', ',', ']' };
 
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 
+static int is_tty()
+{
+	int r = tty;
+	if (!r)
+		r = tty = 1 + isatty(STDERR_FILENO);
+	return r - 1;
+}
+
 static void _vverbose_(int loglevel, const char *file, int line, const char *function, const char *fmt, va_list args)
 {
 	char buffer[4000];
 	char lino[40];
-	int saverr, n, rc;
+	int saverr, n, rc, colorize;
 	struct iovec iov[20];
+	int tty;
 
 	/* save errno */
 	saverr = errno;
 
 	/* check if tty (2) or not (1) */
-	if (!tty)
-		tty = 1 + isatty(STDERR_FILENO);
+	tty = is_tty();
 
 	/* prefix */
+	colorize = verbose_is_colorized();
 	if (colorize)
-		iov[0].iov_base = (void*)(prefixes_colorized[CROP_LOGLEVEL(loglevel)] + (tty - 1 ? 4 : 0));
+		iov[0].iov_base = (void*)(prefixes_colorized[CROP_LOGLEVEL(loglevel)] + (tty ? 4 : 0));
 	else
-		iov[0].iov_base = (void*)(prefixes[CROP_LOGLEVEL(loglevel)] + (tty - 1 ? 4 : 0));
+		iov[0].iov_base = (void*)(prefixes[CROP_LOGLEVEL(loglevel)] + (tty ? 4 : 0));
 	iov[0].iov_len = strlen(iov[0].iov_base);
 
 	/* " " */
@@ -198,7 +211,7 @@ static void _vverbose_(int loglevel, const char *file, int line, const char *fun
 		}
 		iov[n++].iov_len = (size_t)rc;
 	}
-	if (file && (!fmt || tty == 1 || loglevel <= Log_Level_Warning)) {
+	if (file && (!fmt || !tty || loglevel <= Log_Level_Warning)) {
 
 		if (colorize)
 		{
@@ -376,12 +389,15 @@ const char *verbose_name_of_level(int level)
 	return level == CROP_LOGLEVEL(level) ? names[level] : NULL;
 }
 
-void verbose_colorize()
+void verbose_colorize(int value)
 {
-	colorize = 1;
+	colorize = value < 0 ? 0 : value > 0 ? 2 : 1;
 }
 
 int verbose_is_colorized()
 {
-	return colorize;
+	int r = colorize;
+	if (!r)
+		r = colorize = 1 + is_tty();
+	return r - 1;
 }
