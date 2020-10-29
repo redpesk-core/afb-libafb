@@ -104,10 +104,6 @@ enum trace_type
 	Trace_Type_Evt,			/* evt hooks */
 	Trace_Type_Session,		/* session hooks */
 	Trace_Type_Global,		/* global hooks */
-#if !defined(REMOVE_LEGACY_TRACE)
-	Trace_Legacy_Type_Ditf,		/* comapi hooks */
-	Trace_Legacy_Type_Svc,		/* comapi hooks */
-#endif
 	Trace_Type_Count,		/* count of types of hooks */
 };
 
@@ -978,20 +974,6 @@ abstracting[Trace_Type_Count] =
 		.unref =  (void(*)(void*))afb_hook_unref_global,
 		.get_flag = afb_hook_flags_global_from_text
 	},
-#if !defined(REMOVE_LEGACY_TRACE)
-	[Trace_Legacy_Type_Ditf] =
-	{
-		.name = "daemon",
-		.unref =  (void(*)(void*))afb_hook_unref_api,
-		.get_flag = afb_hook_flags_legacy_ditf_from_text
-	},
-	[Trace_Legacy_Type_Svc] =
-	{
-		.name = "service",
-		.unref =  (void(*)(void*))afb_hook_unref_api,
-		.get_flag = afb_hook_flags_legacy_svc_from_text
-	},
-#endif
 };
 
 /*******************************************************************************/
@@ -1278,11 +1260,6 @@ static void addhooks(struct desc *desc)
 {
 	int i;
 
-#if !defined(REMOVE_LEGACY_TRACE)
-	desc->flags[Trace_Type_Api] |= desc->flags[Trace_Legacy_Type_Ditf] | desc->flags[Trace_Legacy_Type_Svc];
-	desc->flags[Trace_Legacy_Type_Ditf] = desc->flags[Trace_Legacy_Type_Svc] = 0;
-#endif
-
 	for (i = 0 ; i < Trace_Type_Count ; i++) {
 		if (desc->flags[i])
 			addhook(desc, i);
@@ -1315,18 +1292,6 @@ static void add_req_flags(void *closure, struct json_object *object)
 	add_flags(closure, object, Trace_Type_Req);
 }
 
-#if !defined(REMOVE_LEGACY_TRACE)
-static void legacy_add_ditf_flags(void *closure, struct json_object *object)
-{
-	add_flags(closure, object, Trace_Legacy_Type_Ditf);
-}
-
-static void legacy_add_svc_flags(void *closure, struct json_object *object)
-{
-	add_flags(closure, object, Trace_Legacy_Type_Svc);
-}
-#endif
-
 static void add_api_flags(void *closure, struct json_object *object)
 {
 	add_flags(closure, object, Trace_Type_Api);
@@ -1353,15 +1318,9 @@ static void add(void *closure, struct json_object *object)
 	int rc;
 	struct desc desc;
 	struct json_object *request, *event, *sub, *global, *session, *api;
-#if !defined(REMOVE_LEGACY_TRACE)
-	struct json_object *daemon, *service;
-#endif
 
 	memcpy (&desc, closure, sizeof desc);
 	request = event = sub = global = session = api = NULL;
-#if !defined(REMOVE_LEGACY_TRACE)
-	daemon = service = NULL;
-#endif
 
 	rc = wrap_json_unpack(object, "{s?s s?s s?s s?s s?s s?s s?o s?o s?o s?o s?o s?o s?o}",
 			"name", &desc.name,
@@ -1372,10 +1331,6 @@ static void add(void *closure, struct json_object *object)
 			"pattern", &desc.pattern,
 			"api", &api,
 			"request", &request,
-#if !defined(REMOVE_LEGACY_TRACE)
-			"daemon", &daemon,
-			"service", &service,
-#endif
 			"event", &event,
 			"session", &session,
 			"global", &global,
@@ -1398,14 +1353,6 @@ static void add(void *closure, struct json_object *object)
 
 		if (api)
 			wrap_json_optarray_for_all(api, add_api_flags, &desc);
-
-#if !defined(REMOVE_LEGACY_TRACE)
-		if (daemon)
-			wrap_json_optarray_for_all(daemon, legacy_add_ditf_flags, &desc);
-
-		if (service)
-			wrap_json_optarray_for_all(service, legacy_add_svc_flags, &desc);
-#endif
 
 		if (event)
 			wrap_json_optarray_for_all(event, add_evt_flags, &desc);

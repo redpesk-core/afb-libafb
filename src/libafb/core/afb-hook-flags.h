@@ -36,12 +36,4 @@ extern char *afb_hook_flags_api_to_text(int value);
 extern char *afb_hook_flags_evt_to_text(int value);
 extern char *afb_hook_flags_session_to_text(int value);
 
-#if !defined(REMOVE_LEGACY_TRACE)
-extern int afb_hook_flags_legacy_ditf_from_text(const char *text);
-extern int afb_hook_flags_legacy_svc_from_text(const char *text);
-
-extern char *afb_hook_flags_legacy_ditf_to_text(int value);
-extern char *afb_hook_flags_legacy_svc_to_text(int value);
-#endif
-
 #endif /* WITH_AFB_HOOK *******************************************************/
