@@ -40,6 +40,11 @@
 #if MHD_VERSION < 0x00095206
 # define MHD_ALLOW_SUSPEND_RESUME MHD_USE_SUSPEND_RESUME
 #endif
+#if MHD_VERSION < 0x00097002
+typedef int mhd_result_t;
+#else
+typedef enum MHD_Result mhd_result_t;
+#endif
 
 #include "core/afb-jobs.h"
 #include "utils/locale-root.h"
@@ -97,7 +102,7 @@ static void reply_error(struct MHD_Connection *connection, unsigned int status)
 	MHD_destroy_response(response);
 }
 
-static int postproc(void *cls,
+static mhd_result_t postproc(void *cls,
                     enum MHD_ValueKind kind,
                     const char *key,
                     const char *filename,
@@ -107,14 +112,16 @@ static int postproc(void *cls,
 		    uint64_t off,
 		    size_t size)
 {
+	int rc;
 	struct afb_hreq *hreq = cls;
 	if (filename != NULL)
-		return afb_hreq_post_add_file(hreq, key, filename, data, size);
+		rc = afb_hreq_post_add_file(hreq, key, filename, data, size);
 	else
-		return afb_hreq_post_add(hreq, key, data, size);
+		rc = afb_hreq_post_add(hreq, key, data, size);
+	return rc ? MHD_YES : MHD_NO;
 }
 
-static int access_handler(
+static mhd_result_t access_handler(
 		void *cls,
 		struct MHD_Connection *connection,
 		const char *url,
@@ -298,7 +305,7 @@ static void listen_callback(void *hsrv, uint32_t revents, struct fdev *fdev)
 	afb_hsrv_run(hsrv);
 }
 
-static int new_client_handler(void *cls, const struct sockaddr *addr, socklen_t addrlen)
+static mhd_result_t new_client_handler(void *cls, const struct sockaddr *addr, socklen_t addrlen)
 {
 	return MHD_YES;
 }
