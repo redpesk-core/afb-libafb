@@ -32,53 +32,7 @@
 #include "afb-type-predefined.h"
 #include "afb-api-v4.h"
 
-/* avoid use of afb_data_action_x4_t in header afb_data */
-static int x4_data_control(struct afb_data *data, afb_data_action_x4_t action)
-{
-	int r = 0;
-
-	switch (action) {
-	case Afb_Data_Action_x4_Notify_Changed:
-		afb_data_notify_changed(data);
-		break;
-	case Afb_Data_Action_x4_Is_Constant:
-		r = afb_data_is_constant(data);
-		break;
-	case Afb_Data_Action_x4_Set_Constant:
-		afb_data_set_constant(data);
-		break;
-	case Afb_Data_Action_x4_Set_Not_Constant:
-		afb_data_set_not_constant(data);
-		break;
-	case Afb_Data_Action_x4_Is_Volatile:
-		r = afb_data_is_volatile(data);
-		break;
-	case Afb_Data_Action_x4_Set_Volatile:
-		afb_data_set_volatile(data);
-		break;
-	case Afb_Data_Action_x4_Set_Not_Volatile:
-		afb_data_set_not_volatile(data);
-		break;
-	case Afb_Data_Action_x4_Lock_Read:
-		afb_data_lock_read(data);
-		break;
-	case Afb_Data_Action_x4_Try_Lock_Read:
-		r = afb_data_try_lock_read(data);
-		break;
-	case Afb_Data_Action_x4_Lock_Write:
-		afb_data_lock_write(data);
-		break;
-	case Afb_Data_Action_x4_Try_Lock_Write:
-		r = afb_data_try_lock_write(data);
-		break;
-	case Afb_Data_Action_x4_Unlock:
-		afb_data_unlock(data);
-		break;
-	default:
-		break;
-	}
-	return r;
-}
+/***********************************************************/
 
 static
 int
@@ -139,6 +93,15 @@ x4_api_type_lookup(
  *      CONS - implies explicit casts in these functions
  *           - use of 2 names for a single function
  *           - introduce at least a jump
+ *
+ * Here is a way to check:
+ *
+ *    step 1: compile the library using 'make'
+ *    step 2: re-activate the warning by uncommenting the above pragma
+ *    step 3: recompile using the command:
+ *              make |& sed "s/‘/\n&/g;s/const //g;/aka/d" | sed "/warning:/d;s,’ .*,’,g" | uniq -c
+ *    step 4: track odd line counts, one indicates a "true" mismatch that
+ *            can be located using signatures
  */
 
 /**********************************************************/
@@ -156,8 +119,19 @@ const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.data_get_constant = afb_data_get_constant,
 	.data_update = afb_data_update,
 	.data_convert = afb_data_convert_to,
-	.data_control = x4_data_control,
 	.data_type = afb_data_type,
+	.data_notify_changed = afb_data_notify_changed,
+	.data_is_volatile = afb_data_is_volatile,
+	.data_set_volatile = afb_data_set_volatile,
+	.data_set_not_volatile = afb_data_set_not_volatile,
+	.data_is_constant = afb_data_is_constant,
+	.data_set_constant = afb_data_set_constant,
+	.data_set_not_constant = afb_data_set_not_constant,
+	.data_lock_read = afb_data_lock_read,
+	.data_try_lock_read = afb_data_try_lock_read,
+	.data_lock_write = afb_data_lock_write,
+	.data_try_lock_write = afb_data_try_lock_write,
+	.data_unlock = afb_data_unlock,
 
 /*-- REQ ------------------------------------------*/
 

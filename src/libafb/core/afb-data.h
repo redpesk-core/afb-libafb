@@ -162,7 +162,7 @@ afb_data_update(
 /**
  * Clear cache of conversions but not the data itself
  *
- * @param data the dat to clear
+ * @param data the data to clear
  */
 extern
 void
@@ -227,7 +227,6 @@ afb_data_get_opacified(
 	struct afb_data **data,
 	struct afb_type **type
 );
-
 
 extern
 int
