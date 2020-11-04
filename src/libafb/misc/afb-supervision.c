@@ -414,9 +414,9 @@ static void process_cb(void *closure, struct json_object *args)
 					json_object_get(args);
 					comreq->apiname = api;
 					comreq->verbname = verb;
-					afb_params_unref(comreq->nparams, comreq->params);
-					comreq->params[0] = data;
-					comreq->nparams = 1;
+					afb_params_unref(comreq->params.ndata, comreq->params.data);
+					comreq->params.data[0] = data;
+					comreq->params.ndata = 1;
 					xapi->itf->process(xapi->closure, comreq);
 					json_object_put(args);
 				}
@@ -443,7 +443,7 @@ static void process_cb(void *closure, struct json_object *args)
 
 static void on_supervision_process(void *closure, struct afb_req_common *comreq)
 {
-	afb_json_legacy_do_single_json_c(comreq->nparams, comreq->params, process_cb, comreq);
+	afb_json_legacy_do_single_json_c(comreq->params.ndata, comreq->params.data, process_cb, comreq);
 }
 
 #endif

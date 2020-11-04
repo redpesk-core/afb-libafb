@@ -265,7 +265,7 @@ static void hook_req(void *closure, const struct afb_hookid *hookid, const struc
 
 static void hook_req_begin(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
-	struct json_object *params = json_object_of_dataset(req->nparams, req->params);
+	struct json_object *params = json_object_of_dataset(req->params.ndata, req->params.data);
 	hook_req(closure, hookid, req, "begin", "{sO?}", "params", params);
 	json_object_put(params);
 }

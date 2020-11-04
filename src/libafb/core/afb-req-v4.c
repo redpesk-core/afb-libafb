@@ -253,8 +253,8 @@ afb_req_v4_parameters(
 	struct afb_data * const **params
 ) {
 	if (params)
-		*params = reqv4->comreq->params;
-	return reqv4->comreq->nparams;
+		*params = reqv4->comreq->params.data;
+	return reqv4->comreq->params.ndata;
 }
 
 void
@@ -343,8 +343,8 @@ static void call_checked_v4(void *closure, int status)
 	if (status > 0)
 		reqv4->verb->callback(
 			reqv4,
-			reqv4->comreq->nparams,
-			(const struct afb_data * const*)reqv4->comreq->params
+			reqv4->comreq->params.ndata,
+			(const struct afb_data * const*)reqv4->comreq->params.data
 			);
 	afb_req_v4_unref(reqv4);
 }

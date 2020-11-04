@@ -356,8 +356,8 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 
 	creds = afb_req_common_on_behalf_cred_export(comreq) ?: "";
 	uuid = afb_session_uuid(comreq->session);
-	if (comreq->nparams < 1
-	 || afb_data_convert_to(comreq->params[0], &afb_type_predefined_json, &arg) < 0) {
+	if (comreq->params.ndata < 1
+	 || afb_data_convert_to(comreq->params.data[0], &afb_type_predefined_json, &arg) < 0) {
 		json = "null";
 	}
 	else {

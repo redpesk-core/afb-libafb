@@ -36,8 +36,7 @@ struct afb_data;
 struct afb_auth;
 struct afb_event_x2;
 
-#define REQ_COMMON_NPARAMS_MAX  8
-#define REQ_COMMON_NREPLIES_MAX 8
+#define REQ_COMMON_NARGS_MAX  8
 
 struct afb_req_common_query_itf
 {
@@ -46,6 +45,21 @@ struct afb_req_common_query_itf
 	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
 };
+
+/**
+ * Internal data for args
+ */
+
+struct afb_req_common_arg
+{
+	/** count of parammeters */
+	unsigned ndata;
+
+	/** the parammeters */
+	struct afb_data **data;
+	struct afb_data *local[REQ_COMMON_NARGS_MAX];
+};
+
 
 /**
  * Internal data for requests
@@ -80,23 +94,15 @@ struct afb_req_common
 
 	const struct afb_req_common_query_itf *queryitf; /**< interface of req implementation functions */
 
-	/** count of parammeters */
-	unsigned nparams;
-
 	/** the parammeters */
-	struct afb_data **params;
-	struct afb_data *local_params[REQ_COMMON_NPARAMS_MAX];
+	struct afb_req_common_arg params;
 
 #if WITH_REPLY_JOB
 	/** the reply */
 	int status;
 
-	/** count of replies */
-	unsigned nreplies;
-
 	/** the replies */
-	struct afb_data **replies;
-	struct afb_data *local_replies[REQ_COMMON_NREPLIES_MAX];
+	struct afb_req_common_arg replies;
 
 #endif
 };

@@ -251,7 +251,7 @@ START_TEST (prepare_forwarding)
 		afb_req_common_prepare_forwarding(req, apiname, verbname, j, data);
 		ck_assert_str_eq(req->apiname, apiname);
 		ck_assert_str_eq(req->verbname, apiname);
-		ck_assert_int_eq(req->nparams, j);
+		ck_assert_int_eq(req->params.ndata, j);
 		ck_assert_int_eq(gval, dataChecksum); // check that previous data closure is call
 		dataChecksum += j;
 	}
@@ -629,7 +629,7 @@ START_TEST(replay)
 {
 	struct afb_req_common *req = &comreq;
 	struct afb_type *type1;
-	struct afb_data *data[REQ_COMMON_NREPLIES_MAX+NB_DATA];
+	struct afb_data *data[REQ_COMMON_NARGS_MAX + NB_DATA];
 	int rc, i;
 	int dataChecksum = 0;
 
@@ -644,18 +644,18 @@ START_TEST(replay)
 		ck_assert_int_eq(rc, 0);
 	}
 
-	fprintf(stderr, "------\ntest that memory get allocated when replay require more than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NREPLIES_MAX);
+	fprintf(stderr, "------\ntest that memory get allocated when replay require more than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NARGS_MAX);
 
-	for (i=1; i<=REQ_COMMON_NREPLIES_MAX+NB_DATA; i++){
+	for (i=1; i<=REQ_COMMON_NARGS_MAX + NB_DATA; i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
 		rc = afb_data_create_raw(&data[i-1], type1, NULL, 0, dataClosureCB, i2p(i));
 		ck_assert_int_eq(rc, 0);
 		dataChecksum += i;
 	}
 
-	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NREPLIES_MAX+NB_DATA, data);
+	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NARGS_MAX + NB_DATA, data);
 
-	ck_assert_ptr_ne(req->replies, req->local_replies);
+	ck_assert_ptr_ne(req->replies.data, req->replies.local);
 
 	i=0;
 	gval = 0;
@@ -669,21 +669,21 @@ START_TEST(replay)
 	ck_assert_int_eq(i, 1);
 	ck_assert_int_eq(gval, dataChecksum);
 
-	fprintf(stderr, "------\ntest that the static buffer is used when replay require les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NREPLIES_MAX);
+	fprintf(stderr, "------\ntest that the static buffer is used when replay require les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NARGS_MAX);
 
 	req->replied = 0;
 	dataChecksum = 0;
 
-	for (i=1; i<=REQ_COMMON_NREPLIES_MAX; i++){
+	for (i=1; i<=REQ_COMMON_NARGS_MAX; i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
 		rc = afb_data_create_raw(&data[i-1], type1, NULL, 0, dataClosureCB, i2p(i));
 		ck_assert_int_eq(rc, 0);
 		dataChecksum += i;
 	}
 
-	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NREPLIES_MAX, data);
+	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NARGS_MAX, data);
 
-	ck_assert_ptr_eq(req->replies, req->local_replies);
+	ck_assert_ptr_eq(req->replies.data, req->replies.local);
 
 	i=0;
 	gval = 0;

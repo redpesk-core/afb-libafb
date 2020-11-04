@@ -301,7 +301,7 @@ static void process_cb(void * closure1, struct json_object *object, const void *
 static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
 {
 	afb_json_legacy_do2_single_json_c(
-		comreq->nparams, comreq->params,
+		comreq->params.ndata, comreq->params.data,
 		process_cb, closure, comreq);
 }
 

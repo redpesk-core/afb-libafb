@@ -419,7 +419,7 @@ static void f_get_cb(void *closure, struct json_object *args)
 
 static void f_get(struct afb_req_common *req)
 {
-	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_get_cb, req);
+	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_get_cb, req);
 }
 
 static void f_set_cb(void *closure, struct json_object *args)
@@ -436,7 +436,7 @@ static void f_set_cb(void *closure, struct json_object *args)
 
 static void f_set(struct afb_req_common *req)
 {
-	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_set_cb, req);
+	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_set_cb, req);
 }
 
 #if WITH_AFB_TRACE
@@ -482,7 +482,7 @@ end:
 
 static void f_trace(struct afb_req_common *req)
 {
-	afb_json_legacy_do_single_json_c(req->nparams, req->params, f_trace_cb, req);
+	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_trace_cb, req);
 }
 #else
 static void f_trace(struct afb_req_common *req)

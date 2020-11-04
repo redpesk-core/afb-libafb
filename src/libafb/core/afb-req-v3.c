@@ -543,7 +543,7 @@ void afb_req_v3_process(
 		return;
 	}
 
-	rc = afb_json_legacy_get_single_json_c(comreq->nparams, comreq->params, &req->json);
+	rc = afb_json_legacy_get_single_json_c(comreq->params.ndata, comreq->params.data, &req->json);
 	if (rc < 0) {
 		free(req);
 		afb_req_common_reply_internal_error_hookable(comreq, rc);
