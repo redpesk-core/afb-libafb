@@ -41,18 +41,15 @@ x4_api_type_register(
 	const char *name,
 	afb_type_flags_x4_t flags
 ) {
-	int i = 0;
-	while (afb_type_predefined_prefix[i] && afb_type_predefined_prefix[i] == name[i])
-		i++;
-	if (afb_type_predefined_prefix[i]) {
+	if (afb_type_is_predefined(name)) {
+		*type = 0;
+		return -1;
+	}
+	else {
 		return afb_type_register(type, name,
 			flags & Afb_Type_Flags_x4_Streamable,
 			flags & Afb_Type_Flags_x4_Streamable,
 			flags & Afb_Type_Flags_x4_Opaque);
-	}
-	else {
-		*type = 0;
-		return -1;
 	}
 }
 

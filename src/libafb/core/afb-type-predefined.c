@@ -51,14 +51,6 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#if !defined(AFB_PREFIX_PREDEF_TYPE)
-#  define AFB_PREFIX_PREDEF_TYPE "afb:"
-#endif
-
-/*****************************************************************************/
-
-const char afb_type_predefined_prefix[] = AFB_PREFIX_PREDEF_TYPE;
-
 /*****************************************************************************/
 /*****************************************************************************/
 /**                                                                         **/

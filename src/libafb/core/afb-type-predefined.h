@@ -27,7 +27,14 @@ struct afb_type;
 
 /*****************************************************************************/
 
-extern const char afb_type_predefined_prefix[];
+#if !defined(AFB_PREFIX_PREDEF_TYPE)
+#  define AFB_PREFIX_PREDEF_TYPE "#"
+#endif
+
+static inline int afb_type_is_predefined(const char *typename)
+{
+	return typename[0] == AFB_PREFIX_PREDEF_TYPE[0];
+}
 
 /*****************************************************************************/
 
