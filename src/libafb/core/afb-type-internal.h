@@ -55,9 +55,6 @@ struct opdesc
 	/** target type if convert or update or fimly type */
 	struct afb_type *type;
 
-	/** link to the next operation for the same type */
-	struct opdesc *next;
-
 	union {
 		/** converter function if kind is convert */
 		afb_type_converter_t converter;
@@ -84,11 +81,14 @@ struct afb_type
 	/** link to next type */
 	struct afb_type *next;
 
+	/** link to direct ancestor of family */
+	struct afb_type *family;
+
 	/** operations */
 	struct opdesc *operations;
 
-	/** link to direct ancestor of family */
-	struct afb_type *family;
+	/** count of operations */
+	uint16_t op_count;
 
 	/** flags */
 	uint16_t flags;

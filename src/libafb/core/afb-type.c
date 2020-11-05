@@ -111,6 +111,7 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 			type->operations = 0;
 			type->family = 0;
 			type->flags = 0;
+			type->op_count = 0;
 			type->next = known_types;
 			known_types = type;
 			rc = 0;
@@ -162,13 +163,18 @@ int afb_type_is_opaque(const struct afb_type *type)
 static
 struct opdesc *
 searchop(
-	struct opdesc *odsc,
+	struct afb_type *base_type,
 	enum opkind kind,
 	const struct afb_type *type
 ) {
-	while (odsc && (odsc->kind != kind || odsc->type != type))
-		odsc = odsc->next;
-	return odsc;
+	struct opdesc *odsc = base_type->operations;
+	struct opdesc *end = &odsc[base_type->op_count];
+	while (odsc != end) {
+		if (odsc->kind == kind && odsc->type == type)
+			return odsc;
+		odsc++;
+	}
+	return 0;
 }
 
 static
@@ -181,15 +187,22 @@ operate(
 	int convert
 ) {
 	int rc;
-	struct opdesc *odsc, *op;
+	struct opdesc *odsc, *op, *opend;
 	struct afb_type *type, *t;
 	struct afb_data *xdata;
 
-	/* Search direct conversion */
+	/*
+	 * Search direct conversion
+	 * ------------------------
+	 *
+	 * A direct convertion is one given by an operation
+	 * of convertion/update from the current type, or one of
+	 * its family parent, to the targetted type.
+	 */
 	type = from_type;
 	while (type) {
 		/* search forward */
-		odsc = searchop(type->operations, convert ? Convert_To : Update_To, to_type);
+		odsc = searchop(type, convert ? Convert_To : Update_To, to_type);
 		if (odsc) {
 			rc = convert
 				? odsc->converter(odsc->closure, from_data, to_type, to_data)
@@ -198,7 +211,7 @@ operate(
 				return rc;
 		}
 		/* search backward */
-		odsc = searchop(to_type->operations, convert ? Convert_From : Update_From, type);
+		odsc = searchop(to_type, convert ? Convert_From : Update_From, type);
 		if (odsc) {
 			rc = convert
 				? odsc->converter(odsc->closure, from_data, to_type, to_data)
@@ -214,18 +227,35 @@ operate(
 			return rc;
 		}
 	}
-	/* Fast search of indirect conversion */
+	/*
+	 * Fast search of indirect conversion
+	 * ----------------------------------
+	 *
+	 * Indirect conversions are the one that imply two operations:
+	 *  - one convertion from the original type to a middle type
+	 *  - one conversion/update from the middle type to the target type
+	 *
+	 * Fast search assumes that the 2 operations are described as operations
+	 * part of the original type, or one of its family parent, and/or the
+	 * target type.
+	 */
 	type = from_type;
 	while (type) {
-		/* search forward */
-		for (op = type->operations ; op ; op = op->next) {
+		/* search forward: the middle type is given by a convert-to */
+		op = type->operations;
+		opend = &op[type->op_count];
+		for ( ; op != opend ; op++) {
 			if (op->kind != Convert_To)
 				continue;
+			/*
+			 * the original type converts to middle type op->type,
+			 * search how it can convert to target type to_type
+			 */
 			odsc = convert
-				? (searchop(to_type->operations, Convert_From, op->type)
-					?: searchop(op->type->operations, Convert_To, to_type))
-				: (searchop(to_type->operations, Update_From, op->type)
-					?: searchop(op->type->operations, Update_To, to_type));
+				? (searchop(to_type, Convert_From, op->type)
+					?: searchop(op->type, Convert_To, to_type))
+				: (searchop(to_type, Update_From, op->type)
+					?: searchop(op->type, Update_To, to_type));
 			if (!odsc)
 				continue;
 			rc = op->converter(op->closure, from_data, op->type, &xdata);
@@ -238,16 +268,24 @@ operate(
 			if (rc >= 0)
 				return rc;
 		}
-		/* search backward */
-		for (op = to_type->operations ; op ; op = op->next) {
+		/* search backward: the middle type is given by a convert/update-from */
+		op = to_type->operations;
+		opend = &op[to_type->op_count];
+		for ( ; op != opend ; op++) {
+			/*
+			 * if the target type converts/updates from middle type op->type,
+			 * search how it can convert from original type from_type.
+			 * note that after forward search, some possibilities were already
+			 * checked (i.e. Convert_To).
+			 */
 			if (convert) {
 				if (op->kind != Convert_From)
 					continue;
-				odsc = searchop(op->type->operations, Convert_From, type);
+				odsc = searchop(op->type, Convert_From, type);
 			} else {
 				if (op->kind != Update_From)
 					continue;
-				odsc = searchop(op->type->operations, Convert_From, type);
+				odsc = searchop(op->type, Convert_From, type);
 			}
 			if (!odsc)
 				continue;
@@ -263,15 +301,24 @@ operate(
 		}
 		type = type->family;
 	}
-	/* Long search of indirect conversion */
+	/*
+	 * Long search of indirect conversion
+	 * ----------------------------------
+	 *
+	 * The indirect conversion searched here are the one that carry
+	 * both operations otherwise it already had been found.
+	 */
 	for (type = known_types ; type ; type = type->next) {
+		/* avoid already checked types */
 		for (t = from_type; t && t != type; t = t->family);
 		if (t || type == to_type)
 			continue;
-		op = searchop(type->operations, Convert_From, from_type);
+
+		/* check if it can be a middle type */
+		op = searchop(type, Convert_From, from_type);
 		if (!op)
 			continue;
-		odsc = searchop(type->operations, convert ? Convert_To : Update_To, to_type);
+		odsc = searchop(type, convert ? Convert_To : Update_To, to_type);
 		if (!odsc)
 			continue;
 		rc = op->converter(op->closure, from_data, type, &xdata);
@@ -323,19 +370,15 @@ add_op(
 ) {
 	struct opdesc *desc;
 
-	desc = type->operations;
-	while (desc && (desc->kind != kind || desc->type != totype)) {
-		desc = desc->next;
-	}
+	desc = searchop(type, kind, totype);
 	if (!desc) {
-		desc = malloc(sizeof *desc);
+		desc = realloc(type->operations, (1 + type->op_count) * sizeof *desc);
 		if (!desc)
 			return X_ENOMEM;
-
+		type->operations = desc;
+		desc += type->op_count++;
 		desc->kind = kind;
 		desc->type = totype;
-		desc->next = type->operations;
-		type->operations = desc;
 	}
 	desc->callback = callback;
 	desc->closure = closure;
@@ -356,6 +399,7 @@ int afb_type_add_converter(
 	afb_type_converter_t converter,
 	void *closure
 ) {
+	/* this method ensures that predefined types can be read only */
 	if (!IS_PREDEFINED(type))
 		return add_op(type, Convert_To, totype, converter, closure);
 	if (!IS_PREDEFINED(totype))
@@ -369,10 +413,10 @@ int afb_type_add_updater(
 	afb_type_updater_t updater,
 	void *closure
 ) {
+	/* this method ensures that predefined types can be read only */
 	if (!IS_PREDEFINED(type))
 		return add_op(type, Update_To, totype, updater, closure);
 	if (!IS_PREDEFINED(totype))
 		return add_op(totype, Update_From, type, updater, closure);
 	return X_EINVAL;
 }
-

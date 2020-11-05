@@ -124,15 +124,41 @@ opaque_to_string(
 /*****************************************************************************/
 /*****************************************************************************/
 
+#define PREDEF(stype) afb_type_predefined_##stype
+#define ALIAS(stype)  __attribute__((alias("predefined_" #stype)))
+
+#define CONVERT(ftype,ttype) \
+	static int convert_##ftype##_to_##ttype(\
+		void *closure,\
+		struct afb_data *in,\
+		struct afb_type *type,\
+		struct afb_data **out \
+	)
+
+#define PREDEFINED_OPERATION(stype) \
+		static const struct opdesc opcvt_##stype[] =
+
+#define CONVERT_TO(ftype,ttype) \
+	{ .kind = Convert_To, .type = &PREDEF(ttype), \
+	  .converter = convert_##ftype##_to_##ttype, .closure = 0 }
+
+#define PREDEFINED_TYPE(stype,flag,super,nxt) \
+	extern struct afb_type ALIAS(stype) PREDEF(stype);  \
+	static const struct afb_type predefined_##stype = \
+	{ \
+		.name = AFB_PREFIX_PREDEF_TYPE #stype, \
+		.next = nxt, \
+		.operations = (struct opdesc*)opcvt_##stype,\
+		.family = super, \
+		.flags = FLAG_IS_PREDEFINED | flag, \
+		.op_count = (uint16_t)(sizeof opcvt_##stype / sizeof opcvt_##stype[0]) \
+	}
+
 /*****************************************************************************/
 /* PREDEFINED OPAQUE */
 
-static int convert_opaque_to_stringz(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(opaque,stringz)
+{
 	int rc;
 	char buffer[OPAQUE_BUFSIZE], *s;
 	unsigned sz;
@@ -153,12 +179,8 @@ static int convert_opaque_to_stringz(
 	return rc;
 }
 
-static int convert_opaque_to_json_string(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(opaque,json)
+{
 	int rc;
 	char buffer[OPAQUE_BUFSIZE], *s;
 	unsigned sz;
@@ -182,12 +204,8 @@ static int convert_opaque_to_json_string(
 	return rc;
 }
 
-static int convert_opaque_to_json_c(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(opaque,json_c)
+{
 	int rc;
 	char buffer[OPAQUE_BUFSIZE];
 	json_object *json;
@@ -203,15 +221,20 @@ static int convert_opaque_to_json_c(
 	return rc;
 }
 
+PREDEFINED_OPERATION(opaque)
+	{
+		CONVERT_TO(opaque, stringz),
+		CONVERT_TO(opaque, json),
+		CONVERT_TO(opaque, json_c)
+	};
+
+PREDEFINED_TYPE(opaque, FLAG_IS_OPAQUE, 0, 0);
+
 /*****************************************************************************/
 /* PREDEFINED STRINGZ */
 
-static int convert_stringz_to_opaque(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(stringz,opaque)
+{
 	int rc;
 	const char *s;
 
@@ -220,12 +243,8 @@ static int convert_stringz_to_opaque(
 	return rc;
 }
 
-static int convert_stringz_to_json_string(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(stringz,json)
+{
 	const char *istr;
 	char *ostr;
 	size_t isz, osz;
@@ -256,19 +275,19 @@ static int convert_stringz_to_json_string(
 	return afb_data_create_raw(out, type, ostr, 3 + osz, free, ostr);
 }
 
+PREDEFINED_OPERATION(stringz)
+	{
+		CONVERT_TO(stringz, opaque),
+		CONVERT_TO(stringz, json)
+	};
+
+PREDEFINED_TYPE(stringz, FLAG_IS_STREAMABLE, 0, &PREDEF(opaque));
 
 /*****************************************************************************/
 /* PREDEFINED JSON */
 
-/**
- * conversion from data of type JSON to data of type JSON-C
- */
-static int convert_json_string_to_json_c(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(json,json_c)
+{
 	int rc;
 	json_object *json;
 	enum json_tokener_error jerr;
@@ -282,12 +301,8 @@ static int convert_json_string_to_json_c(
 	return rc;
 }
 
-static int convert_json_string_to_opaque(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(json,opaque)
+{
 	int rc;
 	const char *s;
 
@@ -299,16 +314,19 @@ static int convert_json_string_to_opaque(
 	return rc;
 }
 
+PREDEFINED_OPERATION(json)
+	{
+		CONVERT_TO(json, opaque),
+		CONVERT_TO(json, json_c)
+	};
+
+PREDEFINED_TYPE(json, FLAG_IS_STREAMABLE, &PREDEF(stringz), &PREDEF(stringz));
 
 /*****************************************************************************/
 /* PREDEFINED JSON-C */
 
-static int convert_json_c_to_json_string(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(json_c,json)
+{
 	struct json_object *object;
 	const char *jsonstr;
 	size_t sz;
@@ -332,12 +350,8 @@ static int convert_json_c_to_json_string(
 	return rc;
 }
 
-static int convert_json_c_to_opaque(
-	void *unused,
-	struct afb_data *in,
-	struct afb_type *type,
-	struct afb_data **out
-) {
+CONVERT(json_c,opaque)
+{
 	int rc;
 	struct json_object *object;
 	const char *s;
@@ -352,145 +366,15 @@ static int convert_json_c_to_opaque(
 	return rc;
 }
 
-/*****************************************************************************/
-/*****************************************************************************/
-/**                                                                         **/
-/**         PREDEFINED TYPES  -  STRUCTURES                                 **/
-/**                                                                         **/
-/*****************************************************************************/
-/*****************************************************************************/
+PREDEFINED_OPERATION(json_c)
+	{
+		CONVERT_TO(json_c, opaque),
+		CONVERT_TO(json_c, json)
+	};
 
-#define PREDEFINED_TYPE(x) \
-		extern struct afb_type __attribute__((alias("predefined_" #x))) afb_type_predefined_##x;  \
-		static const struct afb_type predefined_##x =
+PREDEFINED_TYPE(json_c, 0, 0, &PREDEF(json));
 
 /*****************************************************************************/
-/* PREDEFINED OPAQUE */
 
-static const struct opdesc opcvt_opaque_to_stringz =
-	{
-		.next = 0,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_stringz,
-		.closure = 0,
-		.converter = convert_opaque_to_stringz
-	};
+extern struct afb_type ALIAS(json_c) _afb_type_head_of_predefineds_;
 
-static const struct opdesc opcvt_opaque_to_json_string =
-	{
-		.next = (struct opdesc*)&opcvt_opaque_to_stringz,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_json,
-		.closure = 0,
-		.converter = convert_opaque_to_json_string
-	};
-
-static const struct opdesc opcvt_opaque_to_json_c =
-	{
-		.next = (struct opdesc*)&opcvt_opaque_to_json_string,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_json_c,
-		.closure = 0,
-		.converter = convert_opaque_to_json_c
-	};
-
-PREDEFINED_TYPE(opaque)
-	{
-		.name = AFB_PREFIX_PREDEF_TYPE"OPAQUE",
-		.next = 0,
-		.operations = (struct opdesc*)&opcvt_opaque_to_json_c,
-		.family = 0,
-		.flags = FLAG_IS_PREDEFINED | FLAG_IS_OPAQUE
-	};
-
-/*****************************************************************************/
-/* PREDEFINED STRINGZ */
-
-static const struct opdesc opcvt_stringz_to_opaque =
-	{
-		.next = 0,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_opaque,
-		.closure = 0,
-		.converter = convert_stringz_to_opaque
-	};
-
-static const struct opdesc opcvt_stringz_to_json_string =
-	{
-		.next = (struct opdesc*)&opcvt_stringz_to_opaque,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_json,
-		.closure = 0,
-		.converter = convert_stringz_to_json_string
-	};
-
-PREDEFINED_TYPE(stringz)
-	{
-		.name = AFB_PREFIX_PREDEF_TYPE"STRINGZ",
-		.next = (struct afb_type*)&afb_type_predefined_opaque,
-		.operations = (struct opdesc*)&opcvt_stringz_to_json_string,
-		.family = 0,
-		.flags = FLAG_IS_PREDEFINED | FLAG_IS_STREAMABLE
-	};
-
-/*****************************************************************************/
-/* PREDEFINED JSON */
-
-static const struct opdesc opcvt_json_string_to_opaque =
-	{
-		.next = 0,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_opaque,
-		.converter = convert_json_string_to_opaque
-	};
-
-static const struct opdesc opcvt_json_string_to_json_c =
-	{
-		.next = (struct opdesc*)&opcvt_json_string_to_opaque,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_json_c,
-		.converter = convert_json_string_to_json_c
-	};
-
-PREDEFINED_TYPE(json)
-	{
-		.name = AFB_PREFIX_PREDEF_TYPE"JSON",
-		.next = (struct afb_type*)&afb_type_predefined_stringz,
-		.operations = (struct opdesc*)&opcvt_json_string_to_json_c,
-		.family = &afb_type_predefined_stringz,
-		.flags = FLAG_IS_PREDEFINED | FLAG_IS_STREAMABLE
-	};
-
-/*****************************************************************************/
-/* PREDEFINED JSON-C */
-
-static const struct opdesc opcvt_json_c_to_opaque =
-	{
-		.next = 0,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_opaque,
-		.converter = convert_json_c_to_opaque
-	};
-
-static const struct opdesc opcvt_json_c_to_json_string =
-	{
-		.next = (struct opdesc*)&opcvt_json_c_to_opaque,
-		.kind = Convert_To,
-		.type = &afb_type_predefined_json,
-		.converter = convert_json_c_to_json_string
-	};
-
-PREDEFINED_TYPE(json_c)
-	{
-		.name = AFB_PREFIX_PREDEF_TYPE"JSON-C",
-		.next = (struct afb_type*)&afb_type_predefined_json,
-		.operations = (struct opdesc*)&opcvt_json_c_to_json_string,
-		.flags = FLAG_IS_PREDEFINED
-	};
-
-/*****************************************************************************/
-/* set the head of predefineds */
-
-extern struct afb_type
-		__attribute__((alias("afb_type_predefined_json_c")))
-			_afb_type_head_of_predefineds_;
