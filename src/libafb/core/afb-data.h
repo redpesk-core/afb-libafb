@@ -134,7 +134,6 @@ afb_data_size(
 	struct afb_data *data
 );
 
-
 /**
  * Convert to an other data (possibly return a cached conversion)
  *

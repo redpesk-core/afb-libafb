@@ -49,14 +49,15 @@ struct afb_req_common_query_itf
 /**
  * Internal data for args
  */
-
 struct afb_req_common_arg
 {
-	/** count of parammeters */
+	/** count of data */
 	unsigned ndata;
 
-	/** the parammeters */
+	/** current data */
 	struct afb_data **data;
+
+	/** preallocated local data */
 	struct afb_data *local[REQ_COMMON_NARGS_MAX];
 };
 
@@ -94,7 +95,7 @@ struct afb_req_common
 
 	const struct afb_req_common_query_itf *queryitf; /**< interface of req implementation functions */
 
-	/** the parammeters */
+	/** the parameters */
 	struct afb_req_common_arg params;
 
 #if WITH_REPLY_JOB
