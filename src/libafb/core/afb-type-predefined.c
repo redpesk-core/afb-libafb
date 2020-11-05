@@ -59,7 +59,7 @@
 /*****************************************************************************/
 /*****************************************************************************/
 
-#define OPAQUE_KEY      "afbh@"
+#define OPAQUE_KEY      "#@"
 #define OPAQUE_FMT_RD   OPAQUE_KEY"%x"
 #define OPAQUE_FMT_WR   OPAQUE_KEY"%04x"
 #define OPAQUE_BUFSIZE  (sizeof(OPAQUE_KEY) + 4)
