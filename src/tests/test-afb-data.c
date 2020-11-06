@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <check.h>
 
@@ -37,7 +38,10 @@
 
 #include "core/afb-data.h"
 #include "core/afb-type.h"
+#include "core/afb-type-predefined.h"
 #include "sys/x-errno.h"
+#include <json-c/json.h>
+
 
 /*********************************************************************/
 
@@ -263,6 +267,71 @@ START_TEST (check_cache)
 }
 END_TEST
 
+void data_dispose(void * closure){
+	fprintf(stderr, "went through data_dispose with closure %d\n", p2i(closure));
+	gmask += p2i(closure);
+}
+
+void predefconv(struct afb_type *from, struct afb_type *to){
+	struct afb_data *data, *result;
+	int r;
+	uint64_t i;
+
+	r = afb_data_create_raw(&data, from, &i, 0, data_dispose, i2p(1));
+	ck_assert_int_eq(r, 0);
+	r = afb_data_convert_to(data, &afb_type_predefined_i64, &result);
+	ck_assert_int_eq(r, 0);
+}
+
+START_TEST (test_predefine_types){
+	struct afb_data *data, *result;
+	int i, j, r;
+	char * b[64];
+	json_object * js = json_object_new_int(35);
+
+	struct test_type_data
+	{
+		struct afb_type * predef_type;
+		void * buff;
+	};
+
+	struct test_type_data type_data[] = {
+		{&afb_type_predefined_opaque, b},
+		{&afb_type_predefined_stringz, b},
+		{&afb_type_predefined_json, js},
+		{&afb_type_predefined_json_c, js},
+		{&afb_type_predefined_bool, b},
+		{&afb_type_predefined_i32, b},
+		{&afb_type_predefined_u32, b},
+		{&afb_type_predefined_i64, b},
+		{&afb_type_predefined_u64, b},
+		{&afb_type_predefined_double, b},
+		{NULL,NULL}
+	};
+
+	for(i=0; type_data[i].predef_type!=NULL; i++){
+		gmask = 0;
+		r = afb_data_create_raw(&data, type_data[i].predef_type, type_data[i].buff, 0, data_dispose, i2p(i));
+		ck_assert_int_eq(r, 0);
+		for(j=0; type_data[j].predef_type!=NULL; j++){
+			fprintf(stderr, "testing convertion from %s to %s => ", afb_type_name(type_data[i].predef_type), afb_type_name(type_data[j].predef_type));
+			r = afb_data_convert_to(data, type_data[j].predef_type, &result);
+			if (r == X_ENOENT) {
+				fprintf(stderr, "no convertion available !\n");
+				ck_assert_ptr_eq(result, NULL);
+			}
+			else {
+				fprintf(stderr, "result = %d\n", r);
+				ck_assert_int_eq(r, 0);
+				afb_data_unref(result);
+			}
+		}
+		afb_data_unref(data);
+		// ck_assert_int_eq(gmask, i);
+	}
+}
+END_TEST
+
 /*********************************************************************/
 
 static Suite *suite;
@@ -288,5 +357,6 @@ int main(int ac, char **av)
 			addtest(check_data);
 			addtest(check_convert);
 			addtest(check_cache);
+			addtest(test_predefine_types);
 	return !!srun();
 }
