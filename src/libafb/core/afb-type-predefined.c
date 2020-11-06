@@ -647,7 +647,7 @@ EXTRACT(json_c,struct json_object*,i32,int32_t)
 		return X_EINVAL;
 	v = json_object_get_int(from);
 	if (v < INT32_MIN || v > INT32_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (int32_t)v;
 	return 0;
 }
@@ -658,7 +658,7 @@ EXTRACT(json,const char*,i32,int32_t)
 	char *end;
 	long int v = strtol(from, &end, 10);
 	if (*end || v < INT32_MIN || v > INT32_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (int32_t)v;
 	return 0;
 }
@@ -704,7 +704,7 @@ EXTRACT(json_c,struct json_object*,u32,uint32_t)
 		return X_EINVAL;
 	v = json_object_get_int64(from);
 	if (v < 0 || v > UINT32_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (uint32_t)v;
 	return 0;
 }
@@ -715,7 +715,7 @@ EXTRACT(json,const char*,u32,uint32_t)
 	char *end;
 	unsigned long int v = strtoul(from, &end, 10);
 	if (*end || v > UINT32_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (uint32_t)v;
 	return 0;
 }
@@ -760,7 +760,7 @@ EXTRACT(json_c,struct json_object*,i64,int64_t)
 		return X_EINVAL;
 	v = json_object_get_int64(from);
 	if (v < INT64_MIN || v > INT64_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (int64_t)v;
 	return 0;
 }
@@ -771,7 +771,7 @@ EXTRACT(json,const char*,i64,int64_t)
 	char *end;
 	long long int v = strtoll(from, &end, 10);
 	if (*end || v < INT64_MIN || v > INT64_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (int64_t)v;
 	return 0;
 }
@@ -807,7 +807,7 @@ EXTRACT(json,const char*,u64,uint64_t)
 	char *end;
 	unsigned long long int v = strtoull(from, &end, 10);
 	if (*end || v > UINT64_MAX)
-		return X_EINVAL;
+		return X_ERANGE;
 	*to = (uint64_t)v;
 	return 0;
 }

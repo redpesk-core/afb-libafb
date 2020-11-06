@@ -32,6 +32,8 @@
 #include "afb-type-predefined.h"
 #include "afb-api-v4.h"
 
+#include "sys/x-errno.h"
+
 /***********************************************************/
 
 static
@@ -43,7 +45,7 @@ x4_api_type_register(
 ) {
 	if (afb_type_is_predefined(name)) {
 		*type = 0;
-		return -1;
+		return X_ERANGE;
 	}
 	else {
 		return afb_type_register(type, name,
@@ -59,7 +61,7 @@ x4_api_type_lookup(
 	struct afb_type **type,
 	const char *name
 ) {
-	return (*type = afb_type_get(name)) ? 0 : -1;
+	return (*type = afb_type_get(name)) ? 0 : X_ENOENT;
 }
 
 static
