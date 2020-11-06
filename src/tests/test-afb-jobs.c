@@ -75,7 +75,7 @@ START_TEST (simple)
 	gval = 0;
 	for(i=0; i<NB_TEST_JOBS; i++){
 		r = afb_jobs_queue(NULL, 1, test_job, i2p(i+1));
-		ck_assert_int_eq(r,0);
+		ck_assert_int_gt(r,0);
 	}
 	ck_assert_int_eq(afb_jobs_get_pending_count(), 10);
 	ck_assert_int_eq(gval, 0);
@@ -102,7 +102,7 @@ START_TEST (timeout)
 	ck_assert_int_eq(r, 0);
 	// check that a job get killed if it goes over it's timeout
 	r = afb_jobs_queue(NULL, 1, timeout_test_job, i2p(3));
-	ck_assert_int_eq(r,0);
+	ck_assert_int_gt(r,0);
 	job = afb_jobs_dequeue();
 	afb_jobs_run(job);
 	// if gval = -2 it means that the job has been run once and have been killed
@@ -120,7 +120,7 @@ START_TEST (max_count)
 	ck_assert_int_eq(afb_jobs_get_max_count(), 8);
 	for(i=0; i<10; i++){
 		r = afb_jobs_queue(NULL, 1, test_job, i2p(i+1));
-		if(i<8) ck_assert_int_eq(r, 0);
+		if(i<8) ck_assert_int_gt(r, 0);
 		else ck_assert_int_ne(r, 0);
 	}
 	gval = 0;

@@ -49,7 +49,6 @@
 #include "core/afb-req-common.h"
 #include "core/afb-req-v3.h"
 #include "core/afb-error-text.h"
-#include "core/afb-jobs.h"
 #include "core/afb-sched.h"
 
 #include "sys/verbose.h"

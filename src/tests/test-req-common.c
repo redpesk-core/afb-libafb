@@ -353,12 +353,9 @@ START_TEST (process)
 
 	afb_req_common_process(req, test_apiset);
 
-	// Process jobs manually as scheduler is not running
-	while(afb_jobs_get_pending_count() > 0){
-		i++;
-		fprintf(stderr, "processing job %d\n", i);
-		afb_jobs_run(afb_jobs_dequeue());
-	}
+	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
+		usleep(10);
+
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
 
@@ -437,12 +434,9 @@ START_TEST(process_on_behalf)
 		1
 	);
 
-	// Process jobs manually as scheduler is not running
-	while(afb_jobs_get_pending_count() > 0){
-		i++;
-		fprintf(stderr, "processing job %d\n", i);
-		afb_jobs_run(afb_jobs_dequeue());
-	}
+	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
+		usleep(10);
+
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
 	afb_req_common_unref(req);
@@ -456,11 +450,9 @@ START_TEST(process_on_behalf)
 	afb_req_common_process_on_behalf(req, test_apiset, NULL);
 	ck_assert_ptr_null(req->credentials);
 
-	while(afb_jobs_get_pending_count() > 0){
-		i++;
-		fprintf(stderr, "processing job %d\n", i);
-		afb_jobs_run(afb_jobs_dequeue());
-	}
+	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
+		usleep(10);
+
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	//ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
 
@@ -596,7 +588,7 @@ void test_check_perm(int sig, void * arg){
 
 	gval++;
 
-	afb_sched_exit(NULL);
+	afb_sched_exit(1, NULL);
 }
 
 START_TEST(check_perm)
@@ -657,16 +649,11 @@ START_TEST(replay)
 
 	ck_assert_ptr_ne(req->replies.data, req->replies.local);
 
-	i=0;
 	gval = 0;
 
-	// Process jobs manually as scheduler is not running
-	while (afb_jobs_get_pending_count() > 0){
-		i++;
-		fprintf(stderr, "processing job %d\n", i);
-		afb_jobs_run(afb_jobs_dequeue());
-	}
-	ck_assert_int_eq(i, 1);
+	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
+		usleep(10);
+
 	ck_assert_int_eq(gval, dataChecksum);
 
 	fprintf(stderr, "------\ntest that the static buffer is used when replay require les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NARGS_MAX);
@@ -685,16 +672,11 @@ START_TEST(replay)
 
 	ck_assert_ptr_eq(req->replies.data, req->replies.local);
 
-	i=0;
 	gval = 0;
 
-	// Process jobs manually as scheduler is not running
-	while (afb_jobs_get_pending_count() > 0){
-		i++;
-		fprintf(stderr, "processing job %d\n", i);
-		afb_jobs_run(afb_jobs_dequeue());
-	}
-	ck_assert_int_eq(i, 1);
+	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
+		usleep(10);
+
 	ck_assert_int_eq(gval, dataChecksum);
 
 }

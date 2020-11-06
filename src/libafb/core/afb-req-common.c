@@ -48,7 +48,6 @@
 #include "core/afb-hook.h"
 #include "core/afb-req-common.h"
 #include "core/afb-error-text.h"
-#include "core/afb-jobs.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-sched.h"
 #include "core/afb-session.h"
@@ -368,7 +367,7 @@ static void req_common_process_api(struct afb_req_common *req, int timeout)
 	int rc;
 
 	afb_req_common_addref(req);
-	rc = afb_jobs_queue(req->api->group, timeout, req_common_process_async_cb, req);
+	rc = afb_sched_queue_job(req->api->group, timeout, req_common_process_async_cb, req);
 	if (rc < 0) {
 		/* TODO: allows or not to proccess it directly as when no threading? (see above) */
 		ERROR("can't process job with threads: %s", strerror(-rc));
@@ -835,7 +834,7 @@ do_reply(
 	set_args(nreplies, replies, &req->replies);
 
 	afb_req_common_addref(req);
-	if (afb_jobs_queue(NULL, 0, reply_job, req) < 0)
+	if (afb_sched_queue_job(NULL, 0, reply_job, req) < 0)
 		reply_job(0, req);
 }
 

@@ -32,7 +32,6 @@
 #include <assert.h>
 
 #include "core/afb-jobs.h"
-#include "core/afb-sched.h"
 #include "core/afb-sig-monitor.h"
 #include "sys/verbose.h"
 #include "sys/x-mutex.h"
@@ -53,7 +52,7 @@ struct afb_job
 	int timeout;         /**< timeout in second for processing the request */
 #endif
 	unsigned blocked: 1; /**< is an other request blocking this one ? */
-	unsigned dropped: 1; /**< is removed ? */
+	unsigned active: 1;  /**< is the request active ? */
 };
 
 /* synchronization */
@@ -99,13 +98,13 @@ static struct afb_job *job_create(
 	}
 	/* initializes the job */
 	job->group = group;
+	job->callback = callback;
+	job->arg = arg;
 #if WITH_SIG_MONITOR_TIMERS
 	job->timeout = timeout;
 #endif
-	job->callback = callback;
-	job->arg = arg;
 	job->blocked = 0;
-	job->dropped = 0;
+	job->active = 0;
 end:
 	return job;
 }
@@ -138,30 +137,12 @@ static void job_add(struct afb_job *job)
 	*pjob = job;
 }
 
-/**
- * Queues a new asynchronous job represented by 'callback' and 'arg'
- * for the 'group' and the 'timeout'.
- * Jobs are queued FIFO and are possibly executed in parallel
- * concurrently except for job of the same group that are
- * executed sequentially in FIFO order.
- * @param group    The group of the job or NULL when no group.
- * @param timeout  The maximum execution time in seconds of the job
- *                 or 0 for unlimited time.
- * @param callback The function to execute for achieving the job.
- *                 Its first parameter is either 0 on normal flow
- *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg1'
- *                 given here.
- * @param arg      The second argument for 'callback'
- * @return the count of pending job on success (greater than 0) or
- *         in case of error a negative number in -errno like form
- */
-static int queue_job(
+/* enqueue the job */
+int afb_jobs_queue(
 		const void *group,
 		int timeout,
 		void (*callback)(int, void*),
-		void *arg
-)
+		void *arg)
 {
 	struct afb_job *job;
 	int rc;
@@ -217,15 +198,9 @@ static void job_release(struct afb_job *job)
 	/* then unblock jobs of the same group */
 	group = job->group;
 	if (group) {
-		ijob = job->next;
-		while (ijob) {
-			if (ijob->group != group)
-				ijob = ijob->next;
-			else {
-				ijob->blocked = 0;
-				break;
-			}
-		}
+		do { ijob = ijob->next; } while (ijob && ijob->group != group);
+		if (ijob)
+			ijob->blocked = 0;
 	}
 
 	/* recycle the job */
@@ -236,10 +211,7 @@ static void job_release(struct afb_job *job)
 	x_mutex_unlock(&mutex);
 }
 
-/**
- * Get the next job to process or NULL if none.
- * @return the first job that isn't blocked or NULL
- */
+/* get next pending job */
 struct afb_job *afb_jobs_dequeue()
 {
 	struct afb_job *job;
@@ -248,15 +220,11 @@ struct afb_job *afb_jobs_dequeue()
 	x_mutex_lock(&mutex);
 
 	/* search a job */
-	job = pending_jobs;
-	while (job) {
-		if (job->blocked)
-			job = job->next;
-		else {
-			job->blocked = 1; /* mark job as blocked */
-			pending_count--;
-			break;
-		}
+	for (job = pending_jobs ; job && job->blocked ; job = job->next);
+	if (job) {
+		job->blocked = 1; /* mark job as blocked */
+		job->active = 1; /* mark job as active */
+		pending_count--;
 	}
 
 	/* leave critical */
@@ -265,25 +233,14 @@ struct afb_job *afb_jobs_dequeue()
 	return job;
 }
 
-/**
- * Monitored cancel callback for a job.
- * This function is called by the monitor
- * to cancel the job when the safe environment
- * is set.
- * @param signum 0 on normal flow or the number
- *               of the signal that interrupted the normal
- *               flow, isn't used
- * @param arg    the job to run
- */
+/* cancel the given job */
 void afb_jobs_cancel(struct afb_job *job)
 {
 	job->callback(SIGABRT, job->arg);
 	job_release(job);
 }
 
-/**
- *
- */
+/* Run the given job */
 void afb_jobs_run(struct afb_job *job)
 {
 #if WITH_SIG_MONITOR_TIMERS
@@ -295,92 +252,40 @@ void afb_jobs_run(struct afb_job *job)
 	job_release(job);
 }
 
-/**
- * Queues a new asynchronous job represented by 'callback' and 'arg'
- * for the 'group' and the 'timeout'.
- * Jobs are queued FIFO and are possibly executed in parallel
- * concurrently except for job of the same group that are
- * executed sequentially in FIFO order.
- * @param group    The group of the job or NULL when no group.
- * @param timeout  The maximum execution time in seconds of the job
- *                 or 0 for unlimited time.
- * @param callback The function to execute for achieving the job.
- *                 Its first parameter is either 0 on normal flow
- *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg1'
- *                 given here.
- * @param arg      The second argument for 'callback'
- * @return 0 on success (greater than 0) or
- *         in case of error a negative number in -errno like form
- */
-int afb_jobs_queue_lazy(
-		const void *group,
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg
-)
-{
-	int rc = queue_job(group, timeout, callback, arg);
-	return rc < 0 ? rc : 0;
-}
-
-
-/**
- * Queues a new asynchronous job represented by 'callback' and 'arg'
- * for the 'group' and the 'timeout'.
- * Jobs are queued FIFO and are possibly executed in parallel
- * concurrently except for job of the same group that are
- * executed sequentially in FIFO order.
- * @param group    The group of the job or NULL when no group.
- * @param timeout  The maximum execution time in seconds of the job
- *                 or 0 for unlimited time.
- * @param callback The function to execute for achieving the job.
- *                 Its first parameter is either 0 on normal flow
- *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg1'
- *                 given here.
- * @param arg      The second argument for 'callback'
- * @return 0 on success (greater than 0) or
- *         in case of error a negative number in -errno like form
- */
-int afb_jobs_queue(
-		const void *group,
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg)
-{
-	int rc = queue_job(group, timeout, callback, arg);
-	if (rc > 0) {
-		afb_sched_adapt(rc);
-		rc = 0;
-	}
-	return rc;
-}
-
-/**
- * Get the current count of pending job
- * @return the current count of pending jobs
- */
+/* get pending count of jobs */
 int afb_jobs_get_pending_count(void)
 {
 	return pending_count;
 }
 
-/**
- * Get the maximum count of pending job
- * @return the maximum count of job
- */
+/* get maximum pending count */
 int afb_jobs_get_max_count(void)
 {
 	return max_pending_count;
 }
 
-/**
- * Set the maximum count of pending jobs to 'count'
- * @param count the count to set
- */
+/* set maximum pending count */
 void afb_jobs_set_max_count(int count)
 {
 	if (count > 0)
 		max_pending_count = count;
+}
+
+/* get the count of job still active but not pending */
+int afb_jobs_get_active_count(void)
+{
+	int count = 0;
+	struct afb_job *job;
+
+	/* enter critical */
+	x_mutex_lock(&mutex);
+
+	/* search a job */
+	for (job = pending_jobs ; job ; job = job->next)
+		count += (int)job->active;
+
+	/* leave critical */
+	x_mutex_unlock(&mutex);
+
+	return count;
 }

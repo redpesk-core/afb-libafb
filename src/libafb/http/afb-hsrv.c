@@ -46,7 +46,7 @@ typedef int mhd_result_t;
 typedef enum MHD_Result mhd_result_t;
 #endif
 
-#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
 #include "utils/locale-root.h"
 #include "sys/systemd.h"
 
@@ -296,7 +296,7 @@ static void do_run(int signum, void *arg)
 void afb_hsrv_run(struct afb_hsrv *hsrv)
 {
 	fdev_set_events(hsrv->fdev, 0);
-	if (afb_jobs_queue(hsrv, 0, do_run, hsrv) < 0)
+	if (afb_sched_queue_job(hsrv, 0, do_run, hsrv) < 0)
 		do_run(0, hsrv);
 }
 

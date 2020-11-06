@@ -282,6 +282,9 @@ START_TEST (test)
 }
 END_TEST
 
+/*********************************************************************/
+/* Test with session set */
+
 void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, char * token, char * session, int sessionflag){
 
 	uid_t uid = 1;
@@ -301,8 +304,6 @@ void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, c
 
 }
 
-/*********************************************************************/
-/* Test with session set */
 START_TEST (testRecCommonPerm)
 {
 
@@ -471,9 +472,9 @@ int main(int ac, char **av)
 	mksuite("afb-perm");
 		addtcase("afb-perm");
 			addtest(test);
-			#if BACKEND_PERMISSION_IS_CYNAGORA
+#if BACKEND_PERMISSION_IS_CYNAGORA
 			addtest(testRecCommonPerm);
 			tcase_set_timeout(tcase, 10);
-			#endif
+#endif
 	return !!srun();
 }

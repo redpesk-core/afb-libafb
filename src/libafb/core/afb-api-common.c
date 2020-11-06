@@ -46,7 +46,6 @@
 #include "core/afb-error-text.h"
 #include "core/afb-string-mode.h"
 
-#include "core/afb-jobs.h"
 #include "core/afb-sched.h"
 #include "sys/verbose.h"
 #include "utils/globset.h"
@@ -265,7 +264,7 @@ afb_api_common_queue_job(
 	int timeout
 ) {
 	/* TODO: translate group ~ api */
-	return afb_jobs_queue(group, timeout, callback, argument);
+	return afb_sched_queue_job(group, timeout, callback, argument);
 }
 
 int

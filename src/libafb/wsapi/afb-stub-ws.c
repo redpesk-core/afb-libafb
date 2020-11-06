@@ -44,7 +44,7 @@
 #include "core/afb-json-legacy.h"
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
-#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
 #include "sys/verbose.h"
 #include "sys/fdev.h"
 #include "utils/u16id.h"
@@ -737,7 +737,7 @@ static void on_hangup(void *closure)
 
 static int enqueue_processing(struct afb_proto_ws *proto, void (*callback)(int signum, void* arg), void *arg)
 {
-	return afb_jobs_queue(proto, 0, callback, arg);
+	return afb_sched_queue_job(proto, 0, callback, arg);
 }
 
 /*****************************************************/

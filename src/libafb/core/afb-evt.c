@@ -35,7 +35,7 @@
 #include "core/afb-data.h"
 #include "core/afb-params.h"
 #include "sys/verbose.h"
-#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
 #include "utils/uuid.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
@@ -331,7 +331,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	}
 
 	/* queue the job */
-	rc = afb_jobs_queue(BROADCAST_JOB_GROUP, 0, broadcast_job, jb);
+	rc = afb_sched_queue_job(BROADCAST_JOB_GROUP, 0, broadcast_job, jb);
 	if (rc < 0) {
 		ERROR("cant't queue broadcast string job item for %s", event);
 		destroy_evt_broadcasted(jb);
@@ -439,7 +439,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 		return X_ENOMEM;
 	}
 
-	rc = afb_jobs_queue(PUSH_JOB_GROUP, 0, push_afb_evt_pushed, je);
+	rc = afb_sched_queue_job(PUSH_JOB_GROUP, 0, push_afb_evt_pushed, je);
 	if (rc == 0)
 		rc = 1;
 	else {

@@ -107,7 +107,7 @@ void test_job(int sig, void* arg){
     gval.runingJobs--;
     pthread_mutex_unlock(&gval.mutex);
 
-    fprintf(stderr, "test_job with arg %d trminate !\n", p2i(arg));
+    fprintf(stderr, "test_job with arg %d terminates !\n", p2i(arg));
 
 }
 
@@ -139,7 +139,7 @@ void test_start_job(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(exit_handler);
+    afb_sched_exit(1, exit_handler);
     fprintf(stderr, "living test_start_job\n");
 }
 
@@ -167,7 +167,7 @@ void test_start_job_sync(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(NULL);
+    afb_sched_exit(1, NULL);
 
     fprintf(stderr, "living test_start_job_sync\n");
     fflush(stderr);
@@ -196,7 +196,7 @@ START_TEST(test_async){
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
 
     // queue N jobs
-    for(i=0; i<NBJOBS; i++) afb_jobs_queue(NULL, 1, test_job, i2p(i+1));
+    for(i=0; i<NBJOBS; i++) afb_sched_queue_job(NULL, 1, test_job, i2p(i+1));
 
     // run them asynchronously
     sched_runing = TRUE;
@@ -261,7 +261,7 @@ void test_start_sched_enter(int sig, void * arg){
         r = afb_sched_enter(NULL, 1, test_job_enter, arg);
         if(r)reachError++;
     }
-    afb_sched_exit(NULL);
+    afb_sched_exit(1, NULL);
 
     fprintf(stderr, "living test_start_sched_enter\n");
     fflush(stderr);
@@ -307,33 +307,31 @@ void test_start_sched_adapt(int sig, void * arg){
     if(sig == 0){
 
         // queue N jobs
-        for(i=0; i<NBJOBS-1; i++){
-            afb_jobs_queue(NULL, 0, test_job, i2p(i+1));
+        for(i=0; i<NBJOBS; i++){
+            afb_sched_queue_job(NULL, 0, test_job, i2p(i+1));
             fprintf(stderr, "job %d queued : pending jobs = %d\n", i+1, afb_jobs_get_pending_count());
-
         }
 
         r=0;
         while(afb_jobs_get_pending_count() != 0){
-            usleep(100);
+            fprintf(stderr, "[%d] pending jobs = %d\n", r, afb_jobs_get_pending_count());
+            fflush(stderr);
+            usleep(250000);
             r++;
         }
 
-        fprintf(stderr, "r = %d\npending jobs = %d\nqueuing job %d\n", r, afb_jobs_get_pending_count(), NBJOBS);
+        fprintf(stderr, "[%d] pending jobs = %d\n", r, afb_jobs_get_pending_count());
         fflush(stderr);
-        afb_jobs_queue_lazy(NULL, 1, test_job, i2p(NBJOBS));
-        afb_sched_adapt(0);
-        fprintf(stderr, "pending jobs = %d\n", afb_jobs_get_pending_count());
-
 
         // wait for jobs to end
         r = TRUE;
         while(r){
             pthread_mutex_lock(&gval.mutex);
             if(gval.runingJobs <= 0 && gval.lastJob) r = FALSE;
+            fprintf(stderr, "\npending jobs = %d\nrunning job %d\nlast job = %d\n", afb_jobs_get_pending_count(), gval.runingJobs, gval.lastJob);
+            fflush(stderr);
             pthread_mutex_unlock(&gval.mutex);
-            usleep(1000);
-            //for(i=0; i<__INT_MAX__; i++);
+            usleep(250000);
         }
 
         pthread_mutex_lock(&gval.mutex);
@@ -342,7 +340,7 @@ void test_start_sched_adapt(int sig, void * arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(exit_handler);
+    afb_sched_exit(1, exit_handler);
     fprintf(stderr, "living test_start_sched_adapt\n");
 }
 
@@ -365,7 +363,7 @@ START_TEST(test_sched_adapt){
 
     // run them asynchronously with N-1 threads allowed
     sched_runing = TRUE;
-    ck_assert_int_eq(afb_sched_start(NBJOBS, NBJOBS, NBJOBS+1, test_start_sched_adapt, i2p(NBJOBS)), 0);
+    ck_assert_int_eq(afb_sched_start(NBJOBS+1, NBJOBS, NBJOBS+1, test_start_sched_adapt, i2p(NBJOBS)), 0);
 
     // check everything went alright
     ck_assert_int_eq(sched_runing,FALSE);
@@ -373,6 +371,74 @@ START_TEST(test_sched_adapt){
     ck_assert_int_eq(gval.runingJobs, 0);
     ck_assert_int_eq(gval.killedJobs, 0);
 
+}
+END_TEST
+
+/*********************************************************************/
+
+int evmgr_gotten;
+int evmgr_expected;
+
+void getevmgr(int num)
+{
+    static char spaces[] = "                                                          ";
+    struct evmgr * ev1, *ev2;
+    int off = (int)(sizeof spaces - 1) - (num << 1);
+    char *prefix = &spaces[off < 0 ? 0 : off];
+
+    fprintf(stderr, "%sBEFORE %d\n", prefix, num);
+    ev1 = afb_sched_acquire_event_manager();
+    ck_assert(ev1 != NULL);
+    fprintf(stderr, "%sMIDDLE %d\n", prefix, num);
+    ev2 = afb_sched_acquire_event_manager();
+    ck_assert(ev2 == ev1);
+    fprintf(stderr, "%sAFTER %d\n", prefix, num);
+    evmgr_gotten++;
+}
+
+void jobgetevmgr(int signum, void *arg)
+{
+    int num = p2i(arg);
+    getevmgr(num);
+}
+
+void do_test_evmgr(int signum, void *arg)
+{
+    int i, s;
+
+    fprintf(stderr, "-- MAIN ENTRY --\n");
+    getevmgr(0);
+    evmgr_gotten = 0;
+    evmgr_expected = 20;
+    for (i = 0 ; i < evmgr_expected ; i++) {
+        fprintf(stderr, "-- MAIN launch of %d...\n", 1+i);
+        s = afb_sched_queue_job(NULL, 0, jobgetevmgr, i2p(i+1));
+        fprintf(stderr, "-- MAIN launch of %d -> %d\n", 1+i, s);
+        ck_assert_int_ge(s, 0);
+    }
+    afb_sched_exit(0, 0);
+    fprintf(stderr, "-- MAIN EXIT --\n");
+}
+
+START_TEST(test_evmgr)
+{
+    struct evmgr * ev;
+
+    fprintf(stderr, "\n***********************test_evmgr***********************\n");
+
+    // initialisation of the scheduler
+    ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
+    ev = afb_sched_acquire_event_manager();
+    ck_assert(ev != NULL);
+    afb_jobs_set_max_count(NBJOBS+1);
+    ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS+1);
+
+    // run them asynchronously with N-1 threads allowed
+    sched_runing = TRUE;
+    ck_assert_int_eq(afb_sched_start(5, 0, 40, do_test_evmgr, 0), 0);
+
+    // check everything went alright
+    ck_assert_int_eq(evmgr_gotten, evmgr_expected);
 }
 END_TEST
 
@@ -402,5 +468,6 @@ int main(int ac, char **av)
             addtest(test_sync);
             addtest(test_sched_enter);
             addtest(test_sched_adapt);
+            addtest(test_evmgr);
 	return !!srun();
 }

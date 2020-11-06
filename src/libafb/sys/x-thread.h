@@ -38,6 +38,11 @@ static inline int x_thread_create(
 	return pthread_create(tid, NULL, (void*)entry, arg) ? -errno : 0;
 }
 
+static inline int x_thread_detach(x_thread_t tid)
+{
+	return pthread_detach(tid) ? -errno : 0;
+}
+
 #if WITH_THREAD_LOCAL
 #define X_TLS(type,name) \
 	static _Thread_local type *__tls_##name;\

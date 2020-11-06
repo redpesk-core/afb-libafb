@@ -268,6 +268,7 @@ void evmgr_wakeup(struct evmgr *evmgr)
 }
 
 /**
+ * Returns the current holder
  */
 void *evmgr_holder(struct evmgr *evmgr)
 {
@@ -275,22 +276,17 @@ void *evmgr_holder(struct evmgr *evmgr)
 }
 
 /**
+ * Try to change the holder
+ *
+ * It is successful if the holder is the current holder
+ *
+ * Returns the afterward holder
  */
-int evmgr_release_if(struct evmgr *evmgr, void *holder)
+void *evmgr_try_change_holder(struct evmgr *evmgr, void *holder, void *next)
 {
-	if (evmgr->holder != holder)
-		return 0;
-	evmgr->holder = 0;
-	return 1;
-}
-
-/**
- */
-int evmgr_try_hold(struct evmgr *evmgr, void *holder)
-{
-	if (!evmgr->holder)
-		evmgr->holder = holder;
-	return evmgr->holder == holder;
+	if (evmgr->holder == holder)
+		evmgr->holder = next;
+	return evmgr->holder;
 }
 
 /**

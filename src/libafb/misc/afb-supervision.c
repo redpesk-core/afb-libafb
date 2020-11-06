@@ -54,7 +54,7 @@
 #include "core/afb-error-text.h"
 #include "sys/verbose.h"
 #include "utils/wrap-json.h"
-#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
 #include "sys/x-socket.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
@@ -250,7 +250,7 @@ static void try_connect_supervisor_job(int signum, void *args)
 static void on_sighup(int signum)
 {
 	INFO("Supervision received a SIGHUP");
-	afb_jobs_queue(NULL, 0, try_connect_supervisor_job, NULL);
+	afb_sched_queue_job(NULL, 0, try_connect_supervisor_job, NULL);
 }
 
 /**

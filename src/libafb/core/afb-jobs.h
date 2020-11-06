@@ -25,26 +25,84 @@
 
 struct afb_job;
 
+/**
+ * Queues a new asynchronous job represented by 'callback' and 'arg'
+ * for the 'group' and the 'timeout'.
+ * Jobs are queued in a FIFO (first in first out) structure.
+ * They are dequeued by arrival order.
+ * The group if not NULL is used to group jobs of that same group
+ * sequentially. This is of importance if jobs are executed in
+ * parallel concurrently.
+ *
+ * @param group    The group of the job or NULL when no group.
+ * @param timeout  The maximum execution time in seconds of the job
+ *                 or 0 for unlimited time.
+ * @param callback The function to execute for achieving the job.
+ *                 Its first parameter is either 0 on normal flow
+ *                 or the signal number that broke the normal flow.
+ *                 The remaining parameter is the parameter 'arg1'
+ *                 given here.
+ * @param arg      The second argument for 'callback'
+ *
+ * @return the count of pending job on success (greater than 0) or
+ *         in case of error a negative number in -errno like form
+ */
 extern int afb_jobs_queue(
 		const void *group,
 		int timeout,
 		void (*callback)(int, void*),
 		void *arg);
 
-extern int afb_jobs_queue_lazy(
-		const void *group,
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg);
-
+/**
+ * Get the next job to process or NULL if none, i.e.
+ * if all jobs are blocked or if no job exists.
+ *
+ * Once gotten, the job must be either run or cancelled.
+ *
+ * @return the first job that isn't blocked or NULL
+ */
 extern struct afb_job *afb_jobs_dequeue(void);
 
+/**
+ * Run the given job now.
+ *
+ * @param job   a job a retrieved with afb_jobs_dequeue
+ */
 extern void afb_jobs_run(struct afb_job *job);
 
+/**
+ * Cancel the job gotten by afb_jobs_dequeue.
+ *
+ * The callback function is called with the signal
+ * SIGABRT.
+ *
+ * @param job   a job a retrieved with afb_jobs_dequeue
+ */
 extern void afb_jobs_cancel(struct afb_job *job);
 
+/**
+ * Get the current count of pending job
+ * @return the current count of pending jobs
+ */
 extern int afb_jobs_get_pending_count(void);
 
+/**
+ * Get the maximum count of pending job
+ *
+ * @return the maximum count of job
+ */
 extern int afb_jobs_get_max_count(void);
 
+/**
+ * Set the maximum count of pending jobs to 'count'
+ *
+ * @param count the count to set
+ */
 extern void afb_jobs_set_max_count(int count);
+
+/**
+ * Get the count of job still active but not pending
+ *
+ * @return the count of active jobs
+ */
+extern int afb_jobs_get_active_count(void);

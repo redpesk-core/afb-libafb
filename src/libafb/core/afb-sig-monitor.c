@@ -317,7 +317,7 @@ static void direct_safe_exit(int code)
 #if WITH_SIG_MONITOR_NO_DEFERRED_EXIT
 #  define safe_exit(x) direct_safe_exit(x)
 #else
-#include "afb-jobs.h"
+#include "afb-sched.h"
 static void exit_job(int signum, void* arg)
 {
 	exiting = (int)(intptr_t)arg;
@@ -328,7 +328,7 @@ static void exit_job(int signum, void* arg)
 
 static void safe_exit(int code)
 {
-	if (afb_jobs_queue(safe_exit, 0, exit_job, (void*)(intptr_t)code))
+	if (afb_sched_queue_job(safe_exit, 0, exit_job, (void*)(intptr_t)code))
 		direct_safe_exit(code);
 }
 #endif

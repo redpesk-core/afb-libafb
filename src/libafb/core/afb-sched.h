@@ -76,11 +76,13 @@ extern int afb_sched_call_job_sync(
 
 /**
  * Enter the jobs processing loop.
+ *
  * @param allowed_count Maximum count of thread for jobs including this one
  * @param start_count   Count of thread to start now, must be lower.
  * @param waiter_count  Maximum count of jobs that can be waiting.
  * @param start         The start routine to activate (can't be NULL)
  * @param arg           Arguments to pass to the start routine
+ *
  * @return 0 in case of success or -1 in case of error.
  */
 extern int afb_sched_start(
@@ -92,15 +94,67 @@ extern int afb_sched_start(
 
 /**
  * Exit jobs threads and call handler if not NULL.
+ *
+ * @param force    If zero, the exit occurs when there is no more pending
+ *                 jobs. Otherwise, pending jobs are no more processed.
+ * @param handler  A function called when threads have stopped
+ *                 and before the main thread (the one that called
+ *                 'afb_sched_start') returns.
  */
-extern void afb_sched_exit(void (*handler)());
+extern void afb_sched_exit(int force, void (*handler)());
 
 /**
  * Ensure that the current running thread can control the event loop.
+ *
+ * @return the event loop manager
  */
 extern struct evmgr *afb_sched_acquire_event_manager();
 
 /**
- * adapt the count of thread to the given count of pending jobs
+ * Schedule a new asynchronous job represented by 'callback' and 'arg'
+ * for the 'group' and the 'timeout'.
+ *
+ * Jobs are queued FIFO and are possibly executed in parallel
+ * concurrently except for job of the same group that are
+ * executed sequentially in FIFO order.
+ *
+ * @param group    The group of the job or NULL when no group.
+ * @param timeout  The maximum execution time in seconds of the job
+ *                 or 0 for unlimited time.
+ * @param callback The function to execute for achieving the job.
+ *                 Its first parameter is either 0 on normal flow
+ *                 or the signal number that broke the normal flow.
+ *                 The remaining parameter is the parameter 'arg1'
+ *                 given here.
+ * @param arg      The second argument for 'callback'
+ *
+ * @return 0 on success (greater than 0) or
+ *         in case of error a negative number in -errno like form
  */
-extern void afb_sched_adapt(int pending_job_count);
+extern int afb_sched_queue_job(
+		const void *group,
+		int timeout,
+		void (*callback)(int, void*),
+		void *arg);
+
+/**
+ * Calls synchronously in the current thread the job represented
+ * by 'callback' and 'arg'.
+ * The advantage of calling this function intead of calling
+ *       afb_sig_monitor_run(0, callback, arg)
+ * directly is that this function takes care of the fact that
+ * it can lock the thread for a while. Consequently, this
+ * function release the event loop if it held it and remove
+ * the current thread from the thread of threads handling
+ * asynchronous jobs.
+ *
+ * @param callback The function to execute for achieving the job.
+ *                 Its first parameter is either 0 on normal flow
+ *                 or the signal number that broke the normal flow.
+ *                 The remaining parameter is the parameter 'arg'
+ *                 given here.
+ * @param arg      The second argument for 'callback'
+ */
+extern void afb_sched_call_sync(
+		void (*callback)(int, void*),
+		void *arg);
