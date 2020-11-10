@@ -62,6 +62,19 @@ x4_api_type_lookup(
 	return (*type = afb_type_get(name)) ? 0 : -1;
 }
 
+static
+int
+x4_api_setup_shared_object(
+	afb_api_x4_t root,
+	void *handle
+) {
+	struct afb_v4_dynlib_info info;
+	x_dynlib_t dynlib;
+
+	dynlib.handle = handle;
+	afb_v4_connect_dynlib(&dynlib, &info, root);
+	return 0;
+}
 
 /***********************************************************
  * Hack to avoid work to cast from not const to const */
@@ -197,6 +210,7 @@ const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.create_api = afb_api_v4_new_api_hookable,
 	.job_queue = afb_api_v4_queue_job_hookable,
 	.alias_api = afb_api_v4_add_alias_hookable,
+	.setup_shared_object = x4_api_setup_shared_object,
 
 /*-- PREDEFINED TYPES -----------------------------------*/
 
