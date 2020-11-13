@@ -25,13 +25,69 @@
 
 #include <stdint.h>
 
-#include "sys/evmgr.h"
+#include "sys/ev-mgr.h"
 #include "core/afb-sched.h"
+
+
+/******************************************************************************/
+/******************************************************************************/
+/******  FDEV COMPATIBILITY                                              ******/
+/******************************************************************************/
+/******************************************************************************/
+
+#include "legacy/fdev.h"
+#include "legacy/fdev-provider.h"
+
+static void unref(void *closure)
+{
+	struct ev_fd *efd = closure;
+	ev_fd_unref(efd);
+}
+
+static void clear(void *closure, const struct fdev *fdev)
+{
+	struct ev_fd *efd = closure;
+	ev_fd_set_events(efd, 0);
+}
+
+static void set(void *closure, const struct fdev *fdev)
+{
+	struct ev_fd *efd = closure;
+	ev_fd_set_events(efd, fdev_events(fdev));
+}
+
+static void handler(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
+{
+	struct fdev *fdev = closure;
+	fdev_dispatch(fdev, revents);
+}
+
+static struct fdev_itf itf =
+{
+	.unref = unref,
+	.disable = clear,
+	.enable = set,
+	.update = set
+};
 
 struct fdev *afb_fdev_create(int fd)
 {
+	struct ev_mgr *evmgr;
+	struct ev_fd *efd;
 	struct fdev *fdev;
-	struct evmgr *evmgr = afb_sched_acquire_event_manager();
-	return evmgr_add(&fdev, evmgr, fd) < 0 ? 0 : fdev;
+	int rc;
+
+	evmgr = afb_sched_acquire_event_manager();
+	fdev = fdev_create(fd);
+	if (fdev) {
+		rc = ev_mgr_add_fd(evmgr, &efd, fd, 0, handler, fdev, 0, 0);
+		if (rc >= 0)
+			fdev_set_itf(fdev, &itf, efd);
+		else {
+			fdev_unref(fdev);
+			fdev = 0;
+		}
+	}
+	return fdev;
 }
 

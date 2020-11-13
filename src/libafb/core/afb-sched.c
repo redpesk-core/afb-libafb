@@ -31,7 +31,7 @@
 
 #include "core/afb-jobs.h"
 #include "core/afb-sched.h"
-#include "sys/evmgr.h"
+#include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
 #include "sys/verbose.h"
 #include "sys/x-mutex.h"
@@ -148,7 +148,7 @@ static int in_event_loop = 0;		/**< is waiting events */
 static struct thread *threads;
 
 /* event loop */
-static struct evmgr *evmgr;
+static struct ev_mgr *evmgr;
 
 /* exit manager */
 static void (*exit_handler)();
@@ -229,7 +229,7 @@ static void dump_thread_leave(struct thread *thr)
 static void evloop_wakeup()
 {
 	if (evmgr)
-		evmgr_wakeup(evmgr);
+		ev_mgr_wakeup(evmgr);
 }
 
 /**
@@ -237,7 +237,7 @@ static void evloop_wakeup()
  */
 static void evloop_release(void *me)
 {
-	if (evmgr && !evmgr_try_change_holder(evmgr, me, 0)) {
+	if (evmgr && !ev_mgr_try_change_holder(evmgr, me, 0)) {
 		if (hold_request_count)
 			x_cond_signal(&condhold);
 	}
@@ -248,7 +248,7 @@ static void evloop_release(void *me)
  */
 static int evloop_get(void *me)
 {
-	return evmgr && evmgr_try_change_holder(evmgr, 0, me) == me;
+	return evmgr && ev_mgr_try_change_holder(evmgr, 0, me) == me;
 }
 
 /**
@@ -307,15 +307,15 @@ static void thread_run(int ismain)
 		} else if (!hold_request_count && allowed_thread_count && evloop_get(&me)) {
 			in_event_loop = 1;
 			THREAD_STATE_SET(&me, ts_Event_Handling);
-			if (!evmgr_can_run(evmgr)) {
+			if (!ev_mgr_can_run(evmgr)) {
 				/* busy ? */
 				CRITICAL("Can't enter dispatch while in dispatch!");
 				abort();
 			}
 			/* run the events */
-			evmgr_prepare_run(evmgr);
+			ev_mgr_prepare(evmgr);
 			x_mutex_unlock(&mutex);
-			afb_sig_monitor_run(0, (void(*)(int,void*))evmgr_job_run, evmgr);
+			afb_sig_monitor_run(0, (void(*)(int,void*))ev_mgr_job_run, evmgr);
 			x_mutex_lock(&mutex);
 			in_event_loop = 0;
 			THREAD_STATE_SET(&me, ts_Idle);
@@ -590,7 +590,7 @@ int afb_sched_call_job_sync(
 /**
  * Ensure that the current running thread can control the event loop.
  */
-struct evmgr *afb_sched_acquire_event_manager()
+struct ev_mgr *afb_sched_acquire_event_manager()
 {
 	struct thread *me;
 	void *holder;
@@ -600,7 +600,7 @@ struct evmgr *afb_sched_acquire_event_manager()
 
 	/* creates the evloop on need */
 	if (!evmgr) {
-		evmgr_create(&evmgr);
+		ev_mgr_create(&evmgr);
 		if (!evmgr) {
 			x_mutex_unlock(&mutex);
 			return 0;
@@ -612,7 +612,7 @@ struct evmgr *afb_sched_acquire_event_manager()
 
 	/* try to hold the event loop under lock */
 	holder = me ? (void*)me : (void*)&holder;
-	if (holder != evmgr_try_change_holder(evmgr, 0, holder)) {
+	if (holder != ev_mgr_try_change_holder(evmgr, 0, holder)) {
 		if (me) {
 			THREAD_STATE_PUSH(me, ts_Acquiring);
 		}
@@ -620,10 +620,10 @@ struct evmgr *afb_sched_acquire_event_manager()
 		/* wait for the event loop */
 		hold_request_count++;
 		do {
-			evmgr_wakeup(evmgr);
+			ev_mgr_wakeup(evmgr);
 			x_cond_wait(&condhold, &mutex);
 		}
-		while (holder != evmgr_try_change_holder(evmgr, 0, holder));
+		while (holder != ev_mgr_try_change_holder(evmgr, 0, holder));
 		hold_request_count--;
 
 		if (me) {

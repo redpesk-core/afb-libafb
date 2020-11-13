@@ -46,7 +46,6 @@
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
 #include "sys/verbose.h"
-#include "legacy/fdev.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
 
@@ -121,7 +120,7 @@ struct afb_stub_ws
 
 			/* robustify */
 			struct {
-				struct fdev *(*reopen)(void*);
+				int (*reopen)(void*);
 				void *closure;
 				void (*release)(void*);
 			} robust;
@@ -138,7 +137,7 @@ struct afb_stub_ws
 	char apiname[];
 };
 
-static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, struct fdev *fdev, uint8_t server);
+static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, int fd, uint8_t server);
 
 /******************* ws request part for server *****************/
 
@@ -213,14 +212,14 @@ static const struct afb_req_common_query_itf server_req_req_common_itf = {
 
 static struct afb_proto_ws *client_get_proto(struct afb_stub_ws *stubws)
 {
-	struct fdev *fdev;
+	int fd;
 	struct afb_proto_ws *proto;
 
 	proto = stubws->proto;
 	if (proto == NULL && stubws->robust.reopen) {
-		fdev = stubws->robust.reopen(stubws->robust.closure);
-		if (fdev != NULL)
-			proto = afb_stub_ws_create_proto(stubws, fdev, 1);
+		fd = stubws->robust.reopen(stubws->robust.closure);
+		if (fd >= 0)
+			proto = afb_stub_ws_create_proto(stubws, fd, 1);
 	}
 	return proto;
 }
@@ -742,13 +741,13 @@ static int enqueue_processing(struct afb_proto_ws *proto, void (*callback)(int s
 
 /*****************************************************/
 
-static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, struct fdev *fdev, uint8_t is_client)
+static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, int fd, uint8_t is_client)
 {
 	struct afb_proto_ws *proto;
 
 	stubws->proto = proto = is_client
-		  ? afb_proto_ws_create_client(fdev, &client_itf, stubws)
-		  : afb_proto_ws_create_server(fdev, &server_itf, stubws);
+		  ? afb_proto_ws_create_client(fd, &client_itf, stubws)
+		  : afb_proto_ws_create_server(fd, &server_itf, stubws);
 	if (proto) {
 		afb_proto_ws_on_hangup(proto, on_hangup);
 		afb_proto_ws_set_queuing(proto, enqueue_processing);
@@ -757,13 +756,13 @@ static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws,
 	return proto;
 }
 
-static struct afb_stub_ws *afb_stub_ws_create(struct fdev *fdev, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
+static struct afb_stub_ws *afb_stub_ws_create(int fd, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
 {
 	struct afb_stub_ws *stubws;
 
 	stubws = calloc(1, sizeof *stubws + 1 + strlen(apiname));
 	if (stubws) {
-		if (afb_stub_ws_create_proto(stubws, fdev, is_client)) {
+		if (afb_stub_ws_create_proto(stubws, fd, is_client)) {
 			stubws->refcount = 1;
 			stubws->is_client = is_client;
 			strcpy(stubws->apiname, apiname);
@@ -772,23 +771,22 @@ static struct afb_stub_ws *afb_stub_ws_create(struct fdev *fdev, const char *api
 		}
 		free(stubws);
 	}
-	fdev_unref(fdev);
 	return NULL;
 }
 
-struct afb_stub_ws *afb_stub_ws_create_client(struct fdev *fdev, const char *apiname, struct afb_apiset *apiset)
+struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname, struct afb_apiset *apiset)
 {
-	return afb_stub_ws_create(fdev, apiname, apiset, 1);
+	return afb_stub_ws_create(fd, apiname, apiset, 1);
 }
 
-struct afb_stub_ws *afb_stub_ws_create_server(struct fdev *fdev, const char *apiname, struct afb_apiset *apiset)
+struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset)
 {
 	struct afb_stub_ws *stubws;
 
-	stubws = afb_stub_ws_create(fdev, apiname, apiset, 0);
+	stubws = afb_stub_ws_create(fd, apiname, apiset, 0);
 	if (stubws) {
 #if WITH_CRED
-		afb_cred_create_for_socket(&stubws->cred, fdev_fd(fdev));
+		afb_cred_create_for_socket(&stubws->cred, fd);
 #endif
 		stubws->listener = afb_evt_listener_create(&server_event_itf, stubws);
 		if (stubws->listener != NULL)
@@ -845,7 +843,7 @@ int afb_stub_ws_client_add(struct afb_stub_ws *stubws, struct afb_apiset *apiset
 	return afb_apiset_add(apiset, stubws->apiname, afb_stub_ws_client_api(stubws));
 }
 
-void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, struct fdev *(*reopen)(void*), void *closure, void (*release)(void*))
+void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, int (*reopen)(void*), void *closure, void (*release)(void*))
 {
 	assert(stubws->is_client); /* check client */
 

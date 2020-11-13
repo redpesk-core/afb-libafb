@@ -54,7 +54,7 @@
 #include "core/afb-string-mode.h"
 
 #if WITH_SYSTEMD
-#include "sys/systemd.h"
+#include "misc/afb-systemd.h"
 #endif
 #include "sys/verbose.h"
 #include "utils/globmatch.h"
@@ -236,7 +236,7 @@ x3_api_get_event_loop_hookable(
 
 #if WITH_SYSTEMD
 	afb_sched_acquire_event_manager();
-	r = systemd_get_event_loop();
+	r = afb_systemd_get_event_loop();
 #else
 	r = NULL;
 #endif
@@ -257,7 +257,7 @@ x3_api_get_user_bus_hookable(
 
 #if WITH_SYSTEMD
 	afb_sched_acquire_event_manager();
-	r = systemd_get_user_bus();
+	r = afb_systemd_get_user_bus();
 #else
 	r = NULL;
 #endif
@@ -278,7 +278,7 @@ x3_api_get_system_bus_hookable(
 
 #if WITH_SYSTEMD
 	afb_sched_acquire_event_manager();
-	r = systemd_get_system_bus();
+	r = afb_systemd_get_system_bus();
 #else
 	r = NULL;
 #endif

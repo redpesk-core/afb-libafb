@@ -33,7 +33,6 @@
  */
 #define AFB_WSAPI_VERSION	1
 
-struct fdev;
 struct afb_wsapi;
 struct afb_wsapi_call;
 struct afb_wsapi_describe;
@@ -185,7 +184,7 @@ struct afb_wsapi_itf
 	void (*on_description)(void *closure, const struct afb_wsapi_msg *msg);
 };
 
-extern int afb_wsapi_create(struct afb_wsapi **wsapi, struct fdev *fdev, const struct afb_wsapi_itf *itf, void *closure);
+extern int afb_wsapi_create(struct afb_wsapi **wsapi, int fd, const struct afb_wsapi_itf *itf, void *closure);
 
 extern struct afb_wsapi *afb_wsapi_addref(struct afb_wsapi *wsapi);
 extern void afb_wsapi_unref(struct afb_wsapi *wsapi);

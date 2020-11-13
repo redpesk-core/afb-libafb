@@ -33,16 +33,28 @@
 #include <fcntl.h>
 #include <sys/un.h>
 
+#include <systemd/sd-event.h>
+
 #include "afb-ws-client.h"
 
 #include "misc/afb-socket.h"
-#include "legacy/fdev.h"
-#include "legacy/fdev-systemd.h"
+#include "core/afb-ev-mgr.h"
 #include "wsapi/afb-proto-ws.h"
 #include "wsapi/afb-wsapi.h"
 #include "wsj1/afb-wsj1.h"
+#include "sys/ev-mgr.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
+
+/**************** ev mgr ****************************/
+
+struct ev_mgr *afb_sched_acquire_event_manager()
+{
+	static struct ev_mgr *result;
+	if (!result)
+		ev_mgr_create(&result);
+	return result;
+}
 
 /**************** WebSocket handshake ****************************/
 
@@ -321,7 +333,11 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 	const char *path;
 	struct addrinfo hint, *rai, *iai;
 	struct afb_wsj1 *result;
-	struct fdev *fdev;
+
+	/* ensure connected */
+	rc = afb_ws_client_connect_to_sd_event(eloop);
+	if (rc < 0)
+		return NULL;
 
 	/* scan the uri */
 	rc = parse_uri(uri, &host, &service, &path);
@@ -355,13 +371,10 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 			if (rc == 0) {
 				rc = negociate(fd, proto_json1, path, xhost);
 				if (rc == 0) {
-					fdev = fdev_systemd_create(eloop, fd);
-					if (fdev) {
-						result = afb_wsj1_create(fdev, itf, closure);
-						if (result != NULL) {
-							fcntl(fd, F_SETFL, O_NONBLOCK);
-							break;
-						}
+					result = afb_wsj1_create(fd, itf, closure);
+					if (result != NULL) {
+						fcntl(fd, F_SETFL, O_NONBLOCK);
+						break;
 					}
 				}
 			}
@@ -401,23 +414,50 @@ static char *makequery(const char *path, const char *uuid, const char *token)
 }
 #endif
 
+
 /*****************************************************************************************************************************/
 
-static struct fdev *get_socket(struct sd_event *eloop, const char *uri, int server)
-{
-	int fd;
-	struct fdev *fdev;
+static struct sd_event_source *current_sd_event_source_prepare;
+static struct sd_event_source *current_sd_event_source_io;
 
-	fd = afb_socket_open(uri, server);
-	if (fd < 0)
-		fdev = NULL;
-	else {
-		fdev = fdev_systemd_create(eloop, fd);
-		if (!fdev)
-			close(fd);
-	}
-	return fdev;
+static int onprepare(struct sd_event_source *s, void *userdata)
+{
+	afb_ev_mgr_prepare();
+	return 0;
 }
+
+static int onevent(struct sd_event_source *s, int fd, uint32_t revents, void *userdata)
+{
+	afb_ev_mgr_wait(0);
+	afb_ev_mgr_dispatch();
+	return 0;
+}
+
+/*
+ * Attaches the internal event loop to the given sd_event
+ */
+int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
+{
+	int rc;
+	if (current_sd_event_source_io) {
+		if (sd_event_source_get_event(current_sd_event_source_io) == eloop)
+			return 0;
+		sd_event_source_unref(current_sd_event_source_io);
+		sd_event_source_unref(current_sd_event_source_prepare);
+		current_sd_event_source_io = current_sd_event_source_prepare = 0;
+	}
+	rc = sd_event_add_post(eloop, &current_sd_event_source_prepare, onprepare, 0);
+	if (rc >= 0) {
+		rc = sd_event_add_io(eloop, &current_sd_event_source_io, afb_ev_mgr_get_fd(), EPOLLIN, onevent, 0);
+		if (rc < 0) {
+			sd_event_source_unref(current_sd_event_source_prepare);
+			current_sd_event_source_io = current_sd_event_source_prepare = 0;
+		}
+	}
+	return rc;
+}
+
+/*****************************************************************************************************************************/
 
 /*
  * Establish a websocket-like client connection to the API of 'uri' and if successful
@@ -429,14 +469,17 @@ static struct fdev *get_socket(struct sd_event *eloop, const char *uri, int serv
 struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const char *uri, struct afb_proto_ws_client_itf *itf, void *closure)
 {
 	struct afb_proto_ws *pws;
-	struct fdev *fdev;
+	int fd, rc;
 
-	fdev = get_socket(eloop, uri, 0);
-	if (fdev) {
-		pws = afb_proto_ws_create_client(fdev, itf, closure);
-		if (pws)
-			return pws;
-		fdev_unref(fdev);
+	/* ensure connected */
+	rc = afb_ws_client_connect_to_sd_event(eloop);
+	if (rc >= 0) {
+		fd = afb_socket_open(uri, 0);
+		if (fd) {
+			pws = afb_proto_ws_create_client(fd, itf, closure);
+			if (pws)
+				return pws;
+		}
 	}
 	return NULL;
 }
@@ -450,20 +493,20 @@ struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const cha
  */
 struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char *uri, struct afb_wsapi_itf *itf, void *closure)
 {
-	int rc;
+	int rc, fd;
 	struct afb_wsapi *wsapi;
-	struct fdev *fdev;
 
-	fdev = get_socket(eloop, uri, 0);
-	if (fdev) {
-		rc = afb_wsapi_create(&wsapi, fdev, itf, closure);
-		if (rc < 0)
-			fdev_unref(fdev);
-		else {
-			rc = afb_wsapi_initiate(wsapi);
-			if (rc >= 0)
-				return wsapi;
-			afb_wsapi_unref(wsapi);
+	rc = afb_ws_client_connect_to_sd_event(eloop);
+	if (rc >= 0) {
+		fd = afb_socket_open(uri, 0);
+		if (fd >= 0) {
+			rc = afb_wsapi_create(&wsapi, fd, itf, closure);
+			if (rc >= 0) {
+				rc = afb_wsapi_initiate(wsapi);
+				if (rc >= 0)
+					return wsapi;
+				afb_wsapi_unref(wsapi);
+			}
 		}
 	}
 	return NULL;
@@ -477,61 +520,54 @@ struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char
 
 struct loopcb
 {
-	struct sd_event *eloop;
-	int (*onclient)(void*,struct fdev*);
+	int (*onclient)(void*,int);
 	void *closure;
 	char uri[];
 };
 
-static void server_listen_callback(void *closure, uint32_t revents, struct fdev *fdev)
+static void server_listen_callback(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
-	int fd, rc;
+	int fdc;
 	struct sockaddr addr;
 	socklen_t lenaddr;
-	struct fdev *cfdev;
 	struct loopcb *lcb = closure;
 
-	if ((revents & EPOLLHUP) != 0) {
-		/* hangup? */
-		sd_event_unref(lcb->eloop);
-		free(lcb);
-		fdev_unref(fdev);
-	} else if ((revents & EPOLLIN) != 0) {
+	if ((revents & EPOLLIN) != 0) {
 		/* incmoing client */
 		lenaddr = (socklen_t)sizeof addr;
-		fd = accept(fdev_fd(fdev), &addr, &lenaddr);
-		if (fd >= 0){
-			cfdev = fdev_systemd_create(lcb->eloop, fd);
-			if (!cfdev)
-				close(fd);
-			else {
-				rc = lcb->onclient(lcb->closure, cfdev);
-				if (rc < 0)
-					fdev_unref(cfdev);
-			}
+		fdc = accept(fd, &addr, &lenaddr);
+		if (fdc >= 0) {
+			lcb->onclient(lcb->closure, fdc);
 		}
 	}
 }
 
 /* create the service */
-int afb_ws_client_serve(struct sd_event *eloop, const char *uri, int (*onclient)(void*,struct fdev*), void *closure)
+int afb_ws_client_serve(struct sd_event *eloop, const char *uri, int (*onclient)(void*,int), void *closure)
 {
-	struct fdev *fdev;
+	int fd, rc;
+	struct ev_fd *efd;
 	struct loopcb *lcb;
 
-	lcb = malloc(sizeof *lcb + 1 + strlen(uri));
-	if (lcb != NULL) {
-		fdev = get_socket(eloop, uri, 1);
-		if (fdev) {
-			lcb->eloop = sd_event_ref(eloop);
-			lcb->onclient = onclient;
-			lcb->closure = closure;
-			strcpy(lcb->uri, uri);
-			fdev_set_events(fdev, EPOLLIN);
-			fdev_set_callback(fdev, server_listen_callback, lcb);
-			return 0;
+	rc = afb_ws_client_connect_to_sd_event(eloop);
+	if (rc >= 0) {
+		lcb = malloc(sizeof *lcb + 1 + strlen(uri));
+		if (!lcb)
+			rc = X_ENOMEM;
+		else {
+			rc = afb_socket_open(uri, 1);
+			if (rc >= 0) {
+				fd = rc;
+				lcb->onclient = onclient;
+				lcb->closure = closure;
+				strcpy(lcb->uri, uri);
+				rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, server_listen_callback, lcb, 1, 1);
+				if (rc >= 0)
+					return 0;
+				close(fd);
+			}
+			free(lcb);
 		}
 	}
-	return -1;
+	return rc;
 }
-

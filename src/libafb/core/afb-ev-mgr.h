@@ -23,22 +23,51 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
+#include "sys/ev-mgr.h"
 
 extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
+int afb_ev_mgr_get_fd();
+
+extern
+int afb_ev_mgr_prepare();
+
+extern
+int afb_ev_mgr_wait(int ms);
+
+extern
+void afb_ev_mgr_dispatch();
+
+extern
+int afb_ev_mgr_wait_and_dispatch(int ms);
+
+extern
+int afb_ev_mgr_add_fd(
+	struct ev_fd **efd,
 	int fd,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
+	uint32_t events,
+	ev_fd_cb_t handler,
+	void *closure,
+	int autounref,
+	int autoclose
 );
 
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
+extern
+int afb_ev_mgr_add_prepare(
+	struct ev_prepare **prep,
+	ev_prepare_cb_t handler,
+	void *closure
+);
 
+extern
+int afb_ev_mgr_add_timer(
+	struct ev_timer **timer,
+	int absolute,
+	time_t start_sec,
+	unsigned start_ms,
+	unsigned count,
+	unsigned period_ms,
+	unsigned accuracy_ms,
+	ev_timer_cb_t handler,
+	void *closure,
+	int autounref
+);

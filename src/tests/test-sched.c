@@ -183,7 +183,7 @@ START_TEST(test_async){
     gval.val = 0;
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
-    struct evmgr * ev;
+    struct ev_mgr * ev;
 
     fprintf(stderr, "\n***********************test_async***********************\n");
 
@@ -217,7 +217,7 @@ START_TEST(test_sync){
     gval.val = 0;
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
-    struct evmgr * ev;
+    struct ev_mgr * ev;
 
     fprintf(stderr, "\n************************test_sync************************\n");
 
@@ -275,7 +275,7 @@ START_TEST(test_sched_enter){
     gval.runingJobs = 0;
     gval.killedJobs = 0;
     reachError = FALSE;
-    struct evmgr * ev;
+    struct ev_mgr * ev;
 
     fprintf(stderr, "\n************************test_sched_enter************************\n");
 
@@ -352,7 +352,8 @@ START_TEST(test_sched_adapt){
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
     gval.killedJobs = 0;
-    struct evmgr * ev;
+    struct ev_mgr * ev;
+    int r;
 
     fprintf(stderr, "\n***********************test_sched_adapt***********************\n");
     // initialisation of the scheduler
@@ -364,7 +365,8 @@ START_TEST(test_sched_adapt){
 
     // run them asynchronously with N-1 threads allowed
     sched_runing = TRUE;
-    ck_assert_int_eq(afb_sched_start(NBJOBS+1, NBJOBS, NBJOBS+1, test_start_sched_adapt, i2p(NBJOBS)), 0);
+    r = afb_sched_start(NBJOBS+1, NBJOBS, NBJOBS+1, test_start_sched_adapt, i2p(NBJOBS));
+    ck_assert_int_eq(r, 0);
 
     // check everything went alright
     ck_assert_int_eq(sched_runing,FALSE);
@@ -383,7 +385,7 @@ int evmgr_expected;
 void getevmgr(int num)
 {
     static char spaces[] = "                                                          ";
-    struct evmgr * ev1, *ev2;
+    struct ev_mgr * ev1, *ev2;
     int off = (int)(sizeof spaces - 1) - (num << 1);
     char *prefix = &spaces[off < 0 ? 0 : off];
 
@@ -423,7 +425,7 @@ void do_test_evmgr(int signum, void *arg)
 
 START_TEST(test_evmgr)
 {
-    struct evmgr * ev;
+    struct ev_mgr * ev;
 
     fprintf(stderr, "\n***********************test_evmgr***********************\n");
 

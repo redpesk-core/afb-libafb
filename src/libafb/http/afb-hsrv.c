@@ -47,18 +47,16 @@ typedef enum MHD_Result mhd_result_t;
 #endif
 
 #include "core/afb-sched.h"
+#include "core/afb-ev-mgr.h"
 #include "utils/locale-root.h"
-#include "sys/systemd.h"
+#include "misc/afb-socket.h"
 
-#include "legacy/fdev.h"
 #include "sys/x-errno.h"
 
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
-#include "legacy/afb-fdev.h"
 #include "sys/x-socket.h"
-#include "legacy/afb-socket-fdev.h"
 
 #include "sys/verbose.h"
 
@@ -68,7 +66,7 @@ typedef enum MHD_Result mhd_result_t;
 struct hsrv_itf {
 	struct hsrv_itf *next;
 	struct afb_hsrv *hsrv;
-	struct fdev *fdev;
+	struct ev_fd *efd;
 	char uri[];
 };
 
@@ -91,7 +89,7 @@ struct afb_hsrv {
 	struct hsrv_handler *handlers;
 	struct hsrv_itf *interfaces;
 	struct MHD_Daemon *httpd;
-	struct fdev *fdev;
+	struct ev_fd *efd;
 	char *cache_to;
 };
 
@@ -290,17 +288,17 @@ static void do_run(int signum, void *arg)
 	if (!signum) {
 		do { MHD_run(hsrv->httpd); } while(MHD_get_timeout(hsrv->httpd, &to) == MHD_YES && !to);
 	}
-	fdev_set_events(hsrv->fdev, EPOLLIN);
+	ev_fd_set_events(hsrv->efd, EPOLLIN);
 }
 
 void afb_hsrv_run(struct afb_hsrv *hsrv)
 {
-	fdev_set_events(hsrv->fdev, 0);
+	ev_fd_set_events(hsrv->efd, 0);
 	if (afb_sched_queue_job(hsrv, 0, do_run, hsrv) < 0)
 		do_run(0, hsrv);
 }
 
-static void listen_callback(void *hsrv, uint32_t revents, struct fdev *fdev)
+static void listen_callback(struct ev_fd *efd, int fd, uint32_t revents, void *hsrv)
 {
 	afb_hsrv_run(hsrv);
 }
@@ -465,7 +463,6 @@ int afb_hsrv_set_cache_timeout(struct afb_hsrv *hsrv, int duration)
 
 int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout)
 {
-	struct fdev *fdev;
 	struct MHD_Daemon *httpd;
 	const union MHD_DaemonInfo *info;
 
@@ -495,26 +492,21 @@ int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout)
 		return 0;
 	}
 
-	fdev = afb_fdev_create(info->epoll_fd);
-	if (fdev == NULL) {
+	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EPOLLIN, listen_callback, hsrv, 0, 0) < 0) {
 		MHD_stop_daemon(httpd);
 		ERROR("connection to events for httpd failed");
 		return 0;
 	}
-	fdev_set_autoclose(fdev, 0);
-	fdev_set_events(fdev, EPOLLIN);
-	fdev_set_callback(fdev, listen_callback, hsrv);
 
 	hsrv->httpd = httpd;
-	hsrv->fdev = fdev;
 	return 1;
 }
 
 void afb_hsrv_stop(struct afb_hsrv *hsrv)
 {
-	if (hsrv->fdev != NULL) {
-		fdev_unref(hsrv->fdev);
-		hsrv->fdev = NULL;
+	if (hsrv->efd) {
+		ev_fd_unref(hsrv->efd);
+		hsrv->efd = 0;
 	}
 	if (hsrv->httpd != NULL)
 		MHD_stop_daemon(hsrv->httpd);
@@ -540,27 +532,27 @@ void afb_hsrv_put(struct afb_hsrv *hsrv)
 
 static int hsrv_itf_connect(struct hsrv_itf *itf);
 
-static void hsrv_itf_callback(void *closure, uint32_t revents, struct fdev *fdev)
+static void hsrv_itf_callback(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct hsrv_itf *itf = closure;
-	int fd, sts;
+	int fdc, sts;
 	struct sockaddr addr;
 	socklen_t lenaddr;
 
 	if ((revents & EPOLLHUP) != 0) {
 		ERROR("disconnection for server %s: %m", itf->uri);
 		hsrv_itf_connect(itf);
-		fdev_unref(fdev);
+		ev_fd_unref(efd);
 	} else if ((revents & EPOLLIN) != 0) {
 		lenaddr = (socklen_t)sizeof addr;
-		fd = accept(fdev_fd(fdev), &addr, &lenaddr);
-		if (fd < 0)
+		fdc = accept(fd, &addr, &lenaddr);
+		if (fdc < 0)
 			ERROR("can't accept connection to %s: %m", itf->uri);
 		else {
-			sts = MHD_add_connection(itf->hsrv->httpd, fd, &addr, lenaddr);
+			sts = MHD_add_connection(itf->hsrv->httpd, fdc, &addr, lenaddr);
 			if (sts != MHD_YES) {
 				ERROR("can't add incoming connection to %s: %m", itf->uri);
-				close(fd);
+				close(fdc);
 			}
 		}
 	}
@@ -571,18 +563,21 @@ static int hsrv_itf_connect(struct hsrv_itf *itf)
 	struct sockaddr addr;
 	socklen_t lenaddr;
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-	int rgni;
+	int rgni, rc, fd;
 
-	itf->fdev = afb_socket_fdev_open_scheme(itf->uri, 1, "tcp:");
-	if (!itf->fdev) {
+	fd = afb_socket_open_scheme(itf->uri, 1, "tcp:");
+	if (fd < 0) {
 		ERROR("can't create socket %s", itf->uri);
-		return X_ENOMEM;
+		return -errno;
 	}
-	fdev_set_events(itf->fdev, EPOLLIN);
-	fdev_set_callback(itf->fdev, hsrv_itf_callback, itf);
+	rc = afb_ev_mgr_add_fd(&itf->efd, fd, EPOLLIN, hsrv_itf_callback, itf, 0, 1);
+	if (rc < 0) {
+		ERROR("can't connect socket %s", itf->uri);
+		return rc;
+	}
 	memset(&addr, 0, sizeof addr);
 	lenaddr = (socklen_t)sizeof addr;
-	getsockname(fdev_fd(itf->fdev), &addr, &lenaddr);
+	getsockname(fd, &addr, &lenaddr);
 	if (addr.sa_family == AF_INET && !((struct sockaddr_in*)&addr)->sin_addr.s_addr) {
 		strncpy(hbuf, "*", NI_MAXHOST);
 		sprintf(sbuf, "%d", (int)ntohs(((struct sockaddr_in*)&addr)->sin_port));
@@ -607,7 +602,7 @@ int afb_hsrv_add_interface(struct afb_hsrv *hsrv, const char *uri)
 		return X_ENOMEM;
 
 	itf->hsrv = hsrv;
-	itf->fdev = NULL;
+	itf->efd = 0;
 	strcpy(itf->uri, uri);
 	itf->next = hsrv->interfaces;
 	hsrv->interfaces = itf;

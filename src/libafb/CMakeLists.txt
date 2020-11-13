@@ -31,7 +31,6 @@ file(GLOB LIBAFBSRCS
 	misc/*.c
 	wsapi/*.c
 	wsj1/*.c
-	legacy/*.c
 )
 set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 

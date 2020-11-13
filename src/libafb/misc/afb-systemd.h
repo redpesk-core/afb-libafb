@@ -23,22 +23,16 @@
 
 #pragma once
 
-struct afb_ws_json1;
-struct afb_session;
-struct afb_token;
-struct afb_apiset;
+#if WITH_SYSTEMD
 
-extern
-struct afb_ws_json1 *
-afb_ws_json1_create(
-	int fd,
-	struct afb_apiset *apiset,
-	struct afb_session *session,
-	struct afb_token *token,
-	void (*cleanup)(void*),
-	void *cleanup_closure
-);
+struct sd_event;
+struct sd_bus;
 
-extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
-extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
+extern struct sd_event *afb_systemd_get_event_loop();
+extern struct sd_bus *afb_systemd_get_user_bus();
+extern struct sd_bus *afb_systemd_get_system_bus();
 
+extern int afb_systemd_fds_init();
+extern int afb_systemd_fds_for(const char *name);
+
+#endif

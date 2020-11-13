@@ -27,7 +27,6 @@ struct afb_wsj1;
 struct afb_wsj1_msg;
 
 struct json_object;
-struct fdev;
 
 /*
  * Interface for callback functions.
@@ -58,7 +57,7 @@ struct afb_wsj1_itf {
  * and having the callback interface defined by 'itf' for the 'closure'.
  * Returns the created wsj1 websocket or NULL in case of error.
  */
-extern struct afb_wsj1 *afb_wsj1_create(struct fdev *fdev, struct afb_wsj1_itf *itf, void *closure);
+extern struct afb_wsj1 *afb_wsj1_create(int fd, struct afb_wsj1_itf *itf, void *closure);
 
 /*
  * Increases by one the count of reference to 'wsj1'

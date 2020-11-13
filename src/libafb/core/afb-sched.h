@@ -24,7 +24,7 @@
 #pragma once
 
 struct afb_sched_lock;
-struct evmgr;
+struct ev_mgr;
 
 /**
  * Enter a synchronisation point: activates the job given by 'callback'
@@ -108,7 +108,7 @@ extern void afb_sched_exit(int force, void (*handler)());
  *
  * @return the event loop manager
  */
-extern struct evmgr *afb_sched_acquire_event_manager();
+extern struct ev_mgr *afb_sched_acquire_event_manager();
 
 /**
  * Schedule a new asynchronous job represented by 'callback' and 'arg'

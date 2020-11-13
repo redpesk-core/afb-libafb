@@ -54,12 +54,11 @@ static inline const char *session_of_req(struct afb_req_common *req)
 
 #include <cynagora.h>
 
-#include "legacy/afb-fdev.h"
-#include "legacy/fdev.h"
-
+#include "core/afb-ev-mgr.h"
+#include "sys/ev-mgr.h"
 
 static cynagora_t *cynagora;
-static struct fdev *fdev;
+static struct ev_fd *evfd;
 static pthread_mutex_t mutex;
 static pthread_once_t once = PTHREAD_ONCE_INIT;
 
@@ -73,7 +72,7 @@ static void mkmutex()
 }
 
 
-static void fdev_cb(void *closure, uint32_t events, struct fdev *fdev)
+static void evfdcb(struct ev_fd *evfd, int fd, uint32_t events, void *closure)
 {
 	pthread_mutex_lock(&mutex);
 	cynagora_async_process(cynagora);
@@ -86,20 +85,19 @@ static int cynagora_async_ctl_cb(
 	int fd,
 	uint32_t events)
 {
-	if ((op == EPOLL_CTL_DEL || op == EPOLL_CTL_ADD) && fdev) {
-		fdev_unref(fdev);
-		fdev = NULL;
+	int rc = 0;
+
+	if ((op == EPOLL_CTL_DEL || op == EPOLL_CTL_ADD) && evfd) {
+		ev_fd_unref(evfd);
+		evfd = NULL;
 	}
 	if (op == EPOLL_CTL_ADD) {
-		fdev = afb_fdev_create(fd);
-		if (!fdev)
-			return -errno;
-		fdev_set_autoclose(fdev, 0);
-		fdev_set_callback(fdev, fdev_cb, NULL);
+		rc = afb_ev_mgr_add_fd(&evfd, fd, events, evfdcb, 0, 1, 0);
 	}
-	if (op == EPOLL_CTL_ADD || op == EPOLL_CTL_MOD)
-		fdev_set_events(fdev, events);
-	return 0;
+	if (op == EPOLL_CTL_MOD) {
+		ev_fd_set_events(evfd, events);
+	}
+	return rc;
 }
 
 static int cynagora_acquire()

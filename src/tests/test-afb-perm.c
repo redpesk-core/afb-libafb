@@ -40,7 +40,7 @@
 #include "core/afb-req-common.h"
 #include "core/afb-cred.h"
 #include "core/afb-sched.h"
-#include "sys/evmgr.h"
+#include "sys/ev-mgr.h"
 
 
 #define BUF_SIZE 1024
@@ -211,9 +211,9 @@ struct afb_req_common_query_itf test_queryitf =
 };
 
 void waiteForCB(){
-	struct evmgr *evmgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *evmgr = afb_sched_acquire_event_manager();
 	do {
-		evmgr_run(evmgr, 100);
+		ev_mgr_run(evmgr, 100);
 	}
 	while(done == 0);
 }

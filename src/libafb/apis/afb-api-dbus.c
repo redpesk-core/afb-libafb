@@ -48,7 +48,7 @@
 #include "core/containerof.h"
 
 #include "sys/verbose.h"
-#include "sys/systemd.h"
+#include "misc/afb-systemd.h"
 #include "core/afb-sched.h"
 #include "sys/x-errno.h"
 
@@ -140,7 +140,7 @@ static int make_api_dbus_3(struct api_dbus **papi, int system, const char *path,
 
 	/* choose the bus */
 	afb_sched_acquire_event_manager();
-	sdbus = (system ? systemd_get_system_bus : systemd_get_user_bus)();
+	sdbus = (system ? afb_systemd_get_system_bus : afb_systemd_get_user_bus)();
 	if (sdbus == NULL)
 		goto error2;
 

@@ -33,7 +33,7 @@
 
 #include "utils/websock.h"
 #include "misc/afb-ws.h"
-#include "legacy/fdev.h"
+#include "core/afb-ev-mgr.h"
 #include "sys/x-uio.h"
 #include "sys/x-errno.h"
 
@@ -93,7 +93,7 @@ struct afb_ws
 	const struct afb_ws_itf *itf; /* the callback interface */
 	void *closure;		/* closure when calling the callbacks */
 	struct websock *ws;	/* the websock handler */
-	struct fdev *fdev;	/* the fdev for the socket */
+	struct ev_fd *efd;	/* the fdev for the socket */
 	struct buf buffer;	/* the last read fragment */
 };
 
@@ -127,8 +127,7 @@ static void aws_disconnect(struct afb_ws *ws, int call_on_hangup)
 	struct websock *wsi = ws->ws;
 	if (wsi != NULL) {
 		ws->ws = NULL;
-		fdev_set_callback(ws->fdev, NULL, 0);
-		fdev_unref(ws->fdev);
+		ev_fd_unref(ws->efd);
 		websock_destroy(wsi);
 		free(ws->buffer.buffer);
 		ws->state = waiting;
@@ -137,7 +136,7 @@ static void aws_disconnect(struct afb_ws *ws, int call_on_hangup)
 	}
 }
 
-static void fdevcb(void *ws, uint32_t revents, struct fdev *fdev)
+static void evfdcb(struct ev_fd *efd, int fd, uint32_t revents, void *ws)
 {
 	if ((revents & EPOLLHUP) != 0)
 		afb_ws_hangup(ws);
@@ -154,11 +153,10 @@ static void fdevcb(void *ws, uint32_t revents, struct fdev *fdev)
  *
  * Returns the handle for the afb_ws created or NULL on error.
  */
-struct afb_ws *afb_ws_create(struct fdev *fdev, const struct afb_ws_itf *itf, void *closure)
+struct afb_ws *afb_ws_create(int fd, const struct afb_ws_itf *itf, void *closure)
 {
+	int rc;
 	struct afb_ws *result;
-
-	assert(fdev);
 
 	/* allocation */
 	result = malloc(sizeof * result);
@@ -166,28 +164,31 @@ struct afb_ws *afb_ws_create(struct fdev *fdev, const struct afb_ws_itf *itf, vo
 		goto error;
 
 	/* init */
-	result->fdev = fdev;
-	result->fd = fdev_fd(fdev);
+	result->fd = fd;
 	result->state = waiting;
 	result->itf = itf;
 	result->closure = closure;
 	result->buffer.buffer = NULL;
 	result->buffer.size = 0;
 
+	rc = afb_ev_mgr_add_fd(&result->efd, fd, EPOLLIN, evfdcb, result, 0, 1);
+	if (rc < 0)
+		goto error2;
+
 	/* creates the websocket */
 	result->ws = websock_create_v13(&aws_itf, result);
 	if (result->ws == NULL)
-		goto error2;
+		goto error3;
 
 	/* finalize */
-	fdev_set_events(fdev, EPOLLIN);
-	fdev_set_callback(fdev, fdevcb, result);
 	return result;
 
+error3:
+	ev_fd_unref(result->efd);
 error2:
 	free(result);
 error:
-	fdev_unref(fdev);
+	close(fd);
 	return NULL;
 }
 

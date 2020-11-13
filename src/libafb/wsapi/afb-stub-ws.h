@@ -24,14 +24,13 @@
 
 #pragma once
 
-struct fdev;
 struct afb_stub_ws;
 struct afb_apiset;
 struct afb_api_item;
 
-extern struct afb_stub_ws *afb_stub_ws_create_client(struct fdev *fdev, const char *apiname, struct afb_apiset *apiset);
+extern struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname, struct afb_apiset *apiset);
 
-extern struct afb_stub_ws *afb_stub_ws_create_server(struct fdev *fdev, const char *apiname, struct afb_apiset *apiset);
+extern struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset);
 
 extern void afb_stub_ws_unref(struct afb_stub_ws *stubws);
 
@@ -45,5 +44,5 @@ extern struct afb_api_item afb_stub_ws_client_api(struct afb_stub_ws *stubws);
 
 extern int afb_stub_ws_client_add(struct afb_stub_ws *stubws, struct afb_apiset *apiset);
 
-extern void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, struct fdev *(*reopen)(void*), void *closure, void (*release)(void*));
+extern void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, int (*reopen)(void*), void *closure, void (*release)(void*));
 

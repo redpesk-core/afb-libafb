@@ -23,33 +23,67 @@
 
 #include "libafb-config.h"
 
-#include "afb-watchdog.h"
-
-#if HAS_WATCHDOG
-
-#include <stdlib.h>
-
-#include "core/afb-sched.h"
-
 #if WITH_SYSTEMD
 
 #include <systemd/sd-event.h>
-#include <systemd/sd-daemon.h>
 
 #include "misc/afb-systemd.h"
+#include "core/afb-ev-mgr.h"
+#include "sys/systemd.h"
+#include "sys/x-errno.h"
 
-#endif
-
-int afb_watchdog_activate()
+static void onprepare(struct ev_prepare *prep, void *closure)
 {
-#if WITH_SYSTEMD
-	/* set the watchdog */
-	if (sd_watchdog_enabled(0, NULL)) {
-		afb_sched_acquire_event_manager();
-		sd_event_set_watchdog(afb_systemd_get_event_loop(), 1);
+	struct sd_event *ev = closure;
+	while(sd_event_prepare(ev) > 0)
+		sd_event_dispatch(ev);
+}
+
+static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
+{
+	struct sd_event *ev = closure;
+	if (sd_event_wait(ev, 0) > 0)
+		sd_event_dispatch(ev);
+}
+
+struct sd_event *afb_systemd_get_event_loop()
+{
+	static char set = 0;
+	struct sd_event *result;
+	struct ev_fd *efd;
+	struct ev_prepare *prep;
+	int fd;
+
+	result = systemd_get_event_loop();
+	if (result && !set) {
+		fd = sd_event_get_fd(result);
+		afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, result, 1, 0);
+		afb_ev_mgr_add_prepare(&prep, onprepare, result);
+		set = 1;
 	}
-#endif
-	return 0;
+	return result;
+}
+
+struct sd_bus *afb_systemd_get_user_bus()
+{
+	afb_systemd_get_event_loop();
+	return systemd_get_user_bus();
+}
+
+struct sd_bus *afb_systemd_get_system_bus()
+{
+	afb_systemd_get_event_loop();
+	return systemd_get_system_bus();
+}
+
+int afb_systemd_fds_init()
+{
+	return systemd_fds_init();
+}
+
+int afb_systemd_fds_for(const char *name)
+{
+	return systemd_fds_for(name);
 }
 
 #endif

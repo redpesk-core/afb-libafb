@@ -29,7 +29,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "legacy/afb-fdev.h"
 #include "misc/afb-socket.h"
 
 #include "sys/verbose.h"

@@ -594,7 +594,7 @@ void test_check_perm(int sig, void * arg){
 START_TEST(check_perm)
 {
 	struct afb_req_common req;
-	struct evmgr * ev;
+	struct ev_mgr * ev;
 
 	fprintf(stderr, "\n### Check Perm\n");
 

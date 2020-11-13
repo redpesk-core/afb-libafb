@@ -32,8 +32,8 @@ set(LIBAFBWSC_SOURCES
 	afb-ws-client.c
 	${DIR}/misc/afb-socket.c
 	${DIR}/misc/afb-ws.c
-	${DIR}/legacy/fdev.c
-	${DIR}/legacy/fdev-systemd.c
+	${DIR}/core/afb-ev-mgr.c
+	${DIR}/sys/ev-mgr.c
 	${DIR}/sys/systemd.c
 	${DIR}/sys/verbose.c
 	${DIR}/utils/websock.c

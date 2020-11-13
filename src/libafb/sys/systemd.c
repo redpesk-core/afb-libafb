@@ -25,7 +25,6 @@
 
 #if WITH_SYSTEMD
 
-
 #include <unistd.h>
 
 #include <systemd/sd-event.h>

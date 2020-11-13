@@ -50,7 +50,6 @@
 #if WITH_AFB_DEBUG
 #include "misc/afb-debug.h"
 #endif
-#include "legacy/afb-fdev.h"
 #include "core/afb-error-text.h"
 #include "sys/verbose.h"
 #include "utils/wrap-json.h"
@@ -159,7 +158,6 @@ static void try_connect_supervisor()
 	int fd;
 	ssize_t srd;
 	struct afb_supervisor_initiator initiator;
-	struct fdev *fdev;
 
 	/* get the mutex */
 	x_mutex_lock(&mutex);
@@ -220,12 +218,7 @@ static void try_connect_supervisor()
 #endif
 
 	/* make the supervisor link */
-	fdev = afb_fdev_create(fd);
-	if (!fdev) {
-		ERROR("Creation of fdev failed: %m");
-		goto end2;
-	}
-	supervisor = afb_stub_ws_create_server(fdev, supervision_apiname, supervision_apiset);
+	supervisor = afb_stub_ws_create_server(fd, supervision_apiname, supervision_apiset);
 	if (!supervisor) {
 		ERROR("Creation of supervisor failed: %m");
 		goto end;

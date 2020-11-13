@@ -32,8 +32,6 @@
 #include <microhttpd.h>
 
 #include "wsj1/afb-ws-json1.h"
-#include "legacy/afb-fdev.h"
-#include "legacy/fdev.h"
 #include "utils/sha1.h"
 
 #include "http/afb-method.h"
@@ -105,7 +103,7 @@ static int headerhas(const char *header, const char *needle)
 
 typedef
 	void *(*wscreator_t)(
-		struct fdev *fdev,
+		int fd,
 		struct afb_apiset *apiset,
 		struct afb_session *session,
 		struct afb_token *token,
@@ -163,19 +161,11 @@ static void upgrade_to_websocket(
 {
 	struct memo_websocket *memo = cls;
 	void *ws;
-	struct fdev *fdev;
 
-	fdev = afb_fdev_create(sock);
-	if (!fdev) {
+	ws = memo->proto->create(dup(sock), memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
+	if (ws == NULL) {
 		/* TODO */
 		close_websocket(urh);
-	} else {
-		fdev_set_autoclose(fdev, 0);
-		ws = memo->proto->create(fdev, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
-		if (ws == NULL) {
-			/* TODO */
-			close_websocket(urh);
-		}
 	}
 #if MHD_VERSION <= 0x00095900
 	afb_hreq_unref(memo->hreq);

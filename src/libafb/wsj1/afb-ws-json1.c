@@ -46,7 +46,6 @@
 
 #include "sys/systemd.h"
 #include "sys/verbose.h"
-#include "legacy/fdev.h"
 
 /* predeclaration of structures */
 struct afb_ws_json1;
@@ -119,7 +118,7 @@ static const struct afb_evt_itf evt_itf = {
 
 struct afb_ws_json1 *
 afb_ws_json1_create(
-	struct fdev *fdev,
+	int fd,
 	struct afb_apiset *apiset,
 	struct afb_session *session,
 	struct afb_token *token,
@@ -127,8 +126,6 @@ afb_ws_json1_create(
 	void *cleanup_closure
 ) {
 	struct afb_ws_json1 *result;
-
-	assert(fdev);
 
 	result = malloc(sizeof * result);
 	if (result == NULL)
@@ -142,7 +139,7 @@ afb_ws_json1_create(
 	if (result->session == NULL)
 		goto error2;
 
-	result->wsj1 = afb_wsj1_create(fdev, &wsj1_itf, result);
+	result->wsj1 = afb_wsj1_create(fd, &wsj1_itf, result);
 	if (result->wsj1 == NULL)
 		goto error3;
 
@@ -151,7 +148,7 @@ afb_ws_json1_create(
 		goto error4;
 
 #if WITH_CRED
-	afb_cred_create_for_socket(&result->cred, fdev_fd(fdev));
+	afb_cred_create_for_socket(&result->cred, fd);
 #endif
 	result->apiset = afb_apiset_addref(apiset);
 	return result;
@@ -164,7 +161,7 @@ error3:
 error2:
 	free(result);
 error:
-	fdev_unref(fdev);
+	close(fd);
 	return NULL;
 }
 

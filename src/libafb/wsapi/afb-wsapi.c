@@ -40,7 +40,6 @@
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-wsapi.h"
-#include "legacy/fdev.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 
@@ -1158,7 +1157,7 @@ static const struct afb_ws_itf ws_itf =
 
 /*****************************************************/
 
-int afb_wsapi_create(struct afb_wsapi **wsapi, struct fdev *fdev, const struct afb_wsapi_itf *itf, void *closure)
+int afb_wsapi_create(struct afb_wsapi **wsapi, int fd, const struct afb_wsapi_itf *itf, void *closure)
 {
 	struct afb_wsapi *wsa;
 
@@ -1170,9 +1169,9 @@ int afb_wsapi_create(struct afb_wsapi **wsapi, struct fdev *fdev, const struct a
 		wsa->itf = itf;
 		pthread_mutex_init(&wsa->mutex, NULL);
 
-		fcntl(fdev_fd(fdev), F_SETFD, FD_CLOEXEC);
-		fcntl(fdev_fd(fdev), F_SETFL, O_NONBLOCK);
-		wsa->ws = afb_ws_create(fdev, &ws_itf, wsa);
+		fcntl(fd, F_SETFD, FD_CLOEXEC);
+		fcntl(fd, F_SETFL, O_NONBLOCK);
+		wsa->ws = afb_ws_create(fd, &ws_itf, wsa);
 		if (wsa->ws != NULL) {
 			*wsapi = wsa;
 			return 0;
@@ -1190,7 +1189,7 @@ int afb_wsapi_initiate(struct afb_wsapi *wsapi)
 		: send_version_offer_1(wsapi, WSAPI_VERSION_1);
 }
 
-struct afb_wsapi *afb_wsapi_create_client(struct fdev *fdev, const struct afb_wsapi_itf *itf, void *closure, int init)
+struct afb_wsapi *afb_wsapi_create_client(int fd, const struct afb_wsapi_itf *itf, void *closure, int init)
 {
 	struct afb_wsapi *wsapi;
 
@@ -1204,9 +1203,9 @@ struct afb_wsapi *afb_wsapi_create_client(struct fdev *fdev, const struct afb_ws
 		wsapi->itf = itf;
 		pthread_mutex_init(&wsapi->mutex, NULL);
 
-		fcntl(fdev_fd(fdev), F_SETFD, FD_CLOEXEC);
-		fcntl(fdev_fd(fdev), F_SETFL, O_NONBLOCK);
-		wsapi->ws = afb_ws_create(fdev, &ws_itf, wsapi);
+		fcntl(fd, F_SETFD, FD_CLOEXEC);
+		fcntl(fd, F_SETFL, O_NONBLOCK);
+		wsapi->ws = afb_ws_create(fd, &ws_itf, wsapi);
 		if (wsapi->ws != NULL) {
 			if (init && send_version_offer_1(wsapi, WSAPI_VERSION_1) != 0) {
 				afb_wsapi_unref(wsapi);

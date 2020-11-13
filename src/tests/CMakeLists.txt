@@ -32,6 +32,7 @@ macro(addtest name)
 endmacro(addtest)
 
 if(check_FOUND)
+	addtest(ev-mgr)
 	addtest(wrap-json)
 	addtest(globset ${CMAKE_CURRENT_SOURCE_DIR}/globset.in ${CMAKE_CURRENT_SOURCE_DIR}/globset.out)
 	addtest(u16id)

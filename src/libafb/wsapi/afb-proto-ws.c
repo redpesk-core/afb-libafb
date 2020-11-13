@@ -33,7 +33,6 @@
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-proto-ws.h"
-#include "legacy/fdev.h"
 #include "sys/verbose.h"
 #include "sys/x-endian.h"
 #include "sys/x-uio.h"
@@ -1246,15 +1245,15 @@ static const struct afb_ws_itf server_ws_itf =
 
 /*****************************************************/
 
-static struct afb_proto_ws *afb_proto_ws_create(struct fdev *fdev, const struct afb_proto_ws_server_itf *itfs, const struct afb_proto_ws_client_itf *itfc, void *closure, const struct afb_ws_itf *itf)
+static struct afb_proto_ws *afb_proto_ws_create(int fd, const struct afb_proto_ws_server_itf *itfs, const struct afb_proto_ws_client_itf *itfc, void *closure, const struct afb_ws_itf *itf)
 {
 	struct afb_proto_ws *protows;
 
 	protows = calloc(1, sizeof *protows);
 	if (protows) {
-		fcntl(fdev_fd(fdev), F_SETFD, FD_CLOEXEC);
-		fcntl(fdev_fd(fdev), F_SETFL, O_NONBLOCK);
-		protows->ws = afb_ws_create(fdev, itf, protows);
+		fcntl(fd, F_SETFD, FD_CLOEXEC);
+		fcntl(fd, F_SETFL, O_NONBLOCK);
+		protows->ws = afb_ws_create(fd, itf, protows);
 		if (protows->ws != NULL) {
 			protows->refcount = 1;
 			protows->version = WSAPI_VERSION_UNSET;
@@ -1269,11 +1268,11 @@ static struct afb_proto_ws *afb_proto_ws_create(struct fdev *fdev, const struct 
 	return NULL;
 }
 
-struct afb_proto_ws *afb_proto_ws_create_client(struct fdev *fdev, const struct afb_proto_ws_client_itf *itf, void *closure)
+struct afb_proto_ws *afb_proto_ws_create_client(int fd, const struct afb_proto_ws_client_itf *itf, void *closure)
 {
 	struct afb_proto_ws *protows;
 
-	protows = afb_proto_ws_create(fdev, NULL, itf, closure, &proto_ws_client_ws_itf);
+	protows = afb_proto_ws_create(fd, NULL, itf, closure, &proto_ws_client_ws_itf);
 	if (protows) {
 		if (send_version_offer_1(protows, WSAPI_VERSION_1) != 0) {
 			afb_proto_ws_unref(protows);
@@ -1283,9 +1282,9 @@ struct afb_proto_ws *afb_proto_ws_create_client(struct fdev *fdev, const struct 
 	return protows;
 }
 
-struct afb_proto_ws *afb_proto_ws_create_server(struct fdev *fdev, const struct afb_proto_ws_server_itf *itf, void *closure)
+struct afb_proto_ws *afb_proto_ws_create_server(int fd, const struct afb_proto_ws_server_itf *itf, void *closure)
 {
-	return afb_proto_ws_create(fdev, itf, NULL, closure, &server_ws_itf);
+	return afb_proto_ws_create(fd, itf, NULL, closure, &server_ws_itf);
 }
 
 void afb_proto_ws_unref(struct afb_proto_ws *protows)
