@@ -23,31 +23,12 @@
 
 #pragma once
 
-#include "x-epoll.h"
-
-struct fdev;
-
-#if defined(FDEV_PROVIDER)
-struct fdev_itf
-{
-	void (*unref)(void *closure);
-	void (*disable)(void *closure, const struct fdev *fdev);
-	void (*enable)(void *closure, const struct fdev *fdev);
-	void (*update)(void *closure, const struct fdev *fdev);
-};
-
-extern struct fdev *fdev_create(int fd);
-extern void fdev_set_itf(struct fdev *fdev, struct fdev_itf *itf, void *closure_itf);
-extern void fdev_dispatch(struct fdev *fdev, uint32_t events);
+#if WITH_EPOLL
+#include <sys/epoll.h>
+#else
+#define EPOLLIN  1
+#define EPOLLPRI 2
+#define EPOLLOUT 4
+#define EPOLLERR 8
+#define EPOLLHUP 16
 #endif
-
-extern struct fdev *fdev_addref(struct fdev *fdev);
-extern void fdev_unref(struct fdev *fdev);
-
-extern int fdev_fd(const struct fdev *fdev);
-extern uint32_t fdev_events(const struct fdev *fdev);
-extern int fdev_autoclose(const struct fdev *fdev);
-
-extern void fdev_set_callback(struct fdev *fdev, void (*callback)(void*,uint32_t,struct fdev*), void *closure);
-extern void fdev_set_events(struct fdev *fdev, uint32_t events);
-extern void fdev_set_autoclose(struct fdev *fdev, int autoclose);
