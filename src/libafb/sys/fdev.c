@@ -28,8 +28,8 @@
 #include <unistd.h>
 #include "sys/x-errno.h"
 
-#define FDEV_PROVIDER
 #include "sys/fdev.h"
+#include "sys/fdev-provider.h"
 
 struct fdev
 {

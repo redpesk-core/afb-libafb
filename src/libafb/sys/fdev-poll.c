@@ -29,8 +29,8 @@
 #include <unistd.h>
 #include <assert.h>
 
-#define FDEV_PROVIDER
 #include "sys/fdev.h"
+#include "sys/fdev-provider.h"
 #include "sys/fdev-poll.h"
 #include "sys/x-poll.h"
 #include "sys/x-errno.h"

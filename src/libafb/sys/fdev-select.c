@@ -30,8 +30,8 @@
 #include <assert.h>
 #include <sys/select.h>
 
-#define FDEV_PROVIDER
 #include "sys/fdev.h"
+#include "sys/fdev-provider.h"
 #include "sys/fdev-select.h"
 #include "sys/x-errno.h"
 

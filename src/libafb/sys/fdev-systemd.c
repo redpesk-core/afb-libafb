@@ -27,8 +27,8 @@
 
 #include <systemd/sd-event.h>
 
-#define FDEV_PROVIDER
 #include "sys/fdev.h"
+#include "sys/fdev-provider.h"
 #include "sys/fdev-systemd.h"
 #include "sys/x-errno.h"
 
