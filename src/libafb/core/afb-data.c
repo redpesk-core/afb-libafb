@@ -157,31 +157,8 @@ data_addref(
 }
 
 /**
- * search the conversion of data to the type
- * and returns it or null.
- *
- * @param data the data whose type is searched (not NULL)
- * @param type the type to search (not NULL)
- *
- * @return the found cached conversion data or NULL
+ * really destroys the data and release (dispose) its resources
  */
-static
-struct afb_data *
-data_cvt_search(
-	struct afb_data *data,
-	struct afb_type *type
-) {
-	struct afb_data *i;
-
-	for (i = data;;) {
-		if (i->type == type)
-			return i;
-		i = i->cvt;
-		if (i == data)
-			return 0;
-	}
-}
-
 static inline
 void
 data_destroy(
@@ -300,9 +277,34 @@ data_cvt_merge(
 }
 
 /**
- * unalias the data
+ * search the conversion of data to the type
+ * and returns it or null.
+ *
+ * @param data the data whose type is searched (not NULL)
+ * @param type the type to search (not NULL)
+ *
+ * @return the found cached conversion data or NULL
  */
 static
+struct afb_data *
+data_cvt_search(
+	struct afb_data *data,
+	struct afb_type *type
+) {
+	struct afb_data *i = data;
+
+	do {
+		if (i->type == type)
+			return i;
+		i = i->cvt;
+	} while (i != data);
+	return 0;
+}
+
+/**
+ * unalias the data
+ */
+static inline
 struct afb_data *
 data_unaliased(
 	struct afb_data *data
