@@ -164,11 +164,13 @@ void
 data_destroy(
 	struct afb_data *data
 ) {
-	uint16_t id = data->opaqueid;
-	if (id)
-		u16id2ptr_drop(&opacifier, id, 0);
+	/* cancel any opacified shadow */
+	if (data->opaqueid)
+		u16id2ptr_drop(&opacifier, data->opaqueid, 0);
+	/* release resource */
 	if (data->dispose)
 		data->dispose(data->closure);
+	/* release the data itself */
 	free(data);
 }
 
