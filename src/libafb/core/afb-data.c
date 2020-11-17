@@ -88,7 +88,8 @@ static struct u16id2ptr *opacifier;
 #define FLAG_IS_ETERNAL        32
 #define REF_COUNT_INCREMENT    64
 
-#define INITIAL_REF_AND_FLAGS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
+#define INITIAL_REF_AND_FLAGS_STD    (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
+#define INITIAL_REF_AND_FLAGS_ALIAS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT|FLAG_IS_ALIAS)
 
 #define _HASREF_(rf)           ((rf) >= FLAG_IS_ETERNAL)
 #define HASREF(data)           _HASREF_((data)->ref_and_flags)
@@ -383,7 +384,7 @@ afb_data_create_raw(
 		data->dispose = dispose;
 		data->closure = closure;
 		data->cvt = data;
-		data->ref_and_flags = INITIAL_REF_AND_FLAGS;
+		data->ref_and_flags = INITIAL_REF_AND_FLAGS_STD;
 		data->opaqueid = 0;
 		rc = 0;
 	}
@@ -454,7 +455,7 @@ afb_data_create_alias(
 		data->pointer = 0;
 		data->size = 0;
 		data->cvt = data;
-		data->ref_and_flags = INITIAL_REF_AND_FLAGS | FLAG_IS_ALIAS;
+		data->ref_and_flags = INITIAL_REF_AND_FLAGS_ALIAS;
 		data->opaqueid = 0;
 		data->dispose = (void(*)(void*))afb_data_unref;
 		data->closure = other;
