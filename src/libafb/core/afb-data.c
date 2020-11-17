@@ -275,6 +275,32 @@ data_cvt_changed(
 }
 
 /**
+ * remove any conversion of that data
+ */
+static
+void
+data_cvt_isolate(
+	struct afb_data *data
+) {
+	struct afb_data *i;
+
+	i = data->cvt;
+	if (i != data) {
+		do {
+			if (IS_ALIAS(i) && data == i->closure) {
+				ADDREF(data);
+				i->dispose = (void(*)(void*))afb_data_unref;
+			}
+			i = i->cvt;
+		}
+		while (i->cvt != data);
+		i->cvt = data->cvt;
+		data->cvt = data;
+		data_release(i);
+	}
+}
+
+/**
  * test if item is in the conversion ring of data
  */
 static
@@ -733,6 +759,7 @@ afb_data_set_volatile(
 	struct afb_data *data
 ) {
 	SET_VOLATILE(data);
+	data_cvt_isolate(data);
 }
 
 /* set as not volatile */
