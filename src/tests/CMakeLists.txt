@@ -51,6 +51,7 @@ if(check_FOUND)
 	addtest(afb-auth)
 	addtest(path-search)
 	addtest(expand-vars)
+	addtest(wsapi)
 
 	add_subdirectory(test-bindings)
 	addtest(api-so-v4)
