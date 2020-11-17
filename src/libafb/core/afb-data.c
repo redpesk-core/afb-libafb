@@ -524,7 +524,7 @@ afb_data_convert_to(
 	if (!data_validate(data)) {
 		/* original data is not valid */
 		r = 0;
-		rc = -1;
+		rc = X_EINVAL;
 	}
 	else if (!type) {
 		/* trivial case: the data is of the expected type */
@@ -734,14 +734,14 @@ int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 	int rc;
 
 	if (afb_data_is_constant(data) || IS_ALIAS(data)){
-		rc = -1;
+		rc = X_EINVAL;
 	}
 	else if (data_validate(data)) {
 		afb_data_notify_changed(data);
 		rc = 0;
 	}
 	else {
-		rc = -1;
+		rc = X_EINVAL;
 	}
 	if (pointer)
 		*pointer = rc < 0 ? NULL : (void*)data->pointer;
@@ -759,7 +759,7 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 		rc = 0;
 	}
 	else {
-		rc = -1;
+		rc = X_EINVAL;
 	}
 	if (pointer)
 		*pointer = rc < 0 ? NULL : data->pointer;
