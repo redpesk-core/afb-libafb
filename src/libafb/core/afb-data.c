@@ -184,7 +184,7 @@ void
 data_release(
 	struct afb_data *data
 ) {
-	int gr, r;
+	int gr, r, del;
 	struct afb_data *i, *n, *p;
 
 	gr = HASREF(data);
@@ -194,27 +194,41 @@ data_release(
 		p = data;
 		for (;;) {
 			/* count global use */
+			del = 0;
 			r = HASREF(i);
 			gr += r;
+#if PREFER_MEMORY /* this optimisation reduce the use of memory in favour of speed */
 			if (r == 0) {
 				/* search if unused duplication */
 				n = i->cvt;
 				while (n != i && n->type != i->type)
 					n = n->cvt;
 				if (n != i) {
-					/* release unused duplicate */
-					p->cvt = n = i->cvt;
-					data_destroy(i);
-					/* iteration */
-					if (i == data)
-						data = n;
-					i = n;
+					/*
+					 * Here n is an other instance of data
+					 * No matter of n, just knowing that
+					 * unused i has an other value is enough
+					 * to remove i.
+					 */
+					del = 1;
 				}
 			}
-			if (i == data)
-				break;
-			p = i;
-			i = i->cvt;
+#endif
+			n = i->cvt;
+			if (del) {
+				p->cvt = n;
+				data_destroy(i);
+				if (i == data) {
+					data = n;
+					break;
+				}
+			}
+			else {
+				if (i == data)
+					break;
+				p = i;
+			}
+			i = n;
 		}
 	}
 
