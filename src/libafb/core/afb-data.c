@@ -406,36 +406,111 @@ struct afb_data *
 data_unaliased(
 	struct afb_data *data
 ) {
-	while(IS_ALIAS(data))
+	while (IS_ALIAS(data))
 		data = (struct afb_data*)data->closure;
 	return data;
 }
 
 /**
- * tries to ensure that data is valid
- * returns 1 if valid or zero if it can't validate the data
  */
 static
-int
-data_validate(
+void
+data_make_alias(
+	struct afb_data *alias,
+	struct afb_data *to_data
+) {
+	// ASSERT NOT IS_VALID(alias)
+	SET_ALIAS(alias);
+	alias->closure = to_data;
+	if (data_cvt_has(alias, to_data))
+		alias->dispose = 0;
+	else {
+		alias->dispose = (void(*)(void*))afb_data_unref;
+		ADDREF(to_data);
+		data_cvt_merge(alias, to_data);
+	}
+}
+
+/**
+ */
+static
+struct afb_data *
+data_value_constant(
 	struct afb_data *data
 ) {
-	struct afb_data *r, *i;
+	struct afb_data *u, *r, *i;
 
-	i = data->cvt;
-	while (!IS_VALID(data) && i != data) {
-		if (!IS_VALID(i) || IS_ALIAS(i) || afb_type_convert_data(i->type, i, data->type, &r) < 0) {
-			i = i->cvt;
-		}
-		else {
-			data->pointer = r->pointer;
-			data->size = r->size;
-			data->dispose = (void(*)(void*))afb_data_unref;
-			data->closure = r;
-			SET_VALID(data);
+	/* unalias first */
+	u = data_unaliased(data);
+
+	/* fast check */
+	if (IS_VALID(u))
+		return u;
+
+	/* not valid, search if alias of some valid data */
+	for (i = u->cvt ; i != u ; i = i->cvt) {
+		if (i->type == u->type) {
+			r = data_unaliased(i);
+			if (IS_VALID(r)) {
+				data_make_alias(data, r);
+				return r;
+			}
 		}
 	}
-	return IS_VALID(data);
+
+	/* no valid data, try to make a conversion */
+	for (i = u->cvt ; i != u ; i = i->cvt) {
+		if (!IS_ALIAS(i) && IS_VALID(i) && afb_type_convert_data(i->type, i, u->type, &r) >= 0) {
+			data_make_alias(data, r);
+			return r;
+		}
+	}
+	return 0;
+}
+
+/**
+ */
+static
+struct afb_data *
+data_value_mutable(
+	struct afb_data *data
+) {
+	struct afb_data *u, *r, *i;
+
+	/* unalias first */
+	u = data;
+	while (IS_ALIAS(u)) {
+		u = (struct afb_data*)u->closure;
+		if (u->type != data->type)
+			return 0;
+	}
+
+	/* fast check */
+	if (IS_CONSTANT(u))
+		return 0;
+	if (IS_VALID(u))
+		return u;
+
+	/* not valid, search if alias of some valid data */
+	for (i = u->cvt ; i != u ; i = i->cvt) {
+		if (i->type == u->type) {
+			r = data_unaliased(i);
+			if (IS_VALID(r) && !IS_CONSTANT(r)) {
+				data_make_alias(data, r);
+				return r;
+			}
+		}
+	}
+
+	/* no valid data, try to make a conversion */
+	for (i = u->cvt ; i != u ; i = i->cvt) {
+		if (!IS_ALIAS(i) && IS_VALID(i) && afb_type_convert_data(i->type, i, u->type, &r) >= 0) {
+			UNSET_CONSTANT(r);
+			data_make_alias(data, r);
+			return r;
+		}
+	}
+	return 0;
 }
 
 /*****************************************************************************/
@@ -578,8 +653,8 @@ const void*
 afb_data_const_pointer(
 	struct afb_data *data
 ) {
-	data = data_unaliased(data);
-	return data_validate(data) ? data->pointer : NULL;
+	data = data_value_constant(data);
+	return data ? data->pointer : NULL;
 }
 
 /* Get the size. */
@@ -587,8 +662,8 @@ size_t
 afb_data_size(
 	struct afb_data *data
 ) {
-	data = data_unaliased(data);
-	return data_validate(data) ? data->size : 0;
+	data = data_value_constant(data);
+	return data ? data->size : 0;
 }
 
 /* add conversion from other data */
@@ -599,9 +674,10 @@ afb_data_convert_to(
 	struct afb_data **result
 ) {
 	int rc;
-	struct afb_data *r;
+	struct afb_data *r, *v;
 
-	if (!data_validate(data)) {
+	v = data_value_constant(data);
+	if (!v) {
 		/* original data is not valid */
 		r = 0;
 		rc = X_EINVAL;
@@ -622,8 +698,8 @@ afb_data_convert_to(
 		}
 		else {
 			/* conversion */
-			rc = afb_type_convert_data(data->type, data, type, &r);
-			if (rc >= 0 && !IS_VOLATILE(data)) {
+			rc = afb_type_convert_data(data->type, v, type, &r);
+			if (rc >= 0 && !afb_data_is_volatile(data)) {
 				data_cvt_merge(data, r);
 				rc = 0;
 			}
@@ -639,12 +715,16 @@ afb_data_update(
 	struct afb_data *data,
 	struct afb_data *value
 ) {
-	if (!IS_VALID(data) || afb_data_is_constant(data) || !data_validate(value)) {
+	struct afb_data *from, *to;
+
+	to = data_value_mutable(data);
+	from = data_value_constant(value);
+	if (!to || !from) {
 		/* can not update based on parameter state */
 		return X_EINVAL;
 	}
 
-	return afb_type_update_data(value->type, value, data->type, data);
+	return afb_type_update_data(value->type, from, data->type, to);
 }
 
 
@@ -718,6 +798,7 @@ void
 afb_data_notify_changed(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	data_cvt_changed(data);
 }
 
@@ -726,6 +807,7 @@ int
 afb_data_is_constant(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	return IS_CONSTANT(data);
 }
 
@@ -734,6 +816,7 @@ void
 afb_data_set_constant(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	SET_CONSTANT(data);
 }
 
@@ -742,6 +825,7 @@ void
 afb_data_set_not_constant(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	UNSET_CONSTANT(data);
 }
 
@@ -750,6 +834,7 @@ int
 afb_data_is_volatile(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	return IS_VOLATILE(data);
 }
 
@@ -758,6 +843,7 @@ void
 afb_data_set_volatile(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	SET_VOLATILE(data);
 	data_cvt_isolate(data);
 }
@@ -767,6 +853,7 @@ void
 afb_data_set_not_volatile(
 	struct afb_data *data
 ) {
+	data = data_unaliased(data);
 	UNSET_VOLATILE(data);
 }
 
@@ -785,27 +872,31 @@ static struct afb_data *lockhead(struct afb_data *data)
 
 void afb_data_lock_read(struct afb_data *data)
 {
+	data = data_unaliased(data);
 	lockany_lock_read(lockhead(data));
 }
 
 int afb_data_try_lock_read(struct afb_data *data)
 {
+	data = data_unaliased(data);
 	return lockany_try_lock_read(lockhead(data));
 }
 
 void afb_data_lock_write(struct afb_data *data)
 {
+	data = data_unaliased(data);
 	lockany_lock_write(lockhead(data));
 }
 
 int afb_data_try_lock_write(struct afb_data *data)
 {
+	data = data_unaliased(data);
 	return lockany_try_lock_write(lockhead(data));
 }
 
 void afb_data_unlock(struct afb_data *data)
 {
-	struct afb_data *head = lockhead(data);
+	struct afb_data *head = lockhead(data_unaliased(data));
 	if (!lockany_unlock(head))
 		UNSET_LOCKED(head);
 }
@@ -814,20 +905,21 @@ int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 {
 	int rc;
 
-	if (afb_data_is_constant(data) || IS_ALIAS(data)){
-		rc = X_EINVAL;
-	}
-	else if (data_validate(data)) {
-		afb_data_notify_changed(data);
+	data = data_value_mutable(data);
+	if (data) {
+		if (pointer)
+			*pointer = (void*)data->pointer;
+		if (size)
+			*size = data->size;
 		rc = 0;
 	}
 	else {
+		if (pointer)
+			*pointer = 0;
+		if (size)
+			*size = 0;
 		rc = X_EINVAL;
 	}
-	if (pointer)
-		*pointer = rc < 0 ? NULL : (void*)data->pointer;
-	if (size)
-		*size = rc < 0 ? 0 : data->size;
 	return rc;
 }
 
@@ -835,8 +927,8 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 {
 	int rc;
 
-	data = data_unaliased(data);
-	if (data_validate(data)) {
+	data = data_value_constant(data);
+	if (data) {
 		if (pointer)
 			*pointer = data->pointer;
 		if (size)
