@@ -91,7 +91,7 @@ static struct u16id2ptr *opacifier;
 #define INITIAL_REF_AND_FLAGS_STD    (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
 #define INITIAL_REF_AND_FLAGS_ALIAS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT|FLAG_IS_ALIAS)
 
-#define _HASREF_(rf)           ((rf) >= FLAG_IS_ETERNAL)
+static inline int _HASREF_(uint16_t rf) { return rf >= FLAG_IS_ETERNAL; } /* avoid warning -Wunused-value */
 #define HASREF(data)           _HASREF_((data)->ref_and_flags)
 
 #define ADDREF(data)           _HASREF_(__atomic_add_fetch(&data->ref_and_flags, REF_COUNT_INCREMENT, __ATOMIC_RELAXED))
@@ -275,6 +275,24 @@ data_cvt_changed(
 }
 
 /**
+ * test if item is in the conversion ring of data
+ */
+static
+int
+data_cvt_has(
+	struct afb_data *data,
+	struct afb_data *item
+) {
+	struct afb_data *i = data;
+	do {
+		if (i == item)
+			return 1;
+		i = i->cvt;
+	} while (i != data);
+	return 0;
+}
+
+/**
  * merge an origin and its conversion
  */
 static
@@ -283,11 +301,47 @@ data_cvt_merge(
 	struct afb_data *origin,
 	struct afb_data *data
 ) {
-	struct afb_data *i, *j;
+	struct afb_data *i, *j, *a;
 
-	for (i = origin; i != data && i->cvt != origin; i = i->cvt);
-	if (i != data) {
-		for (j = data; j->cvt != data; j = j->cvt);
+	if (data->cvt == data) {
+		/*
+		 * data to add is single and distinct. This is the mainstream.
+		 */
+		a = (struct afb_data*)(IS_ALIAS(data) ? data->closure : 0);
+		for (i = origin ;; i = i->cvt) {
+			if (i == a) {
+				data->dispose = 0;
+				UNREF(i);
+			}
+			if (i->cvt == origin)
+				break;
+		}
+		i->cvt = data;
+		data->cvt = origin;
+	}
+	else if (!data_cvt_has(origin, data)) {
+		for (i = data ;; i = i->cvt) {
+			if (IS_ALIAS(i)) {
+				a = (struct afb_data*)data->closure;
+				if (!data_cvt_has(data, a)) {
+					i->dispose = 0;
+					UNREF(a);
+				}
+			}
+			if (i->cvt == origin)
+				break;
+		}
+		for (j = origin ;; j = j->cvt) {
+			if (IS_ALIAS(j)) {
+				a = (struct afb_data*)data->closure;
+				if (!data_cvt_has(data, a)) {
+					j->dispose = 0;
+					UNREF(a);
+				}
+			}
+			if (j->cvt == data)
+				break;
+		}
 		i->cvt = data;
 		j->cvt = origin;
 	}
@@ -383,7 +437,7 @@ afb_data_create_raw(
 		data->size = size;
 		data->dispose = dispose;
 		data->closure = closure;
-		data->cvt = data;
+		data->cvt = data; /* single cvt ring: itself */
 		data->ref_and_flags = INITIAL_REF_AND_FLAGS_STD;
 		data->opaqueid = 0;
 		rc = 0;
@@ -454,7 +508,7 @@ afb_data_create_alias(
 		data->type = type;
 		data->pointer = 0;
 		data->size = 0;
-		data->cvt = data;
+		data->cvt = data; /* single cvt ring: itself */
 		data->ref_and_flags = INITIAL_REF_AND_FLAGS_ALIAS;
 		data->opaqueid = 0;
 		data->dispose = (void(*)(void*))afb_data_unref;

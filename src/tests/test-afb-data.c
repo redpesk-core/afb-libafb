@@ -327,7 +327,7 @@ START_TEST (test_predefine_types){
 			}
 		}
 		afb_data_unref(data);
-		// ck_assert_int_eq(gmask, i);
+		ck_assert_int_eq(gmask, i);
 	}
 }
 END_TEST
