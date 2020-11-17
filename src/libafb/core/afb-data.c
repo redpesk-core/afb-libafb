@@ -837,14 +837,18 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 
 	data = data_unaliased(data);
 	if (data_validate(data)) {
+		if (pointer)
+			*pointer = data->pointer;
+		if (size)
+			*size = data->size;
 		rc = 0;
 	}
 	else {
+		if (pointer)
+			*pointer = 0;
+		if (size)
+			*size = 0;
 		rc = X_EINVAL;
 	}
-	if (pointer)
-		*pointer = rc < 0 ? NULL : data->pointer;
-	if (size)
-		*size = rc < 0 ? 0 : data->size;
 	return rc;
 }
