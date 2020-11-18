@@ -574,7 +574,7 @@ static void on_hangup(void *closure)
 				break;
 			}
 			if (clientcb)
-				clientcb(wsapi, &msg->msg);
+				clientcb(wsapi->closure, &msg->msg);
 			else
 				msg_unref(msg);
 		}
