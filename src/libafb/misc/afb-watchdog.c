@@ -21,17 +21,35 @@
  * $RP_END_LICENSE$
  */
 
-#pragma once
+#include "libafb-config.h"
 
-#if !defined(HAS_WATCHDOG)
-#  if defined(NO_JOBS_WATCHDOG)
-#     define HAS_WATCHDOG 0
-#  else
-#     define HAS_WATCHDOG 1
-#  endif
-#endif
+#include "afb-watchdog.h"
 
 #if HAS_WATCHDOG
-extern int watchdog_activate();
+
+#include <stdlib.h>
+
+#include "core/afb-sched.h"
+
+#if WITH_SYSTEMD
+
+#include <systemd/sd-event.h>
+#include <systemd/sd-daemon.h>
+
+#include "sys/systemd.h"
+
 #endif
 
+int afb_watchdog_activate()
+{
+#if WITH_SYSTEMD
+	/* set the watchdog */
+	if (sd_watchdog_enabled(0, NULL)) {
+		afb_sched_acquire_event_manager();
+		sd_event_set_watchdog(systemd_get_event_loop(), 1);
+	}
+#endif
+	return 0;
+}
+
+#endif
