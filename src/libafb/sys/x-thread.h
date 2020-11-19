@@ -33,9 +33,18 @@ typedef void (*x_thread_cb)(void* arg);
 static inline int x_thread_create(
 			x_thread_t *tid,
                         x_thread_cb entry,
-			void *arg)
+			void *arg,
+			int detached)
 {
-	return pthread_create(tid, NULL, (void*)entry, arg) ? -errno : 0;
+	int rc;
+	pthread_attr_t attr;
+
+	pthread_attr_init(&attr);
+	if (detached)
+		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(tid, &attr, (void*)entry, arg) ? -errno : 0;
+	pthread_attr_destroy(&attr);
+	return rc;
 }
 
 static inline int x_thread_detach(x_thread_t tid)

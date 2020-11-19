@@ -381,10 +381,8 @@ static int start_one_thread()
 	int rc;
 
 	started_thread_count++;
-	rc = x_thread_create(&tid, thread_starter, NULL);
-	if (rc == 0)
-		x_thread_detach(tid);
-	else {
+	rc = x_thread_create(&tid, thread_starter, NULL, 1);
+	if (rc < 0) {
 		CRITICAL("not able to start thread: %s", strerror(-rc));
 		started_thread_count--;
 	}
