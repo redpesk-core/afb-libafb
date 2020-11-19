@@ -46,7 +46,7 @@
 
 #include "sys/systemd.h"
 #include "sys/verbose.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 
 /* predeclaration of structures */
 struct afb_ws_json1;

@@ -28,9 +28,9 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 
-#include "sys/fdev.h"
-#include "sys/fdev-provider.h"
-#include "sys/fdev-epoll.h"
+#include "legacy/fdev.h"
+#include "legacy/fdev-provider.h"
+#include "legacy/fdev-epoll.h"
 #include "sys/x-errno.h"
 
 /*

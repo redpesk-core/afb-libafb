@@ -50,7 +50,7 @@
 #if WITH_AFB_DEBUG
 #include "misc/afb-debug.h"
 #endif
-#include "misc/afb-fdev.h"
+#include "legacy/afb-fdev.h"
 #include "core/afb-error-text.h"
 #include "sys/verbose.h"
 #include "utils/wrap-json.h"

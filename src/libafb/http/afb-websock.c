@@ -32,8 +32,8 @@
 #include <microhttpd.h>
 
 #include "wsj1/afb-ws-json1.h"
-#include "misc/afb-fdev.h"
-#include "sys/fdev.h"
+#include "legacy/afb-fdev.h"
+#include "legacy/fdev.h"
 #include "utils/sha1.h"
 
 #include "http/afb-method.h"

@@ -23,19 +23,19 @@
 
 #include "libafb-config.h"
 
-#if WITH_FDEV_SELECT
+#if WITH_FDEV_POLL
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
-#include <sys/select.h>
 
-#include "sys/fdev.h"
-#include "sys/fdev-provider.h"
-#include "sys/fdev-select.h"
+#include "legacy/fdev.h"
+#include "legacy/fdev-provider.h"
+#include "legacy/fdev-poll.h"
+#include "sys/x-poll.h"
 #include "sys/x-errno.h"
 
-struct fdev_select
+struct fdev_poll
 {
 	/** count of allocated items */
 	unsigned allocated;
@@ -52,17 +52,17 @@ struct fdev_select
  */
 static void disable(void *closure, const struct fdev *fdev)
 {
-	struct fdev_select *fdev_select = closure;
+	struct fdev_poll *fdev_poll = closure;
 	const struct fdev **items;
 	unsigned i, n;
 
 	/* build the masks */
-	items = fdev_select->items;
-	n = fdev_select->enabled;
+	items = fdev_poll->items;
+	n = fdev_poll->enabled;
 	for (i = 0 ; i < n && fdev != items[i] ; i++);
 	if (i < n) {
 		items[i] = items[--n];
-		fdev_select->enabled = n;
+		fdev_poll->enabled = n;
 	}
 }
 
@@ -71,18 +71,18 @@ static void disable(void *closure, const struct fdev *fdev)
  */
 static void enable(void *closure, const struct fdev *fdev)
 {
-	struct fdev_select *fdev_select = closure;
+	struct fdev_poll *fdev_poll = closure;
 	const struct fdev **items;
 	unsigned i, n;
 
 	/* build the masks */
-	items = fdev_select->items;
-	n = fdev_select->enabled;
+	items = fdev_poll->items;
+	n = fdev_poll->enabled;
 	for (i = 0 ; i < n && fdev != items[i] ; i++);
 	if (i == n) {
-		assert(n < fdev_select->allocated);
+		assert(n < fdev_poll->allocated);
 		items[n] = fdev;
-		fdev_select->enabled = n + 1;
+		fdev_poll->enabled = n + 1;
 	}
 }
 
@@ -91,10 +91,34 @@ static void enable(void *closure, const struct fdev *fdev)
  */
 static void unref(void *closure)
 {
-	struct fdev_select *fdev_select = closure;
-	assert(fdev_select->allocated);
-	fdev_select->allocated--;
+	struct fdev_poll *fdev_poll = closure;
+	assert(fdev_poll->allocated);
+	fdev_poll->allocated--;
 }
+
+#if POLLIN == EPOLLIN && POLLOUT == EPOLLOUT && POLLHUP == EPOLLHUP
+static inline short fdev2poll(uint32_t flags)
+{
+	return (short)flags;
+}
+static inline uint32_t poll2fdev(short flags)
+{
+	return (uint32_t)flags;
+}
+#else
+static inline short fdev2poll(uint32_t flags)
+{
+	return (flags & EPOLLIN ? POLLIN : 0)
+		| (flags & EPOLLOUT ? POLLOUT : 0)
+		| (flags & EPOLLHUP ? POLLHUP : 0);
+}
+static inline uint32_t poll2fdev(short flags)
+{
+	return (flags & POLLIN ? EPOLLIN : 0)
+		| (flags & POLLOUT ? EPOLLOUT : 0)
+		| (flags & POLLHUP ? EPOLLHUP : 0);
+}
+#endif
 
 /*
  * unref is not handled here
@@ -108,29 +132,30 @@ static struct fdev_itf itf =
 };
 
 /*
- * create an fdev_select
+ * create an fdev_poll
  */
-struct fdev_select *fdev_select_create()
+struct fdev_poll *fdev_poll_create()
 {
-	struct fdev_select *fdev_select;
+	struct fdev_poll *fdev_poll;
 
-	fdev_select = malloc(sizeof *fdev_select);
-	if (fdev_select) {
-		fdev_select->allocated = fdev_select->enabled = 0;
-		fdev_select->items = 0;
+	fdev_poll = malloc(sizeof *fdev_poll);
+	if (fdev_poll) {
+		fdev_poll->allocated = fdev_poll->enabled = 0;
+		fdev_poll->items = 0;
 	}
-	return fdev_select;
+	return fdev_poll;
 }
-void fdev_select_destroy(struct fdev_select *fdev_select)
+
+void fdev_poll_destroy(struct fdev_poll *fdev_poll)
 {
-	free(fdev_select->items);
-	free(fdev_select);
+	free(fdev_poll->items);
+	free(fdev_poll);
 }
 
 /*
- * create an fdev linked to the 'fdev_select' for 'fd'
+ * create an fdev linked to the 'fdev_poll' for 'fd'
  */
-struct fdev *fdev_select_add(struct fdev_select *fdev_select, int fd)
+struct fdev *fdev_poll_add(struct fdev_poll *fdev_poll, int fd)
 {
 	const struct fdev **items;
 	struct fdev *fdev;
@@ -140,85 +165,61 @@ struct fdev *fdev_select_add(struct fdev_select *fdev_select, int fd)
 		return 0;
 	}
 
-	items = realloc(fdev_select->items, (fdev_select->allocated + 1) * sizeof *items);
+	items = realloc(fdev_poll->items, (fdev_poll->allocated + 1) * sizeof *items);
 	if (!items)
 		return 0;
-	fdev_select->items = items;
+	fdev_poll->items = items;
 
 	fdev = fdev_create(fd);
 	if (fdev) {
-		fdev_select->allocated++;
-		fdev_set_itf(fdev, &itf, fdev_select);
+		fdev_poll->allocated++;
+		fdev_set_itf(fdev, &itf, fdev_poll);
 	}
 
 	return fdev;
 }
 
 /*
- * get pollable fd for the fdev_select
+ * get pollable fd for the fdev_poll
  */
-int fdev_select_wait_and_dispatch(struct fdev_select *fdev_select, int timeout_ms)
+int fdev_poll_wait_and_dispatch(struct fdev_poll *fdev_poll, int timeout_ms)
 {
-	fd_set wfds, rfds, efds;
 	const struct fdev **items, *fdev;
 	unsigned i, n;
-	int rc, fd, nfds;
+	int rc;
 	uint32_t ev;
-	struct timeval tv, *ptv;
+	struct pollfd *pfds;
 
-	/* build the masks */
-	FD_ZERO(&wfds);
-	FD_ZERO(&rfds);
-	FD_ZERO(&efds);
-	nfds = -1;
-	n = fdev_select->enabled;
-	items = fdev_select->items;
+	/* build the polls */
+	n = fdev_poll->enabled;
+	items = fdev_poll->items;
+	pfds = alloca(n * sizeof *pfds);
 	for (i = 0 ; i < n ; i++) {
 		fdev = items[i];
-		fd = fdev_fd(fdev);
-		if (fd > nfds)
-			nfds = fd;
-		ev = fdev_events(fdev);
-		if (ev & EPOLLIN)
-			FD_SET(fd, &rfds);
-		if (ev & EPOLLOUT)
-			FD_SET(fd, &wfds);
-		if (ev & EPOLLPRI)
-			FD_SET(fd, &efds);
+		pfds[i].fd = fdev_fd(fdev);
+		pfds[i].events = fdev2poll(fdev_events(fdev));
+		pfds[i].revents = 0;
 	}
-	nfds++;
 
 	/* build the timeval */
 	if (timeout_ms < 0) {
-		if (!nfds)
-			return X_ECANCELED;
-		ptv = 0;
-	} else {
-		tv.tv_sec = timeout_ms / 1000;
-		tv.tv_usec = (timeout_ms % 1000) * 1000;
-		ptv = &tv;
+		if (!n) {
+			errno = ECANCELED;
+			return -1;
+		}
 	}
 
 	/* wait for an event */
-	rc = select(nfds, &rfds, &wfds, &efds, ptv);
-	if (rc < 0)
-		rc = -errno;
-	else if (rc > 0) {
+	rc = poll(pfds, n, timeout_ms);
+	if (rc > 0) {
 		/* dispatch events */
 		rc = 0;
 		for (i = 0 ; i < n ; i++) {
-			fdev = items[i];
-			fd = fdev_fd(fdev);
-			ev = 0;
-			if(FD_ISSET(fd, &rfds))
-				ev |= EPOLLIN;
-			if(FD_ISSET(fd, &wfds))
-				ev |= EPOLLOUT;
-			if(FD_ISSET(fd, &efds))
-				ev |= EPOLLPRI;
+			ev = poll2fdev(pfds[i].revents);
 			if (ev) {
+				fdev = items[i];
 				fdev_dispatch((struct fdev*)fdev, ev);
-				rc++;
+				rc ++;
 			}
 		}
 	}

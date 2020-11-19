@@ -30,20 +30,20 @@
 
 #if WITH_FDEV_SYSTEMD
 # include <systemd/sd-event.h>
-# include "sys/fdev-systemd.h"
+# include "legacy/fdev-systemd.h"
 # include "sys/systemd.h"
 #elif WITH_FDEV_EPOLL
-# include "sys/fdev-epoll.h"
+# include "legacy/fdev-epoll.h"
 #elif WITH_FDEV_POLL
-# include "sys/fdev-poll.h"
+# include "legacy/fdev-poll.h"
 #elif WITH_FDEV_SELECT
-# include "sys/fdev-select.h"
+# include "legacy/fdev-select.h"
 #else
 # error some FDEV is expected
 #endif
 
-#include "sys/evmgr.h"
-#include "sys/fdev.h"
+#include "evmgr.h"
+#include "legacy/fdev.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 

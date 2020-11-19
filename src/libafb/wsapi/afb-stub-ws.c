@@ -46,7 +46,7 @@
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
 #include "sys/verbose.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
 

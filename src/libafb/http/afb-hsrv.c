@@ -50,15 +50,15 @@ typedef enum MHD_Result mhd_result_t;
 #include "utils/locale-root.h"
 #include "sys/systemd.h"
 
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "sys/x-errno.h"
 
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
-#include "misc/afb-fdev.h"
+#include "legacy/afb-fdev.h"
 #include "sys/x-socket.h"
-#include "misc/afb-socket-fdev.h"
+#include "legacy/afb-socket-fdev.h"
 
 #include "sys/verbose.h"
 

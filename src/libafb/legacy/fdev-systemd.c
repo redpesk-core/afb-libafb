@@ -27,9 +27,9 @@
 
 #include <systemd/sd-event.h>
 
-#include "sys/fdev.h"
-#include "sys/fdev-provider.h"
-#include "sys/fdev-systemd.h"
+#include "legacy/fdev.h"
+#include "legacy/fdev-provider.h"
+#include "legacy/fdev-systemd.h"
 #include "sys/x-errno.h"
 
 static int handler(sd_event_source *s, int fd, uint32_t revents, void *userdata)

@@ -33,7 +33,7 @@
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-proto-ws.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "sys/verbose.h"
 #include "sys/x-endian.h"
 #include "sys/x-uio.h"

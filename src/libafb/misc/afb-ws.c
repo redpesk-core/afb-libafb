@@ -33,7 +33,7 @@
 
 #include "utils/websock.h"
 #include "misc/afb-ws.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "sys/x-uio.h"
 #include "sys/x-errno.h"
 

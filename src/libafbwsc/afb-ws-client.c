@@ -36,8 +36,8 @@
 #include "afb-ws-client.h"
 
 #include "misc/afb-socket.h"
-#include "sys/fdev.h"
-#include "sys/fdev-systemd.h"
+#include "legacy/fdev.h"
+#include "legacy/fdev-systemd.h"
 #include "wsapi/afb-proto-ws.h"
 #include "wsapi/afb-wsapi.h"
 #include "wsj1/afb-wsj1.h"
@@ -403,7 +403,7 @@ static char *makequery(const char *path, const char *uuid, const char *token)
 
 /*****************************************************************************************************************************/
 
-struct fdev *get_socket(struct sd_event *eloop, const char *uri, int server)
+static struct fdev *get_socket(struct sd_event *eloop, const char *uri, int server)
 {
 	int fd;
 	struct fdev *fdev;

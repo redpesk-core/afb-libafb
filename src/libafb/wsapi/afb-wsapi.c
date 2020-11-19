@@ -40,7 +40,7 @@
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-wsapi.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 

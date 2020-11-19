@@ -21,42 +21,19 @@
  * $RP_END_LICENSE$
  */
 
-#include "libafb-config.h"
+#pragma once
 
-#include <stdlib.h>
-#include <unistd.h>
+#include "../sys/x-epoll.h"
 
-#include "misc/afb-fdev.h"
-#include "misc/afb-socket.h"
+struct fdev;
 
-#include "sys/fdev.h"
-#include "sys/verbose.h"
+extern struct fdev *fdev_addref(struct fdev *fdev);
+extern void fdev_unref(struct fdev *fdev);
 
+extern int fdev_fd(const struct fdev *fdev);
+extern uint32_t fdev_events(const struct fdev *fdev);
+extern int fdev_autoclose(const struct fdev *fdev);
 
-/**
- * open socket for client or server
- *
- * @param uri the specification of the socket
- * @param server 0 for client, server otherwise
- * @param scheme the default scheme to use if none is set in uri (can be NULL)
- *
- * @return the fdev of the socket or NULL in case of error
- */
-struct fdev *afb_socket_fdev_open_scheme(const char *uri, int server, const char *scheme)
-{
-	struct fdev *fdev;
-	int fd;
-
-	fd = afb_socket_open_scheme(uri, server, scheme);
-	if (fd < 0)
-		fdev = NULL;
-	else {
-		fdev = afb_fdev_create(fd);
-		if (!fdev) {
-			close(fd);
-			ERROR("can't make %s socket for %s", server ? "server" : "client", uri);
-		}
-	}
-	return fdev;
-}
-
+extern void fdev_set_callback(struct fdev *fdev, void (*callback)(void*,uint32_t,struct fdev*), void *closure);
+extern void fdev_set_events(struct fdev *fdev, uint32_t events);
+extern void fdev_set_autoclose(struct fdev *fdev, int autoclose);

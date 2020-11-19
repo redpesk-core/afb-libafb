@@ -29,7 +29,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "misc/afb-fdev.h"
+#include "legacy/afb-fdev.h"
 #include "misc/afb-socket.h"
 
 #include "sys/verbose.h"

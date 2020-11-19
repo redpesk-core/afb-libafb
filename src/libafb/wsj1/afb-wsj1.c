@@ -36,7 +36,7 @@
 
 #include "misc/afb-ws.h"
 #include "wsj1/afb-wsj1.h"
-#include "sys/fdev.h"
+#include "legacy/fdev.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
