@@ -24,6 +24,7 @@
 #pragma once
 
 #include <pthread.h>
+#include <signal.h>
 #include "../sys/x-errno.h"
 
 #define x_thread_t	pthread_t
@@ -50,6 +51,16 @@ static inline int x_thread_create(
 static inline int x_thread_detach(x_thread_t tid)
 {
 	return pthread_detach(tid) ? -errno : 0;
+}
+
+static inline x_thread_t x_thread_self(void)
+{
+	return pthread_self();
+}
+
+static inline int x_thread_kill(x_thread_t tid, int sig)
+{
+	return pthread_kill(tid, sig);
 }
 
 #if WITH_THREAD_LOCAL
