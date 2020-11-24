@@ -714,7 +714,7 @@ mkmsg_reply_cb(
 		escapes |= 1 << 3;
 		n = 4;
 	}
-	if (object) {
+	if (object && strcmp(object, "null")) {
 		strings[n] = msg_response;
 		sizes[n] = sizeof(msg_response) - 1;
 		n++;
