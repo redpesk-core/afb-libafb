@@ -91,7 +91,7 @@ ADD_SUBDIRECTORY(libafb)
 ############################################################################
 
 if(WITH_SYSTEMD AND libsystemd_FOUND)
-	ADD_SUBDIRECTORY(libafbwsc)
+	ADD_SUBDIRECTORY(libafbcli)
 endif()
 if(NOT WITHOUT_TESTS)
 	ADD_SUBDIRECTORY(tests)

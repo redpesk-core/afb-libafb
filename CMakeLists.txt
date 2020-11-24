@@ -38,8 +38,8 @@ set(PROJECT_URL "https://github.com/redpesk/afb-libafb")
 set(LIBAFB_VERSION "4.0")
 set(LIBAFB_SOVERSION "4")
 
-set(LIBAFBWSC_VERSION "4.0")
-set(LIBAFBWSC_SOVERSION "4")
+set(LIBAFBCLI_VERSION "4.0")
+set(LIBAFBCLI_SOVERSION "4")
 
 include(FindPkgConfig)
 include(CheckIncludeFiles)

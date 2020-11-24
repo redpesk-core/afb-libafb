@@ -1,7 +1,7 @@
 ##
 ## Copyright (C) 2015-2020 IoT.bzh Company
 ##
-## This file is part of afb-daemon project.
+## This file is part of afb-libafb project.
 ##
 ## $RP_BEGIN_LICENSE$
 ## Commercial License Usage
@@ -22,12 +22,12 @@
 ## $RP_END_LICENSE$
 ##
 
-Name: libafbwsc
-Description: Client library for communicating with websocket
-Version: @LIBAFBWSC_VERSION@
+Name: libafbcli
+Description: Client library for communicating with afb framework
+Version: @LIBAFBCLI_VERSION@
 URL: @PROJECT_URL@
 
 Requires: json-c libsystemd
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
-Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbwsc
+Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbcli
 

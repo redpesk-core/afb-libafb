@@ -23,12 +23,12 @@
 ###########################################################################
 
 ###########################################
-# build and install libafbwsc
+# build and install libafbcli
 ###########################################
 
 set(DIR ../libafb)
 
-set(LIBAFBWSC_SOURCES
+set(LIBAFBCLI_SOURCES
 	afb-ws-client.c
 	${DIR}/misc/afb-socket.c
 	${DIR}/misc/afb-ws.c
@@ -42,37 +42,37 @@ set(LIBAFBWSC_SOURCES
 	${DIR}/wsj1/afb-wsj1.c
 )
 
-ADD_LIBRARY(libafbwsc SHARED ${LIBAFBWSC_SOURCES})
-set_property(TARGET libafbwsc PROPERTY OUTPUT_NAME afbwsc)
+ADD_LIBRARY(libafbcli SHARED ${LIBAFBCLI_SOURCES})
+set_property(TARGET libafbcli PROPERTY OUTPUT_NAME afbcli)
 
-SET_TARGET_PROPERTIES(libafbwsc PROPERTIES
-	VERSION ${LIBAFBWSC_VERSION}
-	SOVERSION ${LIBAFBWSC_SOVERSION})
+SET_TARGET_PROPERTIES(libafbcli PROPERTIES
+	VERSION ${LIBAFBCLI_VERSION}
+	SOVERSION ${LIBAFBCLI_SOVERSION})
 
-TARGET_LINK_LIBRARIES(libafbwsc
+TARGET_LINK_LIBRARIES(libafbcli
 	${libsystemd_LDFLAGS}
 	${json-c_LDFLAGS}
 	-lpthread
-	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/export-afbwsc.map
+	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/export-libafbcli.map
 	-Wl,--as-needed
 	-Wl,--gc-sections
 )
 
-target_include_directories(libafbwsc PUBLIC ${DIR})
+target_include_directories(libafbcli PUBLIC ${DIR})
 
-INSTALL(TARGETS libafbwsc LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+INSTALL(TARGETS libafbcli LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 INSTALL(FILES
 		afb-ws-client.h
 		${DIR}/wsj1/afb-wsj1.h
 		${DIR}/wsapi/afb-proto-ws.h
 		${DIR}/wsapi/afb-wsapi.h
 	DESTINATION
-		${CMAKE_INSTALL_INCLUDEDIR}/afb
+		${CMAKE_INSTALL_INCLUDEDIR}/libafbcli
 )
 
-CONFIGURE_FILE(libafbwsc.pc.in libafbwsc.pc @ONLY)
+CONFIGURE_FILE(libafbcli.pc.in libafbcli.pc @ONLY)
 INSTALL(FILES
-		${CMAKE_CURRENT_BINARY_DIR}/libafbwsc.pc
+		${CMAKE_CURRENT_BINARY_DIR}/libafbcli.pc
 	DESTINATION
 		${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
