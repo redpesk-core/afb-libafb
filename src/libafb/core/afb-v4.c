@@ -31,7 +31,9 @@
 #include "afb-type.h"
 #include "afb-type-predefined.h"
 #include "afb-api-v4.h"
+#include "afb-ev-mgr.h"
 
+#include "sys/ev-mgr.h"
 #include "sys/x-errno.h"
 
 /***********************************************************/
@@ -229,8 +231,22 @@ const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.type_double = &afb_type_predefined_double,
 #endif
 
-/*-- AFTERWARD ------------------------------------------*/
+/*-- FD's EVENT HANDLING -----------------------------------*/
 
+	.evfd_create = afb_ev_mgr_add_fd,
+	.evfd_addref = ev_fd_addref,
+	.evfd_unref = ev_fd_unref,
+	.evfd_get_fd = ev_fd_fd,
+	.evfd_get_events = ev_fd_events,
+	.evfd_set_events = ev_fd_set_events,
+
+/*-- TIMER HANDLING -----------------------------------*/
+
+	.timer_create = afb_ev_mgr_add_timer,
+	.timer_addref = ev_timer_addref,
+	.timer_unref = ev_timer_unref,
+
+/*-- END -----------------------------------*/
 };
 
 #if WITH_DYNAMIC_BINDING

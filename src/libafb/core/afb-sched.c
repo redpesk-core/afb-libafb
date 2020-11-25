@@ -42,7 +42,7 @@
 #define EVENT_TIMEOUT_TOP  	((uint64_t)-1)
 #define EVENT_TIMEOUT_CHILD	((uint64_t)10000)
 
-#define DEBUGGING 0
+#define DEBUGGING 1
 
 #if DEBUGGING
 #include <stdio.h>
@@ -304,14 +304,16 @@ static void thread_run(int ismain)
 			me.stop = 1;
 
 		/* no job, no stop, check if event loop waits handling */
-		} else if (!hold_request_count && allowed_thread_count && evloop_get(&me)) {
+		} else if (!hold_request_count && allowed_thread_count && evloop_get(&me) && ev_mgr_can_run(evmgr)) {
 			in_event_loop = 1;
 			THREAD_STATE_SET(&me, ts_Event_Handling);
+#if 0
 			if (!ev_mgr_can_run(evmgr)) {
 				/* busy ? */
 				CRITICAL("Can't enter dispatch while in dispatch!");
 				abort();
 			}
+#endif
 			/* run the events */
 			ev_mgr_prepare(evmgr);
 			x_mutex_unlock(&mutex);
