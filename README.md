@@ -3,7 +3,7 @@
 This project provides the library for building microservice architecture
 binder like
 
-This project is available here <https://github.com/redpesk/afb-libafb>.
+This project is available here <https://github.com/redpesk-core/afb-libafb>.
 
 ## License and copying
 
@@ -15,7 +15,7 @@ This project depends of two other project:
 
 - afb-binding (LGPL-3.0):
   for definition of the interface of bindings
-  <https://github.com/redpesk/afb-libafb>
+  <https://github.com/redpesk-core/afb-libafb>
 - json-c (MIT):
   handling of json structures
 
