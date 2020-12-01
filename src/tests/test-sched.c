@@ -197,7 +197,7 @@ START_TEST(test_async){
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
 
     // queue N jobs
-    for(i=0; i<NBJOBS; i++) afb_sched_queue_job(NULL, 1, test_job, i2p(i+1));
+    for(i=0; i<NBJOBS; i++) afb_sched_post_job(NULL, 0, 1, test_job, i2p(i+1));
 
     // run them asynchronously
     sched_runing = TRUE;
@@ -309,7 +309,7 @@ void test_start_sched_adapt(int sig, void * arg){
 
         // queue N jobs
         for(i=0; i<NBJOBS; i++){
-            afb_sched_queue_job(NULL, 0, test_job, i2p(i+1));
+            afb_sched_post_job(NULL, 0, 0, test_job, i2p(i+1));
             fprintf(stderr, "job %d queued : pending jobs = %d\n", i+1, afb_jobs_get_pending_count());
         }
 
@@ -415,7 +415,7 @@ void do_test_evmgr(int signum, void *arg)
     evmgr_expected = 20;
     for (i = 0 ; i < evmgr_expected ; i++) {
         fprintf(stderr, "-- MAIN launch of %d...\n", 1+i);
-        s = afb_sched_queue_job(NULL, 0, jobgetevmgr, i2p(i+1));
+        s = afb_sched_post_job(NULL, 0, 0, jobgetevmgr, i2p(i+1));
         fprintf(stderr, "-- MAIN launch of %d -> %d\n", 1+i, s);
         ck_assert_int_ge(s, 0);
     }

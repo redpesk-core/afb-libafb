@@ -212,7 +212,7 @@ const struct afb_binding_x4r1_itf afb_v4_itf = {
 /*-- MISC ------------------------------------------*/
 
 	.create_api = afb_api_v4_new_api_hookable,
-	.job_queue = afb_api_v4_queue_job_hookable,
+	.job_post = afb_api_v4_post_job_hookable,
 	.alias_api = afb_api_v4_add_alias_hookable,
 	.setup_shared_object = x4_api_setup_shared_object,
 

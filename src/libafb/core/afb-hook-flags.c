@@ -111,7 +111,7 @@ static struct flag api_flags[] = { /* must be sorted by names */
 		{ "new_api",		afb_hook_flag_api_new_api },
 		{ "on_event",		afb_hook_flag_api_on_event },
 		{ "on_event_handler",	afb_hook_flag_api_on_event_handler },
-		{ "queue_job",		afb_hook_flag_api_queue_job },
+		{ "post_job",		afb_hook_flag_api_post_job },
 		{ "require_api",	afb_hook_flag_api_require_api },
 		{ "rootdir_get_fd",	afb_hook_flag_api_rootdir_get_fd },
 		{ "rootdir_open_locale",afb_hook_flag_api_rootdir_open_locale },

@@ -576,9 +576,9 @@ static void hook_api_rootdir_open_locale(void *closure, const struct afb_hookid 
 			key, val);
 }
 
-static void hook_api_queue_job(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result)
+static void hook_api_post_job(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, long delayms, int timeout, void (*callback)(int signum, void *arg), void *argument, void *group, int result)
 {
-	hook_api(closure, hookid, comapi, "queue_job", "{ss}", "result", result);
+	hook_api(closure, hookid, comapi, "post_job", "{ss}", "result", result);
 }
 
 static void hook_api_require_api(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized)
@@ -741,7 +741,7 @@ static struct afb_hook_api_itf hook_api_itf = {
 	.hook_api_event_make = hook_api_event_make,
 	.hook_api_rootdir_get_fd = hook_api_rootdir_get_fd,
 	.hook_api_rootdir_open_locale = hook_api_rootdir_open_locale,
-	.hook_api_queue_job = hook_api_queue_job,
+	.hook_api_post_job = hook_api_post_job,
 	.hook_api_require_api = hook_api_require_api,
 	.hook_api_require_api_result = hook_api_require_api_result,
 	.hook_api_add_alias = hook_api_add_alias_cb,

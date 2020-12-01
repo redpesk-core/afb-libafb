@@ -207,13 +207,19 @@ enum state
 	Idle = 0,
 
 	/** is preparing */
-	Prepare = 1,
+	Preparing = 1,
+
+	/** is ready to wait */
+	Ready = 2,
 
 	/** is waiting */
-	Wait = 2,
+	Waiting = 3,
 
-	/** is dispatching */
-	Dispatch = 3
+	/** an event is pending */
+	Pending = 4,
+
+	/** is dispatching an event */
+	Dispatching = 5
 };
 
 /** Description of handled event loops */
@@ -822,10 +828,18 @@ static void do_cleanup(struct ev_mgr *mgr)
  */
 static int do_prepare(struct ev_mgr *mgr)
 {
-	mgr->state = Prepare;
-	do_cleanup(mgr);
-	preparers_prepare(mgr);
-	return efds_prepare(mgr);
+	int rc;
+
+	if (mgr->state != Idle)
+		rc = X_ENOTSUP;
+	else {
+		mgr->state = Preparing;
+		do_cleanup(mgr);
+		preparers_prepare(mgr);
+		rc = efds_prepare(mgr);
+		mgr->state = Ready;
+	}
+	return rc;
 }
 
 /**
@@ -835,32 +849,39 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 {
 	int rc;
 
-	if (mgr->event.events)
-		rc = X_EBUSY;
+	if (mgr->state != Ready)
+		rc = X_ENOTSUP;
 	else {
-		if (timeout_ms < -1)
-			timeout_ms = -1;
 #if WAKEUP_TGKILL
 		mgr->tid = gettid();
 #elif WAKEUP_THREAD_KILL
 		mgr->tid = x_thread_self();
 #endif
-		mgr->state = Wait;
-		rc = epoll_wait(mgr->epollfd, &mgr->event, 1, timeout_ms);
-		if (rc < 1)
+		mgr->state = Waiting;
+		rc = epoll_wait(mgr->epollfd, &mgr->event, 1,
+					timeout_ms < 0 ? -1 : timeout_ms);
+		if (rc < 1) {
 			mgr->event.events = 0;
-#if WAKEUP_EVENTFD || WAKEUP_PIPE
-		else if (mgr->event.data.ptr == mgr) {
-#if WAKEUP_EVENTFD
-			uint64_t x;
-			read(mgr->eventfd, &x, sizeof x);
-#else
-			char x;
-			read(mgr->pipefds[0], &x, sizeof x);
-#endif
-			mgr->event.events = 0;
+			mgr->state = Idle;
+			rc = rc ? -errno : rc;
 		}
+		else {
+			mgr->state = Pending;
+#if WAKEUP_EVENTFD || WAKEUP_PIPE
+			if (mgr->event.data.ptr == mgr) {
+#if WAKEUP_EVENTFD
+				uint64_t x;
+				read(mgr->eventfd, &x, sizeof x);
+#else
+				char x;
+				read(mgr->pipefds[0], &x, sizeof x);
 #endif
+				mgr->event.events = 0;
+				mgr->state = Idle;
+				rc = X_EINTR;
+			}
+#endif
+		}
 	}
 	return rc;
 }
@@ -871,17 +892,15 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 static void do_dispatch(struct ev_mgr *mgr)
 {
 	struct ev_fd *efd;
-	uint32_t events;
 
-	mgr->state = Dispatch;
-	events = mgr->event.events;
-	if (events) {
-		mgr->event.events = 0;
+	if (mgr->state == Pending) {
+		mgr->state = Dispatching;
 		efd = mgr->event.data.ptr;
 		if (!efd)
 			timer_event(mgr);
 		else
-			fd_dispatch(efd, events);
+			fd_dispatch(efd, mgr->event.events);
+		mgr->state = Idle;
 	}
 }
 
@@ -897,7 +916,7 @@ static void do_dispatch(struct ev_mgr *mgr)
  */
 void ev_mgr_wakeup(struct ev_mgr *mgr)
 {
-	if (mgr->state == Wait) {
+	if (mgr->state == Waiting) {
 #if WAKEUP_TGKILL
 		tgkill(getpid(), mgr->tid, SIGURG);
 #elif WAKEUP_THREAD_KILL
@@ -933,9 +952,7 @@ void *ev_mgr_try_change_holder(struct ev_mgr *mgr, void *holder, void *next)
  */
 int ev_mgr_prepare(struct ev_mgr *mgr)
 {
-	int rc = do_prepare(mgr);
-	mgr->state = Wait;
-	return rc;
+	return do_prepare(mgr);
 }
 
 /**
@@ -943,9 +960,7 @@ int ev_mgr_prepare(struct ev_mgr *mgr)
  */
 int ev_mgr_wait(struct ev_mgr *mgr, int timeout_ms)
 {
-	int rc = do_wait(mgr, timeout_ms);
-	mgr->state = Wait;
-	return rc;
+	return do_wait(mgr, timeout_ms);
 }
 
 /**
@@ -954,7 +969,6 @@ int ev_mgr_wait(struct ev_mgr *mgr, int timeout_ms)
 void ev_mgr_dispatch(struct ev_mgr *mgr)
 {
 	do_dispatch(mgr);
-	mgr->state = Wait;
 }
 
 /**
@@ -962,28 +976,26 @@ void ev_mgr_dispatch(struct ev_mgr *mgr)
  */
 int ev_mgr_run(struct ev_mgr *mgr, int timeout_ms)
 {
-	int rc = do_prepare(mgr);
+	int rc;
+
+	rc = do_prepare(mgr);
 	if (rc >= 0) {
 		rc = do_wait(mgr, timeout_ms);
-		if (rc >= 0)
+		if (rc > 0)
 			do_dispatch(mgr);
 	}
-	mgr->state = Idle;
+
 	return rc;
-}
-
-
-void ev_mgr_job_run(int signum, struct ev_mgr *mgr)
-{
-	if (!signum)
-		ev_mgr_run(mgr, -1);
-	else
-		mgr->state = Idle;
 }
 
 int ev_mgr_can_run(struct ev_mgr *mgr)
 {
 	return mgr->state == Idle;
+}
+
+void ev_mgr_recover_run(struct ev_mgr *mgr)
+{
+	mgr->state = Idle;
 }
 
 /* pollable file descriptor */

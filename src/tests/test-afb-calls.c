@@ -23,7 +23,7 @@
 #define NBPARAMS 3
 
 #if WITH_REQ_PROCESS_ASYNC
-#define RUNJOB while(afb_jobs_get_pending_count()) { afb_jobs_run(afb_jobs_dequeue()); }
+#define RUNJOB while(afb_jobs_get_pending_count()) { afb_jobs_run(afb_jobs_dequeue(0)); }
 #else
 #define RUNJOB (void)0
 #endif

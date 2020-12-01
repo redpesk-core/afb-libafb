@@ -258,14 +258,15 @@ afb_api_v4_vverbose_hookable(
 }
 
 int
-afb_api_v4_queue_job_hookable(
+afb_api_v4_post_job_hookable(
 	struct afb_api_v4 *apiv4,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 ) {
-	return afb_api_common_queue_job_hookable(&apiv4->comapi, callback, argument, group, timeout);
+	return afb_api_common_post_job_hookable(&apiv4->comapi, delayms, timeout, callback, argument, group);
 }
 
 int

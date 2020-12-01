@@ -96,8 +96,8 @@ extern void ev_mgr_dispatch(struct ev_mgr *mgr);
 /**
  */
 extern int ev_mgr_run(struct ev_mgr *mgr, int timeout_ms);
-extern void ev_mgr_job_run(int signum, struct ev_mgr *mgr);
 extern int ev_mgr_can_run(struct ev_mgr *mgr);
+extern void ev_mgr_recover_run(struct ev_mgr *mgr);
 
 /**
  * wake up the event loop if needed

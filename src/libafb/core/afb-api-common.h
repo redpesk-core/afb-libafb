@@ -325,12 +325,13 @@ afb_api_common_event_broadcast(
 
 extern
 int
-afb_api_common_queue_job(
+afb_api_common_post_job(
 	const struct afb_api_common *comapi,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 );
 
 extern
@@ -406,12 +407,13 @@ afb_api_common_event_broadcast_hookable(
 
 extern
 int
-afb_api_common_queue_job_hookable(
+afb_api_common_post_job_hookable(
 	const struct afb_api_common *comapi,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 );
 
 extern

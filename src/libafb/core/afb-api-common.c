@@ -256,15 +256,16 @@ afb_api_common_event_broadcast(
 }
 
 int
-afb_api_common_queue_job(
+afb_api_common_post_job(
 	const struct afb_api_common *comapi,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 ) {
 	/* TODO: translate group ~ api */
-	return afb_sched_queue_job(group, timeout, callback, argument);
+	return afb_sched_post_job(group, delayms, timeout, callback, argument);
 }
 
 int
@@ -488,17 +489,18 @@ afb_api_common_event_broadcast_hookable(
 }
 
 int
-afb_api_common_queue_job_hookable(
+afb_api_common_post_job_hookable(
 	const struct afb_api_common *comapi,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 ) {
-	int r = afb_api_common_queue_job(comapi, callback, argument, group, timeout);
+	int r = afb_api_common_post_job(comapi, delayms, timeout, callback, argument, group);
 #if WITH_AFB_HOOK
-	if (comapi->hookflags & afb_hook_flag_api_queue_job)
-		return afb_hook_api_queue_job(comapi, callback, argument, group, timeout, r);
+	if (comapi->hookflags & afb_hook_flag_api_post_job)
+		return afb_hook_api_post_job(comapi, delayms, timeout, callback, argument, group, r);
 #endif
 	return r;
 }

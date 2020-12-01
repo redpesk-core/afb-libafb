@@ -25,6 +25,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
@@ -42,7 +43,7 @@
 #define EVENT_TIMEOUT_TOP  	((uint64_t)-1)
 #define EVENT_TIMEOUT_CHILD	((uint64_t)10000)
 
-#define DEBUGGING 1
+#define DEBUGGING 0
 
 #if DEBUGGING
 #include <stdio.h>
@@ -252,6 +253,25 @@ static int evloop_get(void *me)
 }
 
 /**
+ * run the event loop
+ */
+static void evloop_sig_run(int signum, void *closure)
+{
+	if (signum)
+		ev_mgr_recover_run(evmgr);
+	else {
+		long delayms = (long)(intptr_t)closure;
+		int to = delayms < 0 ? -1 : delayms <= INT_MAX ? (int)delayms : INT_MAX;
+		int rc = ev_mgr_prepare(evmgr);
+		if (rc >= 0) {
+			rc = ev_mgr_wait(evmgr, to);
+			if (rc > 0)
+				ev_mgr_dispatch(evmgr);
+		}
+	}
+}
+
+/**
  * Main processing loop of internal threads with processing jobs.
  * The loop must be called with the mutex locked
  * and it returns with the mutex locked.
@@ -263,6 +283,7 @@ static void thread_run(int ismain)
 	struct thread me;
 	struct thread **prv;
 	struct afb_job *job;
+	long delayms;
 
 	DUMP_THREAD_ENTER(&me);
 
@@ -281,7 +302,7 @@ static void thread_run(int ismain)
 	while (!me.stop) {
 
 		/* get a job */
-		job = afb_jobs_dequeue();
+		job = afb_jobs_dequeue(&delayms);
 		if (job) {
 			/* run the job */
 			THREAD_STATE_SET(&me, ts_Running);
@@ -304,26 +325,21 @@ static void thread_run(int ismain)
 			me.stop = 1;
 
 		/* no job, no stop, check if event loop waits handling */
-		} else if (!hold_request_count && allowed_thread_count && evloop_get(&me) && ev_mgr_can_run(evmgr)) {
+		} else if (!hold_request_count && allowed_thread_count && !in_event_loop && evloop_get(&me)) {
+
+			/* setup event loop */
 			in_event_loop = 1;
 			THREAD_STATE_SET(&me, ts_Event_Handling);
-#if 0
-			if (!ev_mgr_can_run(evmgr)) {
-				/* busy ? */
-				CRITICAL("Can't enter dispatch while in dispatch!");
-				abort();
-			}
-#endif
+
 			/* run the events */
-			ev_mgr_prepare(evmgr);
 			x_mutex_unlock(&mutex);
-			afb_sig_monitor_run(0, (void(*)(int,void*))ev_mgr_job_run, evmgr);
+			afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
 			x_mutex_lock(&mutex);
-			in_event_loop = 0;
-			THREAD_STATE_SET(&me, ts_Idle);
 
 			/* release the current event loop */
+			THREAD_STATE_SET(&me, ts_Idle);
 			evloop_release(&me);
+			in_event_loop = 0;
 
 		/* no job, no stop and no event loop */
 		} else {
@@ -394,9 +410,13 @@ static int start_one_thread()
 /**
  * Adapt the current threadung to current job requirement
  */
-static void adapt()
+static void adapt(int delayed)
 {
 	DUMP_THREAD_STATES;
+	if (delayed && in_event_loop) {
+		PDBG("    >>>> WAKEUP FOR DELAYED\n");
+		evloop_wakeup();
+	}
 	if (waiting_thread_count) {
 		PDBG("    >>>> SIGNAL\n");
 		waiting_thread_count--;
@@ -406,7 +426,7 @@ static void adapt()
 		PDBG("    >>>> START-THREAD\n");
 		start_one_thread();
 	}
-	else if (in_event_loop) {
+	else if (in_event_loop && !delayed) {
 		PDBG("    >>>> WAKEUP\n");
 		evloop_wakeup();
 	}
@@ -423,23 +443,25 @@ static void adapt()
  * Queues the job as described by parameters and takes the
  * actions to adapt thread pool to treat it.
  */
-static int queue_job(
+static int post_job(
 	const void *group,
+	long delayms,
 	int timeout,
 	void (*callback)(int, void*),
 	void *arg
 ) {
-	int rc = afb_jobs_queue(group, timeout, callback, arg);
+	int rc = afb_jobs_post(group, delayms, timeout, callback, arg);
 	if (rc > 0) {
-		adapt();
+		adapt(delayms > 0);
 		rc = 0;
 	}
 	return rc;
 }
 
 /* Schedule the given job */
-int afb_sched_queue_job(
+int afb_sched_post_job(
 	const void *group,
+	long delayms,
 	int timeout,
 	void (*callback)(int, void*),
 	void *arg
@@ -447,7 +469,7 @@ int afb_sched_queue_job(
 	int rc;
 
 	x_mutex_lock(&mutex);
-	rc = queue_job(group, timeout, callback, arg);
+	rc = post_job(group, delayms, timeout, callback, arg);
 	x_mutex_unlock(&mutex);
 	return rc;
 }
@@ -465,7 +487,7 @@ void afb_sched_call_sync(
 		THREAD_STATE_PUSH(me, ts_Blocked);
 		evloop_release(me);
 		started_thread_count--;
-		adapt();
+		adapt(0);
 		x_mutex_unlock(&mutex);
 	}
 	afb_sig_monitor_run(0, callback, arg);
@@ -491,7 +513,7 @@ static void do_sync_cb(int signum, void *closure)
 	else {
 		x_cond_init(&sync->condsync);
 		x_mutex_lock(&mutex);
-		rc = queue_job(sync->group, sync->timeout, sync->handler, sync);
+		rc = post_job(sync->group, 0, sync->timeout, sync->handler, sync);
 		if (rc >= 0)
 			x_cond_wait(&sync->condsync, &mutex);
 		x_mutex_unlock(&mutex);
@@ -733,7 +755,7 @@ int afb_sched_start(
 	}
 
 	/* queue the start job */
-	rc = afb_jobs_queue(NULL, 0, start, arg);
+	rc = afb_jobs_post(NULL, 0, 0, start, arg);
 	if (rc < 0)
 		goto error;
 

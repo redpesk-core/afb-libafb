@@ -23,13 +23,11 @@
 
 #include "libafb-config.h"
 
-#include <stdlib.h>
 #include <stdint.h>
-#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
 #include <signal.h>
-#include <string.h>
-#include <pthread.h>
-#include <assert.h>
+#include <limits.h>
 
 #include "core/afb-jobs.h"
 #include "core/afb-sig-monitor.h"
@@ -48,6 +46,7 @@ struct afb_job
 	const void *group;   /**< group of the request */
 	void (*callback)(int,void*);   /**< processing callback */
 	void *arg;           /**< argument */
+	long delayms;
 #if WITH_SIG_MONITOR_TIMERS
 	int timeout;         /**< timeout in second for processing the request */
 #endif
@@ -66,21 +65,38 @@ static int pending_count = 0;      /** count of pending jobs */
 static struct afb_job *pending_jobs;
 static struct afb_job *free_jobs;
 
+/* delayed jobs */
+static int delayed_count = 0;
+static uint64_t delayed_base;
+
+static uint64_t getnow()
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	/* X.10^-6 = X.(2^-6 * 5^-6) = X.(2^-6 / 15625) = (X >> 6) / 15625 */
+	return (uint64_t)(ts.tv_sec * 1000) + (uint64_t)((ts.tv_nsec >> 6) / 15625);
+}
+
 /**
  * Create a new job with the given parameters
  * @param group    the group of the job
+ * @param delayms  minimal delay in ms before starting the job
  * @param timeout  the timeout of the job (0 if none)
  * @param callback the function that achieves the job
  * @param arg      the argument of the callback
- * @return the created job unblock or NULL when no more memory
+ * @return zero in case of success or a negative ernno like number
  */
-static struct afb_job *job_create(
+static int job_add(
 		const void *group,
+		long delayms,
 		int timeout,
 		void (*callback)(int,void*),
-		void *arg)
+		void *arg,
+		struct afb_job **result)
 {
-	struct afb_job *job;
+	int rc;
+	uint64_t dt;
+	struct afb_job *job, *ijob, **pjob;
 
 	/* try recycle existing job */
 	job = free_jobs;
@@ -88,16 +104,32 @@ static struct afb_job *job_create(
 		free_jobs = job->next;
 	else {
 		/* allocation without blocking */
-		x_mutex_unlock(&mutex);
 		job = malloc(sizeof *job);
-		x_mutex_lock(&mutex);
 		if (!job) {
-			ERROR("out of memory");
+			rc = -X_ENOMEM;
 			goto end;
 		}
 	}
+	/* update the delay */
+	if (delayms) {
+		if (!delayed_count)
+			delayed_base = getnow();
+		else {
+			dt = (getnow() + delayms) - delayed_base;
+			if (dt > LONG_MAX) {
+				job->next = free_jobs;
+				free_jobs = job;
+				job = 0;
+				rc = X_E2BIG;
+				goto end;
+			}
+			delayms = (long)dt;
+		}
+		delayed_count++;
+	}
 	/* initializes the job */
 	job->group = group;
+	job->delayms = delayms;
 	job->callback = callback;
 	job->arg = arg;
 #if WITH_SIG_MONITOR_TIMERS
@@ -105,22 +137,6 @@ static struct afb_job *job_create(
 #endif
 	job->blocked = 0;
 	job->active = 0;
-end:
-	return job;
-}
-
-/**
- * Adds 'job' at the end of the list of jobs, marking it
- * as blocked if an other job with the same group is pending.
- * @param job the job to add
- */
-static void job_add(struct afb_job *job)
-{
-	const void *group;
-	struct afb_job *ijob, **pjob;
-
-	/* prepare to add */
-	group = job->group;
 	job->next = NULL;
 
 	/* search end and blockers */
@@ -135,11 +151,16 @@ static void job_add(struct afb_job *job)
 
 	/* queue the jobs */
 	*pjob = job;
+	rc = ++pending_count;
+end:
+	*result = job;
+	return rc;
 }
 
 /* enqueue the job */
-int afb_jobs_queue(
+int afb_jobs_post(
 		const void *group,
+		long delayms,
 		int timeout,
 		void (*callback)(int, void*),
 		void *arg)
@@ -155,15 +176,8 @@ int afb_jobs_queue(
 		ERROR("too many jobs");
 		rc = X_EBUSY;
 	} else {
-		/* allocates the job */
-		job = job_create(group, timeout, callback, arg);
-		if (!job)
-			rc = X_ENOMEM;
-		else {
-			/* queues the job */
-			job_add(job);
-			rc = ++pending_count;
-		}
+		/* add the job */
+		rc = job_add(group, delayms, timeout, callback, arg, &job);
 	}
 
 	/* leave critical */
@@ -212,24 +226,47 @@ static void job_release(struct afb_job *job)
 }
 
 /* get next pending job */
-struct afb_job *afb_jobs_dequeue()
+struct afb_job *afb_jobs_dequeue(long *delayms)
 {
 	struct afb_job *job;
+	long d;
 
 	/* enter critical */
 	x_mutex_lock(&mutex);
 
 	/* search a job */
-	for (job = pending_jobs ; job && job->blocked ; job = job->next);
+	if (!delayed_count)
+		d = LONG_MAX;
+	else {
+		d = getnow() - delayed_base;
+	}
+	for (job = pending_jobs ; job && (job->blocked || job->delayms > d); job = job->next);
 	if (job) {
 		job->blocked = 1; /* mark job as blocked */
 		job->active = 1; /* mark job as active */
 		pending_count--;
+		if (job->delayms)
+			delayed_count--;
+		d = 0;
+	}
+	else if (delayed_count) {
+		d = LONG_MAX;
+		for (job = pending_jobs ; job ; job = job->next)
+			if (!job->blocked && job->delayms && job->delayms < d)
+				d = job->delayms;
+		d = (long)((delayed_base + d) - getnow());
+		if (d < 0)
+			d = -1;
+	}
+	else {
+		d = -1;
 	}
 
 	/* leave critical */
 	x_mutex_unlock(&mutex);
 
+	if (delayms)
+		*delayms = d;
 	return job;
 }
 

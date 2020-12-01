@@ -27,8 +27,6 @@
 #include <string.h>
 #include <stdint.h>
 
-//#include <json-c/json.h>
-
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
 
@@ -164,7 +162,7 @@ x3_api_queue_job_hookable(
 	int timeout
 ) {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_queue_job_hookable(comapi, callback, argument, group, timeout);
+	return afb_api_common_post_job_hookable(comapi, 0, timeout, callback, argument, group);
 }
 
 static

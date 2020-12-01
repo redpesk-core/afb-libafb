@@ -294,7 +294,7 @@ static void do_run(int signum, void *arg)
 void afb_hsrv_run(struct afb_hsrv *hsrv)
 {
 	ev_fd_set_events(hsrv->efd, 0);
-	if (afb_sched_queue_job(hsrv, 0, do_run, hsrv) < 0)
+	if (afb_sched_post_job(hsrv, 0, 0, do_run, hsrv) < 0)
 		do_run(0, hsrv);
 }
 

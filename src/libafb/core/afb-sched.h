@@ -119,6 +119,7 @@ extern struct ev_mgr *afb_sched_acquire_event_manager();
  * executed sequentially in FIFO order.
  *
  * @param group    The group of the job or NULL when no group.
+ * @param delayms  minimal time in ms to wait before starting the job
  * @param timeout  The maximum execution time in seconds of the job
  *                 or 0 for unlimited time.
  * @param callback The function to execute for achieving the job.
@@ -131,8 +132,9 @@ extern struct ev_mgr *afb_sched_acquire_event_manager();
  * @return 0 on success (greater than 0) or
  *         in case of error a negative number in -errno like form
  */
-extern int afb_sched_queue_job(
+extern int afb_sched_post_job(
 		const void *group,
+		long delayms,
 		int timeout,
 		void (*callback)(int, void*),
 		void *arg);

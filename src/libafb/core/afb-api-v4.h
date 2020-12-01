@@ -337,12 +337,13 @@ afb_api_v4_event_handler_del_hookable(
 
 extern
 int
-afb_api_v4_queue_job_hookable(
+afb_api_v4_post_job_hookable(
 	struct afb_api_v4 *apiv4,
+	long delayms,
+	int timeout,
 	void (*callback)(int signum, void *arg),
 	void *argument,
-	void *group,
-	int timeout
+	void *group
 );
 
 extern

@@ -35,6 +35,7 @@ struct afb_job;
  * parallel concurrently.
  *
  * @param group    The group of the job or NULL when no group.
+ * @param delayms  Minimal delay in ms before starting the job
  * @param timeout  The maximum execution time in seconds of the job
  *                 or 0 for unlimited time.
  * @param callback The function to execute for achieving the job.
@@ -47,8 +48,9 @@ struct afb_job;
  * @return the count of pending job on success (greater than 0) or
  *         in case of error a negative number in -errno like form
  */
-extern int afb_jobs_queue(
+extern int afb_jobs_post(
 		const void *group,
+		long delayms,
 		int timeout,
 		void (*callback)(int, void*),
 		void *arg);
@@ -59,9 +61,12 @@ extern int afb_jobs_queue(
  *
  * Once gotten, the job must be either run or cancelled.
  *
+ * @param delayms if the result is 0 (no job), the long pointed
+ *                receives a timeout in ms that have to be waiten.
+ *
  * @return the first job that isn't blocked or NULL
  */
-extern struct afb_job *afb_jobs_dequeue(void);
+extern struct afb_job *afb_jobs_dequeue(long *delayms);
 
 /**
  * Run the given job now.

@@ -331,7 +331,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	}
 
 	/* queue the job */
-	rc = afb_sched_queue_job(BROADCAST_JOB_GROUP, 0, broadcast_job, jb);
+	rc = afb_sched_post_job(BROADCAST_JOB_GROUP, 0, 0, broadcast_job, jb);
 	if (rc < 0) {
 		ERROR("cant't queue broadcast string job item for %s", event);
 		destroy_evt_broadcasted(jb);
@@ -439,7 +439,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 		return X_ENOMEM;
 	}
 
-	rc = afb_sched_queue_job(PUSH_JOB_GROUP, 0, push_afb_evt_pushed, je);
+	rc = afb_sched_post_job(PUSH_JOB_GROUP, 0, 0, push_afb_evt_pushed, je);
 	if (rc == 0)
 		rc = 1;
 	else {

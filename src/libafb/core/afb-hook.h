@@ -171,7 +171,7 @@ extern struct json_object *afb_hook_req_get_client_info(const struct afb_req_com
 #define afb_hook_flag_api_get_system_bus		0x00000008
 #define afb_hook_flag_api_rootdir_get_fd		0x00000010
 #define afb_hook_flag_api_rootdir_open_locale		0x00000020
-#define afb_hook_flag_api_queue_job			0x00000040
+#define afb_hook_flag_api_post_job			0x00000040
 #define afb_hook_flag_api_require_api			0x00000080
 #define afb_hook_flag_api_add_alias			0x00000100
 #define afb_hook_flag_api_event_broadcast		0x00000200
@@ -206,7 +206,7 @@ extern struct json_object *afb_hook_req_get_client_info(const struct afb_req_com
 					|afb_hook_flag_api_call\
 					|afb_hook_flag_api_callsync\
 					|afb_hook_flag_api_start\
-					|afb_hook_flag_api_queue_job\
+					|afb_hook_flag_api_post_job\
 					|afb_hook_flag_api_settings)
 
 
@@ -260,7 +260,7 @@ extern struct json_object *afb_hook_req_get_client_info(const struct afb_req_com
 					|afb_hook_flag_api_get_system_bus\
 					|afb_hook_flag_api_rootdir_get_fd\
 					|afb_hook_flag_api_rootdir_open_locale\
-					|afb_hook_flag_api_queue_job\
+					|afb_hook_flag_api_post_job\
 					|afb_hook_flag_api_require_api\
 					|afb_hook_flag_api_require_api)
 
@@ -279,7 +279,7 @@ struct afb_hook_api_itf {
 	void (*hook_api_event_make)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, struct afb_evt *result);
 	void (*hook_api_rootdir_get_fd)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result);
 	void (*hook_api_rootdir_open_locale)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *filename, int flags, const char *locale, int result);
-	void (*hook_api_queue_job)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result);
+	void (*hook_api_post_job)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, long delayms, int timeout, void (*callback)(int signum, void *arg), void *argument, void *group, int result);
 	void (*hook_api_require_api)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized);
 	void (*hook_api_require_api_result)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized, int result);
 	void (*hook_api_add_alias)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *oldname, const char *newname, int result);
@@ -319,7 +319,7 @@ extern void afb_hook_api_vverbose(const struct afb_api_common *comapi, int level
 extern struct afb_evt *afb_hook_api_event_make(const struct afb_api_common *comapi, const char *name, struct afb_evt *result);
 extern int afb_hook_api_rootdir_get_fd(const struct afb_api_common *comapi, int result);
 extern int afb_hook_api_rootdir_open_locale(const struct afb_api_common *comapi, const char *filename, int flags, const char *locale, int result);
-extern int afb_hook_api_queue_job(const struct afb_api_common *comapi, void (*callback)(int signum, void *arg), void *argument, void *group, int timeout, int result);
+extern int afb_hook_api_post_job(const struct afb_api_common *comapi, long delayms, int timeout, void (*callback)(int signum, void *arg), void *argument, void *group, int result);
 extern void afb_hook_api_require_api(const struct afb_api_common *comapi, const char *name, int initialized);
 extern int afb_hook_api_require_api_result(const struct afb_api_common *comapi, const char *name, int initialized, int result);
 extern int afb_hook_api_add_alias(const struct afb_api_common *comapi, const char *api, const char *alias, int result);
