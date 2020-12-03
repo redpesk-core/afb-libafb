@@ -194,6 +194,21 @@ afb_api_common_apiname(
 }
 
 /**
+ * Get the visible name of the api
+ *
+ * @param comapi the api
+ *
+ * @return the name of the pai or its path
+ */
+static inline
+const char *
+afb_api_common_visible_name(
+	const struct afb_api_common *comapi
+) {
+	return comapi->name ?: comapi->path;
+}
+
+/**
  * Is the api sealed?
  *
  * @param comapi the api

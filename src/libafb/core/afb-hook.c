@@ -653,7 +653,7 @@ static void _hook_api_(const struct afb_api_common *comapi, const char *format, 
 {
 	va_list ap;
 	va_start(ap, format);
-	_hook_("api-%s", format, ap, afb_api_common_apiname(comapi));
+	_hook_("api-%s", format, ap, afb_api_common_visible_name(comapi));
 	va_end(ap);
 }
 
