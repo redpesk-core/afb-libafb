@@ -62,7 +62,8 @@
 #define MATCHN(pattern,string,def)   ((pattern) ? MATCHNAME(pattern,string) : (def))
 #define MATCHV(pattern,string,def)   ((pattern) ? MATCHVALUE(pattern,string) : (def))
 
-#define MATCH_API(pattern,string)	MATCHN(pattern,string,afb_apiname_is_public(string))
+#define MATCH_APINN(pattern,string)	MATCHN(pattern,string,afb_apiname_is_public(string))
+#define MATCH_API(pattern,string)	MATCH_APINN(pattern,(string)?:"(null)")
 #define MATCH_VERB(pattern,string)	MATCHN(pattern,string,1)
 #define MATCH_EVENT(pattern,string)	MATCHN(pattern,string,1)
 #define MATCH_SESSION(pattern,string)	MATCHV(pattern,string,1)
