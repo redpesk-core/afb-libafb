@@ -446,12 +446,15 @@ int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
 		sd_event_source_unref(current_sd_event_source_prepare);
 		current_sd_event_source_io = current_sd_event_source_prepare = 0;
 	}
-	rc = sd_event_add_post(eloop, &current_sd_event_source_prepare, onprepare, 0);
+	rc = sd_event_add_defer(eloop, &current_sd_event_source_prepare, onprepare, 0);
 	if (rc >= 0) {
-		rc = sd_event_add_io(eloop, &current_sd_event_source_io, afb_ev_mgr_get_fd(), EPOLLIN, onevent, 0);
-		if (rc < 0) {
-			sd_event_source_unref(current_sd_event_source_prepare);
-			current_sd_event_source_io = current_sd_event_source_prepare = 0;
+		rc = sd_event_add_post(eloop, &current_sd_event_source_prepare, onprepare, 0);
+		if (rc >= 0) {
+			rc = sd_event_add_io(eloop, &current_sd_event_source_io, afb_ev_mgr_get_fd(), EPOLLIN, onevent, 0);
+			if (rc < 0) {
+				sd_event_source_unref(current_sd_event_source_prepare);
+				current_sd_event_source_io = current_sd_event_source_prepare = 0;
+			}
 		}
 	}
 	return rc;
