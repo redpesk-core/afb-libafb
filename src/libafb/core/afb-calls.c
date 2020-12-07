@@ -91,7 +91,8 @@ struct req_calls
 static void req_calls_reply_cb(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct req_calls *req = containerof(struct req_calls, comreq, comreq);
-	req->callback(req->closure1, req->closure2, req->closure3, status, nreplies, replies);
+	if (req->callback)
+		req->callback(req->closure1, req->closure2, req->closure3, status, nreplies, replies);
 }
 
 /**
