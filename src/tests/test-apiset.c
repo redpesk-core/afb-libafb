@@ -61,10 +61,10 @@ const char *names[] = {
 const char *aliases[] = {
 	"Rich",		"Molly",
 	"Alicia",	"Carma",
-	"Drema",	"YVETTE",
+	"Drema",	"Yvette",
 	"Pablo",	"Sheba",
 	"Wendell",	"Sadie",
-	"Cathrine",	"CarMa",
+	"Cathrine",	"Carma",
 	"Allen",	"Corey",
 	"Tori",		"Drema",
 	NULL
