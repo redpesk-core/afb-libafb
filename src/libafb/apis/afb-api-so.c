@@ -154,7 +154,7 @@ static int processfiles(void *closure, struct path_search_item *item)
 		return 0;
 
 	/* try to get it as a binding */
-	rc = load_binding(item->path, 0, s->declare_set, s->call_set);
+	rc = load_binding(item->path, s->failstops, s->declare_set, s->call_set);
 	if (rc >= 0 || !s->failstops)
 		return 0; /* got it or fails ignored */
 
