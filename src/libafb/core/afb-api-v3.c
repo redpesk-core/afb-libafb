@@ -480,6 +480,41 @@ static int x3_api_legacy_call_sync_hookable(
 	return X_ENOTSUP;
 }
 
+struct preinit_s
+{
+	int (*preinit)(void*, struct afb_api_x3 *);
+	void *closure;
+	struct afb_api_x3 *apix3;
+	int result;
+};
+
+static
+void
+safe_preinit_for_new_api(int signum, void *closure)
+{
+	struct preinit_s *ps = closure;
+	if (signum)
+		ps->result = X_EINTR;
+	else
+		ps->result = ps->preinit(ps->closure, ps->apix3);
+}
+
+static
+int
+preinit_for_new_api(
+	void *closure,
+	struct afb_api_v3 *apiv3
+) {
+	struct preinit_s *ps = closure;
+
+	ps->result = 0;
+	if (ps->preinit) {
+		ps->apix3 = api_v3_to_api_x3(apiv3);
+		afb_sig_monitor_run(0, safe_preinit_for_new_api, ps);
+	}
+	return ps->result;
+}
+
 static
 struct afb_api_x3 *
 x3_api_new_api_hookable(
@@ -493,12 +528,15 @@ x3_api_new_api_hookable(
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
 	struct afb_api_v3 *newapi;
 	int rc;
+	struct preinit_s ps;
 
 #if WITH_AFB_HOOK
 	if (apiv3->comapi.hookflags & afb_hook_flag_api_new_api)
 		afb_hook_api_new_api_before(&apiv3->comapi, name, info, noconcurrency);
 #endif
 
+	ps.preinit = preinit;
+	ps.closure = preinit_closure;
 	rc = afb_api_v3_create(
 		&newapi,
 		apiv3->comapi.declare_set,
@@ -506,14 +544,8 @@ x3_api_new_api_hookable(
 		name, Afb_String_Copy,
 		info, Afb_String_Copy,
 		noconcurrency,
-		NULL, NULL,
+		preinit_for_new_api, &ps,
 		apiv3->comapi.path, Afb_String_Const);
-
-	if (rc >= 0 && preinit != NULL) {
-		rc = preinit(preinit_closure, api_v3_to_api_x3(newapi));
-		if (rc < 0)
-			afb_api_v3_unref(newapi);
-	}
 
 #if WITH_AFB_HOOK
 	if (apiv3->comapi.hookflags & afb_hook_flag_api_new_api)
