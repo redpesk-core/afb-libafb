@@ -84,7 +84,7 @@ int afb_token_get(struct afb_token **token, const char *tokenstring)
 	size_t length;
 
 	/* get length of the token string */
-	length =  + strlen(tokenstring);
+	length = strlen(tokenstring);
 
 	/* concurrency */
 	pthread_mutex_lock(&tokenset.mutex);

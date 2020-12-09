@@ -145,7 +145,7 @@ static struct afb_session *sessionset_search(const char *uuid, uint8_t hashidx)
 	struct afb_session *session;
 
 	session = sessions.first;
-	while (session && hashidx != session->hash && strcmp(uuid, session->uuid))
+	while (session && (hashidx != session->hash || strcmp(uuid, session->uuid)))
 		session = session->next;
 
 	return session;
@@ -174,6 +174,7 @@ static int sessionset_add(struct afb_session *session, uint8_t hashidx)
 		return X_EBUSY;
 
 	/* add the session */
+	session->hash = hashidx;
 	session->next = sessions.first;
 	sessions.first = session;
 	sessions.count++;
