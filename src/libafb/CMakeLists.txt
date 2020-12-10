@@ -88,9 +88,6 @@ INSTALL(FILES
 )
 
 # install pkgconfig file
-list(JOIN deps " " PCREQUIRES)
-list(JOIN privs " " PCLIBSPRIV)
-
 CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
 INSTALL(FILES
 		${CMAKE_CURRENT_BINARY_DIR}/libafb.pc

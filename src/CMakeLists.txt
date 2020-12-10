@@ -37,44 +37,30 @@ set(ldflags
 	${json-c_LDFLAGS}
 )
 
-set(deps
-	json-c
-)
-
-set(privs
-)
-
 if (WITH_SYSTEMD)
 	set(incdirs ${incdirs} ${libsystemd_INCLUDE_DIRS})
 	set(ldflags ${ldflags} ${libsystemd_LDFLAGS})
-	set(deps ${deps} libsystemd)
 endif()
 if (NOT WITHOUT_CYNAGORA)
 	set(incdirs ${incdirs} ${cynagora_INCLUDE_DIRS})
 	set(ldflags ${ldflags} ${cynagora_LDFLAGS})
-	set(deps ${deps} cynagora)
 endif()
 if(WITH_LIBUUID)
 	set(incdirs ${incdirs} ${libuuid_INCLUDE_DIRS})
 	set(ldflags ${ldflags} ${libuuid_LDFLAGS})
-	set(deps ${deps} uuid)
 endif()
 if(WITH_LIBMICROHTTPD)
 	set(incdirs ${incdirs} ${libmicrohttpd_INCLUDE_DIRS})
 	set(ldflags ${ldflags} ${libmicrohttpd_LDFLAGS})
-	set(deps ${deps} libmicrohttpd)
 	if(WITH_LIBMAGIC)
 		set(ldflags ${ldflags} -lmagic)
-		set(privs ${privs} -lmagic)
 	endif()
 endif()
 if(WITH_DYNAMIC_BINDING)
 	set(ldflags ${ldflags} -ldl)
-	set(privs ${privs} -ldl)
 endif()
 if(WITH_SIG_MONITOR_TIMERS)
 	set(ldflags ${ldflags} -lrt)
-	set(privs ${privs} -lrt)
 endif()
 
 INCLUDE_DIRECTORIES(${incdirs})
