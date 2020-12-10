@@ -386,6 +386,29 @@ static void describe_apis(struct afb_req_common *req, struct json_object *resu, 
 	}
 }
 
+static void list_apis_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
+{
+	struct json_object *apis = closure;
+	json_object_object_add(apis, name, aliasto ? json_object_new_string(aliasto) : json_object_new_boolean(1));
+}
+
+static void list_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
+{
+	struct json_object *apis = json_object_new_object();
+	json_object_object_add(resu, _apis_, apis);
+	afb_apiset_enum(monitor_api->call_set, 1, list_apis_cb, apis);
+	afb_json_legacy_req_reply_hookable(req, resu, NULL, NULL);
+}
+
+static void get_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
+{
+	if ((json_object_get_type(spec) == json_type_boolean && !json_object_get_boolean(spec))
+	 || (json_object_get_type(spec) == json_type_string && !strcmp(json_object_get_string(spec), "*")))
+		list_apis(req, resu, spec);
+	else
+		describe_apis(req, resu, spec);
+}
+
 /******************************************************************************
 **** Implementation monitoring verbs
 ******************************************************************************/
@@ -412,7 +435,7 @@ static void f_get_cb(void *closure, struct json_object *args)
 			if (!apis)
 				afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
 			else
-				describe_apis(req, r, apis);
+				get_apis(req, r, apis);
 		}
 	}
 }
