@@ -121,9 +121,9 @@ static int decode_verbosity(struct json_object *v)
  * @param the name of the api to set
  * @param closure the verbosity to set as an integer casted to a pointer
  */
-static void set_verbosity_to_all_cb(void *closure, struct afb_apiset *set, const char *name, int isalias)
+static void set_verbosity_to_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
-	if (!isalias)
+	if (!aliasto)
 		afb_apiset_set_logmask(set, name, (int)(intptr_t)closure);
 }
 
@@ -193,7 +193,7 @@ static struct json_object *encode_verbosity(int level)
  * @param the name of the api to set
  * @param closure the json object to build
  */
-static void get_verbosity_of_all_cb(void *closure, struct afb_apiset *set, const char *name, int isalias)
+static void get_verbosity_of_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
 	struct json_object *resu = closure;
 	int m = afb_apiset_get_logmask(set, name);
@@ -290,7 +290,7 @@ static void add_one_name_to_namelist(struct namelist **head, const char *name, s
 	}
 }
 
-static void get_apis_namelist_of_all_cb(void *closure, struct afb_apiset *set, const char *name, int isalias)
+static void get_apis_namelist_of_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
 	struct namelist **head = closure;
 	add_one_name_to_namelist(head, name, NULL);

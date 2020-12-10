@@ -91,7 +91,7 @@ extern const char **afb_apiset_get_names(struct afb_apiset *set, int rec, int ty
 extern void afb_apiset_enum(
 			struct afb_apiset *set,
 			int rec,
-			void (*callback)(void *closure, struct afb_apiset *set, const char *name, int isalias),
+			void (*callback)(void *closure, struct afb_apiset *set, const char *name, const char *aliasto),
 			void *closure);
 
 extern int afb_apiset_require(struct afb_apiset *set, const char *name, const char *required);

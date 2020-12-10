@@ -979,19 +979,19 @@ struct get_names {
 	int type;
 };
 
-static void get_names_count(void *closure, struct afb_apiset *set, const char *name, int isalias)
+static void get_names_count(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
 	struct get_names *gc = closure;
-	if ((1 + isalias) & gc->type) {
+	if ((2 - !aliasto) & gc->type) {
 		gc->size += strlen(name);
 		gc->count++;
 	}
 }
 
-static void get_names_value(void *closure, struct afb_apiset *set, const char *name, int isalias)
+static void get_names_value(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
 	struct get_names *gc = closure;
-	if ((1 + isalias) & gc->type) {
+	if ((2 - !aliasto) & gc->type) {
 		*gc->ptr++ = gc->data;
 		gc->data = stpcpy(gc->data, name) + 1;
 	}
@@ -1046,7 +1046,7 @@ const char **afb_apiset_get_names(struct afb_apiset *set, int rec, int type)
 void afb_apiset_enum(
 	struct afb_apiset *set,
 	int rec,
-	void (*callback)(void *closure, struct afb_apiset *set, const char *name, int isalias),
+	void (*callback)(void *closure, struct afb_apiset *set, const char *name, const char *aliasto),
 	void *closure)
 {
 	int i;
@@ -1059,12 +1059,12 @@ void afb_apiset_enum(
 		for (i = 0 ; i < iset->apis.count ; i++) {
 			d = iset->apis.apis[i];
 			if (searchrec(set, d->name) == d)
-				callback(closure, iset, d->name, 0);
+				callback(closure, iset, d->name, NULL);
 		}
 		a = iset->aliases;
 		while (a) {
 			if (searchrec(set, a->name) == a->api)
-				callback(closure, iset, a->name, 1);
+				callback(closure, iset, a->name, a->api->name);
 			a = a->next;
 		}
 		iset = rec ? iset->subset : NULL;
