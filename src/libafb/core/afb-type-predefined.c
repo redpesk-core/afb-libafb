@@ -232,18 +232,22 @@ opaque_from_string(
 	struct afb_data *found;
 	struct afb_type *otype;
 
-	rc = sscanf(string, OPAQUE_FMT_RD "%n", &opaqueid, &p);
-	if (rc != 1 || string[p] != term) {
+	if (!string)
 		rc = X_EINVAL;
-	}
 	else {
-		rc = afb_data_get_opacified(opaqueid, &found, &otype);
-		if (rc >= 0) {
-			if (type == otype)
-				*out = found;
-			else {
-				afb_data_unref(found);
-				rc = X_ENOENT;
+		rc = sscanf(string, OPAQUE_FMT_RD "%n", &opaqueid, &p);
+		if (rc != 1 || string[p] != term) {
+			rc = X_EINVAL;
+		}
+		else {
+			rc = afb_data_get_opacified(opaqueid, &found, &otype);
+			if (rc >= 0) {
+				if (type == otype)
+					*out = found;
+				else {
+					afb_data_unref(found);
+					rc = X_ENOENT;
+				}
 			}
 		}
 	}
