@@ -165,7 +165,6 @@ void SHA1_final(SHA1_t *context, uint8_t digest[SHA1_DIGEST_LENGTH])
 	}
 #if WIPE
 	/* Wipe variables */
-	i = j = 0;
 	memset(&finalcount, 0, sizeof finalcount);
 	memset(context, 0, sizeof *context);
 #endif
