@@ -467,7 +467,7 @@ static void *context_create(void *closure)
 {
 	struct afb_req_common *req = closure;
 
-	return afb_trace_create(req->apiname?:_monitor_, NULL);
+	return afb_trace_create(_monitor_, NULL);
 }
 
 static void context_destroy(void *pointer)
