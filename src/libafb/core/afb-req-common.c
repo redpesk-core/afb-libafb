@@ -975,6 +975,18 @@ afb_req_common_session_set_LOA_hookable(
 	return r;
 }
 
+unsigned
+afb_req_common_session_get_LOA_hookable(
+	struct afb_req_common *req
+) {
+	int r = afb_session_get_loa(req->session, req->api);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_session_get_LOA)
+		r = afb_hook_req_session_get_LOA(req, r);
+#endif
+	return r < 0 ? 0 : (unsigned)r;
+}
+
 void
 afb_req_common_session_close_hookable(
 	struct afb_req_common *req

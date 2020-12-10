@@ -78,6 +78,12 @@ afb_req_v4_session_set_LOA_hookable(
 );
 
 extern
+unsigned
+afb_req_v4_session_get_LOA_hookable(
+	struct afb_req_v4 *reqv4
+);
+
+extern
 void
 afb_req_v4_session_close_hookable(
 	struct afb_req_v4 *reqv4

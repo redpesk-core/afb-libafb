@@ -246,6 +246,15 @@ x2_req_session_set_LOA_hookable(
 }
 
 static
+unsigned
+x2_req_session_get_LOA_hookable(
+	struct afb_req_x2 *reqx2
+) {
+	struct afb_req_common *comreq = req_v3_from_req_x2(reqx2)->comreq;
+	return afb_req_common_session_get_LOA_hookable(comreq);
+}
+
+static
 void
 x2_req_session_close_hookable(
 	struct afb_req_x2 *reqx2
@@ -510,6 +519,7 @@ const struct afb_req_x2_itf req_v3_itf = {
 	.subcall = x2_req_subcall_hookable,
 	.subcallsync = x2_req_subcall_sync_hookable,
 	.check_permission = x2_req_check_permission, /* TODO */
+	.session_get_LOA = x2_req_session_get_LOA_hookable,
 };
 
 /******************************************************************************/

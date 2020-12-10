@@ -305,6 +305,12 @@ afb_req_common_session_set_LOA_hookable(
 );
 
 extern
+unsigned
+afb_req_common_session_get_LOA_hookable(
+	struct afb_req_common *req
+);
+
+extern
 int
 afb_req_common_subscribe_hookable(
 	struct afb_req_common *req,

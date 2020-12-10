@@ -287,6 +287,11 @@ static void hook_req_session_set_LOA_cb(void *closure, const struct afb_hookid *
 	_hook_req_(req, "session_set_LOA(%u) -> %d", level, result);
 }
 
+static void hook_req_session_get_LOA_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, unsigned result)
+{
+	_hook_req_(req, "session_get_LOA -> %u", result);
+}
+
 static void hook_req_subscribe_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_evt *evt, int result)
 {
 	_hook_req_(req, "subscribe(%s:%d) -> %d", afb_evt_fullname(evt), afb_evt_id(evt), result);
@@ -370,6 +375,7 @@ static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_unref = hook_req_unref_cb,
 	.hook_req_session_close = hook_req_session_close_cb,
 	.hook_req_session_set_LOA = hook_req_session_set_LOA_cb,
+	.hook_req_session_get_LOA = hook_req_session_get_LOA_cb,
 	.hook_req_subscribe = hook_req_subscribe_cb,
 	.hook_req_unsubscribe = hook_req_unsubscribe_cb,
 	.hook_req_subcall = hook_req_subcall_cb,
@@ -454,6 +460,12 @@ void afb_hook_req_session_close(const struct afb_req_common *req)
 int afb_hook_req_session_set_LOA(const struct afb_req_common *req, unsigned level, int result)
 {
 	_HOOK_XREQ_(session_set_LOA, req, level, result);
+	return result;
+}
+
+int afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result)
+{
+	_HOOK_XREQ_(session_get_LOA, req, result);
 	return result;
 }
 

@@ -154,6 +154,13 @@ afb_req_v4_session_set_LOA_hookable(
 	return afb_req_common_session_set_LOA_hookable(reqv4->comreq, level);
 }
 
+unsigned
+afb_req_v4_session_get_LOA_hookable(
+	struct afb_req_v4 *reqv4
+) {
+	return afb_req_common_session_get_LOA_hookable(reqv4->comreq);
+}
+
 void
 afb_req_v4_session_close_hookable(
 	struct afb_req_v4 *reqv4

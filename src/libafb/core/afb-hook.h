@@ -81,7 +81,7 @@ struct afb_hookid
 #define afb_hook_flag_req_subcallsync_result	0x00020000
 #define afb_hook_flag_req_vverbose		0x00040000
 #define __afb_hook_spare_3			0x00080000
-#define __afb_hook_spare_4			0x00100000
+#define afb_hook_flag_req_session_get_LOA	0x00100000
 #define afb_hook_flag_req_has_permission	0x00200000
 #define afb_hook_flag_req_get_application_id	0x00400000
 #define afb_hook_flag_req_context_make		0x00800000
@@ -90,7 +90,8 @@ struct afb_hookid
 /* common flags */
 #define afb_hook_flags_req_life		(afb_hook_flag_req_begin|afb_hook_flag_req_end)
 #define afb_hook_flags_req_args		(afb_hook_flag_req_json|afb_hook_flag_req_get)
-#define afb_hook_flags_req_session	(afb_hook_flag_req_session_close|afb_hook_flag_req_session_set_LOA)
+#define afb_hook_flags_req_session	(afb_hook_flag_req_session_close|afb_hook_flag_req_session_set_LOA\
+					|afb_hook_flag_req_session_get_LOA)
 #define afb_hook_flags_req_event	(afb_hook_flag_req_subscribe|afb_hook_flag_req_unsubscribe)
 #define afb_hook_flags_req_subcalls	(afb_hook_flag_req_subcall|afb_hook_flag_req_subcall_result\
 					|afb_hook_flag_req_subcallsync|afb_hook_flag_req_subcallsync_result)
@@ -118,6 +119,7 @@ struct afb_hook_req_itf {
 	void (*hook_req_unref)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req);
 	void (*hook_req_session_close)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req);
 	void (*hook_req_session_set_LOA)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, unsigned level, int result);
+	void (*hook_req_session_get_LOA)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, unsigned result);
 	void (*hook_req_subscribe)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_evt *evt, int result);
 	void (*hook_req_unsubscribe)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct afb_evt *evt, int result);
 	void (*hook_req_subcall)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[]);
@@ -148,6 +150,7 @@ extern void afb_hook_req_addref(const struct afb_req_common *req);
 extern void afb_hook_req_unref(const struct afb_req_common *req);
 extern void afb_hook_req_session_close(const struct afb_req_common *req);
 extern int afb_hook_req_session_set_LOA(const struct afb_req_common *req, unsigned level, int result);
+extern int afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result);
 extern int afb_hook_req_subscribe(const struct afb_req_common *req, struct afb_evt *evt, int result);
 extern int afb_hook_req_unsubscribe(const struct afb_req_common *req, struct afb_evt *evt, int result);
 extern void afb_hook_req_subcall(const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[], int flags);

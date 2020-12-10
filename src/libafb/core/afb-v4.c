@@ -246,6 +246,10 @@ const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.timer_addref = ev_timer_addref,
 	.timer_unref = ev_timer_unref,
 
+/*-- EXTRA FUNCTIONS -----------------------------------*/
+
+	.req_session_get_LOA = afb_req_v4_session_get_LOA_hookable,
+
 /*-- END -----------------------------------*/
 };
 

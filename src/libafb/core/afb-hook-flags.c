@@ -72,6 +72,7 @@ static struct flag req_flags[] = { /* must be sorted by names */
 		{ "session",		afb_hook_flags_req_session },
 		{ "session_close",	afb_hook_flag_req_session_close },
 		{ "session_set_LOA",	afb_hook_flag_req_session_set_LOA },
+		{ "session_get_LOA",	afb_hook_flag_req_session_get_LOA },
 		{ "subcall",		afb_hook_flag_req_subcall },
 		{ "subcall_result",	afb_hook_flag_req_subcall_result },
 		{ "subcalls",		afb_hook_flags_req_subcalls },
