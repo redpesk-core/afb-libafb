@@ -27,6 +27,7 @@ Description: Client library for communicating with afb framework
 Version: @LIBAFBCLI_VERSION@
 URL: @PROJECT_URL@
 
+Requires: json-c libsystemd
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
-Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbcli @libsystemd_LDFLAGS@ @json-c_LDFLAGS@
+Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbcli
 
