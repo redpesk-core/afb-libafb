@@ -66,6 +66,7 @@ afb_json_legacy_make_data_stringz_len_mode(
 	int rc;
 	const void *val = 0;
 	void *clo = 0;
+	size_t lenp1;
 
 	if (len >= UINT32_MAX) {
 		if (mode == Afb_String_Free)
@@ -76,10 +77,11 @@ afb_json_legacy_make_data_stringz_len_mode(
 	else {
 		rc = 0;
 		if (!string) {
-			len = 0;
+			lenp1 = 0;
 			val = clo = 0;
 		}
 		else {
+			lenp1 = 1 + len;
 			switch(mode) {
 			case Afb_String_Const:
 				val = string;
@@ -90,9 +92,9 @@ afb_json_legacy_make_data_stringz_len_mode(
 				clo = (void*)string;
 				break;
 			case Afb_String_Copy:
-				val = clo = malloc(1 + len);
+				val = clo = malloc(lenp1);
 				if (clo)
-					memcpy(clo, string, 1 + len);
+					memcpy(clo, string, lenp1);
 				else {
 					*data = NULL;
 					rc = X_ENOMEM;
@@ -102,7 +104,7 @@ afb_json_legacy_make_data_stringz_len_mode(
 		}
 		if (rc == 0) {
 			rc = afb_data_create_raw(data,
-						&afb_type_predefined_stringz, val, 1 + len, clo ? free : 0, clo);
+						&afb_type_predefined_stringz, val, lenp1, clo ? free : 0, clo);
 		}
 	}
 	return rc;
