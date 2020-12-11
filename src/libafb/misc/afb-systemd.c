@@ -25,25 +25,37 @@
 
 #if WITH_SYSTEMD
 
+#include <string.h>
 #include <systemd/sd-event.h>
 
 #include "misc/afb-systemd.h"
 #include "core/afb-ev-mgr.h"
 #include "sys/systemd.h"
 #include "sys/x-errno.h"
+#include "sys/verbose.h"
 
 static void onprepare(struct ev_prepare *prep, void *closure)
 {
 	struct sd_event *ev = closure;
-	while(sd_event_prepare(ev) > 0)
+	int rc = sd_event_prepare(ev);
+	while(rc > 0) {
 		sd_event_dispatch(ev);
+		rc = sd_event_prepare(ev);
+	}
+	if (rc < 0)
+		ERROR("sd_event_prepare returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 }
 
 static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct sd_event *ev = closure;
-	if (sd_event_wait(ev, 0) > 0)
+	int rc = sd_event_wait(ev, 0);
+	if (rc > 0) {
 		sd_event_dispatch(ev);
+		rc = sd_event_wait(ev, 0);
+	}
+	if (rc < 0)
+		ERROR("sd_event_wait returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 }
 
 struct sd_event *afb_systemd_get_event_loop()

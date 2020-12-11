@@ -257,8 +257,10 @@ static int evloop_get(void *me)
  */
 static void evloop_sig_run(int signum, void *closure)
 {
-	if (signum)
+	if (signum) {
+		ERROR("Signal %s catched in evloop", strsignal(signum));
 		ev_mgr_recover_run(evmgr);
+	}
 	else {
 		long delayms = (long)(intptr_t)closure;
 		int to = delayms < 0 ? -1 : delayms <= INT_MAX ? (int)delayms : INT_MAX;
