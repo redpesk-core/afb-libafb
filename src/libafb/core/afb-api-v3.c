@@ -162,7 +162,9 @@ x3_api_queue_job_hookable(
 	int timeout
 ) {
 	struct afb_api_common *comapi = api_x3_to_api_common(apix3);
-	return afb_api_common_post_job_hookable(comapi, 0, timeout, callback, argument, group);
+	return timeout < 0
+		? afb_api_common_post_job_hookable(comapi, -(long)timeout, 0, callback, argument, group)
+		: afb_api_common_post_job_hookable(comapi, 0, timeout, callback, argument, group);
 }
 
 static
