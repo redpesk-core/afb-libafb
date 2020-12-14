@@ -280,22 +280,10 @@ static void end_handler(void *cls, struct MHD_Connection *connection, void **rec
 	}
 }
 
-static void do_run(int signum, void *arg)
-{
-	MHD_UNSIGNED_LONG_LONG to;
-	struct afb_hsrv *hsrv = arg;
-
-	if (!signum) {
-		do { MHD_run(hsrv->httpd); } while(MHD_get_timeout(hsrv->httpd, &to) == MHD_YES && !to);
-	}
-	ev_fd_set_events(hsrv->efd, EPOLLIN);
-}
-
 void afb_hsrv_run(struct afb_hsrv *hsrv)
 {
-	ev_fd_set_events(hsrv->efd, 0);
-	if (afb_sched_post_job(hsrv, 0, 0, do_run, hsrv) < 0)
-		do_run(0, hsrv);
+        MHD_UNSIGNED_LONG_LONG to;
+        do { MHD_run(hsrv->httpd); } while(MHD_get_timeout(hsrv->httpd, &to) == MHD_YES && !to);
 }
 
 static void listen_callback(struct ev_fd *efd, int fd, uint32_t revents, void *hsrv)
