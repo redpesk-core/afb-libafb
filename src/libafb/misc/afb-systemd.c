@@ -37,23 +37,36 @@
 static void onprepare(struct ev_prepare *prep, void *closure)
 {
 	struct sd_event *ev = closure;
-	int rc = sd_event_prepare(ev);
-	while(rc > 0) {
-		sd_event_dispatch(ev);
+	int rc;
+
+	switch (sd_event_get_state(ev)) {
+	case SD_EVENT_ARMED:
+		rc = sd_event_wait(ev, 0);
+		if (rc > 0)
+			sd_event_dispatch(ev);
+		/*@fallthrough@*/
+	case SD_EVENT_INITIAL:
 		rc = sd_event_prepare(ev);
+		while(rc > 0) {
+			sd_event_dispatch(ev);
+			rc = sd_event_prepare(ev);
+		}
+		if (rc < 0)
+			ERROR("sd_event_prepare returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
+		/*@fallthrough@*/
+	default:
+		break;
 	}
-	if (rc < 0)
-		ERROR("sd_event_prepare returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 }
 
 static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct sd_event *ev = closure;
-	int rc = sd_event_wait(ev, 0);
-	if (rc > 0) {
+	int rc;
+
+	rc = sd_event_wait(ev, 0);
+	if (rc > 0)
 		sd_event_dispatch(ev);
-		rc = sd_event_wait(ev, 0);
-	}
 	if (rc < 0)
 		ERROR("sd_event_wait returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 }
@@ -69,8 +82,8 @@ struct sd_event *afb_systemd_get_event_loop()
 	result = systemd_get_event_loop();
 	if (result && !set) {
 		fd = sd_event_get_fd(result);
-		afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, result, 1, 0);
 		afb_ev_mgr_add_prepare(&prep, onprepare, result);
+		afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, result, 1, 0);
 		set = 1;
 	}
 	return result;
