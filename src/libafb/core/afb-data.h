@@ -150,7 +150,14 @@ afb_data_convert_to(
 	struct afb_data **result
 );
 
-/* update a data */
+/**
+ * Update the value of the given data with the given value
+ *
+ * @param data the data to be changed, must be mutable
+ * @param value the value to set to data, possibly with convertion
+ *
+ * @return 0 on success or a negative -errno like value
+ */
 extern
 int
 afb_data_update(
@@ -159,9 +166,10 @@ afb_data_update(
 );
 
 /**
- * Clear cache of conversions but not the data itself
+ * Notifies that the data changed and that any of its conversions are not
+ * more valid.
  *
- * @param data the data to clear
+ * @param data the data that changed
  */
 extern
 void
@@ -169,56 +177,99 @@ afb_data_notify_changed(
 	struct afb_data *data
 );
 
-/* test if constant */
+/**
+ * Tests if the data is constant.
+ *
+ * @param data the data to test
+ *
+ * @return 1 if the data is constant or 0 otherwise
+ */
 extern
 int
 afb_data_is_constant(
 	struct afb_data *data
 );
 
-/* set as constant */
+/**
+ * Makes the data constant
+ *
+ * @param data the data to set
+ */
 extern
 void
 afb_data_set_constant(
 	struct afb_data *data
 );
 
-/* set as not constant */
+/**
+ * Makes the data not constant
+ *
+ * @param data the data to set
+ */
 extern
 void
 afb_data_set_not_constant(
 	struct afb_data *data
 );
 
-/* test if volatile */
+/**
+ * Tests if the data is volatile. Conversions of volatile data are never cached.
+ *
+ * @param data the data to test
+ *
+ * @return 1 if the data is volatile or 0 otherwise
+ */
 extern
 int
 afb_data_is_volatile(
 	struct afb_data *data
 );
 
-/* set as volatile */
+/**
+ * Makes the data volatile
+ *
+ * @param data the data to set
+ */
 extern
 void
 afb_data_set_volatile(
 	struct afb_data *data
 );
 
-/* set as not volatile */
+/**
+ * Makes the data not volatile
+ *
+ * @param data the data to set
+ */
 extern
 void
 afb_data_set_not_volatile(
 	struct afb_data *data
 );
 
-/* opacifies the data and returns its opaque id */
+/**
+ * Opacifies the data and returns its opaque id
+ *
+ * @param data the data to be opacified
+ *
+ * @return a positive opaque id or a negative
+ * value -errno like error value in case of error
+ */
 extern
 int
 afb_data_opacify(
 	struct afb_data *data
 );
 
-/* get the data of the given opaque id */
+/**
+ * Get the data associated to the given opaque id
+ *
+ * @param opaqueid the id to search
+ * @param data pointer to the returned data, must not be null
+ * @param type pointer to the type of the returned data, must not be null
+ *
+ * @return 0 in case of success or a negative -errno like value (-EINVAL or -ENOENT)
+ */
 extern
 int
 afb_data_get_opacified(
@@ -227,6 +278,15 @@ afb_data_get_opacified(
 	struct afb_type **type
 );
 
+/**
+ * Gets a mutable pointer to the data and also its size
+ *
+ * @param data the data
+ * @param pointer if not NULL address where to store the pointer
+ * @param size if not NULL address where to store the size
+ *
+ * @return 0 in case of success or -1 in case of error
+ */
 extern
 int
 afb_data_get_mutable(
@@ -234,6 +294,15 @@ afb_data_get_mutable(
 	void **pointer,
 	size_t *size);
 
+/**
+ * Gets a mutable pointer to the data.
+ * Getting a mutable pointer has the effect of
+ * notifying that the data changed.
+ *
+ * @param data the data
+ *
+ * @return the pointer (can be NULL)
+ */
 extern
 int
 afb_data_get_constant(
@@ -241,26 +310,72 @@ afb_data_get_constant(
 	const void **pointer,
 	size_t *size);
 
+/**
+ * Locks the data for read, blocks the current thread
+ * until the data is available for reading.
+ *
+ * The data MUST be unlocked afterward using 'afb_data_unlock'
+ *
+ * @param data the data to lock for read
+ */
 extern
 void
 afb_data_lock_read(
 	struct afb_data *data);
 
+/**
+ * Try to locks the data for read. Always return immediately
+ * with a status indicating whether the data has been locked
+ * for read or whether it wasn't possible to lock it for read.
+ *
+ * If the lock was successful, the data MUST be unlocked
+ * afterward using 'afb_data_unlock'.
+ *
+ * @param data the data to lock for read
+ *
+ * @return 0 in case of success or a negative -errno status if not locked
+ */
 extern
 int
 afb_data_try_lock_read(
 	struct afb_data *data);
 
+/**
+ * Locks the data for write, blocks the current thread
+ * until the data is available for writing.
+ *
+ * The data MUST be unlocked afterward using 'afb_data_unlock'
+ *
+ * @param data the data to lock for write
+ */
 extern
 void
 afb_data_lock_write(
 	struct afb_data *data);
 
+/**
+ * Try to locks the data for write. Always return immediately
+ * with a status indicating whether the data has been locked
+ * for write or whether it wasn't possible to lock it for write.
+ *
+ * If the lock was successful, the data MUST be unlocked
+ * afterward using 'afb_data_unlock'.
+ *
+ * @param data the data to lock for write
+ *
+ * @return 0 in case of success or a negative -errno status if not locked
+ */
 extern
 int
 afb_data_try_lock_write(
 	struct afb_data *data);
 
+/**
+ * Unlock a locked data. It is an error to unlock a data that
+ * the current thread doesn't hold locked.
+ *
+ * @param data the data to unlock
+ */
 extern
 void
 afb_data_unlock(

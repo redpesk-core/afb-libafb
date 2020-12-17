@@ -465,8 +465,6 @@ static void f_set(struct afb_req_common *req)
 #if WITH_AFB_TRACE
 static void *context_create(void *closure)
 {
-	struct afb_req_common *req = closure;
-
 	return afb_trace_create(_monitor_, NULL);
 }
 

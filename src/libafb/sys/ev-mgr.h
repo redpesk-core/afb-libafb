@@ -149,6 +149,17 @@ struct ev_fd;
 
 typedef void (*ev_fd_cb_t)(struct ev_fd *efd, int fd, uint32_t revents, void *closure);
 
+/**
+ * Callbacks of file event handlers
+ *
+ * These callbacks are called when an event occurs on the handled
+ * file descriptor.
+ *
+ * @param efd the file event handler object
+ * @param fd the file descriptor index
+ * @param revents the received events
+ * @param closure the closure given at creation
+ */
 extern int ev_mgr_add_fd(
 		struct ev_mgr *mgr,
 		struct ev_fd **efd,
@@ -171,9 +182,18 @@ extern void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closu
 
 /******************************************************************************/
 
-
 struct ev_timer;
 
+/**
+ * Callbacks of timers
+ *
+ * These callbacks are called when a programmed time even occurs.
+ *
+ * @param timer the timer object
+ * @param closure the closure given at creation
+ * @param decount reverse index of the event: zero for infinite timer
+ *                or a decreasing value finishing with 1
+ */
 typedef void (*ev_timer_cb_t)(struct ev_timer *timer, void *closure, int decount);
 
 extern int ev_mgr_add_timer(
@@ -191,4 +211,3 @@ extern int ev_mgr_add_timer(
 
 extern struct ev_timer *ev_timer_addref(struct ev_timer *timer);
 extern void ev_timer_unref(struct ev_timer *timer);
-

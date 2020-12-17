@@ -26,27 +26,100 @@
 struct afb_data;
 struct afb_type;
 
+/**
+ * The type afb_type_converter_x4_t denote a conversion callback.
+ *
+ * A conversion callback receives 4 parameters:
+ *
+ * @param closure   A closure defined when converter is declared
+ * @param from      The data to convert
+ * @param type      The type to convert to
+ * @param to        Where to store the result of the conversion
+ *
+ * @return It should return an integer status of 0 in case of success
+ *         or a negative value indicating the error.
+ */
 typedef int (*afb_type_converter_t)(
 			void *closure,
 			struct afb_data *from,
 			struct afb_type *type,
 			struct afb_data **to);
 
+/**
+ * The type afb_type_updater_x4_t denote a conversion callback that is able
+ * to update the target instead of creating it.
+ *
+ * A conversion callback receives 4 parameters:
+ *
+ * @param  closure   A closure defined when converter is declared
+ * @param  from      The data of reference
+ * @param  type      The type of the data to update
+ * @param  to        the existing data to update from the given reference
+ *
+ * @return It should return an integer status of 0 in case of success
+ *         or a negative value indicating the error.
+ */
 typedef int (*afb_type_updater_t)(
 			void *closure,
 			struct afb_data *from,
 			struct afb_type *type,
 			struct afb_data *to);
 
+/**
+ * Register a type
+ *
+ * @param type pointer to the returned created type
+ * @param name name of the type to be created
+ * @param streamable boolean, true if type can be streamed
+ * @param shareable boolean, true if type can be shared through memory
+ * @param opaque boolean, true if type can be opacified
+ *
+ * @return 0 in case of success or a negative error code
+ */
 extern int afb_type_register(struct afb_type **result, const char *name, int streamable, int shareable, int opaque);
+
+/**
+ * Get the type of given name
+ *
+ * @param name queried type name
+ *
+ * @return the found type of NULL if not found
+ */
 extern struct afb_type *afb_type_get(const char *name);
+
+/**
+ * Get the name of a type
+ *
+ * @param type the type whose name is queried
+ *
+ * @return the name of the type
+ */
 extern const char *afb_type_name(const struct afb_type *type);
 
+/**
+ * Set the family of the type. An instance of a type naturally converts
+ * to an instance of its family.
+ *
+ * @param type the type whose family is to update
+ * @param family the family to set to the type
+ *
+ * @return 0 on success or a negative -errno like error code
+ */
 extern int afb_type_set_family(
 	struct afb_type *type,
 	struct afb_type *family
 );
 
+/**
+ * Add a convertion routine to a given type
+ *
+ * @param fromtype the reference from type
+ * @param totype the type to convert to
+ * @param converter the converter routine
+ * @param closure the closure for the converter
+ *
+ * @return 0 in case of success or a negative error code
+ */
 extern int afb_type_add_converter(
 	struct afb_type *fromtype,
 	struct afb_type *totype,
@@ -69,7 +142,23 @@ extern int afb_type_add_updater(
  * @return 1 if opaque, 0 if not
  */
 extern int afb_type_is_opaque(const struct afb_type *type);
+
+/**
+ * Is the given type streamable
+ *
+ * @param type type to test
+ *
+ * @return 1 if streamable, 0 if not
+ */
 extern int afb_type_is_streamable(const struct afb_type *type);
+
+/**
+ * Is the given type shareable
+ *
+ * @param type type to test
+ *
+ * @return 1 if shareable, 0 if not
+ */
 extern int afb_type_is_shareable(const struct afb_type *type);
 
 extern

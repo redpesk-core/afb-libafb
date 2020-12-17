@@ -410,7 +410,7 @@ static int start_one_thread()
 }
 
 /**
- * Adapt the current threadung to current job requirement
+ * Adapt the current threading to current job requirement
  */
 static void adapt(int delayed)
 {
