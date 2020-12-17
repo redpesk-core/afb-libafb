@@ -33,8 +33,8 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
-#include <afb/afb-binding-v3.h>
-#include <afb/afb-req-x2.h>
+#include <afb/afb-auth.h>
+#include <afb/afb-session.h>
 
 #include "sys/x-errno.h"
 #include "core/afb-apiset.h"
