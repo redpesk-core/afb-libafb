@@ -24,6 +24,10 @@
 
 #include "libafb-config.h"
 
+#if !BACKEND_PERMISSION_IS_CYNAGORA
+# error "CYNAGORA BACKEND IS EXPECTED FOR THAT TEST"
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
