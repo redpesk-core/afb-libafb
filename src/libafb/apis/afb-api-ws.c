@@ -83,12 +83,12 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 			rc = X_ENOMEM;
 		} else {
 			if (afb_stub_ws_client_add(stubws, declare_set) >= 0) {
-#if 1
-				/* it is asserted here that uri is never released */
-				afb_stub_ws_client_robustify(stubws, reopen_client, (void*)uri, NULL);
-#else
+#if WITH_WSCLIENT_URI_COPY
 				/* it is asserted here that uri is released, so use a copy */
 				afb_stub_ws_client_robustify(stubws, reopen_client, strdup(uri), free);
+#else
+				/* it is asserted here that uri is never released */
+				afb_stub_ws_client_robustify(stubws, reopen_client, (void*)uri, NULL);
 #endif
 				return 0;
 			}

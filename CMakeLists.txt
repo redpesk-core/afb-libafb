@@ -85,6 +85,7 @@ option(WITH_FDEV_SELECT           "Use select implementation of fdev"      OFF)
 option(WITH_FDEV_SYSTEMD          "Use systemd implementation of fdev"     ON)
 option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
 option(WITH_LOCALE_SEARCH_NODE    "Use folder in searchs in locale-root"   ON) # TODO: set to OFF
+option(WITH_WSCLIENT_URI_COPY     "Copy URI of ws-client specification"    OFF)
 # system adaptation
 option(WITH_FNMATCH               "Use fnmatch where possible"             ON)
 option(WITH_LIBUUID               "Activates use of lib uuid"              ON)

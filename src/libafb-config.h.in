@@ -63,6 +63,7 @@
 #cmakedefine01 WITH_SYS_UIO
 #cmakedefine01 WITH_LOCALE_FOLDER
 #cmakedefine01 WITH_LOCALE_SEARCH_NODE
+#cmakedefine01 WITH_WSCLIENT_URI_COPY
 #cmakedefine01 WITH_REALPATH
 #cmakedefine01 WITH_CRED
 #cmakedefine01 WITH_UNIX_SOCKET
