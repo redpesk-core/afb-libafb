@@ -33,6 +33,7 @@
 #include "core/afb-apiset.h"
 #include "apis/afb-api-ws.h"
 #include "misc/afb-socket.h"
+#include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
 #include "wsapi/afb-stub-ws.h"
 #include "sys/verbose.h"
@@ -55,6 +56,7 @@ static void client_on_hangup(struct afb_stub_ws *client)
 {
 	const char *apiname = afb_stub_ws_name(client);
 	WARNING("Disconnected of API %s", apiname);
+	afb_monitor_api_disconnected(apiname);
 }
 
 static int reopen_client(void *closure)

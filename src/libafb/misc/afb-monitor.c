@@ -39,16 +39,21 @@
 #include "core/afb-session.h"
 #include "core/afb-error-text.h"
 #include "core/afb-json-legacy.h"
+#include "core/afb-data.h"
+#include "core/afb-type-predefined.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
 #include "utils/wrap-json.h"
 
 static const char _apis_[] = "apis";
+static const char _disconnected_[] = "disconnected";
 static const char _get_[] = "get";
 static const char _monitor_[] = "monitor";
 static const char _session_[] = "session";
 static const char _set_[] = "set";
+static const char _subscribe_[] = "subscribe";
 static const char _trace_[] = "trace";
+static const char _unsubscribe_[] = "unsubscribe";
 static const char _verbosity_[] = "verbosity";
 
 static const char _debug_[] = "debug";
@@ -58,6 +63,7 @@ static const char _warning_[] = "warning";
 static const char _error_[] = "error";
 
 static struct afb_api_common *monitor_api;
+static struct afb_evt *evt_disconnected;
 
 static void monitor_process(void *closure, struct afb_req_common *req);
 static void monitor_describe(void *closure, void (*describecb)(void *, struct json_object *), void *clocb);
@@ -87,10 +93,64 @@ int afb_monitor_init(struct afb_apiset *declare_set, struct afb_apiset *call_set
 			item.group = NULL;
 			item.itf = &monitor_itf;
 			rc = afb_apiset_add(declare_set, _monitor_, item);
+			afb_evt_create2(&evt_disconnected, _monitor_, _disconnected_);
 		}
 	}
 
 	return rc;
+}
+
+void afb_monitor_api_disconnected(const char *apiname)
+{
+	struct afb_data *param;
+	if (evt_disconnected) {
+		afb_data_create_copy(&param, &afb_type_predefined_stringz, apiname, 1 + strlen(apiname));
+		afb_evt_push(evt_disconnected, 1, &param);
+	}
+}
+
+/******************************************************************************
+**** Monitoring events
+******************************************************************************/
+
+/**
+ * Subscribe or unsubscribe events
+ * @param spec specification of the verbosity to set
+ */
+static void set_sub_unsub(
+		struct afb_req_common *req,
+		struct json_object *list,
+		int (*action)(struct afb_req_common *req, struct afb_evt *evt)
+) {
+	int i, n;
+	struct afb_evt *evt;
+	struct json_object *obj;
+	const char *evname;
+
+	if (json_object_is_type(list, json_type_array)) {
+		n = (int)json_object_array_length(list);
+		if (n == 0)
+			return;
+		obj = json_object_array_get_idx(list, 0);
+	}
+	else  {
+		n = 1;
+		obj = list;
+	}
+	i = 0;
+	for(;;) {
+		if (json_object_is_type(obj, json_type_string)) {
+			evname = json_object_get_string(obj);
+			evt = 0;
+			if (0 == strcmp(evname, _disconnected_))
+				evt = evt_disconnected;
+			if (evt)
+				action(req, evt);
+		}
+		if (++i >= n)
+			return;
+		obj = json_object_array_get_idx(list, i);
+	}
 }
 
 /******************************************************************************
@@ -448,11 +508,18 @@ static void f_get(struct afb_req_common *req)
 static void f_set_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
-	struct json_object *verbosity = NULL;
+	struct json_object *verbosity = NULL,  *subscribe = NULL,  *unsubscribe = NULL;
 
-	wrap_json_unpack(args, "{s?:o}", _verbosity_, &verbosity);
+	wrap_json_unpack(args, "{s?o s?o s?o}",
+				_verbosity_, &verbosity,
+				_subscribe_, &subscribe,
+				_unsubscribe_, &unsubscribe);
 	if (verbosity)
 		set_verbosity(verbosity);
+	if (unsubscribe)
+		set_sub_unsub(req, unsubscribe, afb_req_common_unsubscribe_hookable);
+	if (subscribe)
+		set_sub_unsub(req, subscribe, afb_req_common_subscribe_hookable);
 
 	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
 }
@@ -460,6 +527,32 @@ static void f_set_cb(void *closure, struct json_object *args)
 static void f_set(struct afb_req_common *req)
 {
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_set_cb, req);
+}
+
+static void f_subscribe_cb(void *closure, struct json_object *args)
+{
+	struct afb_req_common *req = closure;
+
+	set_sub_unsub(req, args, afb_req_common_subscribe_hookable);
+	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+}
+
+static void f_subscribe(struct afb_req_common *req)
+{
+	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_subscribe_cb, req);
+}
+
+static void f_unsubscribe_cb(void *closure, struct json_object *args)
+{
+	struct afb_req_common *req = closure;
+
+	set_sub_unsub(req, args, afb_req_common_unsubscribe_hookable);
+	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+}
+
+static void f_unsubscribe(struct afb_req_common *req)
+{
+	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_unsubscribe_cb, req);
 }
 
 #if WITH_AFB_TRACE
@@ -550,10 +643,16 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 			fun = f_set;
 		else if (0 == strcmp(req->verbname, _session_))
 			fun = f_session;
+		else if (0 == strcmp(req->verbname, _subscribe_))
+			fun = f_subscribe;
 		break;
 	case 't':
 		if (0 == strcmp(req->verbname, _trace_))
 			fun = f_trace;
+		break;
+	case 'u':
+		if (0 == strcmp(req->verbname, _unsubscribe_))
+			fun = f_unsubscribe;
 		break;
 	default:
 		break;
