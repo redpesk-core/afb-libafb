@@ -51,10 +51,20 @@ struct api_ws_server
 /***       C L I E N T                                                      ***/
 /******************************************************************************/
 
+static void client_on_hangup(struct afb_stub_ws *client)
+{
+	const char *apiname = afb_stub_ws_name(client);
+	WARNING("Disconnected of API %s", apiname);
+}
+
 static int reopen_client(void *closure)
 {
 	const char *uri = closure;
-	return afb_socket_open(uri, 0);
+	const char *apiname = afb_socket_api(uri);
+	int fd = afb_socket_open(uri, 0);
+	if (fd >= 0)
+		INFO("Reconnected to API %s", apiname);
+	return fd;
 }
 
 int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
@@ -90,6 +100,7 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 				/* it is asserted here that uri is never released */
 				afb_stub_ws_client_robustify(stubws, reopen_client, (void*)uri, NULL);
 #endif
+				afb_stub_ws_set_on_hangup(stubws, client_on_hangup);
 				return 0;
 			}
 			ERROR("can't add the client to the apiset for service %s", uri);
@@ -115,6 +126,13 @@ int afb_api_ws_add_client_weak(const char *uri, struct afb_apiset *declare_set, 
 /***       S E R V E R                                                      ***/
 /******************************************************************************/
 
+static void server_on_hangup(struct afb_stub_ws *server)
+{
+	const char *apiname = afb_stub_ws_name(server);
+	INFO("Disconnection of client of API %s", apiname);
+	afb_stub_ws_unref(server);
+}
+
 static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 {
 	int fdc;
@@ -129,7 +147,7 @@ static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 	} else {
 		server = afb_stub_ws_create_server(fdc, &apiws->uri[apiws->offapi], apiws->apiset);
 		if (server)
-			afb_stub_ws_set_on_hangup(server, afb_stub_ws_unref);
+			afb_stub_ws_set_on_hangup(server, server_on_hangup);
 		else
 			ERROR("can't serve accepted connection to %s", apiws->uri);
 	}
