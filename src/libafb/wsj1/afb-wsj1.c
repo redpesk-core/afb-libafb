@@ -38,6 +38,7 @@
 #include "wsj1/afb-wsj1.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
+#include "sys/x-uio.h"
 
 #define CALL 2
 #define RETOK 3
@@ -519,14 +520,104 @@ int afb_wsj1_close(struct afb_wsj1 *wsj1, uint16_t code, const char *text)
 
 static int wsj1_send_isot(struct afb_wsj1 *wsj1, int i1, const char *s1, const char *o1, const char *t1)
 {
-	char code[2] = { (char)('0' + i1), 0 };
-	return afb_ws_texts(wsj1->ws, "[", code, ",\"", s1, "\",", o1 == NULL ? "null" : o1, t1 != NULL ? ",\"" : "]", t1, "\"]", NULL);
+	struct iovec ios[7];
+	char head[4] = { '[', (char)('0' + i1), ',', '"' };
+	int n;
+
+	ios[0].iov_base = head;
+	ios[0].iov_len = 4;
+	ios[1].iov_base = (void*)s1;
+	ios[1].iov_len = strlen(s1);
+	if (!o1) {
+		if (!t1) {
+			ios[2].iov_base = "\",null]";
+			ios[2].iov_len = 7;
+			n = 3;
+		}
+		else {
+			ios[2].iov_base = "\",null,\"";
+			ios[2].iov_len = 8;
+			ios[3].iov_base = (void*)t1;
+			ios[3].iov_len = strlen(t1);
+			ios[4].iov_base = "\"]";
+			ios[4].iov_len = 2;
+			n = 5;
+		}
+	}
+	else {
+		ios[2].iov_base = "\",";
+		ios[2].iov_len = 2;
+		ios[3].iov_base = (void*)o1;
+		ios[3].iov_len = strlen(o1);
+		if (!t1) {
+			ios[4].iov_base = "]";
+			ios[4].iov_len = 1;
+			n = 5;
+		}
+		else {
+			ios[4].iov_base = ",\"";
+			ios[4].iov_len = 2;
+			ios[5].iov_base = (void*)t1;
+			ios[5].iov_len = strlen(t1);
+			ios[6].iov_base = "\"]";
+			ios[6].iov_len = 2;
+			n = 7;
+		}
+	}
+	return afb_ws_text_v(wsj1->ws, ios, n);
 }
 
 static int wsj1_send_issot(struct afb_wsj1 *wsj1, int i1, const char *s1, const char *s2, const char *o1, const char *t1)
 {
-	char code[2] = { (char)('0' + i1), 0 };
-	return afb_ws_texts(wsj1->ws, "[", code, ",\"", s1, "\",\"", s2, "\",", o1 == NULL ? "null" : o1, t1 != NULL ? ",\"" : "]", t1, "\"]", NULL);
+	struct iovec ios[9];
+	char head[4] = { '[', (char)('0' + i1), ',', '"' };
+	int n;
+
+	ios[0].iov_base = head;
+	ios[0].iov_len = 4;
+	ios[1].iov_base = (void*)s1;
+	ios[1].iov_len = strlen(s1);
+	ios[2].iov_base = "\",\"";
+	ios[2].iov_len = 3;
+	ios[3].iov_base = (void*)s2;
+	ios[3].iov_len = strlen(s2);
+	if (!o1) {
+		if (!t1) {
+			ios[4].iov_base = "\",null]";
+			ios[4].iov_len = 7;
+			n = 5;
+		}
+		else {
+			ios[4].iov_base = "\",null,\"";
+			ios[4].iov_len = 8;
+			ios[5].iov_base = (void*)t1;
+			ios[5].iov_len = strlen(t1);
+			ios[6].iov_base = "\"]";
+			ios[6].iov_len = 2;
+			n = 7;
+		}
+	}
+	else {
+		ios[4].iov_base = "\",";
+		ios[4].iov_len = 2;
+		ios[5].iov_base = (void*)o1;
+		ios[5].iov_len = strlen(o1);
+		if (!t1) {
+			ios[6].iov_base = "]";
+			ios[6].iov_len = 1;
+			n = 7;
+		}
+		else {
+			ios[6].iov_base = ",\"";
+			ios[6].iov_len = 2;
+			ios[7].iov_base = (void*)t1;
+			ios[7].iov_len = strlen(t1);
+			ios[8].iov_base = "\"]";
+			ios[8].iov_len = 2;
+			n = 9;
+		}
+	}
+	return afb_ws_text_v(wsj1->ws, ios, n);
 }
 
 int afb_wsj1_send_event_j(struct afb_wsj1 *wsj1, const char *event, struct json_object *object)
