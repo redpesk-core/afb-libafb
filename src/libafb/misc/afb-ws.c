@@ -80,7 +80,8 @@ enum state
 {
 	waiting,
 	reading_text,
-	reading_binary
+	reading_binary,
+	closing
 };
 
 /*
@@ -95,6 +96,10 @@ struct afb_ws
 	struct websock *ws;	/* the websock handler */
 	struct ev_fd *efd;	/* the fdev for the socket */
 	struct buf buffer;	/* the last read fragment */
+	size_t reading_pos;	/* when state reading, read position */
+	size_t reading_length;	/* when state reading, remaining length */
+	int reading_last;	/* when state reading, is last? */
+	uint16_t closing_code;	/* when state closing, the code */
 };
 
 /*
@@ -394,6 +399,72 @@ static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt)
 }
 
 /*
+ * Reads from the websocket handled by 'ws' the expected data
+ * and append it to the current buffer of 'ws'.
+ */
+static int aws_read_async(struct afb_ws *ws)
+{
+	ssize_t sz;
+	struct buf b;
+	enum state s;
+
+	if (ws->reading_length) {
+		sz = websock_read(ws->ws, &ws->buffer.buffer[ws->reading_pos], ws->reading_length);
+		if (sz <= 0)
+			return (int)sz;
+		ws->reading_pos += (size_t)sz;
+		ws->reading_length -= (size_t)sz;
+	}
+	if (ws->reading_length == 0 && ws->reading_last) {
+		s = ws->state;
+		ws->state = waiting;
+		b = aws_pick_buffer(ws);
+		switch (s) {
+		case reading_text:
+			ws->itf->on_text(ws->closure, b.buffer, b.size);
+			break;
+		case reading_binary:
+			ws->itf->on_binary(ws->closure, b.buffer, b.size);
+			break;
+		case closing:
+			ws->itf->on_close(ws->closure, ws->closing_code, b.buffer, b.size);
+			break;
+		default:
+			free(b.buffer);
+			break;
+		}
+	}
+	return 0;
+}
+
+static int aws_read_async_continue(struct afb_ws *ws, size_t size)
+{
+	char *buffer;
+	size_t bufsz;
+
+	ws->reading_length = size;
+	bufsz = ws->buffer.size + size;
+	buffer = realloc(ws->buffer.buffer, bufsz + 1);
+	if (!buffer) {
+		ws->reading_length = 0; /* TODO: state error */
+		aws_read_async(ws);
+		return X_ENOMEM;
+	}
+	ws->buffer.buffer = buffer;
+	ws->buffer.size = bufsz;
+	buffer[bufsz] = 0;
+	aws_read_async(ws);
+	return 0;
+}
+
+static int aws_read_async_start(struct afb_ws *ws, size_t size)
+{
+	ws->reading_pos = 0;
+	ws->buffer.size = 0;
+	return aws_read_async_continue(ws, size);
+}
+
+/*
  * callback on incoming data
  */
 static void aws_on_readable(struct afb_ws *ws)
@@ -401,42 +472,9 @@ static void aws_on_readable(struct afb_ws *ws)
 	int rc;
 
 	assert(ws->ws != NULL);
-	rc = websock_dispatch(ws->ws, 0);
+	rc = ws->state == waiting? websock_dispatch(ws->ws, 0) : aws_read_async(ws);
 	if (rc == X_EPIPE)
 		afb_ws_hangup(ws);
-}
-
-/*
- * Reads from the websocket handled by 'ws' data of length 'size'
- * and append it to the current buffer of 'ws'.
- * Returns 0 in case of error or 1 in case of success.
- */
-static int aws_read(struct afb_ws *ws, size_t size)
-{
-	struct pollfd pfd;
-	ssize_t sz;
-	char *buffer;
-
-	if (size != 0 || ws->buffer.buffer == NULL) {
-		buffer = realloc(ws->buffer.buffer, ws->buffer.size + size + 1);
-		if (buffer == NULL)
-			return 0;
-		ws->buffer.buffer = buffer;
-		while (size != 0) {
-			sz = websock_read(ws->ws, &buffer[ws->buffer.size], size);
-			if (sz < 0) {
-				if (sz != X_EAGAIN)
-					return 0;
-				pfd.fd = ws->fd;
-				pfd.events = POLLIN;
-				poll(&pfd, 1, 10); /* TODO: make fully asynchronous websockets */
-			} else {
-				ws->buffer.size += (size_t)sz;
-				size -= (size_t)sz;
-			}
-		}
-	}
-	return 1;
 }
 
 /*
@@ -444,18 +482,18 @@ static int aws_read(struct afb_ws *ws, size_t size)
  */
 static void aws_on_close(struct afb_ws *ws, uint16_t code, size_t size)
 {
-	struct buf b;
-
 	ws->state = waiting;
 	aws_clear_buffer(ws);
 	if (ws->itf->on_close == NULL) {
 		websock_drop(ws->ws);
 		afb_ws_hangup(ws);
-	} else if (!aws_read(ws, size))
-		ws->itf->on_close(ws->closure, code, NULL, 0);
+	}
 	else {
-		b = aws_pick_buffer(ws);
-		ws->itf->on_close(ws->closure, code, b.buffer, b.size);
+		ws->state = closing;
+		ws->reading_last = 1;
+		ws->closing_code = code;
+		aws_read_async_start(ws, size);
+		aws_read_async(ws);
 	}
 }
 
@@ -471,24 +509,6 @@ static void aws_drop_error(struct afb_ws *ws, uint16_t code)
 }
 
 /*
- * Reads either text or binary data of 'size' from 'ws' eventually 'last'.
- */
-static void aws_continue(struct afb_ws *ws, int last, size_t size)
-{
-	struct buf b;
-	int istxt;
-
-	if (!aws_read(ws, size))
-		aws_drop_error(ws, WEBSOCKET_CODE_ABNORMAL);
-	else if (last) {
-		istxt = ws->state == reading_text;
-		ws->state = waiting;
-		b = aws_pick_buffer(ws);
-		(istxt ? ws->itf->on_text : ws->itf->on_binary)(ws->closure, b.buffer, b.size);
-	}
-}
-
-/*
  * Callback when 'text' message received from 'ws' with 'size' and possibly 'last'.
  */
 static void aws_on_text(struct afb_ws *ws, int last, size_t size)
@@ -499,7 +519,8 @@ static void aws_on_text(struct afb_ws *ws, int last, size_t size)
 		aws_drop_error(ws, WEBSOCKET_CODE_CANT_ACCEPT);
 	else {
 		ws->state = reading_text;
-		aws_continue(ws, last, size);
+		ws->reading_last = last;
+		aws_read_async_start(ws, size);
 	}
 }
 
@@ -514,7 +535,8 @@ static void aws_on_binary(struct afb_ws *ws, int last, size_t size)
 		aws_drop_error(ws, WEBSOCKET_CODE_CANT_ACCEPT);
 	else {
 		ws->state = reading_binary;
-		aws_continue(ws, last, size);
+		ws->reading_last = last;
+		aws_read_async_start(ws, size);
 	}
 }
 
@@ -525,8 +547,10 @@ static void aws_on_continue(struct afb_ws *ws, int last, size_t size)
 {
 	if (ws->state == waiting)
 		aws_drop_error(ws, WEBSOCKET_CODE_PROTOCOL_ERROR);
-	else
-		aws_continue(ws, last, size);
+	else {
+		ws->reading_last = last;
+		aws_read_async_continue(ws, size);
+	}
 }
 
 /*
