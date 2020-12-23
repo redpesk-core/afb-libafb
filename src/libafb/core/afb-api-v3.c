@@ -991,9 +991,10 @@ afb_api_v3_process_call(
 static
 struct json_object *
 describe_verb_v3(
-	const struct afb_verb_v3 *verb
+	const struct afb_verb_v3 *verb,
+	struct json_tokener *tok
 ) {
-	struct json_object *f, *a, *g;
+	struct json_object *f, *a, *g, *d;
 
 	f = json_object_new_object();
 
@@ -1008,7 +1009,17 @@ describe_verb_v3(
 	json_object_object_add(g, "responses", a);
 	g = json_object_new_object();
 	json_object_object_add(a, "200", g);
-	json_object_object_add(g, "description", json_object_new_string(verb->info?:verb->verb));
+	if (!verb->info)
+		d = json_object_new_string(verb->verb);
+	else {
+		json_tokener_reset(tok);
+		d = json_tokener_parse_ex(tok, verb->info, -1);
+		if (json_tokener_get_error(tok) != json_tokener_success) {
+			json_object_put(d);
+			d = json_object_new_string(verb->info);
+		}
+	}
+	json_object_object_add(g, "description", d);
 
 	return f;
 }
@@ -1021,16 +1032,40 @@ afb_api_v3_make_description_openAPIv3(
 	struct afb_verb_v3 **iter, **end;
 	const struct afb_verb_v3 *verb;
 	struct json_object *r, *i, *p;
+	struct json_tokener *tok;
+	struct json_object_iterator jit, jend;
 
+	tok = json_tokener_new();
 	r = json_object_new_object();
 	json_object_object_add(r, "openapi", json_object_new_string("3.0.0"));
 
 	i = json_object_new_object();
 	json_object_object_add(r, "info", i);
-	json_object_object_add(i, "title", json_object_new_string(api->comapi.name));
 	json_object_object_add(i, "version", json_object_new_string("0.0.0"));
-	if (api->comapi.info)
-		json_object_object_add(i, "description", json_object_new_string(api->comapi.info));
+	if (api->comapi.info) {
+		json_tokener_reset(tok);
+		p = json_tokener_parse_ex(tok, api->comapi.info, -1);
+		if (json_tokener_get_error(tok) != json_tokener_success) {
+			json_object_put(p);
+			p = json_object_new_string(api->comapi.info);
+			json_object_object_add(i, "description", p);
+		}
+		else if (!json_object_is_type(p, json_type_object)) {
+			json_object_object_add(i, "description", p);
+		}
+		else {
+			jit = json_object_iter_begin(p);
+			jend = json_object_iter_end(p);
+			while (!json_object_iter_equal(&jit, &jend)) {
+				json_object_object_add(i,
+					json_object_iter_peek_name(&jit),
+					json_object_get(json_object_iter_peek_value(&jit)));
+				json_object_iter_next(&jit);
+			}
+			json_object_put(p);
+		}
+	}
+	json_object_object_add(i, "title", json_object_new_string(api->comapi.name));
 
 	buffer[0] = '/';
 	buffer[sizeof buffer - 1] = 0;
@@ -1042,15 +1077,16 @@ afb_api_v3_make_description_openAPIv3(
 	while (iter != end) {
 		verb = *iter++;
 		strncpy(buffer + 1, verb->verb, sizeof buffer - 2);
-		json_object_object_add(p, buffer, describe_verb_v3(verb));
+		json_object_object_add(p, buffer, describe_verb_v3(verb, tok));
 	}
 	verb = api->verbs.statics;
 	if (verb)
 		while(verb->verb) {
 			strncpy(buffer + 1, verb->verb, sizeof buffer - 2);
-			json_object_object_add(p, buffer, describe_verb_v3(verb));
+			json_object_object_add(p, buffer, describe_verb_v3(verb, tok));
 			verb++;
 		}
+	json_tokener_free(tok);
 	return r;
 }
 
