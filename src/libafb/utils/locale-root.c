@@ -474,12 +474,16 @@ void locale_root_set_default_search(struct locale_root *root, struct locale_sear
 
 /***************************************************************/
 
+#define GIVEN_LOCALE    0
+#define DEFAULT_LOCALE  1
+#define NO_LOCALE       2
+
 struct iter
 {
 	struct locale_root *root;
 	const char *filename;
 	const char *list;
-	int falldef;
+	int state;
 	int llen;
 	int offset;
 	int flen;
@@ -498,7 +502,7 @@ static int iter_init(struct iter *iter, const char *filename, struct locale_root
 	iter->root = root;
 	iter->filename = filename;
 	iter->flen = (int)strlen(filename) + 1;
-	iter->falldef = 1;
+	iter->state = GIVEN_LOCALE;
 #if WITH_OPENAT
 	offset = 0;
 #else
@@ -523,21 +527,6 @@ static void iter_list_next(struct iter *iter)
 	iter_list_set(iter, iter->list + l, iter->llen - l);
 }
 
-static int iter_list_init(struct iter *iter, const char *filename, struct locale_root *root, const char *list, int llen)
-{
-	int rc = iter_init(iter, filename, root);
-	iter_list_set(iter, list, llen);
-	return rc;
-}
-
-static int iter_search_init(struct iter *iter, const char *filename, struct locale_root *root, struct locale_search *search)
-{
-	int rc = iter_init(iter, filename, root);
-	if (search)
-		iter_list_set(iter, search->list, search->llen);
-	return rc;
-}
-
 static int iter_set(struct iter *iter)
 {
 	const char *item;
@@ -555,27 +544,26 @@ static int iter_set(struct iter *iter)
 			return 0;
 		memcpy(dest, item, ilen);
 		dest[ilen] = '/';
-		memcpy(&dest[ilen + 1], iter->filename, iter->flen);
+		dest = &dest[ilen + 1];
 	} else {
 		if (iter->offset + iter->flen >= sizeof iter->path)
 			return 0;
-		memcpy(dest, iter->filename, iter->flen);
 	}
+	memcpy(dest, iter->filename, iter->flen);
 	return 1;
 }
 
 static int iter_next(struct iter *iter)
 {
-	int r = 0;
 	struct locale_search *search;
 
 	if (iter->llen != 0) {
 		iter_list_next(iter);
 		if (iter->llen != 0)
 			return 1;
-		r = 1;
 	}
-	if (iter->falldef) {
+	if (iter->state == GIVEN_LOCALE) {
+		iter->state = DEFAULT_LOCALE;
 		search = iter->root->default_search;
 		if (search) {
 			iter_list_set(iter, search->list, search->llen);
@@ -583,9 +571,33 @@ static int iter_next(struct iter *iter)
 				return 1;
 		}
 	}
-	if (r)
+	if (iter->state == DEFAULT_LOCALE) {
+		iter->state = NO_LOCALE;
 		iter->offset -= (int)(sizeof _locales_ - 1);
-	return r;
+		iter->llen = 0;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int iter_list_init(struct iter *iter, const char *filename, struct locale_root *root, const char *list, int llen)
+{
+	int rc = iter_init(iter, filename, root);
+	iter_list_set(iter, list, llen);
+	if (iter->llen == 0)
+		rc = iter_next(iter) ? 0 : X_EINVAL;
+	return rc;
+}
+
+static int iter_search_init(struct iter *iter, const char *filename, struct locale_root *root, struct locale_search *search)
+{
+	int rc = iter_init(iter, filename, root);
+	if (search)
+		iter_list_set(iter, search->list, search->llen);
+	if (iter->llen == 0)
+		rc = iter_next(iter) ? 0 : X_EINVAL;
+	return rc;
 }
 
 /***************************************************************/
