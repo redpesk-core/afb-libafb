@@ -1133,7 +1133,7 @@ int afb_wsapi_msg_unsubscribe(const struct afb_wsapi_msg *msg, uint16_t eventid)
 int afb_wsapi_msg_description_s(const struct afb_wsapi_msg *msg, const char *data)
 {
 	struct msg *m = (struct msg *)msg;
-	int rc = send_cmd_id16_str(m->wsapi, CHAR_FOR_EVT_UNSUBSCRIBE, m->requestid, data);
+	int rc = send_cmd_id16_str(m->wsapi, CHAR_FOR_DESCRIPTION, m->requestid, data);
 	msg_unref(m);
 	return rc;
 }
