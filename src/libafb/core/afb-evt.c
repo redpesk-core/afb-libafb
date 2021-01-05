@@ -332,7 +332,9 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 
 	/* queue the job */
 	rc = afb_sched_post_job(BROADCAST_JOB_GROUP, 0, 0, broadcast_job, jb);
-	if (rc < 0) {
+	if (rc >= 0)
+		rc = 0;
+	else {
 		ERROR("cant't queue broadcast string job item for %s", event);
 		destroy_evt_broadcasted(jb);
 	}
@@ -342,7 +344,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 /*
  * Broadcasts the event 'evt' with its 'object'
  * 'object' is released (like afb_dataset_unref)
- * Returns the count of listener that received the event.
+ * Returns 0 on success or a negative error code
  */
 int afb_evt_broadcast(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[])
 {
@@ -440,7 +442,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 	}
 
 	rc = afb_sched_post_job(PUSH_JOB_GROUP, 0, 0, push_afb_evt_pushed, je);
-	if (rc == 0)
+	if (rc >= 0)
 		rc = 1;
 	else {
 		ERROR("cant't queue push evt job item for %s", evt->fullname);

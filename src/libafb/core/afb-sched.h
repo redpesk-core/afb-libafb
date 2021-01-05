@@ -129,7 +129,7 @@ extern struct ev_mgr *afb_sched_acquire_event_manager();
  *                 given here.
  * @param arg      The second argument for 'callback'
  *
- * @return 0 on success (greater than 0) or
+ * @return the job id on success (greater than 0) or
  *         in case of error a negative number in -errno like form
  */
 extern int afb_sched_post_job(

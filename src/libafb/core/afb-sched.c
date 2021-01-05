@@ -453,10 +453,8 @@ static int post_job(
 	void *arg
 ) {
 	int rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc >= 0) {
+	if (rc >= 0)
 		adapt(delayms > 0);
-		rc = 0;
-	}
 	return rc;
 }
 
@@ -516,8 +514,10 @@ static void do_sync_cb(int signum, void *closure)
 		x_cond_init(&sync->condsync);
 		x_mutex_lock(&mutex);
 		rc = post_job(sync->group, 0, sync->timeout, sync->handler, sync);
-		if (rc >= 0)
+		if (rc >= 0) {
 			x_cond_wait(&sync->condsync, &mutex);
+			rc = 0;
+		}
 		x_mutex_unlock(&mutex);
 	}
 	sync->rc = rc;

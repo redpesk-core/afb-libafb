@@ -328,7 +328,7 @@ static void exit_job(int signum, void* arg)
 
 static void safe_exit(int code)
 {
-	if (afb_sched_post_job(safe_exit, 0, 0, exit_job, (void*)(intptr_t)code))
+	if (afb_sched_post_job(safe_exit, 0, 0, exit_job, (void*)(intptr_t)code) < 0)
 		direct_safe_exit(code);
 }
 #endif
