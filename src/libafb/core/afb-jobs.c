@@ -35,8 +35,11 @@
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
+#define MAX_JOB_COUNT_MAX  65000
 #if !defined(AFB_JOBS_DEFAULT_MAX_COUNT)
 #    define AFB_JOBS_DEFAULT_MAX_COUNT    64
+#elif AFB_JOBS_DEFAULT_MAX_COUNT > MAX_JOB_COUNT_MAX
+#    error "AFB_JOBS_DEFAULT_MAX_COUNT too big"
 #endif
 
 /** Description of a pending job */
@@ -50,8 +53,9 @@ struct afb_job
 #if WITH_SIG_MONITOR_TIMERS
 	int timeout;         /**< timeout in second for processing the request */
 #endif
-	unsigned blocked: 1; /**< is an other request blocking this one ? */
-	unsigned active: 1;  /**< is the request active ? */
+	uint16_t id;         /**< id of the job */
+	uint8_t  blocked: 1; /**< is an other request blocking this one ? */
+	uint8_t  active: 1;  /**< is the request active ? */
 };
 
 /* synchronization */
@@ -60,6 +64,7 @@ static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 /* counts for jobs */
 static int max_pending_count = AFB_JOBS_DEFAULT_MAX_COUNT;  /** maximum count of pending jobs */
 static int pending_count = 0;      /** count of pending jobs */
+static uint16_t idgen;
 
 /* queue of jobs */
 static struct afb_job *pending_jobs;
@@ -138,6 +143,7 @@ static int job_add(
 	job->blocked = 0;
 	job->active = 0;
 	job->next = NULL;
+	job->id = idgen ?: 1;
 
 	/* search end and blockers */
 	pjob = &pending_jobs;
@@ -145,11 +151,19 @@ static int job_add(
 	while (ijob) {
 		if (group && ijob->group == group)
 			job->blocked = 1;
-		pjob = &ijob->next;
-		ijob = ijob->next;
+		if (ijob->id == job->id) {
+			job->id = job->id + 1 ?: 1;
+			pjob = &pending_jobs;
+			ijob = pending_jobs;
+		}
+		else {
+			pjob = &ijob->next;
+			ijob = ijob->next;
+		}
 	}
 
 	/* queue the jobs */
+	idgen = job->id + 1;
 	*pjob = job;
 	rc = ++pending_count;
 end:
@@ -183,7 +197,7 @@ int afb_jobs_post(
 	/* leave critical */
 	x_mutex_unlock(&mutex);
 
-	return rc;
+	return rc < 0 ? rc : (int)job->id;
 }
 
 /**
@@ -203,14 +217,16 @@ static void job_release(struct afb_job *job)
 	/* first dequeue the job */
 	pjob = &pending_jobs;
 	ijob = pending_jobs;
+	group = job->group;
 	while (ijob != job) {
+		if (group == ijob->group)
+			group = 0;
 		pjob = &ijob->next;
 		ijob = ijob->next;
 	}
 	*pjob = job->next;
 
 	/* then unblock jobs of the same group */
-	group = job->group;
 	if (group) {
 		do { ijob = ijob->next; } while (ijob && ijob->group != group);
 		if (ijob)
@@ -277,6 +293,38 @@ void afb_jobs_cancel(struct afb_job *job)
 	job_release(job);
 }
 
+/* Abort the job of the given id */
+int afb_jobs_abort(int jobid)
+{
+	int rc;
+	struct afb_job *job;
+
+	/* enter critical */
+	x_mutex_lock(&mutex);
+
+	/* search the job */
+	for (job = pending_jobs ; job && job->id != jobid; job = job->next);
+	if (!job)
+		rc = X_ENOENT;
+	else if (job->active)
+		rc = X_EBUSY;
+	else {
+		rc = 0;
+		job->blocked = 1; /* mark job as blocked */
+		job->active = 1; /* mark job as active */
+	}
+
+	/* leave critical */
+	x_mutex_unlock(&mutex);
+
+	if (rc == 0) {
+		job->callback(SIGABRT, job->arg);
+		job_release(job);
+	}
+
+	return rc;
+}
+
 /* Run the given job */
 void afb_jobs_run(struct afb_job *job)
 {
@@ -304,7 +352,7 @@ int afb_jobs_get_max_count(void)
 /* set maximum pending count */
 void afb_jobs_set_max_count(int count)
 {
-	if (count > 0)
+	if (count > 0 && count <= MAX_JOB_COUNT_MAX)
 		max_pending_count = count;
 }
 

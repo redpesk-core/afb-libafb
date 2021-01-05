@@ -453,7 +453,7 @@ static int post_job(
 	void *arg
 ) {
 	int rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc > 0) {
+	if (rc >= 0) {
 		adapt(delayms > 0);
 		rc = 0;
 	}

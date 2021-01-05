@@ -45,8 +45,8 @@ struct afb_job;
  *                 given here.
  * @param arg      The second argument for 'callback'
  *
- * @return the count of pending job on success (greater than 0) or
- *         in case of error a negative number in -errno like form
+ * @return the id of the job, greater than zero, or in case
+ *         of error a negative number in -errno like form
  */
 extern int afb_jobs_post(
 		const void *group,
@@ -84,6 +84,19 @@ extern void afb_jobs_run(struct afb_job *job);
  * @param job   a job a retrieved with afb_jobs_dequeue
  */
 extern void afb_jobs_cancel(struct afb_job *job);
+
+/**
+ * Abort the job of the given id.
+ *
+ * The callback function is called with the signal
+ * SIGABRT.
+ *
+ * @param jobid the job id as returned by afb_jobs_post
+ *
+ * @return zero on success or a negative code
+ *  X_ENOENT if invalid jobid or X_EBUSY if in progress
+ */
+extern int afb_jobs_abort(int jobid);
 
 /**
  * Get the current count of pending job
