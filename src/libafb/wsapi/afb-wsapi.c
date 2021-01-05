@@ -1072,16 +1072,16 @@ struct json_object *afb_wsapi_msg_json_data(const struct afb_wsapi_msg *msg)
 			data = m->msg.call.data;
 			break;
 		case afb_wsapi_msg_type_reply:
-			data = m->msg.call.data;
+			data = m->msg.reply.data;
 			break;
 		case afb_wsapi_msg_type_description:
-			data = m->msg.call.data;
+			data = m->msg.description.data;
 			break;
 		case afb_wsapi_msg_type_event_push:
-			data = m->msg.call.data;
+			data = m->msg.event_push.data;
 			break;
 		case afb_wsapi_msg_type_event_broadcast:
-			data = m->msg.call.data;
+			data = m->msg.event_broadcast.data;
 			break;
 		default:
 			data = NULL;
