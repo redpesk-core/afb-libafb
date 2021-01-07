@@ -1189,36 +1189,6 @@ int afb_wsapi_initiate(struct afb_wsapi *wsapi)
 		: send_version_offer_1(wsapi, WSAPI_VERSION_1);
 }
 
-struct afb_wsapi *afb_wsapi_create_client(int fd, const struct afb_wsapi_itf *itf, void *closure, int init)
-{
-	struct afb_wsapi *wsapi;
-
-	wsapi = calloc(1, sizeof *wsapi);
-	if (wsapi == NULL)
-		errno = ENOMEM;
-	else {
-		wsapi->refcount = 1;
-		wsapi->version = WSAPI_VERSION_UNSET;
-		wsapi->closure = closure;
-		wsapi->itf = itf;
-		pthread_mutex_init(&wsapi->mutex, NULL);
-
-		fcntl(fd, F_SETFD, FD_CLOEXEC);
-		fcntl(fd, F_SETFL, O_NONBLOCK);
-		wsapi->ws = afb_ws_create(fd, &ws_itf, wsapi);
-		if (wsapi->ws != NULL) {
-			if (init && send_version_offer_1(wsapi, WSAPI_VERSION_1) != 0) {
-				afb_wsapi_unref(wsapi);
-				wsapi = NULL;
-			}
-			return wsapi;
-		}
-		pthread_mutex_destroy(&wsapi->mutex);
-		free(wsapi);
-	}
-	return NULL;
-}
-
 void afb_wsapi_unref(struct afb_wsapi *wsapi)
 {
 	if (wsapi && !__atomic_sub_fetch(&wsapi->refcount, 1, __ATOMIC_RELAXED)) {
