@@ -35,6 +35,7 @@ extern void afb_hsrv_put(struct afb_hsrv *hsrv);
 
 extern void afb_hsrv_stop(struct afb_hsrv *hsrv);
 extern int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout);
+extern int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, const char *cert, const char *key);
 extern int afb_hsrv_set_cache_timeout(struct afb_hsrv *hsrv, int duration);
 #if WITH_OPENAT
 extern int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, const char *alias, int priority, int relax);

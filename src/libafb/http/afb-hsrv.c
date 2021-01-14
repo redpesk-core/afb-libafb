@@ -449,37 +449,56 @@ int afb_hsrv_set_cache_timeout(struct afb_hsrv *hsrv, int duration)
 	return 1;
 }
 
-int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout)
+int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, const char *cert, const char *key)
 {
 	struct MHD_Daemon *httpd;
 	const union MHD_DaemonInfo *info;
+	unsigned int flags;
+	enum MHD_OPTION key_or_end;
 
-	httpd = MHD_start_daemon(
-			MHD_USE_EPOLL
+	/* compute the flags */
+	flags = MHD_USE_EPOLL
 			| MHD_ALLOW_UPGRADE
 			| MHD_USE_TCP_FASTOPEN
 			| MHD_USE_NO_LISTEN_SOCKET
 			| MHD_USE_DEBUG
-			| MHD_ALLOW_SUSPEND_RESUME,
+			| MHD_ALLOW_SUSPEND_RESUME;
+	key_or_end = MHD_OPTION_END;
+	if (cert || key) {
+		if (!cert || !key) {
+			ERROR("hsrv start, invalid invalid tls arguments");
+			return 0;
+		}
+		flags |= MHD_USE_TLS;
+		key_or_end = MHD_OPTION_HTTPS_MEM_KEY;
+	}
+
+	/* start the LMHD daemon */
+	httpd = MHD_start_daemon(
+			flags,
 			0,				/* port */
 			new_client_handler, NULL,	/* Tcp Accept call back + extra attribute */
-			access_handler, hsrv,	/* Http Request Call back + extra attribute */
+			access_handler, hsrv,		/* Http Request Call back + extra attribute */
 			MHD_OPTION_NOTIFY_COMPLETED, end_handler, hsrv,
 			MHD_OPTION_CONNECTION_TIMEOUT, connection_timeout,
+			key_or_end, key,
+			MHD_OPTION_HTTPS_MEM_CERT, cert,
 			MHD_OPTION_END);	/* options-end */
 
 	if (httpd == NULL) {
-		ERROR("httpStart invalid httpd");
+		ERROR("hsrv start, can't setup MHD");
 		return 0;
 	}
 
+	/* retrieves the file descriptor of the epoll of the daemon */
 	info = MHD_get_daemon_info(httpd, MHD_DAEMON_INFO_EPOLL_FD);
 	if (info == NULL) {
 		MHD_stop_daemon(httpd);
-		ERROR("httpStart no pollfd");
+		ERROR("hsrv start, no pollfd");
 		return 0;
 	}
 
+	/* record it to the main loop */
 	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EPOLLIN, listen_callback, hsrv, 0, 0) < 0) {
 		MHD_stop_daemon(httpd);
 		ERROR("connection to events for httpd failed");
@@ -488,6 +507,11 @@ int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout)
 
 	hsrv->httpd = httpd;
 	return 1;
+}
+
+int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout)
+{
+	return afb_hsrv_start_tls(hsrv, connection_timeout, 0, 0);
 }
 
 void afb_hsrv_stop(struct afb_hsrv *hsrv)
