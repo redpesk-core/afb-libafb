@@ -461,7 +461,6 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 			| MHD_ALLOW_UPGRADE
 			| MHD_USE_TCP_FASTOPEN
 			| MHD_USE_NO_LISTEN_SOCKET
-			| MHD_USE_DEBUG
 			| MHD_ALLOW_SUSPEND_RESUME;
 	key_or_end = MHD_OPTION_END;
 	if (cert || key) {
@@ -472,6 +471,8 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 		flags |= MHD_USE_TLS;
 		key_or_end = MHD_OPTION_HTTPS_MEM_KEY;
 	}
+	if (0)
+		flags |= MHD_USE_DEBUG;
 
 	/* start the LMHD daemon */
 	httpd = MHD_start_daemon(
