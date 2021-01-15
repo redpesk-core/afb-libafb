@@ -28,11 +28,13 @@
 struct json_object;
 struct afb_apiset;
 struct argp_option;
+struct afb_hsrv;
 
 extern int afb_extend_load(struct json_object *config);
 extern int afb_extend_get_options(const struct argp_option ***options, const char ***names);
 extern int afb_extend_config(struct json_object *config);
 extern int afb_extend_declare(struct afb_apiset *declare_set, struct afb_apiset *call_set);
+extern int afb_extend_http(struct afb_hsrv *hsrv);
 extern int afb_extend_serve(struct afb_apiset *call_set);
 extern int afb_extend_exit(struct afb_apiset *declare_set);
 

@@ -42,6 +42,7 @@ struct afb_extension_manifest
 
 struct json_object;
 struct afb_apiset;
+struct afb_hsrv;
 
 #include <argp.h>
 
@@ -49,5 +50,6 @@ extern const struct argp_option AfbExtensionOptionsV1[];
 
 extern int AfbExtensionConfigV1(void **data, struct json_object *config);
 extern int AfbExtensionDeclareV1(void *data, struct afb_apiset *declare_set, struct afb_apiset *call_set);
+extern int AfbExtensionHTTPV1(void *data, struct afb_hsrv *hsrv);
 extern int AfbExtensionServeV1(void *data, struct afb_apiset *call_set);
 extern int AfbExtensionExitV1(void *data, struct afb_apiset *declare_set);

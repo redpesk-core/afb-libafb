@@ -45,6 +45,7 @@
 #define CONFIG_V1	"AfbExtensionConfigV1"
 #define DECLARE_V1	"AfbExtensionDeclareV1"
 #define SERVE_V1	"AfbExtensionServeV1"
+#define HTTP_V1		"AfbExtensionHTTPV1"
 #define EXIT_V1		"AfbExtensionExitV1"
 
 struct extension
@@ -284,6 +285,28 @@ int afb_extend_declare(struct afb_apiset *declare_set, struct afb_apiset *call_s
 		}
 	}
 	return rc;
+}
+
+int afb_extend_http(struct afb_hsrv *hsrv)
+{
+#if WITH_LIBMICROHTTPD
+	int rc, s;
+	struct extension *ext;
+	int (*http_v1)(void *data, struct afb_hsrv *hsrv);
+
+	rc = 0;
+	for (ext = extensions ; ext ; ext = ext->next) {
+		s = x_dynlib_symbol(&ext->handle, HTTP_V1, (void**)&http_v1);
+		if (s >= 0) {
+			s = http_v1(ext->data, hsrv);
+			if (s < 0)
+				rc = s;
+		}
+	}
+	return rc;
+#else
+	return X_ENOTSUP;
+#endif
 }
 
 int afb_extend_serve(struct afb_apiset *call_set)
