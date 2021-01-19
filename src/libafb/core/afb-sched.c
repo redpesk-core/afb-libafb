@@ -774,3 +774,56 @@ error:
 	}
 	return rc;
 }
+
+/* wait that no thread is running jobs */
+int afb_sched_wait_idle(int wait_jobs, int timeout)
+{
+	const int one_second = 1000000; /* 1000000 us = 1000 ms = 1s */
+	const int delay_short = 1000; /* 1000 us = 1 ms */
+	const int delay_long = 100000; /* 100000 us = 100 ms */
+
+	int cpt = 0, delay, jobcnt, idle;
+
+	for(;;) {
+		/* get the current counters */
+		x_mutex_lock(&mutex);
+		jobcnt = afb_jobs_get_pending_count();
+		idle = waiting_thread_count + in_event_loop >= started_thread_count;
+		if (idle && !started_thread_count && jobcnt && wait_jobs) {
+			/* start a prcessing thread on need */
+			PDBG("    >>>> START-THREAD-WAIT-IDLE\n");
+			start_one_thread();
+		}
+		x_mutex_unlock(&mutex);
+
+		/* compute next delay or exit if diled as expected */
+		if (!idle)
+			delay = delay_short;
+		else {
+			if (!wait_jobs || !jobcnt)
+				return jobcnt;
+			delay = delay_long;
+		}
+
+		/* exit on expired timeout */
+		if (!timeout)
+			return -1;
+
+		/* wait for a delay */
+		/*
+		 * NOTA BENE: using a wait is not beautiful but that function
+		 * used in tests is not used for normal operations.
+		 * Though, if it had to be used in normal operations, a more
+		 * proper way of doing this thing would be to use signaled
+		 * condition.
+		 */
+		cpt += delay;
+		usleep(delay);
+
+		/* handle timeout decount (coarse grained timeout) */
+		if (cpt >= one_second) {
+			cpt -= one_second;
+			timeout -= (timeout > 0);
+		}
+	}
+}

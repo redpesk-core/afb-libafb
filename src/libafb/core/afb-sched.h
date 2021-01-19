@@ -160,3 +160,25 @@ extern int afb_sched_post_job(
 extern void afb_sched_call_sync(
 		void (*callback)(int, void*),
 		void *arg);
+
+/**
+ * Wait that every running thread are in waiting state.
+ * One of the thread can be in event loop, waiting for some
+ * event, while the other threads are just idled.
+ *
+ * This means that if the scheduler is waiting for a timeout
+ * to start a job, the job queue might be not empty. To ensure
+ * that the job queue is empty set 'wait_jobs' to 1
+ *
+ * If the scheduler is not started, this function can be used
+ * to wait achievement of all automatically started threads.
+ *
+ * If wait_jobs is not zero and not thread is started, the
+ * routine starts at least one thread to process the jobs.
+ *
+ * @param wait_jobs if not zero, wait completion of all jobs
+ * @param timeout the timeout in seconds (negative for infinite)
+ *
+ * @return -1 if timeout or the count of pending jobs
+ */
+extern int afb_sched_wait_idle(int wait_jobs, int timeout);
