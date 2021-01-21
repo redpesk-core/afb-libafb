@@ -79,7 +79,7 @@ void test_job(int sig, void* arg){
         gval.val ++;
 
         // if this job is not the last one whaite the las job
-        if(p2i(arg) < NBJOBS){
+        if(gval.runingJobs < NBJOBS){
             r = TRUE;
             while(r){
                 pthread_mutex_unlock(&gval.mutex);
@@ -144,6 +144,35 @@ void test_start_job(int sig, void* arg){
     fprintf(stderr, "living test_start_job\n");
 }
 
+void test_job_sync(int sig, void* arg){
+
+    int i, j;
+
+    fprintf(stderr, "test_job_sync received sig %d with arg %d\n", sig, p2i(arg));
+
+    if(sig == 0){
+        if (arg)
+            for(;;)
+                for(i=0; i<__INT_MAX__; i++)
+                    for(j=0; j<__INT_MAX__; j++);
+        pthread_mutex_lock(&gval.mutex);
+        gval.lastJob = TRUE;
+        pthread_mutex_unlock(&gval.mutex);
+    }
+    // if the job receve a stoping signal, inform the test rotine throw gval
+    else if(sig == SIGVTALRM ||
+            sig == SIGTERM ||
+            sig == SIGKILL)
+    {
+        // unlock mutex in case the job have been killed while mutex was locked
+        pthread_mutex_lock(&gval.mutex);
+        gval.killedJobs++;
+        pthread_mutex_unlock(&gval.mutex);
+    }
+    fprintf(stderr, "test_job_sync with arg %d terminates !\n", p2i(arg));
+
+}
+
 void test_start_job_sync(int sig, void* arg){
 
     int i, r;
@@ -151,7 +180,7 @@ void test_start_job_sync(int sig, void* arg){
     fprintf(stderr, "start_test_job_sync received sig %d with arg %d\n", sig, p2i(arg));
 
     if(sig == 0){
-        afb_sched_call_job_sync(NULL, 1, test_job, arg);
+        afb_sched_call_job_sync(NULL, 1, test_job_sync, arg);
 
         // wait for jobs to end
         r = TRUE;
@@ -231,7 +260,7 @@ START_TEST(test_sync){
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
 
     // run one sync job
-    ck_assert_int_eq(afb_sched_start(1, 1, 2, test_start_job_sync, i2p(NBJOBS)), 0);
+    ck_assert_int_eq(afb_sched_start(1, 1, 2, test_start_job_sync, i2p(0)), 0);
 
     ck_assert_int_eq(sched_runing,FALSE);
     ck_assert_int_eq(gval.runingJobs, 0);
