@@ -830,7 +830,7 @@ static int do_prepare(struct ev_mgr *mgr)
 {
 	int rc;
 
-	if (mgr->state != Idle)
+	if (mgr->state != Idle && mgr->state != Ready)
 		rc = X_ENOTSUP;
 	else {
 		mgr->state = Preparing;
