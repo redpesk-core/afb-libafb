@@ -351,7 +351,7 @@ static int handle_alias(struct afb_hreq *hreq, void *data)
 	}
 
 	search = locale_root_search(da->root, hreq->lang, 0);
-	rc = afb_hreq_reply_locale_file_if_exist(hreq, search, &hreq->tail[1]);
+	rc = afb_hreq_reply_locale_file_if_exist(hreq, search, &hreq->tail[hreq->lentail > 0]);
 	locale_search_unref(search);
 	if (rc == 0) {
 		if (da->relax)
