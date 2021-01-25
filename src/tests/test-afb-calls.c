@@ -201,7 +201,7 @@ START_TEST (test)
 	// inti a common req
 	afb_req_common_init(&req, &test_queryitf, "toto","patatate", 0, NULL);
 
-	
+
 	/***** Test acync calls *****/
 	fprintf(stderr, "\n### Test async calls\n");
 

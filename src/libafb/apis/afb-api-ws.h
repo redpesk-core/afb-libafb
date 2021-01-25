@@ -31,5 +31,3 @@ extern int afb_api_ws_add_client_strong(const char *uri, struct afb_apiset *decl
 extern int afb_api_ws_add_client_weak(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set);
 
 extern int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set);
-
-

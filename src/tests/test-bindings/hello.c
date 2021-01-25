@@ -60,7 +60,7 @@ static void unsubscribe(afb_req_t request, unsigned nparams, afb_data_t const *p
   int rc;
   rc = afb_req_unsubscribe(request, event);
   if(rc >= 0){
-    fprintf(stderr, "Hello : unsubscribe success !\n");  
+    fprintf(stderr, "Hello : unsubscribe success !\n");
     afb_data_array_addref(nparams, params);
     afb_req_reply(request, 0, nparams, params);
   }
@@ -93,28 +93,28 @@ static int mainctl(afb_api_x4_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, voi
     case afb_ctlid_Root_Entry :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Root_Entry\n", afb_ctlid_Root_Entry);
     break;
-    
+
     case afb_ctlid_Pre_Init :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Pre_Init\n", afb_ctlid_Pre_Init);
     break;
-    
+
     case afb_ctlid_Init :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Init\n", afb_ctlid_Init);
     break;
-    
+
     case afb_ctlid_Class_Ready :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Class_Ready\n", afb_ctlid_Class_Ready);
     break;
-    
+
     case afb_ctlid_Orphan_Event :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Orphan_Event\n", afb_ctlid_Orphan_Event);
     break;
-    
+
     case afb_ctlid_Exiting :
       fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Exiting\n", afb_ctlid_Exiting);
     break;
   }
-  
+
   return 0;
 }
 const struct afb_binding_v4 afbBindingExport = {

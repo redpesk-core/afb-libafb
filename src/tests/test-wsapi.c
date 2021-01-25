@@ -100,7 +100,7 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             fprintf(stderr, "\ttype : NONE\n");
         break;
 
-        case afb_wsapi_msg_type_call : 
+        case afb_wsapi_msg_type_call :
             fprintf(stderr, "\ttype : call\n");
             fprintf(stderr, "\tsession id : %d\n", msg->call.sessionid);
             fprintf(stderr, "\ttoken id : %d\n", msg->call.tokenid);
@@ -136,7 +136,7 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_str_eq(REPLY_DATA, str_msg);
         break;
 
-        case afb_wsapi_msg_type_event_create : 
+        case afb_wsapi_msg_type_event_create :
             fprintf(stderr, "\ttype : event_create\n");
             fprintf(stderr, "\tid : %d\n", msg->event_create.eventid);
             fprintf(stderr, "\tname : %s\n", msg->event_create.eventname);
@@ -144,13 +144,13 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_str_eq(EVENT_NAME, msg->event_create.eventname);
         break;
 
-        case afb_wsapi_msg_type_event_remove : 
+        case afb_wsapi_msg_type_event_remove :
             fprintf(stderr, "\ttype : event_remove\n");
             fprintf(stderr, "\tid : %d\n", msg->event_remove.eventid);
             ck_assert_int_eq(EVENT_ID, msg->event_remove.eventid);
         break;
 
-        case afb_wsapi_msg_type_event_subscribe : 
+        case afb_wsapi_msg_type_event_subscribe :
             fprintf(stderr, "\ttype : event_subscribe\n");
             fprintf(stderr, "\tid : %d\n", msg->event_subscribe.eventid);
             fprintf(stderr, "\tclosure : %d\n", p2i(msg->event_subscribe.closure));
@@ -159,7 +159,7 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
 
         break;
 
-        case afb_wsapi_msg_type_event_unsubscribe : 
+        case afb_wsapi_msg_type_event_unsubscribe :
             fprintf(stderr, "\ttype : event_unsubscribe\n");
             fprintf(stderr, "\tid : %d\n", msg->event_unsubscribe.eventid);
             fprintf(stderr, "\tclosure : %d\n", p2i(msg->event_unsubscribe.closure));
@@ -167,7 +167,7 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_int_eq(CALL_CLOSURE, p2i(msg->event_unsubscribe.closure));
         break;
 
-        case afb_wsapi_msg_type_event_push : 
+        case afb_wsapi_msg_type_event_push :
             fprintf(stderr, "\ttype : event_push\n");
             fprintf(stderr, "\tid : %d\n", msg->event_push.eventid);
             fprintf(stderr, "\tdata : %s\n", msg->event_push.data);
@@ -175,7 +175,7 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_str_eq(EVENT_PUSH_DATA, str_msg);
         break;
 
-        case afb_wsapi_msg_type_event_broadcast : 
+        case afb_wsapi_msg_type_event_broadcast :
             fprintf(stderr, "\ttype : event_broadcast\n");
             fprintf(stderr, "\tname : %s\n", msg->event_broadcast.name);
             fprintf(stderr, "\tdata : %s\n", msg->event_broadcast.data);
@@ -187,17 +187,17 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_int_eq(EVENT_BROADCAST_HOP-1, msg->event_broadcast.hop);
         break;
 
-        case afb_wsapi_msg_type_event_unexpected : 
+        case afb_wsapi_msg_type_event_unexpected :
             fprintf(stderr, "\ttype : event_unexpected\n");
             fprintf(stderr, "\tevent id : %d\n", msg->event_unexpected.eventid);
             ck_assert_int_eq(EVENT_ID, msg->event_unexpected.eventid);
-            
+
             // test ref/unref of wsapi_msg
             ck_assert_ptr_eq(afb_wsapi_msg_addref(msg), msg);
             afb_wsapi_msg_unref(msg);
         break;
 
-        case afb_wsapi_msg_type_session_create : 
+        case afb_wsapi_msg_type_session_create :
             fprintf(stderr, "\ttype : session_create\n");
             fprintf(stderr, "\tsession : %s\n", msg->session_create.sessionname);
             fprintf(stderr, "\tsession id : %d\n", msg->session_create.sessionid);
@@ -205,13 +205,13 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_str_eq(msg->session_create.sessionname, SESSION_NAME);
         break;
 
-        case afb_wsapi_msg_type_session_remove : 
+        case afb_wsapi_msg_type_session_remove :
             fprintf(stderr, "\ttype : session_remove\n");
             fprintf(stderr, "\tsession id : %d\n", msg->session_remove.sessionid);
             ck_assert_int_eq(msg->session_remove.sessionid, SESSION_ID);
         break;
 
-        case afb_wsapi_msg_type_token_create : 
+        case afb_wsapi_msg_type_token_create :
             fprintf(stderr, "\ttype : token_create\n");
             fprintf(stderr, "\tname : %s\n", msg->token_create.tokenname);
             fprintf(stderr, "\tid : %d\n", msg->token_create.tokenid);
@@ -219,19 +219,19 @@ void test_cb(void * closure, const struct afb_wsapi_msg * msg){
             ck_assert_str_eq(msg->token_create.tokenname, TOKEN_NAME);
         break;
 
-        case afb_wsapi_msg_type_token_remove : 
+        case afb_wsapi_msg_type_token_remove :
             fprintf(stderr, "\ttype : token_remove\n");
             fprintf(stderr, "\tid : %d\n", TOKEN_ID);
             ck_assert_int_eq(msg->token_remove.tokenid, TOKEN_ID);
         break;
 
-        case afb_wsapi_msg_type_describe : 
+        case afb_wsapi_msg_type_describe :
             fprintf(stderr, "\ttype : describe\n");
             json_data = json_object_new_string(DESCRIPTION_DATA);
             afb_wsapi_msg_description_j(msg, json_data);
         break;
 
-        case afb_wsapi_msg_type_description : 
+        case afb_wsapi_msg_type_description :
             fprintf(stderr, "\ttype : description\n");
             fprintf(stderr, "\tclosure : %d\n", p2i(msg->description.closure));
             fprintf(stderr, "\tdata : %s\n", msg->description.data);
@@ -290,7 +290,7 @@ const struct afb_wsapi_itf itf = {
 };
 
 void wsapi_test_init(int fd[], struct afb_wsapi * wsapi[]){
-    
+
     int rc, i;
 
     for (i=0; i<NB_WSAPI; i++) {
@@ -306,7 +306,7 @@ void wsapi_test_init(int fd[], struct afb_wsapi * wsapi[]){
 }
 
 void wsapi_test_hangup(struct afb_wsapi * wsapi[]){
-    
+
     int i;
 
     for (i=0; i<NB_WSAPI; i++) {
@@ -320,7 +320,7 @@ void wsapi_test_hangup(struct afb_wsapi * wsapi[]){
 /******************************** Tests ********************************/
 
 void start_afb_scheduler(int signum, void* arg){
-    
+
     if (signum){
         fprintf(stderr, "start_afb_scheduler receved sig %d", signum);
         return;
