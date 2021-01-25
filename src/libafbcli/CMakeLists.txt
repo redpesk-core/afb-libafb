@@ -40,6 +40,7 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/wsapi/afb-proto-ws.c
 	${DIR}/wsapi/afb-wsapi.c
 	${DIR}/wsj1/afb-wsj1.c
+	${DIR}/tls/tls.c
 )
 
 ADD_LIBRARY(libafbcli SHARED ${LIBAFBCLI_SOURCES})
@@ -52,6 +53,7 @@ SET_TARGET_PROPERTIES(libafbcli PROPERTIES
 TARGET_LINK_LIBRARIES(libafbcli
 	${libsystemd_LDFLAGS}
 	${json-c_LDFLAGS}
+	${gnutls_LDFLAGS}
 	-lpthread
 	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/export-libafbcli.map
 	-Wl,--as-needed

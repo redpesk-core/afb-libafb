@@ -42,6 +42,7 @@
 #include "wsapi/afb-proto-ws.h"
 #include "wsapi/afb-wsapi.h"
 #include "wsj1/afb-wsj1.h"
+#include "tls/tls.h"
 #include "sys/ev-mgr.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
@@ -54,6 +55,59 @@ struct ev_mgr *afb_sched_acquire_event_manager()
 	if (!result)
 		ev_mgr_create(&result);
 	return result;
+}
+
+/*****************************************************************************************************************************/
+
+static struct sd_event_source *current_sd_event_source_prepare;
+static struct sd_event_source *current_sd_event_source_io;
+
+static int onprepare(struct sd_event_source *s, void *userdata)
+{
+	afb_ev_mgr_prepare();
+	return 0;
+}
+
+static int onevent(struct sd_event_source *s, int fd, uint32_t revents, void *userdata)
+{
+	afb_ev_mgr_wait(0);
+	afb_ev_mgr_dispatch();
+	return 0;
+}
+
+/*
+ * Attaches the internal event loop to the given sd_event
+ */
+int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
+{
+	int rc;
+	if (current_sd_event_source_io) {
+		if (sd_event_source_get_event(current_sd_event_source_io) == eloop)
+			return 0;
+		sd_event_source_unref(current_sd_event_source_io);
+		sd_event_source_unref(current_sd_event_source_prepare);
+		current_sd_event_source_io = current_sd_event_source_prepare = 0;
+	}
+	rc = sd_event_add_defer(eloop, &current_sd_event_source_prepare, onprepare, 0);
+	if (rc >= 0) {
+		rc = sd_event_add_post(eloop, &current_sd_event_source_prepare, onprepare, 0);
+		if (rc >= 0) {
+			rc = sd_event_add_io(eloop, &current_sd_event_source_io, afb_ev_mgr_get_fd(), EPOLLIN, onevent, 0);
+			if (rc < 0) {
+				sd_event_source_unref(current_sd_event_source_prepare);
+				current_sd_event_source_io = current_sd_event_source_prepare = 0;
+			}
+		}
+	}
+	if (rc >= 0) {
+		rc = sd_event_prepare(eloop);
+		while (rc > 0) {
+			rc = sd_event_dispatch(eloop);
+			rc = rc <= 0 ? -1 : sd_event_prepare(eloop);
+		}
+
+	}
+	return rc;
 }
 
 /**************** WebSocket handshake ****************************/
@@ -149,6 +203,24 @@ static int make_request(char **request, const char *path, const char *host, cons
 	return rc;
 }
 
+static int writeall(int fd, const void *buffer, size_t size)
+{
+	size_t offset;
+	ssize_t ssz;
+
+	offset = 0;
+	while (size > offset) {
+		ssz = write(fd, buffer + offset, size - offset);
+		if (ssz >= 0)
+			offset += (size_t)ssz;
+		else if (errno == EAGAIN)
+			usleep(10000);
+		else if (errno != EINTR)
+			return -1;
+	}
+	return 0;
+}
+
 /* create the request and send it to fd, returns the expected accept string */
 static const char *send_request(int fd, const char **protocols, const char *path, const char *host)
 {
@@ -169,21 +241,42 @@ static const char *send_request(int fd, const char **protocols, const char *path
 		return NULL;
 
 	/* send the request */
-	do { rc = (int)write(fd, request, length); } while(rc < 0 && errno == EINTR);
+	rc = writeall(fd, request, length);
 	free(request);
 	return rc < 0 ? NULL : ack;
 }
 
 /* read a line not efficiently but without buffering */
-static int receive_line(int fd, char *line, int size)
+static int receive_line(struct sd_event *eloop, int fd, char *line, int size)
 {
-	int rc, length = 0, cr = 0;
+	int rc, length = 0, cr = 0, st;
 	for(;;) {
 		if (length >= size)
 			return X_EMSGSIZE;
-		do { rc = (int)read(fd, line + length, 1); } while (rc < 0 && errno == EINTR);
-		if (rc < 0)
-			return -1;
+		for(;;) {
+			rc = (int)read(fd, line + length, 1);
+			if (rc == 1)
+				break;
+			else if (errno == EAGAIN) {
+				afb_ev_mgr_prepare();
+				st = sd_event_get_state(eloop);
+				if (st == SD_EVENT_INITIAL) {
+					rc = sd_event_prepare(eloop);
+					st = rc == 0 ? SD_EVENT_ARMED : SD_EVENT_PENDING;
+				}
+				if (st == SD_EVENT_ARMED) {
+					rc = sd_event_wait(eloop, 10000);
+					st = rc == 0 ? SD_EVENT_INITIAL : SD_EVENT_PENDING;
+				}
+				if (st == SD_EVENT_PENDING) {
+					rc = sd_event_dispatch(eloop);
+					if (rc <= 0)
+						return -1;
+				}
+			}
+			else if (errno != EINTR)
+				return -1;
+		}
 		if (line[length] == '\r')
 			cr = 1;
 		else if (cr != 0 && line[length] == '\n') {
@@ -202,14 +295,14 @@ static inline int isheader(const char *head, size_t klen, const char *key)
 }
 
 /* receives and scan the response */
-static int receive_response(int fd, const char **protocols, const char *ack)
+static int receive_response(struct sd_event *eloop, int fd, const char **protocols, const char *ack)
 {
 	char line[4096], *it;
 	int rc, haserr, result = -1;
 	size_t len, clen;
 
 	/* check the header line to be something like: "HTTP/1.1 101 Switching Protocols" */
-	rc = receive_line(fd, line, (int)sizeof(line));
+	rc = receive_line(eloop, fd, line, (int)sizeof(line));
 	if (rc < 0)
 		goto error;
 	len = strcspn(line, " ");
@@ -228,7 +321,7 @@ static int receive_response(int fd, const char **protocols, const char *ack)
 	clen = 0;
 	haserr = 0;
 	for(;;) {
-		rc = receive_line(fd, line, (int)sizeof(line));
+		rc = receive_line(eloop, fd, line, (int)sizeof(line));
 		if (rc < 0)
 			goto error;
 		if (rc == 0)
@@ -272,21 +365,36 @@ error:
 	return rc;
 }
 
-static int negociate(int fd, const char **protocols, const char *path, const char *host)
+static int negociate(struct sd_event *eloop, int fd, const char **protocols, const char *path, const char *host)
 {
 	const char *ack = send_request(fd, protocols, path, host);
-	return ack == NULL ? -1 : receive_response(fd, protocols, ack);
+	return ack == NULL ? -1 : receive_response(eloop, fd, protocols, ack);
 }
 
 /* tiny parse a "standard" websock uri ws://host:port/path... */
-static int parse_uri(const char *uri, char **host, char **service, const char **path)
+static int parse_uri(const char *uri, char **host, char **service, const char **path, int *secured)
 {
 	const char *h, *p;
 	size_t hlen, plen;
 
 	/* the scheme */
+	*secured = 0;
+#if WITH_GNUTLS
+	if (strncmp(uri, "wss://", 6) == 0) {
+		*secured = 1;
+		uri += 6;
+	}
+	else if (strncmp(uri, "https://", 6) == 0) {
+		*secured = 1;
+		uri += 8;
+	}
+	else
+#endif
 	if (strncmp(uri, "ws://", 5) == 0)
 		uri += 5;
+	else if (strncmp(uri, "http://", 6) == 0) {
+		uri += 7;
+	}
 
 	/* the host */
 	h = uri;
@@ -328,7 +436,7 @@ static const char *proto_json1[2] = { "x-afb-ws-json1",	NULL };
 
 struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *uri, struct afb_wsj1_itf *itf, void *closure)
 {
-	int rc, fd;
+	int rc, fd, tls;
 	char *host, *service, xhost[32];
 	const char *path;
 	struct addrinfo hint, *rai, *iai;
@@ -340,7 +448,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 		return NULL;
 
 	/* scan the uri */
-	rc = parse_uri(uri, &host, &service, &path);
+	rc = parse_uri(uri, &host, &service, &path, &tls);
 	if (rc < 0)
 		return NULL;
 
@@ -368,12 +476,23 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 		fd = socket(iai->ai_family, iai->ai_socktype, iai->ai_protocol);
 		if (fd >= 0) {
 			rc = connect(fd, iai->ai_addr, iai->ai_addrlen);
+			if (rc == 0)
+				fcntl(fd, F_SETFL, O_NONBLOCK);
+#if WITH_GNUTLS
+			if (rc == 0 && tls) {
+				rc = tls_upgrade_client(afb_sched_acquire_event_manager(), fd, 0/*host*/);
+				if (rc >= 0) {
+					afb_ev_mgr_prepare();
+					fd = rc;
+					rc = 0;
+				}
+			}
+#endif
 			if (rc == 0) {
-				rc = negociate(fd, proto_json1, path, xhost);
+				rc = negociate(eloop, fd, proto_json1, path, xhost);
 				if (rc == 0) {
 					result = afb_wsj1_create(fd, itf, closure);
 					if (result != NULL) {
-						fcntl(fd, F_SETFL, O_NONBLOCK);
 						break;
 					}
 				}
@@ -386,76 +505,57 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 	return result;
 }
 
-#if 0
-/* compute the queried path */
-static char *makequery(const char *path, const char *uuid, const char *token)
-{
-	char *result;
-	int rc;
-
-	while(*path == '/')
-		path++;
-	if (uuid == NULL) {
-		if (token == NULL)
-			rc = asprintf(&result, "/%s", path);
-		else
-			rc = asprintf(&result, "/%s?x-afb-token=%s", path, token);
-	} else {
-		if (token == NULL)
-			rc = asprintf(&result, "/%s?x-afb-uuid=%s", path, uuid);
-		else
-			rc = asprintf(&result, "/%s?x-afb-uuid=%s&x-afb-token=%s", path, uuid, token);
-	}
-	if (rc < 0) {
-		errno = ENOMEM;
-		return NULL;
-	}
-	return result;
-}
-#endif
-
-
 /*****************************************************************************************************************************/
 
-static struct sd_event_source *current_sd_event_source_prepare;
-static struct sd_event_source *current_sd_event_source_io;
-
-static int onprepare(struct sd_event_source *s, void *userdata)
+static int sockopenpref(const char *uri, int server, const char *prefix, const char *scheme)
 {
-	afb_ev_mgr_prepare();
-	return 0;
+	int mfd, fd;
+	size_t len;
+
+	len = strlen(prefix);
+	if (strncasecmp(uri, prefix, len))
+		return 0;
+
+#if WITH_GNUTLS
+	int tls = uri[len] == 's' || uri[len] == 'S';
+	len += tls;
+#endif
+	if (uri[len] != ':')
+		return 0;
+	len += uri[len + 1] == '/' && uri[len + 2] == '/' ? 3 : 1;
+
+	fd = afb_socket_open_scheme(&uri[len], server, scheme ?: prefix);
+	if (fd == 0) {
+		mfd = fd;
+		fd = dup(mfd);
+		close(mfd);
+	}
+#if WITH_GNUTLS
+	if (fd > 0 && tls) {
+		mfd = fd;
+		fd = tls_upgrade_client(afb_sched_acquire_event_manager(), mfd, 0);
+		if (fd < 0)
+			close(mfd);
+		else
+			afb_ev_mgr_prepare();
+	}
+#endif
+	return fd;
 }
 
-static int onevent(struct sd_event_source *s, int fd, uint32_t revents, void *userdata)
-{
-	afb_ev_mgr_wait(0);
-	afb_ev_mgr_dispatch();
-	return 0;
-}
-
-/*
- * Attaches the internal event loop to the given sd_event
- */
-int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
+static int sockopen(struct sd_event *eloop, const char *uri, int server)
 {
 	int rc;
-	if (current_sd_event_source_io) {
-		if (sd_event_source_get_event(current_sd_event_source_io) == eloop)
-			return 0;
-		sd_event_source_unref(current_sd_event_source_io);
-		sd_event_source_unref(current_sd_event_source_prepare);
-		current_sd_event_source_io = current_sd_event_source_prepare = 0;
-	}
-	rc = sd_event_add_defer(eloop, &current_sd_event_source_prepare, onprepare, 0);
+
+	/* ensure connectable */
+	rc = afb_ws_client_connect_to_sd_event(eloop);
 	if (rc >= 0) {
-		rc = sd_event_add_post(eloop, &current_sd_event_source_prepare, onprepare, 0);
-		if (rc >= 0) {
-			rc = sd_event_add_io(eloop, &current_sd_event_source_io, afb_ev_mgr_get_fd(), EPOLLIN, onevent, 0);
-			if (rc < 0) {
-				sd_event_source_unref(current_sd_event_source_prepare);
-				current_sd_event_source_io = current_sd_event_source_prepare = 0;
-			}
-		}
+		rc = sockopenpref(uri, server, "ws", "tcp");
+		rc = rc ?: sockopenpref(uri, server, "http", "tcp");
+		rc = rc ?: sockopenpref(uri, server, "tcp", 0);
+		rc = rc ?: sockopenpref(uri, server, "unix", 0);
+		rc = rc ?: sockopenpref(uri, server, "sd", 0);
+		rc = rc ?: afb_socket_open_scheme(uri, server, 0);
 	}
 	return rc;
 }
@@ -472,17 +572,13 @@ int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
 struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const char *uri, struct afb_proto_ws_client_itf *itf, void *closure)
 {
 	struct afb_proto_ws *pws;
-	int fd, rc;
+	int fd;
 
-	/* ensure connected */
-	rc = afb_ws_client_connect_to_sd_event(eloop);
-	if (rc >= 0) {
-		fd = afb_socket_open(uri, 0);
-		if (fd) {
-			pws = afb_proto_ws_create_client(fd, itf, closure);
-			if (pws)
-				return pws;
-		}
+	fd = sockopen(eloop, uri, 0);
+	if (fd) {
+		pws = afb_proto_ws_create_client(fd, itf, closure);
+		if (pws)
+			return pws;
 	}
 	return NULL;
 }
@@ -499,17 +595,14 @@ struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char
 	int rc, fd;
 	struct afb_wsapi *wsapi;
 
-	rc = afb_ws_client_connect_to_sd_event(eloop);
-	if (rc >= 0) {
-		fd = afb_socket_open(uri, 0);
-		if (fd >= 0) {
-			rc = afb_wsapi_create(&wsapi, fd, itf, closure);
-			if (rc >= 0) {
-				rc = afb_wsapi_initiate(wsapi);
-				if (rc >= 0)
-					return wsapi;
-				afb_wsapi_unref(wsapi);
-			}
+	fd = sockopen(eloop, uri, 0);
+	if (fd >= 0) {
+		rc = afb_wsapi_create(&wsapi, fd, itf, closure);
+		if (rc >= 0) {
+			rc = afb_wsapi_initiate(wsapi);
+			if (rc >= 0)
+				return wsapi;
+			afb_wsapi_unref(wsapi);
 		}
 	}
 	return NULL;
@@ -558,7 +651,7 @@ int afb_ws_client_serve(struct sd_event *eloop, const char *uri, int (*onclient)
 		if (!lcb)
 			rc = X_ENOMEM;
 		else {
-			rc = afb_socket_open(uri, 1);
+			rc = afb_socket_open_scheme(uri, 1, 0);
 			if (rc >= 0) {
 				fd = rc;
 				lcb->onclient = onclient;
