@@ -73,6 +73,7 @@
 #cmakedefine01 WITH_REQ_PROCESS_ASYNC
 #cmakedefine01 WITH_CASE_FOLDING
 #cmakedefine01 WITH_EXTENSION
+#cmakedefine01 WITH_GNUTLS
 
 #if WITH_LIBMICROHTTPD
 /* Always add INFER_EXTENSION (more details in afb-hreq.c) */

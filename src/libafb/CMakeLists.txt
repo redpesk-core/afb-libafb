@@ -32,6 +32,7 @@ file(GLOB LIBAFBSRCS
 	wsapi/*.c
 	wsj1/*.c
 	extend/*.c
+	tls/*.c
 )
 set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -75,6 +76,7 @@ INSTALL(DIRECTORY
 		wsapi
 		wsj1
 		extend
+		tls
 	DESTINATION
 		${CMAKE_INSTALL_INCLUDEDIR}/libafb
 	FILES_MATCHING PATTERN

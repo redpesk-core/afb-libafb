@@ -77,6 +77,7 @@ option(WITH_API_CREATOR           "Record creator's API of API"            ON)
 option(WITH_REQ_PROCESS_ASYNC     "Enforce asynchronous processing of requests" ON)
 option(WITH_CASE_FOLDING          "Fold case for API, VERB, EVENT names"   OFF)
 option(WITH_EXTENSION             "Activate ability to load extensions"    ON)
+option(WITH_GNUTLS                "Activate TLS ability with gnutls"       OFF)
 # tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)
@@ -174,6 +175,10 @@ if(WITH_LIBUUID)
 		Setting WITH_LIBUUID to OFF and continuing without LIBUUID.")
 		set(WITH_LIBUUID OFF)
 	endif()
+endif()
+
+if(WITH_GNUTLS)
+	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.3)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
