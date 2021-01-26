@@ -30,12 +30,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include <check.h>
 #include <signal.h>
 #include <pthread.h>
 
 #include "core/afb-sig-monitor.h"
+#include "core/afb-jobs.h"
 #include "sys/verbose.h"
 
 /*********************************************************************/
@@ -199,6 +201,49 @@ START_TEST (dumpstack_test)
 }
 END_TEST
 
+void on_exit_test(int status, void *args){
+	fprintf(stderr, "on_exit_test was call with status = %d\n", status);
+	ck_assert_int_eq(status, 1);
+	abort();
+}
+
+START_TEST(sigterm_test)
+{
+	
+	gval = 0;
+	int status;
+	fprintf(stderr, "\n***************** sigterm_test *****************\n");
+	
+	pid_t apid, gpid = fork();
+	
+	if(gpid == 0){
+		
+		// set up an on exit call back
+		ck_assert_int_eq(0,on_exit(on_exit_test, NULL));
+
+		// set max runing jobs to 0 in order to reach on_rescue_exit
+		// callback when the job will be killed 
+		afb_jobs_set_max_count(0);
+
+		// activate signal monitoring
+		ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
+
+		// run a job
+		afb_sig_monitor_run(1, test_job, i2p(2));
+	}
+	else {
+		fprintf(stderr, "job with gpid %d sleeping for 10000µs\n", (int)gpid);
+		usleep(10000);
+		fprintf(stderr, "afb_jobs_get_pending_count = %d\n", afb_jobs_get_pending_count());
+		kill(gpid, SIGTERM);
+		apid = wait(&status);
+		fprintf(stderr, "wait returned pid %d and status = %d\n", (int)apid, status);
+		ck_assert_int_ne(0, status);
+	}
+	fprintf(stderr, "job with gpid = %d done gval = %d\n", (int)gpid, gval);
+	
+}
+END_TEST
 /*********************************************************************/
 
 static Suite *suite;
@@ -225,5 +270,6 @@ int main(int ac, char **av)
 			addtest(timeout_test);
 			addtest(clean_timeout_test);
 			addtest(dumpstack_test);
+			addtest(sigterm_test);
 	return !!srun();
 }
