@@ -352,7 +352,7 @@ int afb_jobs_get_max_count(void)
 /* set maximum pending count */
 void afb_jobs_set_max_count(int count)
 {
-	if (count > 0 && count <= MAX_JOB_COUNT_MAX)
+	if (count >= 0 && count <= MAX_JOB_COUNT_MAX)
 		max_pending_count = count;
 }
 
