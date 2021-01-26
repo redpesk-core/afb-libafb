@@ -37,6 +37,29 @@ struct json_object;
 struct afb_api_common;
 enum afb_string_mode;
 
+/**
+ * Creates an instance of given name and add it to the declare_set.
+ *
+ * If a preinit callback is given, it will be called at end of
+ * the creation if every thing went right. It will receive its
+ * closure and the created api. If it returns a negative number,
+ * the creation is cancelled.
+ *
+ * @param api pointer where is stored the result
+ * @param declare_set the apiset for declaring the new api
+ * @param call_set the apiset to use for calls
+ * @param name the name of the name
+ * @param mode_name mode of use of the name
+ * @param info info about the api, can be NULL
+ * @param mode_info mode of use of the info
+ * @param noconcurrency set the concurrency mode: 0 means concurrent, not zero means serial
+ * @param preinit callback ofr preinitialisation (can be NULL)
+ * @param closure closure of the preinit
+ * @param path path of the binding shared object (can be NULL)
+ * @param mode_path mode of use of the path
+ *
+ * @return 0 in case of success or a negative error code
+ */
 extern
 int
 afb_api_v3_create(
