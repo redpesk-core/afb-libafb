@@ -493,6 +493,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 				if (rc == 0) {
 					result = afb_wsj1_create(fd, itf, closure);
 					if (result != NULL) {
+						afb_ev_mgr_prepare();
 						break;
 					}
 				}
