@@ -105,7 +105,11 @@ int afb_ws_client_connect_to_sd_event(struct sd_event *eloop)
 			rc = sd_event_dispatch(eloop);
 			rc = rc <= 0 ? -1 : sd_event_prepare(eloop);
 		}
-
+		if (sd_event_get_state(eloop) == SD_EVENT_ARMED) {
+			rc = sd_event_wait(eloop, 0);
+			if (rc > 0)
+				rc = sd_event_dispatch(eloop);
+		}
 	}
 	return rc;
 }
@@ -578,8 +582,10 @@ struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const cha
 	fd = sockopen(eloop, uri, 0);
 	if (fd) {
 		pws = afb_proto_ws_create_client(fd, itf, closure);
-		if (pws)
+		if (pws) {
+			afb_ev_mgr_prepare();
 			return pws;
+		}
 	}
 	return NULL;
 }
@@ -600,6 +606,7 @@ struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char
 	if (fd >= 0) {
 		rc = afb_wsapi_create(&wsapi, fd, itf, closure);
 		if (rc >= 0) {
+			afb_ev_mgr_prepare();
 			rc = afb_wsapi_initiate(wsapi);
 			if (rc >= 0)
 				return wsapi;
