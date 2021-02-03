@@ -59,7 +59,7 @@ struct extension
 
 static struct extension *extensions;
 
-static int load_extension(const char *path)
+static int load_extension(const char *path, int failstops)
 {
 	struct afb_extension_manifest *manifest;
 	struct extension *ext;
@@ -70,6 +70,10 @@ static int load_extension(const char *path)
 	DEBUG("Trying extension %s", path);
 	rc = x_dynlib_open(path, &handle, 1, 0);
 	if (rc < 0) {
+		if (failstops) {
+			ERROR("Unloadable extension %s: %s", path, x_dynlib_error(&handle));
+			return rc;
+		}
 		DEBUG("can't load extension %s", path);
 		return 0;
 	}
@@ -77,8 +81,14 @@ static int load_extension(const char *path)
 	/* search the symbol */
 	rc = x_dynlib_symbol(&handle, MANIFEST, (void**)&manifest);
 	if (rc < 0) {
-		DEBUG("Not an extension %s", path);
-		rc = 0;
+		if (failstops) {
+			ERROR("Not an extension %s: %s", path, x_dynlib_error(&handle));
+			return rc;
+		}
+		else {
+			DEBUG("Not an extension %s", path);
+			rc = 0;
+		}
 	} else if (!manifest || manifest->magic != AFB_EXTENSION_MAGIC
 			|| !manifest->name) {
 		ERROR("Manifest error of extension %s", path);
@@ -110,7 +120,7 @@ static void load_extension_cb(void *closure, struct json_object *value)
 	int rc, *ret = closure;
 
 	if (*ret >= 0 && json_object_is_type(value, json_type_string)) {
-		rc = load_extension(json_object_get_string(value));
+		rc = load_extension(json_object_get_string(value), 1);
 		if (rc < *ret)
 			*ret = rc;
 	}
@@ -131,7 +141,7 @@ static int try_extension(void *closure, struct path_search_item *item)
 		return 0;
 
 	/* try to get it as a binding */
-	rc = load_extension(item->path);
+	rc = load_extension(item->path, 0);
 	if (rc >= 0)
 		return 0; /* got it */
 
