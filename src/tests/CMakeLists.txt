@@ -52,6 +52,7 @@ if(check_FOUND)
 	addtest(path-search)
 	addtest(expand-vars)
 	addtest(wsapi)
+	addtest(afb-evt)
 
 	add_subdirectory(test-bindings)
 	addtest(api-so-v4)
