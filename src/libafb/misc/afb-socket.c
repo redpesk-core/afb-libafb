@@ -191,8 +191,14 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 			host = NULL;
 	}
 	rc = getaddrinfo(host, service, &hint, &rai);
-	if (rc < 0)
-		return -errno;
+	if (rc != 0) {
+		switch(rc) {
+		case EAI_MEMORY:
+			return X_ENOMEM;
+		default:
+			return X_ECANCELED;
+		}
+	}
 
 	/* check emptiness */
 	if (!rai)
