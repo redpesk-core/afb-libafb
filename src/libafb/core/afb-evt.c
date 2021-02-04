@@ -326,7 +326,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	/* create the structure for the job */
 	jb = make_evt_broadcasted(event, nparams, params, uuid, hop);
 	if (jb == NULL) {
-		ERROR("Cant't create broadcast string job item for %s", event);
+		ERROR("Can't create broadcast string job item for %s", event);
 		return X_ENOMEM;
 	}
 
@@ -335,7 +335,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	if (rc >= 0)
 		rc = 0;
 	else {
-		ERROR("cant't queue broadcast string job item for %s", event);
+		ERROR("Can't queue broadcast string job item for %s", event);
 		destroy_evt_broadcasted(jb);
 	}
 	return rc;
@@ -437,7 +437,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 
 	je = make_evt_pushed(evt, nparams, params);
 	if (je == NULL) {
-		ERROR("Cant't create push evt job item for %s", evt->fullname);
+		ERROR("Can't create push evt job item for %s", evt->fullname);
 		return X_ENOMEM;
 	}
 
@@ -445,7 +445,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 	if (rc >= 0)
 		rc = 1;
 	else {
-		ERROR("cant't queue push evt job item for %s", evt->fullname);
+		ERROR("Can't queue push evt job item for %s", evt->fullname);
 		destroy_evt_pushed(je);
 	}
 
@@ -981,7 +981,7 @@ int afb_evt_listener_unwatch_id(struct afb_evt_listener *listener, uint16_t even
 
 /*
  * Avoids the 'listener' to watch any event, calling the callback
- * 'remove' of the interface if 'remoe' is not zero.
+ * 'remove' of the interface if 'remove' is not zero.
  */
 void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int remove)
 {
