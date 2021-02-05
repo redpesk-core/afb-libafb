@@ -244,6 +244,9 @@ static mhd_result_t access_handler(
 		return MHD_YES;
 	}
 
+	/* init the context */
+	afb_hreq_init_context(hreq);
+
 	/* search an handler for the request */
 	hreq->scanned = 1;
 	iter = hsrv->handlers;

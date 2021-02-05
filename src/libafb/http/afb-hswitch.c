@@ -102,11 +102,6 @@ int afb_hswitch_websocket_switch(struct afb_hreq *hreq, void *data)
 	if (hreq->lentail != 0)
 		return 0;
 
-	if (afb_hreq_init_context(hreq) < 0) {
-		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
-		return 1;
-	}
-
 	return afb_websock_check_upgrade(hreq, apiset);
 }
 
