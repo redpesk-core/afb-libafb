@@ -74,7 +74,7 @@ static const char key_for_bearer[] = "Bearer";
 static const char key_for_access_token[] = "access_token";
 
 static char *cookie_name = NULL;
-static char *cookie_setter = NULL;
+static char *cookie_attr = NULL;
 static char *tmp_pattern = NULL;
 
 /*
@@ -157,9 +157,29 @@ static int validsubpath(const char *subpath)
 	return 1;
 }
 
+static void set_response_cookie(struct afb_hreq *hreq, struct MHD_Response *response)
+{
+	int rc;
+	char *cookie;
+	const char *uuid;
+	int res;
+
+	uuid = hreq->comreq.session ? afb_session_uuid(hreq->comreq.session) : NULL;
+	if (uuid != NULL) {
+		rc = asprintf(&cookie, "%s=%s%s", cookie_name, uuid, cookie_attr);
+		if (rc < 0)
+			res = MHD_NO;
+		else {
+			res = MHD_add_response_header(response, MHD_HTTP_HEADER_SET_COOKIE, cookie);
+			free(cookie);
+		}
+		if (res == MHD_NO)
+			ERROR("unable to set cookie");
+	}
+}
+
 static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_Response *response, va_list args)
 {
-	char *cookie;
 	const char *k, *v;
 
 	if (hreq->replied != 0)
@@ -173,11 +193,7 @@ static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_
 	}
 
 
-	v = hreq->comreq.session ? afb_session_uuid(hreq->comreq.session) : NULL;
-	if (v != NULL && asprintf(&cookie, cookie_setter, v) > 0) {
-		MHD_add_response_header(response, MHD_HTTP_HEADER_SET_COOKIE, cookie);
-		free(cookie);
-	}
+	set_response_cookie(hreq, response);
 	MHD_queue_response(hreq->connection, status, response);
 	MHD_destroy_response(response);
 
@@ -990,16 +1006,14 @@ int afb_hreq_init_cookie(int port, const char *path, int maxage)
 	int rc;
 
 	free(cookie_name);
-	free(cookie_setter);
-	cookie_name = NULL;
-	cookie_setter = NULL;
+	free(cookie_attr);
+	cookie_name = cookie_attr = NULL;
 
-	path = path ? : "/";
 	rc = asprintf(&cookie_name, "%s-%d", long_key_for_uuid, port);
 	if (rc < 0)
 		return 0;
-	rc = asprintf(&cookie_setter, "%s=%%s; Path=%s; Max-Age=%d; HttpOnly",
-			cookie_name, path, maxage);
+	rc = asprintf(&cookie_attr, "; Path=%s; Max-Age=%d; HttpOnly",
+			path ?: "/", maxage);
 	if (rc < 0)
 		return 0;
 	return 1;
