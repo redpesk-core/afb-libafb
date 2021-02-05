@@ -408,7 +408,7 @@ int afb_hreq_redirect_to_ending_slash_if_needed(struct afb_hreq *hreq)
 	memcpy(tourl, hreq->url, hreq->lenurl);
 	tourl[hreq->lenurl] = '/';
 	tourl[hreq->lenurl + 1] = 0;
-	afb_hreq_redirect_to(hreq, tourl, 1);
+	afb_hreq_redirect_to(hreq, tourl, 1, 1);
 	return 1;
 }
 
@@ -718,14 +718,17 @@ static char *url_with_query(struct afb_hreq *hreq, const char *url)
 	return mkq.text;
 }
 
-void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_part)
+void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_part, int permanent)
 {
 	const char *to;
 	char *wqp;
+	int redir = permanent
+			? MHD_HTTP_MOVED_PERMANENTLY /* TODO MHD_HTTP_PERMANENT_REDIRECT */
+			: MHD_HTTP_TEMPORARY_REDIRECT;
 
 	wqp = add_query_part ? url_with_query(hreq, url) : NULL;
 	to = wqp ? : url;
-	afb_hreq_reply_static(hreq, MHD_HTTP_MOVED_PERMANENTLY, 0, NULL,
+	afb_hreq_reply_static(hreq, redir, 0, NULL,
 			MHD_HTTP_HEADER_LOCATION, to, NULL);
 	DEBUG("redirect from [%s] to [%s]", hreq->url, url);
 	free(wqp);

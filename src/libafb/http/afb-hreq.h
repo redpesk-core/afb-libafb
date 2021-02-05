@@ -73,7 +73,15 @@ extern int afb_hreq_reply_locale_file_if_exist(struct afb_hreq *hreq, struct loc
 
 extern int afb_hreq_reply_locale_file(struct afb_hreq *hreq, struct locale_search *search, const char *filename);
 
-extern void afb_hreq_redirect_to(struct afb_hreq *request, const char *url, int add_query_part);
+/**
+ * Send a REDIRECT HTTP response
+ * 
+ * @param hreq the HTTP request handler
+ * @param url the URL to redirect to
+ * @param add_query_part if not zero add the query argument to the url
+ * @param permanent if not the the redirect is permanent otherwise temporary
+ */
+extern void afb_hreq_redirect_to(struct afb_hreq *request, const char *url, int add_query_part, int permanent);
 
 extern int afb_hreq_redirect_to_ending_slash_if_needed(struct afb_hreq *hreq);
 

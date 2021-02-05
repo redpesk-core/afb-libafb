@@ -91,7 +91,7 @@ int afb_hswitch_one_page_api_redirect(struct afb_hreq *hreq, void *data)
 	url[plen++] = '#';
 	url[plen++] = '!';
 	memcpy(&url[plen], &hreq->tail[1], hreq->lentail);
-	afb_hreq_redirect_to(hreq, url, 1);
+	afb_hreq_redirect_to(hreq, url, 1, 1);
 	return 1;
 }
 
