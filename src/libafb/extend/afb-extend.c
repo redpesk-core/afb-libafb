@@ -35,6 +35,7 @@
 #include "sys/verbose.h"
 #include "sys/x-dynlib.h"
 #include "utils/wrap-json.h"
+#include "core/afb-v4.h"
 
 #if WITH_DIRENT
 #include "utils/path-search.h"
@@ -65,6 +66,7 @@ static int load_extension(const char *path, int failstops)
 	struct extension *ext;
 	x_dynlib_t handle;
 	int rc;
+	struct afb_v4_dynlib_info infov4;
 
 	/* try to load */
 	DEBUG("Trying extension %s", path);
@@ -97,6 +99,7 @@ static int load_extension(const char *path, int failstops)
 		ERROR("Unsupported version %d of extension %s", manifest->version, path);
 		rc = X_ENOTSUP;
 	} else {
+		afb_v4_connect_dynlib(&handle, &infov4, 0);
 		ext = malloc(strlen(path) + 1 + sizeof *ext);
 		if (!ext)
 			rc = X_ENOMEM;
