@@ -27,9 +27,23 @@ struct afb_data;
 struct afb_type;
 
 /**
- *  Allocates a new data without type
+ * Allocates a new data with the given type
  *
- * @param result where to store the allocated data
+ * This creates a data wrapping the type, the pointer
+ * and the size. The created data handles what it wraps
+ * for its lifetime managed with @see afb_data_addref and
+ * @see afb_data_unref.
+ *
+ * At the end of its life the dispose function, if not null,
+ * is called with the given closure. If the creation of the
+ * data fails, the dispose function is called before returning.
+ *
+ * @param result pointer to the created data
+ * @param type type of the data to create
+ * @param pointer pointer wrapped by the data
+ * @param size size of the pointed data or 0 if it does not care
+ * @param dispose a function to release the wrapped data (can be NULL)
+ * @param closure closure for the dispose function
  *
  * @return 0 in case of success or a negative number on error
  */

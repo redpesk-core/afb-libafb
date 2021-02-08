@@ -164,6 +164,7 @@ struct afb_wsapi_msg
 
 	}; /* anonymous */
 };
+
 struct afb_wsapi_itf
 {
 	void (*on_hangup)(void *closure);

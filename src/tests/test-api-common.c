@@ -187,7 +187,7 @@ void observe(int loglevel, const char *file, int line, const char *function, con
 	ck_assert_int_eq(666, line);
 	ck_assert_str_eq("test", file);
 	ck_assert_str_eq("this_is_a_test", function);
-	
+
 	observation++;
 }
 
@@ -213,7 +213,7 @@ START_TEST (test_functional)
 	sa.itf = &api_itf_null;
 	sa.closure = NULL;
 	sa.group = NULL;
-	
+
 	int rc, i, test_val, checksum;
 
 	/* initialisation */
@@ -240,10 +240,10 @@ START_TEST (test_functional)
 
 	/******** settings ********/
 	fprintf(stderr, "\n******** settings ********\n");
-	
+
 	fprintf(stderr, "comapi->setting = %s\n", json_object_to_json_string(comapi->settings));
 	ck_assert_ptr_null(comapi->settings);
-	
+
 	fprintf(stderr, "make settings...\n");
 	settings = afb_api_common_settings_hookable(comapi);
 	fprintf(stderr, "comapi->setting = %s\n", json_object_to_json_string(comapi->settings));
@@ -251,7 +251,7 @@ START_TEST (test_functional)
 	ck_assert_int_eq(0, wrap_json_check(comapi->settings, "{s:s}", "binding-path", path));
 	settings = wrap_json_clone(comapi->settings);
 	afb_api_common_set_config(settings);
-	
+
 	comapi->settings = NULL;
 	fprintf(stderr, "set up a json config and load it ...\n");
 	// set up the json config
@@ -267,37 +267,37 @@ START_TEST (test_functional)
 
 	/******** job ********/
 	fprintf(stderr, "\n******** job ********\n");
-	
+
 	test_val = 0;
-	
+
 	rc = afb_api_common_post_job_hookable(comapi, 0, 1, test_cb, &test_val, NULL);
 	fprintf(stderr, "Posting a job with afb_api_common_post_job returned %d\n", rc);
-	
+
 	fprintf(stderr, "Run the job and and test it by checking that test_val has been incremented\n");
 	RUNJOB;
-	
+
 	fprintf(stderr, "testval = %d\n", test_val);
 	ck_assert_int_eq(1, test_val);
 
 	/******** alias ********/
 	fprintf(stderr, "\n******** alias ********\n");
-	
+
 	fprintf(stderr, "Create the alias '%s' to the api '%s'\n", aliasname, name);
 	afb_apiset_add(declset, name, sa);
 	rc = afb_api_common_add_alias_hookable(comapi, NULL, aliasname);
 	ck_assert_int_eq(0, rc);
-	
+
 	fprintf(stderr, "Try to create it again and check that it pops an error\n");
 	rc = afb_api_common_add_alias_hookable(comapi, NULL, aliasname);
 	ck_assert_int_eq(X_EEXIST, rc);
-	
+
 	fprintf(stderr, "Try to create an invalid named alias and check that it pops an error\n");
 	rc = afb_api_common_add_alias_hookable(comapi, NULL, "bad\\alias\"n&me");
 	ck_assert_int_eq(X_EINVAL, rc);
 
 	/******** vverbose ********/
 	fprintf(stderr, "\n******** vverbose ********\n");
-	
+
 	observation = 0;
 	va_list test_va_list;
 	verbose_observer = observe;
@@ -308,7 +308,7 @@ START_TEST (test_functional)
 
 	/******** event_broadcast ********/
 	fprintf(stderr, "\n******** event_broadcast ********\n");
-	
+
 	// preparing params
 	type1 = afb_type_get("type1");
 	if (!type1) {
@@ -327,7 +327,7 @@ START_TEST (test_functional)
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(X_EINVAL, rc);
 
-	
+
 	fprintf(stderr, "\n### start api...\n");
 	int test_start_closure = 0;
 	rc = afb_api_common_start(comapi, test_start_cb, &test_start_closure);
@@ -336,7 +336,7 @@ START_TEST (test_functional)
 	ck_assert_int_eq(1, rc);
 	ck_assert_int_eq(1, test_start_closure);
 	ck_assert_int_eq(comapi->state, Api_State_Run);
-	
+
 	fprintf(stderr, "Cheeck that afb_api_common_start return an error when api is in inti state\n");
 	comapi->state = Api_State_Init;
 	test_start_closure = 0;
@@ -345,7 +345,7 @@ START_TEST (test_functional)
 	fprintf(stderr, "-> test_start_closure = %d\n", test_start_closure);
 	ck_assert_int_eq(X_EBUSY, rc);
 	ck_assert_int_eq(0, test_start_closure);
-	
+
 	comapi->state = Api_State_Run;
 
 	fprintf(stderr, "\n### retry to broadcast event...\n");
@@ -389,13 +389,13 @@ START_TEST (test_functional)
 	fprintf(stderr, "require class '%s' before it has been provide...\n", name);
 	rc = afb_api_common_class_require_hookable(comapi, name);
 	fprintf(stderr, "-> rc = %d\n", rc);
-	// ck_assert_int_eq(X_ENOENT, rc); 
+	// ck_assert_int_eq(X_ENOENT, rc);
 
 	fprintf(stderr, "provide the class '%s'...\n", name);
 	rc = afb_api_common_class_provide_hookable(comapi, name);
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(0, rc);
-	
+
 	fprintf(stderr, "require class '%s'...\n", name);
 	rc = afb_api_common_class_require_hookable(comapi, name);
 	fprintf(stderr, "-> rc = %d\n", rc);
@@ -427,7 +427,7 @@ START_TEST (test_listeners)
 	fprintf(stderr, "\n******** listeners ********\n");
 
 	struct afb_api_common *comapi = &capi;
-	
+
 	struct afb_data * params[NBPARAMS];
 	struct afb_type * type1;
 

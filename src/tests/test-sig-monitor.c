@@ -209,20 +209,20 @@ void on_exit_test(int status, void *args){
 
 START_TEST(sigterm_test)
 {
-	
+
 	gval = 0;
 	int status;
 	fprintf(stderr, "\n***************** sigterm_test *****************\n");
-	
+
 	pid_t apid, gpid = fork();
-	
+
 	if(gpid == 0){
-		
+
 		// set up an on exit call back
 		ck_assert_int_eq(0,on_exit(on_exit_test, NULL));
 
 		// set max runing jobs to 0 in order to reach on_rescue_exit
-		// callback when the job will be killed 
+		// callback when the job will be killed
 		afb_jobs_set_max_count(0);
 
 		// activate signal monitoring
@@ -241,7 +241,7 @@ START_TEST(sigterm_test)
 		ck_assert_int_ne(0, status);
 	}
 	fprintf(stderr, "job with gpid = %d done gval = %d\n", (int)gpid, gval);
-	
+
 }
 END_TEST
 /*********************************************************************/

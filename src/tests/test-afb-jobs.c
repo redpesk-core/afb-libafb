@@ -199,7 +199,7 @@ START_TEST(job_delayed)
 		r = afb_jobs_post(TEST_GROUPE, DELAY*i, 1, test_job, i2p(i+1));
 		ck_assert_int_gt(r,0);
 	}
-	
+
 	// start time monitoring
 	start = getnow();
 
@@ -223,7 +223,7 @@ START_TEST(job_delayed)
 		fprintf(stderr, "delay = %ld spent time = %ld\n", delay, getnow()-start);
 		ck_assert_ptr_eq(job, NULL);
 		ck_assert_int_le(delay, DELAY);
-		
+
 
 		// wait for the delay to end
 		fprintf(stderr, "wait to reach %dms after start...    ", DELAY*i);

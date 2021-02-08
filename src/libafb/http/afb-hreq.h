@@ -75,7 +75,7 @@ extern int afb_hreq_reply_locale_file(struct afb_hreq *hreq, struct locale_searc
 
 /**
  * Send a REDIRECT HTTP response
- * 
+ *
  * @param hreq the HTTP request handler
  * @param url the URL to redirect to
  * @param add_query_part if not zero add the query argument to the url
@@ -87,12 +87,12 @@ extern void afb_hreq_redirect_to(struct afb_hreq *request, const char *url, int 
  * Make an url to the path for the client, can be used for redirect to local path.
  * It behaves like return snprintf(buffer,size,"%s://%s/%s", protocol, host, path)
  * where protocol and host are those of the request hreq.
- * 
+ *
  * @param hreq the HTTP request of reference
  * @param path the path to add after the host (if NULL then empty string)
  * @param buffer the buffer where to store the result
  * @param size sizeof the buffer
- * 
+ *
  * @return the length of the computed path. If greater or equal than given size, the
  * result is truncated to fit the buffer's size
  */

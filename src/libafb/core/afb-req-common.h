@@ -104,7 +104,6 @@ struct afb_req_common
 
 	/** the replies */
 	struct afb_req_common_arg replies;
-
 #endif
 };
 
