@@ -750,6 +750,20 @@ void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_
 	free(wqp);
 }
 
+int afb_hreq_make_here_url(struct afb_hreq *hreq, const char *path, char *buffer, size_t size)
+{
+	const char *host;
+	const union MHD_ConnectionInfo *info;
+
+	info = MHD_get_connection_info(hreq->connection, MHD_CONNECTION_INFO_PROTOCOL);
+	host = afb_hreq_get_header(hreq, MHD_HTTP_HEADER_HOST);
+
+	return snprintf(buffer, size, "%s://%s/%s",
+			info && info->tls_session ? "https" : "http",
+			host ?: "0.0.0.0",
+			!path ? "" : &path[path[0] == '/']);
+}
+
 const char *afb_hreq_get_cookie(struct afb_hreq *hreq, const char *name)
 {
 	return MHD_lookup_connection_value(hreq->connection, MHD_COOKIE_KIND, name);

@@ -83,6 +83,21 @@ extern int afb_hreq_reply_locale_file(struct afb_hreq *hreq, struct locale_searc
  */
 extern void afb_hreq_redirect_to(struct afb_hreq *request, const char *url, int add_query_part, int permanent);
 
+/**
+ * Make an url to the path for the client, can be used for redirect to local path.
+ * It behaves like return snprintf(buffer,size,"%s://%s/%s", protocol, host, path)
+ * where protocol and host are those of the request hreq.
+ * 
+ * @param hreq the HTTP request of reference
+ * @param path the path to add after the host (if NULL then empty string)
+ * @param buffer the buffer where to store the result
+ * @param size sizeof the buffer
+ * 
+ * @return the length of the computed path. If greater or equal than given size, the
+ * result is truncated to fit the buffer's size
+ */
+extern int afb_hreq_make_here_url(struct afb_hreq *hreq, const char *path, char *buffer, size_t size);
+
 extern int afb_hreq_redirect_to_ending_slash_if_needed(struct afb_hreq *hreq);
 
 extern const char *afb_hreq_get_cookie(struct afb_hreq *hreq, const char *name);
