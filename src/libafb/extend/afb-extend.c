@@ -49,15 +49,28 @@
 #define HTTP_V1		"AfbExtensionHTTPV1"
 #define EXIT_V1		"AfbExtensionExitV1"
 
+/**
+ * Record for an extension
+ */
 struct extension
 {
+	/** link to the next extension */
 	struct extension *next;
+
+	/** pointer to the manifest of the extension */
 	struct afb_extension_manifest *manifest;
+
+	/** handle of the library */
 	x_dynlib_t handle;
+
+	/** data of the extension */
 	void *data;
+
+	/** path of the loaded library */
 	char path[];
 };
 
+/** head of the linked list of the loaded extensions */
 static struct extension *extensions;
 
 static int load_extension(const char *path, int failstops)
@@ -85,7 +98,6 @@ static int load_extension(const char *path, int failstops)
 	if (rc < 0) {
 		if (failstops) {
 			ERROR("Not an extension %s: %s", path, x_dynlib_error(&handle));
-			return rc;
 		}
 		else {
 			DEBUG("Not an extension %s", path);
@@ -96,25 +108,43 @@ static int load_extension(const char *path, int failstops)
 		ERROR("Manifest error of extension %s", path);
 		rc = X_EINVAL;
 	} else if (manifest->version != 1) {
-		ERROR("Unsupported version %d of extension %s", manifest->version, path);
+		ERROR("Unsupported version %d of extension %s: %s", manifest->version, manifest->name, path);
 		rc = X_ENOTSUP;
 	} else {
 		afb_v4_connect_dynlib(&handle, &infov4, 0);
-		ext = malloc(strlen(path) + 1 + sizeof *ext);
-		if (!ext)
-			rc = X_ENOMEM;
+		if (infov4.root || infov4.desc || infov4.mainctl) {
+			ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
+			ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
+			if (infov4.root)
+				ERROR(" ... with AFB_BINDING_NO_ROOT defined (or option -D)");
+			if (infov4.desc)
+				ERROR(" ... without defining a main structure (afbBindingRoot or afbBindingV4)");
+			if (infov4.mainctl)
+				ERROR(" ... without defining an entry function (afbBindingEntry or afbBindingV4Entry)");
+			rc = X_ENOTSUP;
+		}
 		else {
-			NOTICE("Adding extension %s of %s", manifest->name, path);
-			ext->next = extensions;
-			ext->handle = handle;
-			ext->manifest = manifest;
-			ext->data = 0;
-			strcpy(ext->path, path);
-			extensions = ext;
-			return 1;
+			ext = malloc(strlen(path) + 1 + sizeof *ext);
+			if (!ext)
+				rc = X_ENOMEM;
+			else {
+				NOTICE("Adding extension %s of %s", manifest->name, path);
+				ext->next = extensions;
+				ext->handle = handle;
+				ext->manifest = manifest;
+				ext->data = 0;
+				strcpy(ext->path, path);
+				extensions = ext;
+				return 1;
+			}
 		}
 	}
 	x_dynlib_close(&handle);
+	if (!failstops && rc < 0) {
+		if (rc < 0)
+			NOTICE("Ignoring extension %s", path);
+		rc = 0;
+	}
 	return rc;
 }
 
