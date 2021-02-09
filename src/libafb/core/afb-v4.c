@@ -120,7 +120,7 @@ x4_api_setup_shared_object(
 
 /**********************************************************/
 
-const struct afb_binding_x4r1_itf afb_v4_itf = {
+static const struct afb_binding_x4r1_itf afb_v4_itf = {
 
 /*-- DATA ------------------------------------------*/
 
