@@ -71,7 +71,6 @@ static void mkmutex()
 	pthread_mutexattr_destroy(&a);
 }
 
-
 static void evfdcb(struct ev_fd *evfd, int fd, uint32_t events, void *closure)
 {
 	pthread_mutex_lock(&mutex);
@@ -146,27 +145,19 @@ void afb_perm_check_req_async(
 	int rc;
 	cynagora_key_t key;
 
-#if WITH_CRED
-	if (!req->credentials)
+	if (!req->credentials) {
 		/* case of permission for self */
 		rc = 1;
-
-	else
-#endif
-	if (!permission) {
+	}
+	else if (!permission) {
 		ERROR("Got a null permission!");
 		rc = 0;
 	}
 	else {
 		rc = cynagora_acquire();
 		if (rc >= 0) {
-#if WITH_CRED
 			key.client = req->credentials->label;
 			key.user = req->credentials->user;
-#else
-			key.client = "";
-			key.user = "";
-#endif
 			key.session = session_of_req(req);
 			key.permission = permission;
 			rc = cynagora_async_check(cynagora, &key, 0, 0, callback, closure);

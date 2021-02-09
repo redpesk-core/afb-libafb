@@ -27,6 +27,30 @@ struct afb_req_common;
 
 #if WITH_CRED
 
+/**
+ * Check if the credential associated with the request 'req'
+ * are including a granted access to the permission.
+ *
+ * This check is by nature asynchronous because the permission
+ * is granted by an foreign process (an authority).
+ *
+ * The result of the check is given to the callback. Precisely,
+ * the callback receives 2 values: the closure given at the call
+ * and the status of the check. The values of the check status are:
+ *
+ *      - 0 if the permission is denied
+ *      - 1 if the permission is granted
+ *      - negative if some error occurred during the processus
+ *
+ * Optimization allows to cache requested permission if possible.
+ * If the answer is cached, the callback can be called immediately
+ * before returning.
+ *
+ * @param req request whose credential are to be used for the check
+ * @param permission the permission to be checked
+ * @param callback the callback that receives the status
+ * @param closure the closure passed back to the callback
+ */
 extern void afb_perm_check_req_async(
 	struct afb_req_common *req,
 	const char *permission,
