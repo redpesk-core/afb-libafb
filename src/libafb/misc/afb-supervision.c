@@ -345,11 +345,11 @@ static void process_cb(void *closure, struct json_object *args)
 		if (wrap_json_unpack(args, "s", &uuid))
 			wrap_json_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
-			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
 		else {
 			session = afb_session_search(uuid);
 			if (!session)
-				afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_unknown_session, NULL);
+				afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_NO_ITEM), NULL);
 			else {
 				afb_session_close(session);
 				afb_session_unref(session);
@@ -391,7 +391,7 @@ static void process_cb(void *closure, struct json_object *args)
 	case Do:
 		sub = NULL;
 		if (wrap_json_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
-			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_invalid_request, NULL);
+			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
 		else {
 			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);
 			if (rc < 0)

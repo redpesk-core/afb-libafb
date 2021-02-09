@@ -318,7 +318,7 @@ static void x2_req_subcall_hookable(
 
 	rc = afb_json_legacy_make_data_json_c(&data, args);
 	if (rc < 0) {
-		callback(closure, 0, afb_error_text_internal_error, 0, reqx2);
+		callback(closure, 0, afb_error_text(rc), 0, reqx2);
 	}
 	else {
 		afb_req_v3_addref(req);
@@ -357,7 +357,7 @@ x2_req_subcall_sync_hookable(
 	if (rc < 0) {
 		result = rc;
 		*object = 0;
-		*error = strdup(afb_error_text_internal_error);
+		*error = strdup(afb_error_text(rc));
 		*info = 0;
 	}
 	else {

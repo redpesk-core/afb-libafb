@@ -37,6 +37,18 @@ struct json_object;
 
 /**********************************************************************/
 
+/**
+ * Create a DATA for the given JSON-C object
+ *
+ * The take owning of the object. This means that the object
+ * will be release (json_object_put) when the data get released
+ * or if the creation of the data fails.
+ *
+ * @param result pointer to the created result
+ * @param object the JSON-C object to wrap in data
+ *
+ * @return 0 on success or else a negative error code
+ */
 extern
 int
 afb_json_legacy_make_data_json_c(

@@ -47,4 +47,3 @@
 #define X_EPIPE		-EPIPE
 #define X_EPROTO	-EPROTO
 #define X_ERANGE	-ERANGE
-

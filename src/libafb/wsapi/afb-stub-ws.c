@@ -33,6 +33,7 @@
 
 #include <afb/afb-event-x2.h>
 #include <afb/afb-binding-x4.h>
+#include <afb/afb-errno.h>
 
 #include "core/afb-session.h"
 #include "core/afb-cred.h"
@@ -48,6 +49,7 @@
 #include "sys/verbose.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
+#include "sys/x-errno.h"
 
 struct afb_stub_ws;
 
@@ -275,7 +277,7 @@ static void process_cb(void * closure1, struct json_object *object, const void *
 
 	proto = client_get_proto(stubws);
 	if (proto == NULL) {
-		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_disconnected, NULL);
+		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_DISCONNECTED), NULL);
 		return;
 	}
 
@@ -292,7 +294,7 @@ static void process_cb(void * closure1, struct json_object *object, const void *
 				afb_req_common_on_behalf_cred_export(comreq));
 	}
 	if (rc < 0) {
-		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text_internal_error, "can't send message");
+		afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INTERNAL_ERROR), "can't send message");
 		afb_req_common_unref(comreq);
 	}
 }
@@ -547,7 +549,6 @@ server_on_call_cb(
 	uint16_t tokenid,
 	const char *user_creds
 ) {
-	const char *errstr = afb_error_text_internal_error;
 	struct afb_stub_ws *stubws = closure;
 	struct server_req *wreq;
 	struct afb_session *session;
@@ -555,6 +556,7 @@ server_on_call_cb(
 	size_t lenverb, lencreds;
 	struct afb_data *arg;
 	int rc;
+	int err = AFB_ERRNO_OUT_OF_MEMORY;
 
 	afb_stub_ws_addref(stubws);
 
@@ -601,12 +603,12 @@ server_on_call_cb(
 	return;
 
 no_session:
-	errstr = afb_error_text_unknown_session;
+	err = AFB_ERRNO_INVALID_REQUEST;
 out_of_memory:
 	json_object_put(object);
 out_of_memory2:
 	afb_stub_ws_unref(stubws);
-	afb_proto_ws_call_reply(call, NULL, errstr, NULL);
+	afb_proto_ws_call_reply(call, NULL, afb_error_text(err), NULL);
 	afb_proto_ws_call_unref(call);
 }
 

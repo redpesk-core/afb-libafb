@@ -23,14 +23,4 @@
 
 #pragma once
 
-extern const char afb_error_text_aborted[];
-extern const char afb_error_text_disconnected[];
-extern const char afb_error_text_insufficient_scope[];
-extern const char afb_error_text_internal_error[];
-extern const char afb_error_text_invalid_request[];
-extern const char afb_error_text_invalid_token[];
-extern const char afb_error_text_not_available[];
-extern const char afb_error_text_not_replied[];
-extern const char afb_error_text_unknown_api[];
-extern const char afb_error_text_unknown_session[];
-extern const char afb_error_text_unknown_verb[];
+extern const char *afb_error_text(int code);
