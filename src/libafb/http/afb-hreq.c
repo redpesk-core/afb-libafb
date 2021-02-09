@@ -42,6 +42,7 @@
 #endif
 
 #include <afb/afb-arg.h>
+#include <afb/afb-errno.h>
 
 #include "core/afb-session.h"
 #include "utils/locale-root.h"
@@ -907,7 +908,10 @@ static void req_reply(struct afb_req_common *comreq, int status, unsigned nrepli
 	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 	struct MHD_Response *response;
 	char *message;
+	const char *optkey = NULL;
+	const char *optval = NULL;
 	size_t length;
+	int http_status;
 
 	/* create the reply */
 	afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
@@ -915,15 +919,37 @@ static void req_reply(struct afb_req_common *comreq, int status, unsigned nrepli
 	response = MHD_create_response_from_buffer(length, message, MHD_RESPMEM_MUST_FREE);
 
 	/* handle authorisation feedback */
-#if FIXME
-should use status
-	if (reply->error == afb_error_text_invalid_token)
+	switch (status) {
+	case AFB_ERRNO_INTERNAL_ERROR:
+	case AFB_ERRNO_OUT_OF_MEMORY:
+		http_status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		break;
+	case AFB_ERRNO_UNKNOWN_API:
+	case AFB_ERRNO_UNKNOWN_VERB:
+		http_status = MHD_HTTP_NOT_FOUND;
+		break;
+	case AFB_ERRNO_NOT_AVAILABLE:
+		http_status = MHD_HTTP_NOT_IMPLEMENTED;
+		break;
+	case AFB_ERRNO_UNAUTHORIZED:
+	case AFB_ERRNO_INVALID_TOKEN:
+		optkey = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
+		optval = "error=\"invalid_token\"";
 		afb_hreq_reply(hreq, MHD_HTTP_UNAUTHORIZED, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"invalid_token\"", NULL);
-	else if (reply->error == afb_error_text_insufficient_scope)
-		afb_hreq_reply(hreq, MHD_HTTP_FORBIDDEN, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"insufficient_scope\"", NULL);
-	else
-#endif
-		afb_hreq_reply(hreq, MHD_HTTP_OK, response, NULL);
+		http_status = MHD_HTTP_UNAUTHORIZED;
+		break;
+	case AFB_ERRNO_FORBIDDEN:
+	case AFB_ERRNO_INSUFFICIENT_SCOPE:
+	case AFB_ERRNO_BAD_API_STATE:
+		optkey = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
+		optval = "error=\"insufficient_scope\"";
+		http_status = MHD_HTTP_FORBIDDEN;
+		break;
+	default:
+		http_status = MHD_HTTP_OK;
+		break;
+	}
+	afb_hreq_reply(hreq, http_status, response, optkey, optval, NULL);
 }
 
 static int _iterargs_(struct json_object *obj, enum MHD_ValueKind kind, const char *key, const char *value)
