@@ -1028,19 +1028,34 @@ struct json_object *wrap_json_object_add(struct json_object *dest, struct json_o
 struct json_object *wrap_json_array_insert_array(struct json_object *dest, struct json_object *added, int idx)
 {
 	int i, nd, na;
+
+	/* check th type */
 	if (!json_object_is_type(dest, json_type_array) || !json_object_is_type(added, json_type_array))
 		return dest;
+
+	/* get lengths */
 	nd = (int) json_object_array_length(dest);
 	na = (int) json_object_array_length(added);
-	i = nd + na;
-	if (idx < 0 || idx > nd)
+
+	/* handle case of negative indexes */
+	if (idx < 0)
+		idx = 1 + nd + idx;
+
+	/* limit index to destination size */
+	if (idx < 0)
+		idx = 0;
+	else if (idx > nd)
 		idx = nd;
+
+	/* move part of the array after insertion point */
+	i = nd + na;
 	while (i > idx + na) {
 		i--;
 		json_object_array_put_idx(dest,
 			i,
 			json_object_get(json_object_array_get_idx(dest, i - na)));
 	}
+	/* copy the added items */
 	while (i > idx) {
 		i--;
 		json_object_array_put_idx(dest,

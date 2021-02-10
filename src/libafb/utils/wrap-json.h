@@ -369,10 +369,9 @@ extern struct json_object *wrap_json_object_add(struct json_object *dest, struct
  * @param dest the array to complete, this array is modified
  * @param added the array containing content to add
  * @param idx the index where the 'added' array content will be inserted into
- * 'dest' array. To insert 'added' array at the end of 'dest' array,
- * you can set 'idx' to:
- * - a negative value.
- * - a valued bigger than 'dest' array length.
+ * 'dest' array. Negative values indicates location based on the end, -1 means
+ * "at the end, after the last element", -2 means "just before the last element",
+ * -X means "just before the X-1 th element"
  *
  * @return the destination array 'dest'
  *
