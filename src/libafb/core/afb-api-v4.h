@@ -54,7 +54,7 @@ enum afb_string_mode;
  * @param info info about the api, can be NULL
  * @param mode_info mode of use of the info
  * @param noconcurrency set the concurrency mode: 0 means concurrent, not zero means serial
- * @param preinit callback ofr preinitialisation (can be NULL)
+ * @param preinit callback for preinitialisation (can be NULL)
  * @param closure closure of the preinit
  * @param path path of the binding shared object (can be NULL)
  * @param mode_path mode of use of the path
