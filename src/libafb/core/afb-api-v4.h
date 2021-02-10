@@ -26,12 +26,13 @@
 
 struct afb_apiset;
 struct afb_api_v4;
-struct afb_api_x4;
 struct afb_auth;
-struct afb_req_x4;
+struct afb_req_v4;
 struct afb_verb_v4;
 struct afb_binding_v4;
 struct afb_req_common;
+struct afb_data;
+struct afb_evt;
 struct json_object;
 
 struct afb_api_common;
