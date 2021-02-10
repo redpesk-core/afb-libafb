@@ -1010,16 +1010,72 @@ struct json_object *wrap_json_clone_deep(struct json_object *object)
 /* add items of object added in dest */
 struct json_object *wrap_json_object_add(struct json_object *dest, struct json_object *added)
 {
+	return wrap_json_object_merge(dest, added, wrap_json_merge_option_replace);
+}
+
+/* merge items of object 'merged' to the object 'dest' */
+static void object_merge(struct json_object *dest, struct json_object *merged, int option)
+{
+	int exists, add;
+	enum json_type tyto, tyfrom;
+	struct json_object *to, *from;
 	struct json_object_iterator it, end;
-	if (json_object_is_type(dest, json_type_object) && json_object_is_type(added, json_type_object)) {
-		it = json_object_iter_begin(added);
-		end = json_object_iter_end(added);
-		while (!json_object_iter_equal(&it, &end)) {
+
+	/* iterate over elements of the merged object */
+	it = json_object_iter_begin(merged);
+	end = json_object_iter_end(merged);
+	while (!json_object_iter_equal(&it, &end)) {
+		from = json_object_iter_peek_value(&it);
+		if (option == wrap_json_merge_option_replace) {
+			/* always replace */
+			add = 1;
+		}
+		else {
+			/* check if dest has already an item of the name */
+			exists = json_object_object_get_ex(dest, json_object_iter_peek_name(&it), &to);
+			if (!exists) {
+				/* add if not existing */
+				add = 1;
+			}
+			else if (option == wrap_json_merge_option_keep) {
+				/* no replacement */
+				add = 0;
+			}
+			else {
+				tyto = json_object_get_type(to);
+				tyfrom = json_object_get_type(from);
+				if (tyto == json_type_object && tyfrom == json_type_object) {
+					/* recursive merge of objects */
+					object_merge(to, from, option);
+					add = 0;
+				}
+				else if (tyto == json_type_array && tyfrom == json_type_array) {
+					/* append the array */
+					wrap_json_array_insert_array(to, from, -1);
+					add = 0;
+				}
+				else {
+					/* fallback baheaviour */
+					add = option & wrap_json_merge_option_replace;
+				}
+			}
+		}
+
+		/* add or replace the item if required */
+		if (add) {
 			json_object_object_add(dest,
 				json_object_iter_peek_name(&it),
-				json_object_get(json_object_iter_peek_value(&it)));
-			json_object_iter_next(&it);
+				json_object_get(from));
 		}
+		json_object_iter_next(&it);
+	}
+}
+
+/* merge items of object 'merged' to the object 'dest' */
+struct json_object *wrap_json_object_merge(struct json_object *dest, struct json_object *merged, int option)
+{
+	if (json_object_is_type(dest, json_type_object) && json_object_is_type(merged, json_type_object)) {
+		object_merge(dest, merged, option);
 	}
 	return dest;
 }

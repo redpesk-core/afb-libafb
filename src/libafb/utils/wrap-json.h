@@ -352,7 +352,8 @@ extern struct json_object *wrap_json_clone_deep(struct json_object *object);
 extern struct json_object *wrap_json_clone_depth(struct json_object *object, int depth);
 
 /**
- * Adds the items of the object 'added' to the object 'dest'.
+ * Adds the items of the object 'added' to the object 'dest', replacing existing one
+ * (but @see wrap_json_object_merge).
  *
  * @param dest the object to complete this object is modified
  * @param added the object containing fields to add
@@ -360,6 +361,7 @@ extern struct json_object *wrap_json_clone_depth(struct json_object *object, int
  * @return the destination object 'dest'
  *
  * @example wrap_json_object_add({"a":"a"},{"X":"X"}) -> {"a":"a","X":"X"}
+ * @example wrap_json_object_add({"a":"a"},{"a":"X"}) -> {"a":"X"}
  */
 extern struct json_object *wrap_json_object_add(struct json_object *dest, struct json_object *added);
 
@@ -378,6 +380,67 @@ extern struct json_object *wrap_json_object_add(struct json_object *dest, struct
  * @example wrap_json_array_insert(["a","b",5],["X","Y",0.92], 1) -> ["a","X","Y",0.92,"b",5]
  */
 extern struct json_object *wrap_json_array_insert_array(struct json_object *dest, struct json_object *added, int idx);
+
+/**
+ * Possible options for wrap_json_object_merge
+ */
+enum wrap_json_merge_option {
+	/** keep original value */
+	wrap_json_merge_option_keep = 0,
+
+	/** replace original value */
+	wrap_json_merge_option_replace = 1,
+
+	/** join values but if not possible keep original value */
+	wrap_json_merge_option_join_or_keep = 2,
+
+	/** join values but if not possible replace original value */
+	wrap_json_merge_option_join_or_replace = 3
+};
+
+/**
+ * Merges the items of the object 'merged' to the object 'dest'.
+ * If a field already exist, the option treats how to process.
+ *
+ * When option == wrap_json_merge_option_keep:
+ *
+ *    The original value of the field is kept
+ *
+ * When option == wrap_json_merge_option_replace:
+ *
+ *    The merged value replaces the original value
+ *
+ * When option == wrap_json_merge_option_join_or_keep:
+ *
+ *    If the values can be joined, then the resul is the result
+ *    of the join process. If it can't, the original value is kept.
+ *
+ * When option == wrap_json_merge_option_join_or_replace:
+ *
+ *    If the values can be joined, then the resul is the result
+ *    of the join process. If it can't, the merged value
+ *    replaces the original one.
+ *
+ * The join process of the merge is possible if joined values
+ * are both an object or both an array.
+ *
+ * When both values are arrays, the values of the array merged
+ * are appened to the end of the original array.
+ *
+ * When both values are object, the object of value merged
+ * is recursively merged to the original destination object.
+ *
+ * @param dest the object to complete this object is modified
+ * @param merged the object containing fields to merge to dest
+ * @param option merge option to use in case of conflict @see wrap_json_merge_option
+ *
+ * @return the destination object 'dest'
+ *
+ * @example wrap_json_object_merge({"a":"a"},{"X":"X"},any) -> {"a":"a","X":"X"}
+ * @example wrap_json_object_merge({"a":"a"},{"a":"X"},wrap_json_merge_option_keep) -> {"a":"a"}
+ * @example wrap_json_object_merge({"a":"a"},{"a":"X"},wrap_json_merge_option_replace) -> {"a":"X"}
+ */
+extern struct json_object *wrap_json_object_merge(struct json_object *dest, struct json_object *merged, int option);
 
 /**
  * Sort the 'array' and returns it. Sorting is done accordingly to the
