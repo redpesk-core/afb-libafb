@@ -21,7 +21,6 @@
  * $RP_END_LICENSE$
  */
 
-#include "libafb-config.h"
 
 #include "afb-permission-text.h"
 

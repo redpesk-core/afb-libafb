@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_DBUS_TRANSPARENCY
 
 struct afb_req_itf;

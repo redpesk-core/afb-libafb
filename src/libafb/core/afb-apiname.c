@@ -21,7 +21,6 @@
  * $RP_END_LICENSE$
  */
 
-#include "libafb-config.h"
 
 #include "core/afb-apiname.h"
 

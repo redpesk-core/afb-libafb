@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_DYNAMIC_BINDING
 
 struct afb_apiset;

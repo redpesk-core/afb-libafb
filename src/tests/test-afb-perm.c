@@ -22,7 +22,6 @@
  $RP_END_LICENSE$
 */
 
-#include "libafb-config.h"
 
 #if !BACKEND_PERMISSION_IS_CYNAGORA
 # error "CYNAGORA BACKEND IS EXPECTED FOR THAT TEST"

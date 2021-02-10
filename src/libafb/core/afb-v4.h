@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #define afb_api_x4 afb_api_v4
 #define afb_type_x4 afb_type
 #define afb_data_x4 afb_data

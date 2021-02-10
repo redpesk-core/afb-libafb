@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #include <pthread.h>
 #include <signal.h>
 #include "../sys/x-errno.h"

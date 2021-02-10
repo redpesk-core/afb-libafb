@@ -29,7 +29,6 @@
  * to avoid modifying such read only data.
  */
 
-#include "libafb-config.h"
 
 #include <stdlib.h>
 #include <string.h>

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_AFB_HOOK  /***********************************************************/
 
 #include <stdarg.h>

@@ -25,7 +25,6 @@
  * SUCH DAMAGE.
  */
 
-#include "libafb-config.h"
 
 #include <stdint.h>
 #include <string.h>

@@ -21,7 +21,6 @@
  * $RP_END_LICENSE$
  */
 
-#include "libafb-config.h"
 #include "afb-error-text.h"
 
 #include <afb/afb-errno.h>

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_FDEV_POLL
 
 struct fdev;

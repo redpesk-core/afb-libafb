@@ -24,10 +24,7 @@
 
 #pragma once
 
-#if !WITH_AFB_HOOK && WITH_AFB_TRACE
-#  undef WITH_AFB_TRACE
-#  define WITH_AFB_TRACE 0
-#endif
+#include <libafb/libafb-config.h>
 
 #if WITH_AFB_TRACE
 

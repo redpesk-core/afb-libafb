@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 struct afb_apiset;
 struct afb_req_common;
 struct json_object;

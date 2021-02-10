@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #include <stdarg.h>
 
 struct json_object;

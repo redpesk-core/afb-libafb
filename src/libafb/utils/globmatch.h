@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #define GLOB    '*'
 
 extern unsigned globmatch(const char *pat, const char *str);

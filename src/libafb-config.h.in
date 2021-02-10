@@ -80,3 +80,8 @@
 #  define INFER_EXTENSION 1
 #  cmakedefine01 HAVE_LIBMAGIC
 #endif
+#if !WITH_AFB_HOOK && WITH_AFB_TRACE
+#  undef WITH_AFB_TRACE
+#  define WITH_AFB_TRACE 0
+#endif
+

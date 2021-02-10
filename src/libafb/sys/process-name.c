@@ -20,7 +20,6 @@
  * $RP_END_LICENSE$
  */
 
-#include "libafb-config.h"
 
 #include <string.h>
 #include <unistd.h>

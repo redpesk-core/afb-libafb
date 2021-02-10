@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_AFB_HOOK  /***********************************************************/
 
 extern int afb_hook_flags_req_from_text(const char *text);

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 struct afb_api_common;
 struct afb_req_common;
 struct afb_data;

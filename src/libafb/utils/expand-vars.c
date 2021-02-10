@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include "libafb-config.h"
 
 #include <stdlib.h>
 #include <unistd.h>

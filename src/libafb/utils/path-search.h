@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 struct path_search;
 
 extern struct path_search *path_search_addref(struct path_search *paths);

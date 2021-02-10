@@ -27,7 +27,6 @@
  *   Copyright 2010-2012 self.disconnect (APACHE-2)
  */
 
-#include "libafb-config.h"
 
 #include <stdlib.h>
 #include <stdint.h>

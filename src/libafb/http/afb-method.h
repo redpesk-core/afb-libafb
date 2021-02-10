@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_LIBMICROHTTPD
 
 enum afb_method {

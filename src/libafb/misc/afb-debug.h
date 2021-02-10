@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <libafb/libafb-config.h>
+
 #if WITH_AFB_DEBUG
 
 extern void afb_debug(const char *key);
