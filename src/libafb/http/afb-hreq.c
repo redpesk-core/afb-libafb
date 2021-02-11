@@ -739,7 +739,7 @@ void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_
 {
 	const char *to;
 	char *wqp;
-	int redir = permanent
+	unsigned int redir = permanent
 			? MHD_HTTP_MOVED_PERMANENTLY /* TODO MHD_HTTP_PERMANENT_REDIRECT */
 			: MHD_HTTP_TEMPORARY_REDIRECT;
 
@@ -911,7 +911,7 @@ static void req_reply(struct afb_req_common *comreq, int status, unsigned nrepli
 	const char *optkey = NULL;
 	const char *optval = NULL;
 	size_t length;
-	int http_status;
+	unsigned int http_status;
 
 	/* create the reply */
 	afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);

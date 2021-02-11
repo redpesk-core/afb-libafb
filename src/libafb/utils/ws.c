@@ -170,7 +170,7 @@ static int ws_send_internal_v(ws_t *ws, char first, const x_buf_t *bufs, int cou
 	return rc < 0 ? -errno : 0;
 }
 
-static int ws_send_internal(ws_t *ws, unsigned char first, const void *buffer, size_t size)
+static int ws_send_internal(ws_t *ws, char first, const void *buffer, size_t size)
 {
 	x_buf_t bufs;
 
@@ -338,7 +338,7 @@ int _dispatch_(ws_t *ws, int ibuf)
 		while (ws->lenhead < ws->szhead) {
 			if (length == 0)
 				goto end;
-			ws->header[ws->lenhead++] = *buffer++;
+			ws->header[ws->lenhead++] = (unsigned char)*buffer++;
 			length--;
 		}
 
@@ -382,7 +382,7 @@ int _dispatch_(ws_t *ws, int ibuf)
 		while (ws->lenhead < ws->szhead) {
 			if (length == 0)
 				goto end;
-			ws->header[ws->lenhead++] = *buffer++;
+			ws->header[ws->lenhead++] = (unsigned char)*buffer++;
 			length--;
 		}
 
@@ -577,7 +577,7 @@ const char *ws_strerror(uint16_t code)
 		"EXPECT_EXTENSION",  /* 1010 */
 		"INTERNAL_ERROR",    /* 1011 */
 	};
-	if (code < 1000 || (code - 1000) >= (sizeof msgs / sizeof *msgs))
+	if (code < 1000 || (code - 1000) >= (int)(sizeof msgs / sizeof *msgs))
 		return "?";
 	return msgs[code - 1000];
 }

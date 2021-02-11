@@ -227,7 +227,7 @@ START_TEST(job_delayed)
 		// wait for the delay to end
 		fprintf(stderr, "wait to reach %dms after start...    ", DELAY*i);
 		t = getnow();
-		while((getnow()-start) < DELAY*i)
+		while((getnow()-start) < (long unsigned int)(DELAY*i))
 			usleep(100);
 		fprintf(stderr, "slept %ldms\n", getnow()-t);
 

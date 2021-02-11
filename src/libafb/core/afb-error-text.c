@@ -25,7 +25,7 @@
 
 #include <afb/afb-errno.h>
 
-static const char text_aborted[]            = "aborted";
+//static const char text_aborted[]            = "aborted";
 static const char text_bad_state[]          = "bad-state";
 static const char text_disconnected[]       = "disconnected";
 static const char text_forbidden[]          = "forbidden";
@@ -38,7 +38,7 @@ static const char text_not_available[]      = "not-available";
 static const char text_not_replied[]        = "not-replied";
 static const char text_unauthorized[]       = "unauthorized";
 static const char text_unknown_api[]        = "unknown-api";
-static const char text_unknown_session[]    = "unknown-session";
+//static const char text_unknown_session[]    = "unknown-session";
 static const char text_unknown_verb[]       = "unknown-verb";
 
 const char *afb_error_text(int code)

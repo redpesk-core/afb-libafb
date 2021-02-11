@@ -624,7 +624,7 @@ static int timer_dispatch(
 
 		/* process the timer */
 		if (timer->is_active) {
-			timer->handler(timer, timer->closure, timer->decount);
+			timer->handler(timer, timer->closure, (int)timer->decount);
 			/* hack, hack, hack: below, just ignore blind events */
 			do { timer->next_ms += timer->period_ms; } while(timer->next_ms <= now);
 			if (timer->decount) {

@@ -96,7 +96,7 @@ struct afb_evt {
 
 #if WITH_AFB_HOOK
 	/* hooking */
-	int hookflags;
+	unsigned hookflags;
 #endif
 
 	/* refcount */

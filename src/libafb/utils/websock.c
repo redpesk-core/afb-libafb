@@ -597,7 +597,7 @@ const char *websocket_explain_error(uint16_t code)
 		"EXPECT_EXTENSION",  /* 1010 */
 		"INTERNAL_ERROR",    /* 1011 */
 	};
-	if (code < 1000 || (code - 1000) >= (sizeof msgs / sizeof *msgs))
+	if (code < 1000 || (code - 1000) >= (int)(sizeof msgs / sizeof *msgs))
 		return "?";
 	return msgs[code - 1000];
 }

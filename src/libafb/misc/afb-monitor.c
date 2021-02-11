@@ -149,7 +149,7 @@ static void set_sub_unsub(
 		}
 		if (++i >= n)
 			return;
-		obj = json_object_array_get_idx(list, i);
+		obj = json_object_array_get_idx(list, (wrap_json_index_t)i);
 	}
 }
 
@@ -302,7 +302,7 @@ static struct json_object *get_verbosity(struct json_object *spec)
 	} else if (json_object_is_type(spec, json_type_array)) {
 		n = (int)json_object_array_length(spec);
 		for (i = 0 ; i < n ; i++)
-			get_verbosity_of(resu, json_object_get_string(json_object_array_get_idx(spec, i)));
+			get_verbosity_of(resu, json_object_get_string(json_object_array_get_idx(spec, (wrap_json_index_t)i)));
 	} else if (json_object_is_type(spec, json_type_string)) {
 		get_verbosity_of(resu, json_object_get_string(spec));
 	} else if (json_object_get_boolean(spec)) {
@@ -381,7 +381,7 @@ static struct namelist *get_apis_namelist(struct json_object *spec)
 		for (i = 0 ; i < n ; i++)
 			add_one_name_to_namelist(&head,
 						 json_object_get_string(
-							 json_object_array_get_idx(spec, i)),
+							 json_object_array_get_idx(spec, (wrap_json_index_t)i)),
 						 NULL);
 	} else if (json_object_is_type(spec, json_type_string)) {
 		add_one_name_to_namelist(&head, json_object_get_string(spec), NULL);

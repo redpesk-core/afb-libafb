@@ -143,7 +143,7 @@ static int api_array_ensure_count(struct api_array *array, int count)
 	void **anys;
 
 	c = (count + INCR - 1) & ~(INCR - 1);
-	anys = realloc(array->anys, c * sizeof *anys);
+	anys = realloc(array->anys, (size_t)c * sizeof *anys);
 	if (!anys)
 		return X_ENOMEM;
 
@@ -1029,7 +1029,7 @@ const char **afb_apiset_get_names(struct afb_apiset *set, int rec, int type)
 		gc.ptr = names;
 		afb_apiset_enum(set, rec, get_names_value, &gc);
 #if !defined(APISET_NO_SORT)
-		qsort(names, gc.ptr - names, sizeof *names, get_names_sortcb);
+		qsort(names, (size_t)(gc.ptr - names), sizeof *names, get_names_sortcb);
 #endif
 		*gc.ptr = NULL;
 	}

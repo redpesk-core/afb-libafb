@@ -337,7 +337,7 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 	dsz = 0;
 	i = 0;
 	while (i < iovcnt) {
-		dsz += iov[i++].iov_len;
+		dsz += (ssize_t)iov[i++].iov_len;
 		if (dsz < 0)
 			return X_EINVAL;
 	}
@@ -368,12 +368,12 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 				iov2 += i;
 			else {
 				iov += i;
-				iov2 = alloca(iovcnt * sizeof *iov2);
+				iov2 = alloca((unsigned)iovcnt * sizeof *iov2);
 				for (i = 0 ; i < iovcnt ; i++)
 					iov2[i] = iov[i];
 			}
 			iov2->iov_base += rc;
-			iov2->iov_len -= rc;
+			iov2->iov_len -= (size_t)rc;
 		}
 		pfd.fd = ws->fd;
 		pfd.events = POLLOUT;

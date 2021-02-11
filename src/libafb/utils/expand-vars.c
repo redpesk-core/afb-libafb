@@ -72,7 +72,7 @@ static char *expand(const char *value, char ***varsarray)
 				}
 				if (c) {
 					for (end = ++begin ; *end && *end != c ; end++);
-					len = end - begin;
+					len = (size_t)(end - begin);
 					if (*end) {
 						end++;
 						remove += 3 + len; /* length to remove */
@@ -84,7 +84,7 @@ static char *expand(const char *value, char ***varsarray)
 				}
 				else {
 					for (end = begin ; isalnum(*end) || *end == '_' ; end++);
-					len = end - begin;
+					len = (size_t)(end - begin);
 					remove += 1 + len; /* length to remove */
 				}
 				/* search the value of the variable in vars and env */
@@ -126,7 +126,7 @@ static char *expand(const char *value, char ***varsarray)
 		}
 		else {
 			/* prepare expansion after scan */
-			i = (begin - value) + add - remove;
+			i = (size_t)(begin - value) + add - remove;
 			if (i >= EXPAND_VARS_LIMIT) {
 				/* limit recursivity effect */
 				begin = 0;

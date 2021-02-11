@@ -268,7 +268,7 @@ opaque_to_string(
 	}
 	else {
 		rc = snprintf(buffer, size, OPAQUE_FMT_WR, opaqueid);
-		if (rc < 0 || rc >= size) {
+		if (rc < 0 || (size_t)rc >= size) {
 			rc = X_EFAULT;
 		}
 	}
@@ -578,7 +578,7 @@ TRANSFORM_BASIC(bool, uint8_t, double, double)
 
 CONVERT(bool,json)
 {
-	char value = get_bool(in);
+	uint8_t value = get_bool(in);
 	return make_stringz_static(out, value ? "true" : "false");
 }
 
@@ -635,7 +635,7 @@ CONVERT(i32,json)
 {
 	char buffer[30];
 	int len = snprintf(buffer, sizeof buffer, "%d", get_i32(in));
-	return make_stringz_copy_length(out, buffer, len);
+	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
 CONVERT(i32,json_c)
@@ -692,7 +692,7 @@ CONVERT(u32,json)
 {
 	char buffer[30];
 	int len = snprintf(buffer, sizeof buffer, "%u", get_u32(in));
-	return make_stringz_copy_length(out, buffer, len);
+	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
 CONVERT(u32,json_c)
@@ -748,7 +748,7 @@ CONVERT(i64,json)
 {
 	char buffer[60];
 	int len = snprintf(buffer, sizeof buffer, "%lld", (long long)get_i64(in));
-	return make_stringz_copy_length(out, buffer, len);
+	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
 CONVERT(i64,json_c)
@@ -802,7 +802,7 @@ CONVERT(u64,json)
 {
 	char buffer[60];
 	int len = snprintf(buffer, sizeof buffer, "%llu", (long long)get_u64(in));
-	return make_stringz_copy_length(out, buffer, len);
+	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
 EXTRACT(json,const char*,u64,uint64_t)
@@ -834,7 +834,7 @@ CONVERT(double,json)
 {
 	char buffer[60];
 	int len = snprintf(buffer, sizeof buffer, "%18g", get_double(in));
-	return make_stringz_copy_length(out, buffer, len);
+	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
 CONVERT(double,json_c)

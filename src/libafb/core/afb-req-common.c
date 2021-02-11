@@ -531,9 +531,9 @@ afb_req_common_validate_async(
 int
 afb_req_common_has_loa(
 	struct afb_req_common *req,
-	int value
+	unsigned value
 ) {
-	return value <= 0 || afb_session_get_loa(req->session, req->api) >= value;
+	return value <= 0 || afb_session_get_loa(req->session, req->api) >= (int)value;
 }
 
 /******************************************************************************/
@@ -977,12 +977,13 @@ unsigned
 afb_req_common_session_get_LOA_hookable(
 	struct afb_req_common *req
 ) {
-	int r = afb_session_get_loa(req->session, req->api);
+	int rc = afb_session_get_loa(req->session, req->api);
+	unsigned r = rc < 0 ? 0 : (unsigned)rc;
 #if WITH_AFB_HOOK
 	if (req->hookflags & afb_hook_flag_req_session_get_LOA)
 		r = afb_hook_req_session_get_LOA(req, r);
 #endif
-	return r < 0 ? 0 : (unsigned)r;
+	return r;
 }
 
 void
@@ -1004,9 +1005,9 @@ afb_req_common_get_client_info_hookable(
 #if WITH_CRED
 	struct afb_cred *cred = req->credentials;
 	if (cred && cred->id) {
-		json_object_object_add(r, "uid", json_object_new_int(cred->uid));
-		json_object_object_add(r, "gid", json_object_new_int(cred->gid));
-		json_object_object_add(r, "pid", json_object_new_int(cred->pid));
+		json_object_object_add(r, "uid", json_object_new_int64((int64_t)cred->uid));
+		json_object_object_add(r, "gid", json_object_new_int64((int64_t)cred->gid));
+		json_object_object_add(r, "pid", json_object_new_int64((int64_t)cred->pid));
 		json_object_object_add(r, "user", json_object_new_string(cred->user));
 		json_object_object_add(r, "label", json_object_new_string(cred->label));
 		json_object_object_add(r, "id", json_object_new_string(cred->id));
@@ -1014,7 +1015,7 @@ afb_req_common_get_client_info_hookable(
 #endif
 	if (req->session) {
 		json_object_object_add(r, "uuid", json_object_new_string(afb_session_uuid(req->session)?:""));
-		json_object_object_add(r, "LOA", json_object_new_int(afb_session_get_loa(req->session, req->api)));
+		json_object_object_add(r, "LOA", json_object_new_int((int)afb_session_get_loa(req->session, req->api)));
 	}
 #if WITH_AFB_HOOK
 	if (req->hookflags & afb_hook_flag_req_get_client_info)

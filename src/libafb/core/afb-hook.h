@@ -138,7 +138,7 @@ struct afb_hook_req_itf {
 
 extern void afb_hook_init_req(struct afb_req_common *req);
 
-extern struct afb_hook_req *afb_hook_create_req(const char *api, const char *verb, struct afb_session *session, int flags, struct afb_hook_req_itf *itf, void *closure);
+extern struct afb_hook_req *afb_hook_create_req(const char *api, const char *verb, struct afb_session *session, unsigned flags, struct afb_hook_req_itf *itf, void *closure);
 extern struct afb_hook_req *afb_hook_addref_req(struct afb_hook_req *spec);
 extern void afb_hook_unref_req(struct afb_hook_req *spec);
 
@@ -152,7 +152,7 @@ extern void afb_hook_req_addref(const struct afb_req_common *req);
 extern void afb_hook_req_unref(const struct afb_req_common *req);
 extern void afb_hook_req_session_close(const struct afb_req_common *req);
 extern int afb_hook_req_session_set_LOA(const struct afb_req_common *req, unsigned level, int result);
-extern int afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result);
+extern unsigned afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result);
 extern int afb_hook_req_subscribe(const struct afb_req_common *req, struct afb_evt *evt, int result);
 extern int afb_hook_req_unsubscribe(const struct afb_req_common *req, struct afb_evt *evt, int result);
 extern void afb_hook_req_subcall(const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[], int flags);
@@ -354,8 +354,8 @@ extern void afb_hook_api_on_event_handler_before(const struct afb_api_common *co
 extern void afb_hook_api_on_event_handler_after(const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern);
 extern struct json_object *afb_hook_api_settings(const struct afb_api_common *comapi, struct json_object *object);
 
-extern int afb_hook_flags_api(const char *api);
-extern struct afb_hook_api *afb_hook_create_api(const char *api, int flags, struct afb_hook_api_itf *itf, void *closure);
+extern unsigned afb_hook_flags_api(const char *api);
+extern struct afb_hook_api *afb_hook_create_api(const char *api, unsigned flags, struct afb_hook_api_itf *itf, void *closure);
 extern struct afb_hook_api *afb_hook_addref_api(struct afb_hook_api *hook);
 extern void afb_hook_unref_api(struct afb_hook_api *hook);
 
@@ -399,8 +399,8 @@ extern void afb_hook_evt_name(const char *evt, int id, const char *result);
 extern void afb_hook_evt_addref(const char *evt, int id);
 extern void afb_hook_evt_unref(const char *evt, int id);
 
-extern int afb_hook_flags_evt(const char *name);
-extern struct afb_hook_evt *afb_hook_create_evt(const char *pattern, int flags, struct afb_hook_evt_itf *itf, void *closure);
+extern unsigned afb_hook_flags_evt(const char *name);
+extern struct afb_hook_evt *afb_hook_create_evt(const char *pattern, unsigned flags, struct afb_hook_evt_itf *itf, void *closure);
 extern struct afb_hook_evt *afb_hook_addref_evt(struct afb_hook_evt *hook);
 extern void afb_hook_unref_evt(struct afb_hook_evt *hook);
 
@@ -432,7 +432,7 @@ extern void afb_hook_session_destroy(struct afb_session *session);
 extern void afb_hook_session_addref(struct afb_session *session);
 extern void afb_hook_session_unref(struct afb_session *session);
 
-extern struct afb_hook_session *afb_hook_create_session(const char *pattern, int flags, struct afb_hook_session_itf *itf, void *closure);
+extern struct afb_hook_session *afb_hook_create_session(const char *pattern, unsigned flags, struct afb_hook_session_itf *itf, void *closure);
 extern struct afb_hook_session *afb_hook_addref_session(struct afb_hook_session *hook);
 extern void afb_hook_unref_session(struct afb_hook_session *hook);
 
@@ -448,7 +448,7 @@ struct afb_hook_global_itf {
 	void (*hook_global_vverbose)(void *closure, const struct afb_hookid *hookid, int level, const char *file, int line, const char *function, const char *fmt, va_list args);
 };
 
-extern struct afb_hook_global *afb_hook_create_global(int flags, struct afb_hook_global_itf *itf, void *closure);
+extern struct afb_hook_global *afb_hook_create_global(unsigned flags, struct afb_hook_global_itf *itf, void *closure);
 extern struct afb_hook_global *afb_hook_addref_global(struct afb_hook_global *hook);
 extern void afb_hook_unref_global(struct afb_hook_global *hook);
 

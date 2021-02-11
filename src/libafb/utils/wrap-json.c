@@ -107,7 +107,7 @@ static int encode_base64(
 	if (pad)
 		rlen += ((~rlen) + 1) & 3;
 	if (width)
-		rlen += rlen / width;
+		rlen += rlen / (unsigned)width;
 
 	/* allocate the output */
 	result = malloc(rlen + 1);
@@ -417,7 +417,7 @@ int wrap_json_vpack(struct json_object **result, const char *desc, va_list args)
 			if (c != top->type || top <= stack)
 				goto internal_error;
 			obj = (top--)->cont;
-			if (*d == '*' && !(c == '}' ? json_object_object_length(obj) : json_object_array_length(obj))) {
+			if (*d == '*' && !(c == '}' ? !!json_object_object_length(obj) : !!json_object_array_length(obj))) {
 				json_object_put(obj);
 				obj = NULL;
 			}
@@ -748,7 +748,7 @@ static int vunpack(struct json_object *object, const char *desc, va_list args, i
 				if (key && key >= unpack_accept_any) {
 					if (top->index >= top->count)
 						goto out_of_range;
-					obj = json_object_array_get_idx(top->parent, top->index++);
+					obj = json_object_array_get_idx(top->parent, (wrap_json_index_t)top->index++);
 				}
 			}
 			break;
@@ -883,7 +883,7 @@ static void array_for_all(struct json_object *object, void (*callback)(void*,str
 	int n = (int)json_object_array_length(object);
 	int i = 0;
 	while(i < n)
-		callback(closure, json_object_array_get_idx(object, i++));
+		callback(closure, json_object_array_get_idx(object, (wrap_json_index_t)i++));
 }
 
 /* apply callback to items of an array or to it if not an object */
@@ -931,7 +931,7 @@ void wrap_json_for_all(struct json_object *object, void (*callback)(void*,struct
 		int n = (int)json_object_array_length(object);
 		int i = 0;
 		while(i < n)
-			callback(closure, json_object_array_get_idx(object, i++), NULL);
+			callback(closure, json_object_array_get_idx(object, (wrap_json_index_t)i++), NULL);
 	}
 }
 
@@ -973,8 +973,8 @@ static struct json_object *clone_array(struct json_object *array, int subdepth)
 	struct json_object *r = json_object_new_array();
 	while (n) {
 		n--;
-		json_object_array_put_idx(r, n,
-			wrap_json_clone_depth(json_object_array_get_idx(array, n), subdepth));
+		json_object_array_put_idx(r, (wrap_json_index_t)n,
+			wrap_json_clone_depth(json_object_array_get_idx(array, (wrap_json_index_t)n), subdepth));
 	}
 	return r;
 }
@@ -1108,15 +1108,15 @@ struct json_object *wrap_json_array_insert_array(struct json_object *dest, struc
 	while (i > idx + na) {
 		i--;
 		json_object_array_put_idx(dest,
-			i,
-			json_object_get(json_object_array_get_idx(dest, i - na)));
+			(wrap_json_index_t)i,
+			json_object_get(json_object_array_get_idx(dest, (wrap_json_index_t)(i - na))));
 	}
 	/* copy the added items */
 	while (i > idx) {
 		i--;
 		json_object_array_put_idx(dest,
-			i,
-			json_object_get(json_object_array_get_idx(added, i - idx)));
+			(wrap_json_index_t)i,
+			json_object_get(json_object_array_get_idx(added, (wrap_json_index_t)(i - idx))));
 	}
 	return dest;
 }
@@ -1247,8 +1247,8 @@ static int jcmp(struct json_object *x, struct json_object *y, int inc, int sort)
 		if (r > 0 && inc)
 			r = 0;
 		for (i = 0 ; !r && i < ny ; i++) {
-			jx = json_object_array_get_idx(x, i);
-			jy = json_object_array_get_idx(y, i);
+			jx = json_object_array_get_idx(x, (wrap_json_index_t)i);
+			jy = json_object_array_get_idx(y, (wrap_json_index_t)i);
 			r = jcmp(jx, jy, inc, sort);
 		}
 		break;

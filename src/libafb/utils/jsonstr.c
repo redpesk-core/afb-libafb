@@ -387,7 +387,7 @@ int jsonstr_test(const char *string, size_t stringlenmax, size_t *size)
 	init_readtxt(string, stringlenmax, &rt);
 	r = test_value(&rt) && rt.c == 0;
 	if (size)
-		*size = rt.pos - string - !r;
+		*size = (size_t)(rt.pos - string) - !r;
 	return r;
 }
 

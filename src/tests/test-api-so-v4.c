@@ -67,8 +67,8 @@ int getpath(char buffer[PATH_BUF_SIZE], const char *base, int ival)
 		lenp = (int)strlen(*pp);
 		if (lenp + len + 1 > PATH_BUF_SIZE)
 			break;
-		memmove(buffer + lenp, buffer, len + 1);
-		memcpy(buffer, *pp, lenp);
+		memmove(buffer + lenp, buffer, (size_t)len + 1);
+		memcpy(buffer, *pp, (size_t)lenp);
 		pp++;
 		len += lenp;
 		rc = access(buffer, F_OK);

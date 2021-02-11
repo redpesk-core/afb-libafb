@@ -172,7 +172,7 @@ static void ctxt_error(char **errors, const char *format, ...)
 	sz = errs ? strlen(errs) : 0;
 	errs = realloc(errs, sz + (size_t)len);
 	if (errs) {
-		memcpy(errs + sz, buffer, len);
+		memcpy(errs + sz, buffer, (size_t)len);
 		*errors = errs;
 	}
 }
@@ -548,7 +548,7 @@ static void hook_api_rootdir_get_fd(void *closure, const struct afb_hookid *hook
 	if (result >= 0) {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
-		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
+		path[s < 0 ? 0 : (size_t)s >= sizeof path ? sizeof path - 1 : (size_t)s] = 0;
 		key = "path";
 		val = path;
 	} else {
@@ -568,7 +568,7 @@ static void hook_api_rootdir_open_locale(void *closure, const struct afb_hookid 
 	if (result >= 0) {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
-		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
+		path[s < 0 ? 0 : (size_t)s >= sizeof path ? sizeof path - 1 : (size_t)s] = 0;
 		key = "path";
 		val = path;
 	} else {
@@ -947,7 +947,7 @@ struct
 {
 	const char *name;
 	void (*unref)(void*);
-	int (*get_flag)(const char*);
+	int (*get_flag)(const char*, unsigned*);
 }
 abstracting[Trace_Type_Count] =
 {
@@ -1190,7 +1190,7 @@ struct desc
 	const char *apiname;
 	const char *verbname;
 	const char *pattern;
-	int flags[Trace_Type_Count];
+	unsigned flags[Trace_Type_Count];
 };
 
 static void addhook(struct desc *desc, enum trace_type type)
@@ -1275,7 +1275,8 @@ static void addhooks(struct desc *desc)
 
 static void add_flags(void *closure, struct json_object *object, enum trace_type type)
 {
-	int value;
+	int rc;
+	unsigned flags;
 	const char *name, *queried;
 	struct desc *desc = closure;
 
@@ -1285,9 +1286,9 @@ static void add_flags(void *closure, struct json_object *object, enum trace_type
 					json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 	else {
 		queried = (name[0] == '*' && !name[1]) ? "all" : name;
-		value = abstracting[type].get_flag(queried);
-		if (value)
-			desc->flags[type] |= value;
+		rc = abstracting[type].get_flag(queried, &flags);
+		if (rc >= 0)
+			desc->flags[type] |= flags;
 		else
 			ctxt_error(&desc->context->errors, "unknown %s name %s",
 					abstracting[type].name, name);

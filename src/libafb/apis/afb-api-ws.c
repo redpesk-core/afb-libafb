@@ -229,7 +229,7 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 
 	/* make the structure */
 	lapi = strlen(api);
-	extra = luri == (api - uri) + lapi ? 0 : lapi + 1;
+	extra = luri == (size_t)(api - uri) + lapi ? 0 : lapi + 1;
 	apiws = malloc(sizeof * apiws + 1 + luri + extra);
 	if (!apiws) {
 		ERROR("out of memory");

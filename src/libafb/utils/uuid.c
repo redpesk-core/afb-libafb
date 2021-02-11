@@ -100,32 +100,32 @@ void uuid_new_binary(uuid_binary_t uuid)
 	if (++counter == 0)
 		counter = 1;
 
-	uuid[0] = (char)(x >> 24);
-	uuid[1] = (char)(x >> 16);
-	uuid[2] = (char)(x >> 8);
-	uuid[3] = (char)(x);
+	uuid[0] = (unsigned char)(x >> 24);
+	uuid[1] = (unsigned char)(x >> 16);
+	uuid[2] = (unsigned char)(x >> 8);
+	uuid[3] = (unsigned char)(x);
 
-	uuid[4] = (char)(pid >> 8);
-	uuid[5] = (char)(pid);
-
-	GETRND(&x);
-	uuid[6] = (char)(((x >> 16) & 0x0f) | 0x40); /* pseudo-random version */
-	uuid[7] = (char)(x >> 8);
+	uuid[4] = (unsigned char)(pid >> 8);
+	uuid[5] = (unsigned char)(pid);
 
 	GETRND(&x);
-	uuid[8] = (char)(((x >> 16) & 0x3f) | 0x80); /* variant RFC4122 */
-	uuid[9] = (char)(x >> 8);
+	uuid[6] = (unsigned char)(((x >> 16) & 0x0f) | 0x40); /* pseudo-random version */
+	uuid[7] = (unsigned char)(x >> 8);
 
 	GETRND(&x);
-	uuid[10] = (char)(x >> 16);
-	uuid[11] = (char)(x >> 8);
+	uuid[8] = (unsigned char)(((x >> 16) & 0x3f) | 0x80); /* variant RFC4122 */
+	uuid[9] = (unsigned char)(x >> 8);
 
 	GETRND(&x);
-	uuid[12] = (char)(x >> 16);
-	uuid[13] = (char)(x >> 8);
+	uuid[10] = (unsigned char)(x >> 16);
+	uuid[11] = (unsigned char)(x >> 8);
 
-	uuid[14] = (char)(counter >> 8);
-	uuid[15] = (char)(counter);
+	GETRND(&x);
+	uuid[12] = (unsigned char)(x >> 16);
+	uuid[13] = (unsigned char)(x >> 8);
+
+	uuid[14] = (unsigned char)(counter >> 8);
+	uuid[15] = (unsigned char)(counter);
 #undef INIRND
 #undef GETRND
 #endif

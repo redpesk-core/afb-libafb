@@ -263,8 +263,8 @@ static int wsj1_msg_scan(char *text, size_t items[10][2])
 			end = pos;
 			while (end > beg && end[-1] == ' ')
 				end--;
-			items[n][0] = beg - text; /* start offset */
-			items[n][1] = end - beg;  /* length */
+			items[n][0] = (size_t)(beg - text); /* start offset */
+			items[n][1] = (size_t)(end - beg);  /* length */
 			n++;
 			if (*pos == ']')
 				break;

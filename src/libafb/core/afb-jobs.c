@@ -116,11 +116,11 @@ static int job_add(
 		}
 	}
 	/* update the delay */
-	if (delayms) {
+	if (delayms > 0) {
 		if (!delayed_count)
 			delayed_base = getnow();
 		else {
-			dt = (getnow() + delayms) - delayed_base;
+			dt = (getnow() + (uint64_t)delayms) - delayed_base;
 			if (dt > LONG_MAX) {
 				job->next = free_jobs;
 				free_jobs = job;
@@ -245,6 +245,7 @@ static void job_release(struct afb_job *job)
 struct afb_job *afb_jobs_dequeue(long *delayms)
 {
 	struct afb_job *job;
+	uint64_t dt;
 	long d;
 
 	/* enter critical */
@@ -254,7 +255,8 @@ struct afb_job *afb_jobs_dequeue(long *delayms)
 	if (!delayed_count)
 		d = LONG_MAX;
 	else {
-		d = getnow() - delayed_base;
+		dt = getnow() - delayed_base;
+		d = dt > LONG_MAX ? LONG_MAX : (long)dt;
 	}
 	for (job = pending_jobs ; job && (job->blocked || job->delayms > d); job = job->next);
 	if (job) {
@@ -270,7 +272,7 @@ struct afb_job *afb_jobs_dequeue(long *delayms)
 		for (job = pending_jobs ; job ; job = job->next)
 			if (!job->blocked && job->delayms && job->delayms < d)
 				d = job->delayms;
-		d = (long)((delayed_base + d) - getnow());
+		d = (long)((delayed_base + (uint64_t)d) - getnow());
 		if (d < 0)
 			d = -1;
 	}

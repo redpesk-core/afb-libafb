@@ -68,7 +68,7 @@ struct afb_req_v4
 	const struct afb_verb_v4 *verb;
 
 	/** hook flag */
-	int hookflags;
+	unsigned hookflags;
 
 	/** count of references */
 	uint16_t refcount;

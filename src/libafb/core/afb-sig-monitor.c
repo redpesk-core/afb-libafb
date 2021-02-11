@@ -102,7 +102,7 @@ static void dumpstack(int crop, int signum)
 		idx = 0;
 		while (pos < length && idx < count) {
 			rc = snprintf(&buffer[pos], length - pos, " [%d/%d] %s\n", idx + 1, count, locations[idx]);
-			pos += rc >= 0 ? rc : 0;
+			pos += rc >= 0 ? (size_t)rc : 0;
 			idx++;
 		}
 		buffer[length] = 0;

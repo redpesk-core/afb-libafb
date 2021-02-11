@@ -75,7 +75,7 @@ static int has(struct path_search *paths, const char *value, short length)
 {
 	for ( ; paths && paths->length ; paths = paths->parent) {
 		short plen = paths->length >= 0 ? paths->length : (short)-paths->length;
-		if (plen == length && !memcmp(paths->path, value, length))
+		if (plen == length && !memcmp(paths->path, value, (size_t)length))
 			return 1;
 	}
 	return 0;
@@ -93,13 +93,13 @@ static int add(struct path_search **paths, const char *value, int length)
 		return 0;
 
 	/* create a new path entry */
-	path = malloc(sizeof *path + 1 + length);
+	path = malloc(sizeof *path + 1 + (size_t)length);
 	if (!path)
 		return X_ENOMEM;
 
 	/* initialize */
 	path->length = (short)length;
-	memcpy(path->path, value, length);
+	memcpy(path->path, value, (size_t)length);
 	path->path[length] = 0;
 	path->parent = *paths;
 	path->refcount = 1;
@@ -335,11 +335,11 @@ static int search_in_dir(struct search *search)
 
 			/* copy name if no overflow */
 			len = (short)strlen(dl.ent->d_name);
-			if (len + pos >= sizeof(search->path)) {
+			if (len + pos >= (int)sizeof(search->path)) {
 				/* overflow detected */
 				continue;
 			}
-			memcpy(name, dl.ent->d_name, 1 + len);
+			memcpy(name, dl.ent->d_name, 1 + (size_t)len);
 
 			/* get type after dereferencing if link */
 			type = dl.ent->d_type;
@@ -415,7 +415,7 @@ static int searchrec(struct path_search *paths, struct search *search)
 	if (paths->length > 0) {
 		/* searching before parents */
 		length = (unsigned short)paths->length;
-		search->item.pathlen = length;
+		search->item.pathlen = (short)length;
 		memcpy(search->path, paths->path, 1 + length);
 		search->prv = 0;
 		stop = search_in_dir(search);
@@ -428,7 +428,7 @@ static int searchrec(struct path_search *paths, struct search *search)
 		stop = paths->parent ? searchrec(paths->parent, search) : 0;
 		if (!stop) {
 			length = (unsigned short)-paths->length;
-			search->item.pathlen = length;
+			search->item.pathlen = (short)length;
 			memcpy(search->path, paths->path, 1 + length);
 			search->prv = 0;
 			stop = search_in_dir(search);

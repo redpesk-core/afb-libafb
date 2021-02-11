@@ -174,7 +174,7 @@ static int is_tty()
 static void _vverbose_(int loglevel, const char *file, int line, const char *function, const char *fmt, va_list args)
 {
 	char buffer[4000];
-	char lino[40];
+	char lino[40]; /* line number with more than 39 digits are difficult to find */
 	int saverr, n, rc, colorize;
 	struct iovec iov[20];
 	int tty;
@@ -231,7 +231,7 @@ static void _vverbose_(int loglevel, const char *file, int line, const char *fun
 		if (line) {
 			/* line number */
 			iov[n].iov_base = lino;
-			iov[n++].iov_len = snprintf(lino, sizeof lino, "%d", line);
+			iov[n++].iov_len = (size_t)snprintf(lino, sizeof lino, "%d", line);
 		} else {
 			/* "?" */
 			iov[n].iov_base = (void*)&chars[1];

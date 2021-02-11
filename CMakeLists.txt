@@ -108,7 +108,7 @@ link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
 
 add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
 add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
-add_compile_options(-Wno-sign-compare -Wno-sign-conversion)
+add_compile_options(-Wsign-compare -Wsign-conversion)
 add_compile_options(
 	$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
 	$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>

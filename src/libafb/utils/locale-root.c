@@ -366,7 +366,7 @@ static struct locale_search *create_search(struct locale_root *root, const char 
 		__atomic_add_fetch(&root->intcount, 1, __ATOMIC_RELAXED);
 		search->root = root;
 		search->refcount = 1;
-		memcpy(search->list, list, llen);
+		memcpy(search->list, list, (size_t)llen);
 		search->llen = llen;
 	}
 	return search;
@@ -381,7 +381,7 @@ static inline int search_matches(struct locale_search *search, const char *list,
 {
 	return search != NULL
 	    && search->llen == llen
-	    && !memcmp(search->list, list, llen);
+	    && !memcmp(search->list, list, (size_t)llen);
 }
 
 /*
@@ -540,16 +540,16 @@ static int iter_set(struct iter *iter)
 
 	if (item) {
 		ilen = (int)strlen(item);
-		if (iter->offset + ilen + iter->flen >= sizeof iter->path)
+		if (iter->offset + ilen + iter->flen >= (int)sizeof iter->path)
 			return 0;
-		memcpy(dest, item, ilen);
+		memcpy(dest, item, (size_t)ilen);
 		dest[ilen] = '/';
 		dest = &dest[ilen + 1];
 	} else {
-		if (iter->offset + iter->flen >= sizeof iter->path)
+		if (iter->offset + iter->flen >= (int)sizeof iter->path)
 			return 0;
 	}
-	memcpy(dest, iter->filename, iter->flen);
+	memcpy(dest, iter->filename, (size_t)iter->flen);
 	return 1;
 }
 

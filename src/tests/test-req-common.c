@@ -248,7 +248,7 @@ START_TEST (prepare_forwarding)
 			rc = afb_data_create_raw(&data[i-1], type1, NULL, 0, dataClosureCB, i2p(i));
 			ck_assert_int_eq(rc, 0);
 		}
-		afb_req_common_prepare_forwarding(req, apiname, verbname, j, data);
+		afb_req_common_prepare_forwarding(req, apiname, verbname, (unsigned)j, data);
 		ck_assert_str_eq(req->apiname, apiname);
 		ck_assert_str_eq(req->verbname, apiname);
 		ck_assert_int_eq(req->params.ndata, j);

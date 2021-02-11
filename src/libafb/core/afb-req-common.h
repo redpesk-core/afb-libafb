@@ -80,8 +80,8 @@ struct afb_req_common
 	         asyncount: 4;          /**< count of async items */
 
 #if WITH_AFB_HOOK
-	int hookflags;			/**< flags for hooking */
-	int hookindex;			/**< hook index of the request if hooked */
+	unsigned hookflags;		/**< flags for hooking */
+	unsigned hookindex;		/**< hook index of the request if hooked */
 #endif
 	void *asyncitems[7];
 

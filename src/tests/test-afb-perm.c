@@ -86,8 +86,8 @@ int getpath(char buffer[BUF_SIZE], const char *base)
 	while (rc < 0 && *pp) {
 		lenp = (int)strlen(*pp);
 		if (lenp + len + 1 > BUF_SIZE) break;
-		memmove(buffer + lenp, buffer, len + 1);
-		memcpy(buffer, *pp, lenp);
+		memmove(buffer + lenp, buffer, (size_t)len + 1);
+		memcpy(buffer, *pp, (size_t)lenp);
 		pp++;
 		len += lenp;
 		rc = access(buffer, F_OK);
@@ -300,7 +300,7 @@ void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, c
 	ck_assert_int_eq(afb_cred_create(&req->credentials, uid, gid, pid, gpath), 0);
 
 	val = done = 0;
-	afb_req_common_check_and_set_session_async(req, auth, sessionflag, testCB, NULL);
+	afb_req_common_check_and_set_session_async(req, auth, (unsigned)sessionflag, testCB, NULL);
 	waiteForCB();
 	ck_assert_int_eq(done, 1);
 
@@ -349,7 +349,7 @@ START_TEST (testRecCommonPerm)
 	ck_assert_int_ge(afb_req_common_session_set_LOA_hookable(&req1, 1),0);
 	for(i=0; i<=3; i++){
 		fprintf(stderr, "LOA %d for %d :\n", i, TEST_LOA);
-		auth.loa = i;
+		auth.loa = (unsigned)i;
 		test_rec_common_perm(&req1, &auth, NULL, SESSION_NAME, 0);
 		if(i<2)ck_assert_int_eq(val, 1);
 		else ck_assert_int_eq(val, 0);

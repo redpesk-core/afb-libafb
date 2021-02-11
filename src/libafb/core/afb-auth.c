@@ -75,7 +75,7 @@ static struct json_object *addauth(struct json_object *o, const struct afb_auth 
 	switch(auth->type) {
 	case afb_auth_No: return addperm(o, json_object_new_boolean(0));
 	case afb_auth_Token: return addperm_key_valstr(o, "session", "check");
-	case afb_auth_LOA: return addperm_key_valint(o, "LOA", auth->loa);
+	case afb_auth_LOA: return addperm_key_valint(o, "LOA", (int)(auth->loa));
 	case afb_auth_Permission: return addperm_key_valstr(o, "permission", auth->text);
 	case afb_auth_Or: return addperm_key_val(o, "anyOf", addauth_or_array(json_object_new_array(), auth));
 	case afb_auth_And: return addauth(addauth(o, auth->first), auth->next);

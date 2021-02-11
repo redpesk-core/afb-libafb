@@ -178,8 +178,8 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 	service = strchr(spec, ':');
 	if (tail == NULL || service == NULL || tail < service)
 		return X_EINVAL;
-	host = strndupa(spec, service++ - spec);
-	service = strndupa(service, tail - service);
+	host = strndupa(spec, (size_t)(service++ - spec));
+	service = strndupa(service, (size_t)(tail - service));
 
 	/* get addr */
 	memset(&hint, 0, sizeof hint);
@@ -349,7 +349,7 @@ static struct entry *get_entry(const char *uri, int *offset, const char *scheme)
 	while (i) {
 		i--;
 		len = (int)strlen(entries[i].prefix);
-		if (!strncmp(uri, entries[i].prefix, len))
+		if (!strncmp(uri, entries[i].prefix, (size_t)len))
 			goto end; /* found */
 	}
 
@@ -364,7 +364,7 @@ static struct entry *get_entry(const char *uri, int *offset, const char *scheme)
 		while (i) {
 			i--;
 			if (deflen == (int)strlen(entries[i].prefix)
-			 && !strncmp(scheme, entries[i].prefix, deflen - 1))
+			 && !strncmp(scheme, entries[i].prefix, (size_t)(deflen - 1)))
 				goto end; /* found */
 		}
 	}
@@ -396,7 +396,7 @@ static int open_uri(const char *uri, int server, const char *scheme)
 	uri += offset;
 	api = strstr(uri, as_api);
 	if (api)
-		uri = strndupa(uri, api - uri);
+		uri = strndupa(uri, (size_t)(api - uri));
 
 	/* open the socket */
 	switch (e->type) {

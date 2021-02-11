@@ -841,7 +841,7 @@ afb_api_common_decref(
 }
 
 #if WITH_AFB_HOOK
-int
+unsigned
 afb_api_common_update_hook(
 	struct afb_api_common *comapi
 ) {

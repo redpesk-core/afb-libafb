@@ -37,13 +37,13 @@
 struct flag
 {
 	const char *name;	/** the name */
-	int value;		/** the value */
+	unsigned value;		/** the value */
 };
 
 struct flags
 {
 	struct flag *flags;
-	int count;
+	unsigned count;
 };
 
 #define FLAGS(x)   ((struct flags){ .flags = x, .count = (int)(sizeof x / sizeof * x) })
@@ -169,8 +169,10 @@ static int compare(const char *query, const char *value, size_t query_length)
 }
 
 /* get the value of the flag of 'name' in the array 'flags' of 'count elements */
-static int get_flag(const char *name, struct flags flags, size_t length)
+static int get_flag(const char *name, struct flags flags, size_t length, unsigned *result)
 {
+	unsigned lower, upper;
+
 	/* replace "*" by "all" */
 	if (length == 1 && *name == '*') {
 		name = "all";
@@ -178,26 +180,33 @@ static int get_flag(const char *name, struct flags flags, size_t length)
 	}
 
 	/* dichotomic search */
-	int lower = 0, upper = flags.count;
+	lower = 0;
+	upper = flags.count;
 	while (lower < upper) {
-		int mid = (lower + upper) >> 1;
+		unsigned mid = (lower + upper) >> 1;
 		int cmp = compare(name, flags.flags[mid].name, length);
-		if (!cmp)
-			return flags.flags[mid].value;
 		if (cmp < 0)
 			upper = mid;
-		else
+		else if (cmp > 0)
 			lower = mid + 1;
+		else {
+			*result = flags.flags[mid].value;
+			return 0;
+		}
 	}
 
+	/* not in the table, then valid values are 'no' or 'none', return 0 in that case,
+	 * -1 otherwise */
+	*result = 0;
 	return -(compare(name, "no", length) && compare(name, "none", length));
 }
 
-static int from_text(const char *text, struct flags flags)
+static int from_text(const char *text, unsigned *ptrresult, struct flags flags)
 {
 	static const char sep[] = " \t,";
 	size_t s;
-	int result = 0, val;
+	unsigned result = 0, val;
+	int rc;
 
 	if (text) {
 		for (;;) {
@@ -205,20 +214,22 @@ static int from_text(const char *text, struct flags flags)
 			if (!*text)
 				break;
 			s = strcspn(text, sep);
-			val = get_flag(text, flags, s);
-			if (val == -1)
-				return val;
+			rc = get_flag(text, flags, s, &val);
+			if (rc < 0)
+				return rc;
 			result |= val;
 			text += s;
 		}
 	}
-	return result;
+	if (ptrresult)
+		*ptrresult = result;
+	return 0;
 }
 
-static char *to_text(int value, struct flags flags)
+static char *to_text(unsigned value, struct flags flags)
 {
-	int borrow = 0, mask = 0, i, v, imask;
-	size_t s = 0;
+	unsigned borrow = 0, mask = 0, i, v, imask;
+	unsigned s = 0;
 	char *result = NULL;
 
 	if (!value)
@@ -245,12 +256,12 @@ static char *to_text(int value, struct flags flags)
 				borrow = value;
 			else {
 				if (!result)
-					s += strlen(flags.flags[imask].name) + !!s;
+					s += (unsigned)strlen(flags.flags[imask].name) + !!s;
 				else {
 					if (s)
 						result[s++] = ',';
 					strcpy(&result[s], flags.flags[imask].name);
-					s += strlen(flags.flags[imask].name);
+					s += (unsigned)strlen(flags.flags[imask].name);
 				}
 			}
 		}
@@ -258,52 +269,52 @@ static char *to_text(int value, struct flags flags)
 	return result;
 }
 
-int afb_hook_flags_req_from_text(const char *text)
+int afb_hook_flags_req_from_text(const char *text, unsigned *flags)
 {
-	return from_text(text, FLAGS(req_flags));
+	return from_text(text, flags, FLAGS(req_flags));
 }
 
-int afb_hook_flags_api_from_text(const char *text)
+int afb_hook_flags_api_from_text(const char *text, unsigned *flags)
 {
-	return from_text(text, FLAGS(api_flags));
+	return from_text(text, flags, FLAGS(api_flags));
 }
 
-int afb_hook_flags_evt_from_text(const char *text)
+int afb_hook_flags_evt_from_text(const char *text, unsigned *flags)
 {
-	return from_text(text, FLAGS(evt_flags));
+	return from_text(text, flags, FLAGS(evt_flags));
 }
 
-int afb_hook_flags_session_from_text(const char *text)
+int afb_hook_flags_session_from_text(const char *text, unsigned *flags)
 {
-	return from_text(text, FLAGS(session_flags));
+	return from_text(text, flags, FLAGS(session_flags));
 }
 
-int afb_hook_flags_global_from_text(const char *text)
+int afb_hook_flags_global_from_text(const char *text, unsigned *flags)
 {
-	return from_text(text, FLAGS(global_flags));
+	return from_text(text, flags, FLAGS(global_flags));
 }
 
-char *afb_hook_flags_req_to_text(int value)
+char *afb_hook_flags_req_to_text(unsigned value)
 {
 	return to_text(value, FLAGS(req_flags));
 }
 
-char *afb_hook_flags_api_to_text(int value)
+char *afb_hook_flags_api_to_text(unsigned value)
 {
 	return to_text(value, FLAGS(api_flags));
 }
 
-char *afb_hook_flags_evt_to_text(int value)
+char *afb_hook_flags_evt_to_text(unsigned value)
 {
 	return to_text(value, FLAGS(evt_flags));
 }
 
-char *afb_hook_flags_session_to_text(int value)
+char *afb_hook_flags_session_to_text(unsigned value)
 {
 	return to_text(value, FLAGS(session_flags));
 }
 
-char *afb_hook_flags_global_to_text(int value)
+char *afb_hook_flags_global_to_text(unsigned value)
 {
 	return to_text(value, FLAGS(global_flags));
 }

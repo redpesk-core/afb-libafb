@@ -245,7 +245,7 @@ static const char *send_request(int fd, const char **protocols, const char *path
 		return NULL;
 
 	/* send the request */
-	rc = writeall(fd, request, length);
+	rc = writeall(fd, request, (size_t)length);
 	free(request);
 	return rc < 0 ? NULL : ack;
 }
@@ -347,7 +347,7 @@ static int receive_response(struct sd_event *eloop, int fd, const char **protoco
 				if (strcmp(it, "websocket") != 0)
 					haserr = 1;
 			} else if (isheader(line, len, "Content-Length")) {
-				clen = atol(it);
+				clen = (long unsigned)atol(it);
 			}
 		}
 	}
@@ -523,7 +523,7 @@ static int sockopenpref(const char *uri, int server, const char *prefix, const c
 
 #if WITH_GNUTLS
 	int tls = uri[len] == 's' || uri[len] == 'S';
-	len += tls;
+	len += !!tls;
 #endif
 	if (uri[len] != ':')
 		return 0;

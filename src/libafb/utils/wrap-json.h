@@ -32,6 +32,20 @@
 #include <json-c/json.h>
 
 /**
+ * The type wrap_json_index_t helps to have a single code
+ * compliant with versions lower  or greater than 0.13
+ *
+ * For version lower than 0.13, indexes and sizes are integers
+ *
+ * From 0.13 it is size_t
+ */
+#if JSON_C_VERSION_NUM >= 0x000d00
+typedef size_t wrap_json_index_t;
+#else
+typedef int wrap_json_index_t;
+#endif
+
+/**
  * Definition of error codes returned by wrap/unwrap/check functions
  */
 enum wrap_json_error_codes {

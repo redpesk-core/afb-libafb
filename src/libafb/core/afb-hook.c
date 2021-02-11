@@ -463,7 +463,7 @@ int afb_hook_req_session_set_LOA(const struct afb_req_common *req, unsigned leve
 	return result;
 }
 
-int afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result)
+unsigned afb_hook_req_session_get_LOA(const struct afb_req_common *req, unsigned result)
 {
 	_HOOK_XREQ_(session_get_LOA, req, result);
 	return result;
@@ -543,10 +543,10 @@ struct json_object *afb_hook_req_get_client_info(const struct afb_req_common *re
 
 void afb_hook_init_req(struct afb_req_common *req)
 {
-	static int reqindex = 0;
+	static unsigned reqindex = 0;
 
-	int f, flags;
-	int add, x;
+	unsigned int f, flags, x;
+	int add;
 	struct afb_hook_req *hook;
 
 	/* scan hook list to get the expected flags */
@@ -575,7 +575,7 @@ void afb_hook_init_req(struct afb_req_common *req)
 	}
 }
 
-struct afb_hook_req *afb_hook_create_req(const char *api, const char *verb, struct afb_session *session, int flags, struct afb_hook_req_itf *itf, void *closure)
+struct afb_hook_req *afb_hook_create_req(const char *api, const char *verb, struct afb_session *session, unsigned flags, struct afb_hook_req_itf *itf, void *closure)
 {
 	struct afb_hook_req *hook;
 
@@ -728,7 +728,7 @@ static void hook_api_rootdir_get_fd_cb(void *closure, const struct afb_hookid *h
 	else {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
-		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
+		path[s < 0 ? 0 : (size_t)s >= sizeof path ? sizeof path - 1 : (size_t)s] = 0;
 		_hook_api_(comapi, "rootdir_get_fd() -> %d = %s", result, path);
 	}
 }
@@ -745,7 +745,7 @@ static void hook_api_rootdir_open_locale_cb(void *closure, const struct afb_hook
 	else {
 		snprintf(proc, sizeof proc, "/proc/self/fd/%d", result);
 		s = readlink(proc, path, sizeof path);
-		path[s < 0 ? 0 : s >= sizeof path ? sizeof path - 1 : s] = 0;
+		path[s < 0 ? 0 : (size_t)s >= sizeof path ? sizeof path - 1 : (size_t)s] = 0;
 		_hook_api_(comapi, "rootdir_open_locale(%s, %d, %s) -> %d = %s", filename, flags, locale, result, path);
 	}
 }
@@ -1177,9 +1177,9 @@ struct json_object *afb_hook_api_settings(const struct afb_api_common *comapi, s
  * section: hooking comapi
  *****************************************************************************/
 
-int afb_hook_flags_api(const char *api)
+unsigned afb_hook_flags_api(const char *api)
 {
-	int flags;
+	unsigned flags;
 	struct afb_hook_api *hook;
 
 	flags = 0;
@@ -1194,7 +1194,7 @@ int afb_hook_flags_api(const char *api)
 	return flags;
 }
 
-struct afb_hook_api *afb_hook_create_api(const char *api, int flags, struct afb_hook_api_itf *itf, void *closure)
+struct afb_hook_api *afb_hook_create_api(const char *api, unsigned flags, struct afb_hook_api_itf *itf, void *closure)
 {
 	struct afb_hook_api *hook;
 
@@ -1399,9 +1399,9 @@ void afb_hook_evt_unref(const char *evt, int id)
  * section: hooking services (evt)
  *****************************************************************************/
 
-int afb_hook_flags_evt(const char *name)
+unsigned afb_hook_flags_evt(const char *name)
 {
-	int flags;
+	unsigned flags;
 	struct afb_hook_evt *hook;
 
 	flags = 0;
@@ -1416,7 +1416,7 @@ int afb_hook_flags_evt(const char *name)
 	return flags;
 }
 
-struct afb_hook_evt *afb_hook_create_evt(const char *pattern, int flags, struct afb_hook_evt_itf *itf, void *closure)
+struct afb_hook_evt *afb_hook_create_evt(const char *pattern, unsigned flags, struct afb_hook_evt_itf *itf, void *closure)
 {
 	struct afb_hook_evt *hook;
 
@@ -1587,7 +1587,7 @@ void afb_hook_session_unref(struct afb_session *session)
  * section: hooking sessions (session)
  *****************************************************************************/
 
-struct afb_hook_session *afb_hook_create_session(const char *pattern, int flags, struct afb_hook_session_itf *itf, void *closure)
+struct afb_hook_session *afb_hook_create_session(const char *pattern, unsigned flags, struct afb_hook_session_itf *itf, void *closure)
 {
 	struct afb_hook_session *hook;
 
@@ -1727,7 +1727,7 @@ static void afb_hook_global_vverbose(int level, const char *file, int line, cons
 static void update_global()
 {
 	struct afb_hook_global *hook;
-	int flags = 0;
+	unsigned flags = 0;
 
 	x_rwlock_rdlock(&rwlock);
 	hook = list_of_global_hooks;
@@ -1740,7 +1740,7 @@ static void update_global()
 	x_rwlock_unlock(&rwlock);
 }
 
-struct afb_hook_global *afb_hook_create_global(int flags, struct afb_hook_global_itf *itf, void *closure)
+struct afb_hook_global *afb_hook_create_global(unsigned flags, struct afb_hook_global_itf *itf, void *closure)
 {
 	struct afb_hook_global *hook;
 

@@ -169,8 +169,8 @@ static int try_extension(void *closure, struct path_search_item *item)
 	int rc, *ret = closure;
 
 	/* only try files having ".so" extension */
-	if (item->namelen < (sizeof extension - 1)
-	 || memcmp(&item->name[item->namelen - (sizeof extension - 1)], extension, sizeof extension))
+	if (item->namelen < (short)(sizeof extension - 1)
+	 || memcmp(&item->name[item->namelen - (short)(sizeof extension - 1)], extension, sizeof extension))
 		return 0;
 
 	/* try to get it as a binding */
@@ -260,8 +260,8 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 
 	/* allocates enough for the result */
 	for (n = 0, ext = extensions ; ext ; ext = ext->next, n++);
-	*options_array_result = oar = malloc(n * sizeof *oar);
-	*names = enam = malloc(n * sizeof *enam);
+	*options_array_result = oar = malloc((unsigned)n * sizeof *oar);
+	*names = enam = malloc((unsigned)n * sizeof *enam);
 	if (!oar || !enam) {
 		if (oar) {
 			free(oar);

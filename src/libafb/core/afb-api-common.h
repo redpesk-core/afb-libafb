@@ -107,7 +107,7 @@ struct afb_api_common
 
 #if WITH_AFB_HOOK
 	/* hooking flags */
-	int hookflags; /* historical Daemon InTerFace */
+	unsigned hookflags; /* historical Daemon InTerFace */
 #endif
 };
 
@@ -274,7 +274,7 @@ afb_api_common_set_config(
 
 #if WITH_AFB_HOOK
 extern
-int
+unsigned
 afb_api_common_update_hook(
 	struct afb_api_common *comapi
 );

@@ -817,7 +817,7 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 		 * condition.
 		 */
 		cpt += delay;
-		usleep(delay);
+		usleep((useconds_t)delay);
 
 		/* handle timeout decount (coarse grained timeout) */
 		if (cpt >= one_second) {

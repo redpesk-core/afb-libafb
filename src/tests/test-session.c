@@ -361,17 +361,6 @@ struct afb_hook_session_itf hookitf = {
 	.hook_session_unref = on_unref
 };
 
-extern void afb_hook_session_create(struct afb_session *session);
-extern void afb_hook_session_close(struct afb_session *session);
-extern void afb_hook_session_destroy(struct afb_session *session);
-extern void afb_hook_session_addref(struct afb_session *session);
-extern void afb_hook_session_unref(struct afb_session *session);
-
-extern struct afb_hook_session *afb_hook_create_session(const char *pattern, int flags, struct afb_hook_session_itf *itf, void *closure);
-extern struct afb_hook_session *afb_hook_addref_session(struct afb_hook_session *hook);
-extern void afb_hook_unref_session(struct afb_hook_session *hook);
-
-
 START_TEST (check_hooking)
 {
 	struct afb_hook_session *hs;

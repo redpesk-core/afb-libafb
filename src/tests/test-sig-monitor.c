@@ -62,7 +62,7 @@ int observation;
 
 
 void * timeout_backup(void * timeout){
-	sleep(p2i(timeout));
+	sleep((unsigned)p2i(timeout));
 	pthread_mutex_lock(&mutex);
 	timeout_completed = TRUE;
 	pthread_mutex_unlock(&mutex);

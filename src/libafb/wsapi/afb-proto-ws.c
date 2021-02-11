@@ -320,7 +320,7 @@ static int writebuf_putbuf(struct writebuf *wb, const void *value, int length)
 
 	/* check enough length */
 	nafter = n + length;
-	if (nafter > WRITEBUF_BUFSZ)
+	if (nafter > (int)WRITEBUF_BUFSZ)
 		return 0;
 
 	/* get where to store */

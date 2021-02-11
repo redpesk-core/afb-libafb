@@ -128,8 +128,8 @@ int getpath(char buffer[PATH_BUF_SIZE], const char *base, int ival)
 		lenp = (int)strlen(*pp);
 		if (lenp + len + 1 > PATH_BUF_SIZE)
 			break;
-		memmove(buffer + lenp, buffer, len + 1);
-		memcpy(buffer, *pp, lenp);
+		memmove(buffer + lenp, buffer, (size_t)len + 1);
+		memcpy(buffer, *pp, (size_t)lenp);
 		pp++;
 		len += lenp;
 		rc = access(buffer, F_OK);
@@ -148,7 +148,7 @@ void dataClosureCB(void *arg)
 }
 
 void testCB(void *closure1, void *closure2, void *closure3, int a, unsigned int b, struct afb_data *const * data){
-    int i;
+    unsigned int i;
 	fprintf(stderr, "testCB was called\n");
 	for (i=0; i<b; i++) {
 		verbDataGval += p2i(afb_data_const_pointer(data[i]));
@@ -170,7 +170,8 @@ START_TEST (test)
 	unsigned int nreplies;
 	int status;
 
-	int rc, i, checksum;
+	int rc, checksum;
+	unsigned int i;
 
 	// preparing params
 	type1 = afb_type_get("type1");
@@ -183,7 +184,7 @@ START_TEST (test)
 	for(i=1; i<=NBPARAMS;  i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
 		rc = afb_data_create_raw(&params[i-1], type1, i2p(i), 0, dataClosureCB, i2p(i));
-		checksum += i;
+		checksum += (int)i;
 	}
 
 	declare_set = afb_apiset_create("toto", 1);
