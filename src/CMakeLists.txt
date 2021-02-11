@@ -86,8 +86,7 @@ INCLUDE_DIRECTORIES(${incdirs})
 
 ############################################################################
 
-configure_file(libafb-config.h.in libafb-config.h @ONLY)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/libafb)
 
 ############################################################################
 

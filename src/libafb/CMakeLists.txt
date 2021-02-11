@@ -22,6 +22,10 @@
 # $RP_END_LICENSE$
 ###########################################################################
 
+configure_file(libafb-config.h.in libafb-config.h @ONLY)
+
+###########################################################################
+
 file(GLOB LIBAFBSRCS
 	core/*.c
 	utils/*.c
@@ -84,7 +88,7 @@ INSTALL(DIRECTORY
 )
 
 INSTALL(FILES
-		${CMAKE_CURRENT_BINARY_DIR}/../libafb-config.h
+		${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h
 	DESTINATION
 		${CMAKE_INSTALL_INCLUDEDIR}/libafb
 )
