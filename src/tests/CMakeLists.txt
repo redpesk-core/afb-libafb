@@ -51,6 +51,7 @@ if(check_FOUND)
 	addtest(afb-auth)
 	addtest(path-search)
 	addtest(expand-vars)
+	addtest(expand-json)
 	addtest(wsapi)
 	addtest(afb-evt)
 
