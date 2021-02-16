@@ -24,34 +24,34 @@
 #include "expand-vars.h"
 
 #if !defined(EXPAND_VARS_LIMIT)
-#    define  EXPAND_VARS_LIMIT           4096
+#    define  EXPAND_VARS_LIMIT           16384
+#endif
+#if !defined(EXPAND_VARS_DEPTH_MAX)
+#    define  EXPAND_VARS_DEPTH_MAX       10
 #endif
 
 extern char **environ;
 
-static const char *getvar(const char *name, size_t len, char ***varsarray)
-{
-	char **ivar, *var;
-	size_t i;
-
-	for (ivar = *varsarray ; ivar ; ivar = *++varsarray) {
-		for (var = *ivar ; var ; var = *++ivar) {
-			for (i = 0 ; var[i] == name[i] ; i++);
-			if (var[i] == '=' && i == len)
-				return &var[i + 1];
-		}
-	}
-	return 0;
-}
-
-static char *expand(const char *value, char ***varsarray)
+/**
+ * Internal expansion of the variables of the given value
+ * using values returned by function.
+ *
+ * @param value the value whose variables are to be expanded
+ * @param function the name resolution function
+ * @param closure the closure to give to the function
+ *
+ * @return NULL if no variable expansion was performed or if
+ * memory allocation failed or if maximum recusion was reached
+ */
+static char *expand(const char *value, expand_vars_cb function, void *closure)
 {
 	char *result, *write, *previous, c;
 	const char *begin, *end, *val;
-	int drop, again;
+	int drop, again, depth;
 	size_t remove, add, i, len;
 
-	write = result = previous = 0;
+	depth = 0;
+	write = result = previous = NULL;
 	begin = value;
 	while (begin) {
 		drop = again = 0;
@@ -61,7 +61,7 @@ static char *expand(const char *value, char ***varsarray)
 			if (c != '$') {
 				/* not a variable to expand */
 				if (write)
-				*write++ = c;
+					*write++ = c;
 			}
 			else {
 				/* search name of the variable to expand */
@@ -92,8 +92,8 @@ static char *expand(const char *value, char ***varsarray)
 					drop = 0;
 				}
 				else {
-					val = getvar(begin, len, varsarray);
-					if (val) {
+					val = function(closure, begin, len);
+					if (val != NULL) {
 						/* expand value of found variable */
 						for(i = 0 ; (c = val[i]) ; i++) {
 							if (write) {
@@ -113,27 +113,31 @@ static char *expand(const char *value, char ***varsarray)
 			free(previous);
 			begin = value = previous = result;
 			*write = 0;
-			result = write = 0;
+			result = write = NULL;
+			if (++depth >= EXPAND_VARS_DEPTH_MAX) {
+				/* limit recursivity effect */
+				begin = NULL;
+			}
 		}
 		else if (write) {
 			/* expansion done */
 			*write = 0;
-			begin = 0;
+			begin = NULL;
 		}
 		else if (!remove) {
 			/* no expansion to do after first scan */
-			begin = 0;
+			begin = NULL;
 		}
 		else {
 			/* prepare expansion after scan */
 			i = (size_t)(begin - value) + add - remove;
 			if (i >= EXPAND_VARS_LIMIT) {
-				/* limit recursivity effect */
-				begin = 0;
+				/* limit expansion size */
+				begin = NULL;
 			}
 			else {
 				result = write = malloc(i);
-				begin = write ? value : 0;
+				begin = write ? value : NULL;
 			}
 		}
 	}
@@ -141,36 +145,90 @@ static char *expand(const char *value, char ***varsarray)
 	return result;
 }
 
-char *expand_vars_array(const char *value, int copy, char ***varsarray)
+/**
+ * Internal routine used to get variables from arrays
+ *
+ * @param closure array of array of variable definitions
+ * @param name begin of the name of the variable
+ * @param len  len of the variable
+ *
+ * @return a pointer to the value or NULL if the variable is not found
+ */
+static const char *getvar(void *closure, const char *name, size_t len)
 {
-	char *expanded = expand(value, varsarray);
+	char ***varsarray = closure;
+	char **ivar;
+	const char *res;
+
+	for (ivar = *varsarray ; ivar ; ivar = *++varsarray) {
+		res = expand_vars_search(ivar, name, len);
+		if (res)
+			return res;
+	}
+	return NULL;
+}
+
+/* search in vars */
+const char *expand_vars_search(char **vars, const char *name, size_t len)
+{
+	char *var;
+
+	for (var = *vars ; var ; var = *++vars) {
+		if (!memcmp(var, name, len) && var[len] == '=')
+			return &var[len + 1];
+	}
+	return NULL;
+}
+
+/* search in env */
+const char *expand_vars_search_env(const char *name, size_t len)
+{
+	return expand_vars_search(environ, name, len);
+}
+
+/* expand using function */
+char *expand_vars_function(const char *value, int copy, expand_vars_cb function, void *closure)
+{
+	char *expanded = expand(value, function, closure);
 	return expanded ?: copy ? strdup(value) : 0;
 }
 
+/* expand using array of definitions */
+char *expand_vars_array(const char *value, int copy, char ***varsarray)
+{
+	char *expanded = expand(value, getvar, varsarray);
+	return expanded ?: copy ? strdup(value) : 0;
+}
+
+/* expand using variables definition */
 char *expand_vars_only(const char *value, int copy, char **vars)
 {
 	char **array[] = { vars, 0 };
 	return expand_vars_array(value, copy, array);
 }
 
+/* expand using environment */
 char *expand_vars_env_only(const char *value, int copy)
 {
 	char **array[] = { environ, 0 };
 	return expand_vars_array(value, copy, array);
 }
 
+/* expand using variables and environment */
 char *expand_vars(const char *value, int copy, char **before, char **after)
 {
 	char **array[] = { before, environ, after, 0 };
 	return expand_vars_array(value, copy, &array[!before]);
 }
 
+/* expand using variables and environment */
 char *expand_vars_first(const char *value, int copy, char **vars)
 {
 	char **array[] = { vars, environ, 0 };
 	return expand_vars_array(value, copy, &array[!vars]);
 }
 
+/* expand using variables and environment */
 char *expand_vars_last(const char *value, int copy, char **vars)
 {
 	char **array[] = { environ, vars, 0 };
