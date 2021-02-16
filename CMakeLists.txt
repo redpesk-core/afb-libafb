@@ -32,7 +32,7 @@ set(PROJECT_DESCRIPTION "Core library for implementing Application framework Bin
 set(PROJECT_VERSION 4.0.0beta9)
 set(PROJECT_VERSION_MAJOR 4)
 set(PROJECT_VERSION_MINOR 0)
-set(PROJECT_VERSION_PATCH 0beta9)
+set(PROJECT_VERSION_PATCH 0beta10)
 set(PROJECT_URL "https://github.com/redpesk-core/afb-libafb")
 
 set(LIBAFB_VERSION "4.0")
