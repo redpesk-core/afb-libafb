@@ -24,6 +24,7 @@
 
 pkg_check_modules(check check)
 
+add_definitions(-DTEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
 macro(addtest name)
 	add_executable(test-${name} test-${name}.c)
 	target_include_directories(test-${name} PRIVATE ${INCLUDE_DIRS} ${check_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/../libafb)
@@ -52,6 +53,7 @@ if(check_FOUND)
 	addtest(path-search)
 	addtest(expand-vars)
 	addtest(expand-json)
+	addtest(json-locator)
 	addtest(wsapi)
 	addtest(afb-evt)
 
