@@ -451,6 +451,8 @@ afb_api_v4_new_api_hookable(
 #endif
 
 	ctlarg.pre_init.path = apiv4->comapi.path;
+	ctlarg.pre_init.uid = NULL;
+	ctlarg.pre_init.config = NULL;
 	scp.ctlid = afb_ctlid_Pre_Init;
 	scp.ctlarg = &ctlarg;
 	scp.userdata = userdata;
