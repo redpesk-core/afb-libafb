@@ -29,8 +29,10 @@
 #if WITH_DYNAMIC_BINDING
 
 struct afb_apiset;
+struct json_object;
 
 extern int afb_api_so_add_binding(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set);
+extern int afb_api_so_add_binding_config(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config);
 
 #if WITH_DIRENT
 struct path_search;

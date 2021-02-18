@@ -69,7 +69,7 @@ static int safe_dlopen(const char *filename, x_dynlib_t *dynlib, int global, int
 	return sd.status;
 }
 
-static int load_binding(const char *path, int force, struct afb_apiset *declare_set, struct afb_apiset * call_set)
+static int load_binding(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config, int force)
 {
 	int rc;
 	x_dynlib_t dynlib;
@@ -91,7 +91,7 @@ static int load_binding(const char *path, int force, struct afb_apiset *declare_
 	 */
 
 	/* try the version 4 */
-	rc = afb_api_so_v4_add(path, &dynlib, declare_set, call_set);
+	rc = afb_api_so_v4_add_config(path, &dynlib, declare_set, call_set, config);
 	if (rc < 0)
 		/* error when loading a valid v4 binding */
 		goto error2;
@@ -100,7 +100,7 @@ static int load_binding(const char *path, int force, struct afb_apiset *declare_
 		return 0; /* yes version 4 */
 
 	/* try the version 3 */
-	rc = afb_api_so_v3_add(path, &dynlib, declare_set, call_set);
+	rc = afb_api_so_v3_add_config(path, &dynlib, declare_set, call_set, config);
 	if (rc < 0)
 		/* error when loading a valid v3 binding */
 		goto error2;
@@ -118,11 +118,16 @@ error:
 	return force ? rc : 0;
 }
 
-
 int afb_api_so_add_binding(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set)
 {
-	return load_binding(path, 1, declare_set, call_set);
+	return load_binding(path, declare_set, call_set, NULL, 1);
 }
+
+int afb_api_so_add_binding_config(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config)
+{
+	return load_binding(path, declare_set, call_set, config, 1);
+}
+
 
 #if WITH_DIRENT
 
@@ -154,7 +159,7 @@ static int processfiles(void *closure, struct path_search_item *item)
 		return 0;
 
 	/* try to get it as a binding */
-	rc = load_binding(item->path, s->failstops, s->declare_set, s->call_set);
+	rc = load_binding(item->path, s->declare_set, s->call_set, NULL, s->failstops);
 	if (rc >= 0 || !s->failstops)
 		return 0; /* got it or fails ignored */
 

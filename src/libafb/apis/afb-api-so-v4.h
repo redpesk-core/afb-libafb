@@ -29,13 +29,43 @@
 #if WITH_DYNAMIC_BINDING
 
 struct afb_apiset;
+struct json_object;
+
 /**
- * @param   path        path to binding
- * @param   dynlib      binding dynamic library
- * @param   declare_set
- * @param   call_set
- * @return  1 in case of success
+ * Inspect the loaded shared object to check if it is a binding V4
+ * If yes try to load and pre initiialize it.
+ *
+ * @param path    path of the loaded library
+ * @param dynlib  handle of the dynamic library
+ * @param declare_set the apiset where the binding APIS are to be declared
+ * @param call_set the apiset to use when invoking other apis
+ *
+ * @return 0 if not a binding v4, 1 if valid binding V4 correctly pre-initialized,
+ *         a negative number if invalid binding V4 or error when initializing.
  */
 extern int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set);
+
+/**
+ * Inspect the loaded shared object 'dynlib' to check if it is a binding V4
+ * If yes try to load and pre initiialize it.
+ *
+ * @param path    path of the loaded library
+ * @param dynlib  handle of the dynamic library
+ * @param declare_set the apiset where the binding APIS are to be declared
+ * @param call_set the apiset to use when invoking other apis
+ * @param config  a configuration object
+ *
+ * @return 0 if not a binding v4, 1 if valid binding V4 correctly pre-initialized,
+ *         a negative number if invalid binding V4 or error when initializing.
+ */
+extern
+int
+afb_api_so_v4_add_config(
+	const char *path,
+	x_dynlib_t *dynlib,
+	struct afb_apiset *declare_set,
+	struct afb_apiset * call_set,
+	struct json_object *config
+);
 
 #endif

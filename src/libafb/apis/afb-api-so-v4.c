@@ -88,6 +88,12 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
 	return afb_api_v4_safe_ctlproc(api, a->mainctl, afb_ctlid_Root_Entry, &ctlarg);
 }
 
+/* add the binding of dynlib for path */
+int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
+{
+	return afb_api_so_v4_add_config(path, dynlib, declare_set, call_set, NULL);
+}
+
 /**
  * Inspect the loaded shared object to check if it is a binding V4
  * If yes try to load and pre initiialize it.
@@ -100,7 +106,7 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
  * @return 0 if not a binding v4, 1 if valid binding V4 correctly pre-initialized,
  *         a negative number if invalid binding V4 or error when initializing.
  */
-int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
+int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config)
 {
 	int rc;
 	struct afb_v4_dynlib_info a;

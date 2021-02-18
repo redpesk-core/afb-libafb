@@ -29,7 +29,9 @@
 #if WITH_DYNAMIC_BINDING
 
 struct afb_apiset;
+struct json_object;
 
 extern int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set);
+extern int afb_api_so_v3_add_config(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config);
 
 #endif
