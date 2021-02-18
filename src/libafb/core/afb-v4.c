@@ -125,7 +125,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 /*-- DATA ------------------------------------------*/
 
 	.create_data_raw = afb_data_create_raw,
-	.create_data_alloc = afb_data_create_alloc,
+	.create_data_alloc = afb_data_create_alloc0,
 	.create_data_copy = afb_data_create_copy,
 	.data_addref = afb_data_addref,
 	.data_unref = afb_data_unref,

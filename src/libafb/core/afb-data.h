@@ -70,6 +70,15 @@ afb_data_create_alloc(
 
 extern
 int
+afb_data_create_alloc0(
+	struct afb_data **result,
+	struct afb_type *type,
+	void **pointer,
+	size_t size
+);
+
+extern
+int
 afb_data_create_copy(
 	struct afb_data **result,
 	struct afb_type *type,
