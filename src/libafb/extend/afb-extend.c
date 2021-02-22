@@ -63,6 +63,9 @@ struct extension
 	/** handle of the library */
 	x_dynlib_t handle;
 
+	/** uid of the extension */
+	const char *uid;
+
 	/** data of the extension */
 	void *data;
 
@@ -73,13 +76,31 @@ struct extension
 /** head of the linked list of the loaded extensions */
 static struct extension *extensions;
 
-static int load_extension(const char *path, int failstops)
+static struct extension *search_extension_uid(const char *uid)
+{
+	struct extension *ext = extensions;
+	while(ext != NULL && strcmp(ext->uid, uid))
+		ext = ext->next;
+	return ext;
+}
+
+static struct extension *search_extension_path(const char *path)
+{
+	struct extension *ext = extensions;
+	while(ext != NULL && strcmp(ext->path, path))
+		ext = ext->next;
+	return ext;
+}
+
+static int load_extension(const char *path, int failstops, const char *uid)
 {
 	struct afb_extension_manifest *manifest;
 	struct extension *ext;
 	x_dynlib_t handle;
+	size_t pathlen, strsz;
 	int rc;
 	struct afb_v4_dynlib_info infov4;
+	const char *name;
 
 	/* try to load */
 	DEBUG("Trying extension %s", path);
@@ -111,31 +132,44 @@ static int load_extension(const char *path, int failstops)
 		ERROR("Unsupported version %d of extension %s: %s", manifest->version, manifest->name, path);
 		rc = X_ENOTSUP;
 	} else {
-		afb_v4_connect_dynlib(&handle, &infov4, 0);
-		if (infov4.root || infov4.desc || infov4.mainctl) {
-			ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
-			ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
-			if (infov4.root)
-				ERROR(" ... with AFB_BINDING_NO_ROOT defined (or option -D)");
-			if (infov4.desc)
-				ERROR(" ... without defining a main structure (afbBindingRoot or afbBindingV4)");
-			if (infov4.mainctl)
-				ERROR(" ... without defining an entry function (afbBindingEntry or afbBindingV4Entry)");
-			rc = X_ENOTSUP;
-		}
-		else {
-			ext = malloc(strlen(path) + 1 + sizeof *ext);
-			if (!ext)
-				rc = X_ENOMEM;
+		name = uid == NULL ? manifest->name : uid;
+		if (search_extension_uid(name) != NULL) {
+			ERROR("Duplicated extension name %s", name);
+			rc = X_EEXIST;
+		} else {
+			afb_v4_connect_dynlib(&handle, &infov4, 0);
+			if (infov4.root || infov4.desc || infov4.mainctl) {
+				ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
+				ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
+				if (infov4.root)
+					ERROR(" ... with AFB_BINDING_NO_ROOT defined (or option -D)");
+				if (infov4.desc)
+					ERROR(" ... without defining a main structure (afbBindingRoot or afbBindingV4)");
+				if (infov4.mainctl)
+					ERROR(" ... without defining an entry function (afbBindingEntry or afbBindingV4Entry)");
+				rc = X_ENOTSUP;
+			}
 			else {
-				NOTICE("Adding extension %s of %s", manifest->name, path);
-				ext->next = extensions;
-				ext->handle = handle;
-				ext->manifest = manifest;
-				ext->data = 0;
-				strcpy(ext->path, path);
-				extensions = ext;
-				return 1;
+				strsz = pathlen = 1 + strlen(path);
+				if (uid != NULL)
+					strsz += strlen(uid) + 1;
+				ext = malloc(strsz + sizeof *ext);
+				if (!ext)
+					rc = X_ENOMEM;
+				else {
+					NOTICE("Adding extension %s of %s", name, path);
+					ext->next = extensions;
+					ext->handle = handle;
+					ext->manifest = manifest;
+					ext->data = 0;
+					memcpy(ext->path, path, pathlen);
+					if (uid == NULL)
+						ext->uid = manifest->name;
+					else
+						ext->uid = strcpy(&ext->path[pathlen], uid);
+					extensions = ext;
+					return 1;
+				}
 			}
 		}
 	}
@@ -151,12 +185,32 @@ static int load_extension(const char *path, int failstops)
 static void load_extension_cb(void *closure, struct json_object *value)
 {
 	int rc, *ret = closure;
+	struct json_object *path, *uid;
+	const char *pathstr, *uidstr;
 
-	if (*ret >= 0 && json_object_is_type(value, json_type_string)) {
-		rc = load_extension(json_object_get_string(value), 1);
-		if (rc < *ret)
-			*ret = rc;
+	pathstr = NULL;
+	if (json_object_is_type(value, json_type_string)) {
+		pathstr = json_object_get_string(value);
+		uidstr = NULL;
 	}
+	else if (json_object_is_type(value, json_type_object)
+		&& json_object_object_get_ex(value, "path", &path)) {
+		if (json_object_object_get_ex(value, "uid", &uid))
+			uidstr = json_object_get_string(uid);
+		else
+			uidstr = NULL;
+		pathstr = json_object_get_string(path);
+	}
+	else {
+		ERROR("Invalid extension specifier %s", json_object_get_string(value));
+		rc = X_EINVAL;
+		pathstr = NULL;
+	}
+	if (pathstr != NULL) {
+		rc = load_extension(pathstr, 1, uidstr);
+	}
+	if (rc < 0 && *ret >= 0)
+		*ret = rc;
 }
 
 #if WITH_DIRENT
@@ -174,7 +228,7 @@ static int try_extension(void *closure, struct path_search_item *item)
 		return 0;
 
 	/* try to get it as a binding */
-	rc = load_extension(item->path, 0);
+	rc = load_extension(item->path, 0, NULL);
 	if (rc >= 0)
 		return 0; /* got it */
 
@@ -222,6 +276,7 @@ static void load_extpath_cb(void *closure, struct json_object *value)
 
 #endif
 
+/* load extensions */
 int afb_extend_load(struct json_object *config)
 {
 	struct extension *ext, *head;
@@ -250,6 +305,7 @@ int afb_extend_load(struct json_object *config)
 	return rc;
 }
 
+/* get command line option description */
 int afb_extend_get_options(const struct argp_option ***options_array_result, const char ***names)
 {
 	int rc, n, s;
@@ -263,14 +319,10 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 	*options_array_result = oar = malloc((unsigned)n * sizeof *oar);
 	*names = enam = malloc((unsigned)n * sizeof *enam);
 	if (!oar || !enam) {
-		if (oar) {
-			free(oar);
-			*options_array_result = 0;
-		}
-		if (enam) {
-			free(enam);
-			*names = 0;
-		}
+		free(oar);
+		free(enam);
+		*options_array_result = 0;
+		*names = 0;
 		rc = X_ENOMEM;
 	}
 	else {
@@ -280,7 +332,7 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 			s = x_dynlib_symbol(&ext->handle, OPTIONS_V1, (void**)&options);
 			if (s >= 0) {
 				oar[n] = options;
-				enam[n] = ext->manifest->name;
+				enam[n] = ext->uid;
 				n++;
 			}
 		}
@@ -289,22 +341,73 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 	return rc;
 }
 
+/**
+ * Callback for merging config found in @p value with
+ * config of the root given by @p closure
+ */
+static void merge_config_cb(void *closure, struct json_object *value)
+{
+	struct json_object *root = closure;
+	struct json_object *obj, *config;
+	struct extension *ext;
+
+	/* no merge if no config */
+	if (!json_object_is_type(value, json_type_object)
+		|| !json_object_object_get_ex(value, "config", &config))
+		return;
+
+	/* get the extension */
+	ext = NULL;
+	if (json_object_object_get_ex(value, "uid", &obj)
+	 && json_object_is_type(obj, json_type_string)) {
+		ext = search_extension_uid(json_object_get_string(obj));
+	}
+	if (ext == NULL
+	 && json_object_object_get_ex(value, "path", &obj)
+	 && json_object_is_type(obj, json_type_string)) {
+		ext = search_extension_path(json_object_get_string(obj));
+	}
+	if (ext == NULL)
+		return;
+
+	/* search in root for the uid */
+	if (!json_object_object_get_ex(root, ext->uid, &obj)) {
+		/* none exist, add the config */
+		json_object_object_add(root, ext->uid, json_object_get(config));
+	}
+	else {
+		/* existed, then merge */
+		wrap_json_object_merge(obj, config, wrap_json_merge_option_join_or_keep);
+	}
+}
+
+/* configure the extensions */
 int afb_extend_config(struct json_object *config)
 {
 	int rc, s;
 	struct extension *ext;
-	int (*config_v1)(void **data, struct json_object *config);
-	struct json_object *root, *obj;
+	int (*config_v1)(void **data, struct json_object *config, const char *uid);
+	struct json_object *root, *obj, *array;
 
-	root = 0;
-	json_object_object_get_ex(config, "@extconfig", &root);
+	/* get the configuration root obejct */
+	if (!json_object_object_get_ex(config, "@extconfig", &root)
+		|| !json_object_is_type(root, json_type_object)) {
+		root = json_object_new_object();
+		json_object_object_add(config, "@extconfig", root);
+	}
+
+	/* merge with config extensions */
+	if (json_object_object_get_ex(config, "extension", &array))
+		wrap_json_optarray_for_all(array, merge_config_cb, root);
+
+	/* iterate over extensions */
 	rc = 0;
 	for (ext = extensions ; ext ; ext = ext->next) {
 		s = x_dynlib_symbol(&ext->handle, CONFIG_V1, (void**)&config_v1);
 		if (s >= 0) {
-			obj = 0;
-			json_object_object_get_ex(root, ext->manifest->name, &obj);
-			s = config_v1(&ext->data, obj);
+			obj = NULL;
+			json_object_object_get_ex(root, ext->uid, &obj);
+			s = config_v1(&ext->data, obj, ext->uid);
 			if (s < 0)
 				rc = s;
 		}
@@ -312,6 +415,7 @@ int afb_extend_config(struct json_object *config)
 	return rc;
 }
 
+/* declare apis */
 int afb_extend_declare(struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
 	int rc, s;
@@ -330,6 +434,7 @@ int afb_extend_declare(struct afb_apiset *declare_set, struct afb_apiset *call_s
 	return rc;
 }
 
+/* declare http */
 int afb_extend_http(struct afb_hsrv *hsrv)
 {
 #if WITH_LIBMICROHTTPD
@@ -352,6 +457,7 @@ int afb_extend_http(struct afb_hsrv *hsrv)
 #endif
 }
 
+/* start serving */
 int afb_extend_serve(struct afb_apiset *call_set)
 {
 	int rc, s;
@@ -370,6 +476,7 @@ int afb_extend_serve(struct afb_apiset *call_set)
 	return rc;
 }
 
+/* exit extensions */
 int afb_extend_exit(struct afb_apiset *declare_set)
 {
 	int rc, s;
