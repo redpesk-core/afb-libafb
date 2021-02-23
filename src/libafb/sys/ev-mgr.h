@@ -173,9 +173,9 @@ extern int ev_mgr_add_fd(
 extern struct ev_fd *ev_fd_addref(struct ev_fd *efd);
 extern void ev_fd_unref(struct ev_fd *efd);
 
-extern int ev_fd_fd(const struct ev_fd *efd);
+extern int ev_fd_fd(struct ev_fd *efd);
 
-extern uint32_t ev_fd_events(const struct ev_fd *efd);
+extern uint32_t ev_fd_events(struct ev_fd *efd);
 extern void ev_fd_set_events(struct ev_fd *efd, uint32_t events);
 
 extern void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closure);

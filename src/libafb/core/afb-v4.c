@@ -81,44 +81,8 @@ x4_api_setup_shared_object(
 }
 
 /***********************************************************
- * Hack to avoid work to cast from not const to const */
-
-#pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
-
-/* From the alternatives to that single line above,
- * the possibilities are:
- *
- *   - Manage const/not const in bindings
- *      PRO  - cleaner
- *           - compiler check of types
- *      CONS - should have 2 typedefs or 0 instead of one
- *           - implies that some opaque are writable
- *           - implies complexity of internal of the binder
- *
- *   - Use alias attributes
- *      PRO  - cleaner
- *      CONS - actually a kind of convertion from incompatible pointers
- *           - use of 2 names for a single function
- *           - not verified by compiler
- *
- *   - Introduce wrapper functions
- *      PRO  - cleaner
- *           - compiler check of types
- *      CONS - implies explicit casts in these functions
- *           - use of 2 names for a single function
- *           - introduce at least a jump
- *
- * Here is a way to check:
- *
- *    step 1: compile the library using 'make'
- *    step 2: re-activate the warning by uncommenting the above pragma
- *    step 3: recompile using the command:
- *              make |& sed "s/‘/\n&/g;s/const //g;/aka/d" | sed "/warning:/d;s,’ .*,’,g" | uniq -c
- *    step 4: track odd line counts, one indicates a "true" mismatch that
- *            can be located using signatures
+ * interface
  */
-
-/**********************************************************/
 
 static const struct afb_binding_x4r1_itf afb_v4_itf = {
 

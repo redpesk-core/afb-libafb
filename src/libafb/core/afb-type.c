@@ -130,7 +130,7 @@ struct afb_type *afb_type_get(const char *name)
 	return type;
 }
 
-const char *afb_type_name(const struct afb_type *type)
+const char *afb_type_name(struct afb_type *type)
 {
 	return type->name;
 }

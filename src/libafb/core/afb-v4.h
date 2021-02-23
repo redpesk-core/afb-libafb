@@ -26,11 +26,13 @@
 
 #include <libafb/libafb-config.h>
 
-#define afb_api_x4 afb_api_v4
-#define afb_type_x4 afb_type
-#define afb_data_x4 afb_data
-#define afb_req_x4 afb_req_v4
+#define afb_api_x4   afb_api_v4
+#define afb_type_x4  afb_type
+#define afb_data_x4  afb_data
+#define afb_req_x4   afb_req_v4
 #define afb_event_x4 afb_evt
+#define afb_evfd_x4  ev_fd
+#define afb_timer_x4 ev_timer
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding-v4.h>

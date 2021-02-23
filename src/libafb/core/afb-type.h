@@ -94,7 +94,7 @@ extern struct afb_type *afb_type_get(const char *name);
  *
  * @return the name of the type
  */
-extern const char *afb_type_name(const struct afb_type *type);
+extern const char *afb_type_name(struct afb_type *type);
 
 /**
  * Set the family of the type. An instance of a type naturally converts

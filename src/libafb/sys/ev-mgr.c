@@ -345,12 +345,12 @@ void ev_fd_unref(struct ev_fd *efd)
 	}
 }
 
-int ev_fd_fd(const struct ev_fd *efd)
+int ev_fd_fd(struct ev_fd *efd)
 {
 	return efd->fd;
 }
 
-uint32_t ev_fd_events(const struct ev_fd *efd)
+uint32_t ev_fd_events(struct ev_fd *efd)
 {
 	return efd->events;
 }

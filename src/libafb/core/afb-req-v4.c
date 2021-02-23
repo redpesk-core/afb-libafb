@@ -350,7 +350,7 @@ static void call_checked_v4(void *closure, int status)
 		reqv4->verb->callback(
 			reqv4,
 			reqv4->comreq->params.ndata,
-			(const struct afb_data * const*)reqv4->comreq->params.data
+			reqv4->comreq->params.data
 			);
 	afb_req_v4_unref(reqv4);
 }
