@@ -578,6 +578,7 @@ data_create(
 /***    Public routines  ***/
 /*****************************************************************************/
 
+/* creates a data */
 int
 afb_data_create_raw(
 	struct afb_data **result,
@@ -596,7 +597,7 @@ afb_data_create_raw(
 	return rc;
 }
 
-
+/* allocates a data */
 int
 afb_data_create_alloc(
 	struct afb_data **result,
@@ -608,6 +609,7 @@ afb_data_create_alloc(
 	void *p;
 	int rc;
 
+	/* alloc shared memory */
 	p = share_realloc(NULL, size);
 	if (p == NULL) {
 		*result = NULL;
@@ -615,6 +617,7 @@ afb_data_create_alloc(
 		rc = X_ENOMEM;
 	}
 	else {
+		/* create the data */
 		rc = afb_data_create_raw(result, type, p, size, share_free, p);
 		if (rc < 0)
 			p = NULL;
@@ -625,6 +628,7 @@ afb_data_create_alloc(
 	return rc;
 }
 
+/* allocate data */
 int
 afb_data_create_alloc0(
 	struct afb_data **result,
@@ -635,6 +639,7 @@ afb_data_create_alloc0(
 	return afb_data_create_alloc(result, type, pointer, size, 1);
 }
 
+/* allocate data copy */
 int
 afb_data_create_copy(
 	struct afb_data **result,
@@ -651,6 +656,7 @@ afb_data_create_copy(
 	return rc;
 }
 
+/* create an alias */
 int
 afb_data_create_alias(
 	struct afb_data **result,

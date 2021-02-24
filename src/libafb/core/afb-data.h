@@ -38,10 +38,10 @@ struct afb_type;
  * is called with the given closure. If the creation of the
  * data fails, the dispose function is called before returning.
  *
- * @param result pointer to the created data
- * @param type type of the data to create
+ * @param result  pointer to the created data
+ * @param type    type of the data to create
  * @param pointer pointer wrapped by the data
- * @param size size of the pointed data or 0 if it does not care
+ * @param size    size of the pointed data or 0 if it does not care
  * @param dispose a function to release the wrapped data (can be NULL)
  * @param closure closure for the dispose function
  *
@@ -58,6 +58,23 @@ afb_data_create_raw(
 	void *closure
 );
 
+/**
+ * Creates a new data instance of the given type by allocating memory
+ * of the given size. The allocated memory optionnaly filled with zeroes.
+ *
+ * This function is equivalent to (if allocation doesn't fails):
+ *
+ *    *pointer = zeroes ? calloc(1, size) : malloc(size);
+ *    return afb_create_data_raw(data, type, *pointer, size, free, *pointer);
+ *
+ * @param result   pointer to the created data
+ * @param type     type of the data to created
+ * @param pointer  pointer of the data to create
+ * @param size     size of the data to create
+ * @param zeroes   if not zero, the allocated memory is filled with zeroes
+ *
+ * @return 0 in case of successful subscription or negative value in case of error.
+ */
 extern
 int
 afb_data_create_alloc(
@@ -68,6 +85,22 @@ afb_data_create_alloc(
 	int zeroes
 );
 
+/**
+ * Creates a new data instance of the given type by allocating memory
+ * of the given size. The allocated memory filled with zeroes.
+ *
+ * This function is equivalent to (if allocation doesn't fails):
+ *
+ *    *pointer = calloc(1, size);
+ *    return afb_create_data_raw(data, type, *pointer, size, free, *pointer);
+ *
+ * @param result   pointer to the created data
+ * @param type     type of the data to created
+ * @param pointer  pointer of the data to create
+ * @param size     size of the data to create
+ *
+ * @return 0 in case of successful subscription or negative value in case of error.
+ */
 extern
 int
 afb_data_create_alloc0(
@@ -77,6 +110,23 @@ afb_data_create_alloc0(
 	size_t size
 );
 
+/**
+ * Creates a new data instance of the given type by copying the memory
+ * given by pointer and size. The memory where data is copied can eventually
+ * be shared.
+ *
+ * This function is equivalent to (except it returns valid code):
+ *
+ *    if (afb_create_data_alloc(data, type, &ptr, size, 0) >= 0)
+ *        memcpy(ptr, pointer, size);
+ *
+ * @param result   pointer to the created data
+ * @param type     type of the data to created
+ * @param pointer  pointer of the data to create
+ * @param size     size of the data to create
+ *
+ * @return 0 in case of successful subscription or negative value in case of error.
+ */
 extern
 int
 afb_data_create_copy(
@@ -86,6 +136,15 @@ afb_data_create_copy(
 	size_t size
 );
 
+/**
+ * Creates a new data instance of the given type by aliasing the other data.
+ *
+ * @param result   pointer to the created data
+ * @param type     type of the data to created
+ * @param other    the data to be aliased
+ *
+ * @return 0 in case of successful subscription or negative value in case of error.
+ */
 extern
 int
 afb_data_create_alias(
