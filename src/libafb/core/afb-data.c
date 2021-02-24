@@ -68,8 +68,11 @@ struct afb_data
 	/** next conversion */
 	struct afb_data *cvt;
 
-	/** reference count and flags */
-	uint16_t ref_and_flags;
+	/** flags */
+	uint16_t flags;
+
+	/** reference count */
+	uint16_t refcount;
 
 	/** opaque id of the data */
 	uint16_t opaqueid;
@@ -98,21 +101,22 @@ static struct u16id2ptr *opacifier;
 #define FLAG_IS_VALID           4
 #define FLAG_IS_LOCKED          8
 #define FLAG_IS_ALIAS          16
-#define FLAG_IS_ETERNAL        32
-#define REF_COUNT_INCREMENT    64
 
-#define INITIAL_REF_AND_FLAGS_STD    (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT)
-#define INITIAL_REF_AND_FLAGS_ALIAS  (FLAG_IS_CONSTANT|FLAG_IS_VALID|REF_COUNT_INCREMENT|FLAG_IS_ALIAS)
+#define REF_COUNT_ETERNAL      1
+#define REF_COUNT_INCREMENT    2
 
-static inline int _HASREF_(uint16_t rf) { return rf >= FLAG_IS_ETERNAL; } /* avoid warning -Wunused-value */
-#define HASREF(data)           _HASREF_((data)->ref_and_flags)
+#define INITIAL_FLAGS_STD     (FLAG_IS_CONSTANT|FLAG_IS_VALID)
+#define INITIAL_FLAGS_ALIAS   (FLAG_IS_CONSTANT|FLAG_IS_VALID|FLAG_IS_ALIAS)
 
-#define ADDREF(data)           _HASREF_(__atomic_add_fetch(&data->ref_and_flags, REF_COUNT_INCREMENT, __ATOMIC_RELAXED))
-#define UNREF(data)            _HASREF_(__atomic_sub_fetch(&data->ref_and_flags, REF_COUNT_INCREMENT, __ATOMIC_RELAXED))
+#define HASREF(data)           (((data)->refcount) != 0)
+#define ADDREF(data)           __atomic_add_fetch(&data->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
+#define UNREF(data)            __atomic_sub_fetch(&data->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
+#define SET_ETERNAL(data)      ((data)->refcount = REF_COUNT_ETERNAL)
 
-#define TEST_FLAGS(data,flag)  (__atomic_load_n(&((data)->ref_and_flags), __ATOMIC_RELAXED) & (flag))
-#define SET_FLAGS(data,flag)   (__atomic_or_fetch(&((data)->ref_and_flags), flag, __ATOMIC_RELAXED))
-#define UNSET_FLAGS(data,flag) (__atomic_and_fetch(&((data)->ref_and_flags), ~flag, __ATOMIC_RELAXED))
+
+#define TEST_FLAGS(data,flag)  (__atomic_load_n(&((data)->flags), __ATOMIC_RELAXED) & (flag))
+#define SET_FLAGS(data,flag)   (__atomic_or_fetch(&((data)->flags), flag, __ATOMIC_RELAXED))
+#define UNSET_FLAGS(data,flag) (__atomic_and_fetch(&((data)->flags), ~flag, __ATOMIC_RELAXED))
 
 #define IS_VALID(data)         TEST_FLAGS(data,FLAG_IS_VALID)
 #define SET_VALID(data)        SET_FLAGS(data,FLAG_IS_VALID)
@@ -181,7 +185,7 @@ data_addref(
 	struct afb_data *data
 ) {
 	if (!ADDREF(data))
-		SET_FLAGS(data, FLAG_IS_ETERNAL);
+		SET_ETERNAL(data);
 }
 
 /**
@@ -546,7 +550,7 @@ data_create(
 	size_t size,
 	void (*dispose)(void*),
 	void *closure,
-	uint16_t ref_and_flags
+	uint16_t flags
 ) {
 	int rc;
 	struct afb_data *data;
@@ -561,7 +565,8 @@ data_create(
 		data->dispose = dispose;
 		data->closure = closure;
 		data->cvt = data; /* single cvt ring: itself */
-		data->ref_and_flags = ref_and_flags;
+		data->flags = flags;
+		data->refcount = REF_COUNT_INCREMENT;
 		data->opaqueid = 0;
 		rc = 0;
 	}
@@ -584,7 +589,7 @@ afb_data_create_raw(
 ) {
 	int rc;
 
-	rc = data_create(result, type, pointer, size, dispose, closure, INITIAL_REF_AND_FLAGS_STD);
+	rc = data_create(result, type, pointer, size, dispose, closure, INITIAL_FLAGS_STD);
 	if (rc && dispose)
 		dispose(closure);
 
@@ -654,7 +659,7 @@ afb_data_create_alias(
 ) {
 	int rc;
 
-	rc = data_create(result, type, NULL, 0, (void*)afb_data_unref, other, INITIAL_REF_AND_FLAGS_ALIAS);
+	rc = data_create(result, type, NULL, 0, (void*)afb_data_unref, other, INITIAL_FLAGS_ALIAS);
 	if (rc == 0)
 		data_addref(other);
 
