@@ -39,7 +39,7 @@
 #  error "Unsupported pointer size"
 #endif
 
-/* granule of allocation */
+/* grain of allocation */
 #define N 4
 
 /*
@@ -67,13 +67,31 @@ static inline uint16_t get_capacity(uint16_t upper)
 #endif
 }
 
+/**
+ * flattened structure
+ */
 typedef struct {
+	/** current upper index */
 	uint16_t upper;
+
+	/** current capacity */
 	uint16_t capacity;
+
+	/** pointer to ids */
 	uint16_t *ids;
+
+	/** pointer to pointers */
 	void **ptrs;
 } flat_t;
 
+/**
+ * set fields of @p flat accordingly to the @p base pointer
+ * of upper value being @p up
+ *
+ * @param flat structure to initialise
+ * @param base base in memory
+ * @param up upper value for base
+ */
 static void flatofup(flat_t *flat, void *base, uint16_t up)
 {
 	uint16_t cap, *ids;
@@ -81,35 +99,59 @@ static void flatofup(flat_t *flat, void *base, uint16_t up)
 	flat->upper = up;
 	flat->capacity = cap = get_capacity(up);
 	flat->ids = ids = base;
-	flat->ptrs = ((void**)(&ids[cap + 1])) - 1;
+	flat->ptrs = ((void**)(&ids[cap + 1])) - 1; /* minus one causes indexes are from 1 */
 }
 
+/**
+ * get flat for the give base
+ *
+ * @param flat structure to initialise
+ * @param base base in memory
+ */
 static void flatof(flat_t *flat, void *base)
 {
 	if (base)
+		/* not empty */
 		flatofup(flat, base, *(uint16_t*)base);
 	else {
+		/* empty */
 		flat->upper = flat->capacity = 0;
 		flat->ids = NULL;
 		flat->ptrs = NULL;
 	}
 }
 
+/**
+ * compute the byte size for a given capacity
+ */
 static inline size_t size(uint16_t capacity)
 {
 	return sizeof(uint16_t) * (capacity + 1)
 		+ sizeof(void*) * capacity;
 }
 
+/**
+ * search the @p id and returns its not null index if
+ * found or 0 if not found
+ *
+ * @param flat the flat structure
+ * @param id id to locate
+ *
+ * @return 0 if not found or else the index of @p id
+ */
 static inline uint16_t search(flat_t *flat, uint16_t id)
 {
 	uint16_t *ids = flat->ids;
-	uint16_t r = flat->upper;
-	while(r && ids[r] != id)
-		r--;
-	return r;
+	uint16_t *end = &ids[flat->upper];
+	while(ids != end)
+		if (id == *++ids)
+			return (uint16_t)(ids - flat->ids);
+	return 0;
 }
 
+/**
+ * add the id and the pointer in flat
+ */
 static void *add(flat_t *flat, uint16_t id, void *ptr)
 {
 	void *grown, *result;
@@ -140,20 +182,27 @@ static void *add(flat_t *flat, uint16_t id, void *ptr)
 	return result;
 }
 
+/**
+ * drop the item of index
+ */
 static void *drop(flat_t *flat, uint16_t index)
 {
 	void **ptrs, *result;
 	uint16_t upper, idx, capa;
 
+	/* remove the upper element */
 	upper = flat->upper;
 	if (index != upper) {
 		flat->ids[index] = flat->ids[upper];
 		flat->ptrs[index] = flat->ptrs[upper];
 	}
 	flat->ids[0] = --upper;
+
+	/* shrink capacity */
 	capa = get_capacity(upper);
 	result = flat->ids;
 	if (capa != flat->capacity) {
+		/* shrink pointers */
 		ptrs = flat->ptrs;
 		flatofup(flat, result, upper);
 		idx = 1;
@@ -162,6 +211,7 @@ static void *drop(flat_t *flat, uint16_t index)
 			idx++;
 		}
 #if U16ID_ALWAYS_SHRINK
+		/* reallocating if shrink */
 		result = realloc(flat->ids, size(capa));
 		if (result == NULL)
 			result = flat->ids;
@@ -170,6 +220,9 @@ static void *drop(flat_t *flat, uint16_t index)
 	return result;
 }
 
+/**
+ * drop all items
+ */
 static void dropall(void **pbase)
 {
 	void *base;
@@ -179,6 +232,9 @@ static void dropall(void **pbase)
 		*(uint16_t*)base = 0;
 }
 
+/**
+ * destroy the array
+ */
 static void destroy(void **pbase)
 {
 	void *base;
@@ -188,6 +244,9 @@ static void destroy(void **pbase)
 	free(base);
 }
 
+/**
+ * create an empty array
+ */
 static int create(void **pbase)
 {
 	void *base;
@@ -203,21 +262,25 @@ static int create(void **pbase)
 /**        u16id2ptr                                                 **/
 /**********************************************************************/
 
+/* create a u16id2ptr */
 int u16id2ptr_create(struct u16id2ptr **pi2p)
 {
 	return create((void**)pi2p);
 }
 
+/* destroy a u16id2ptr */
 void u16id2ptr_destroy(struct u16id2ptr **pi2p)
 {
 	destroy((void**)pi2p);
 }
 
+/* clear a u16id2ptr */
 void u16id2ptr_dropall(struct u16id2ptr **pi2p)
 {
 	dropall((void**)pi2p);
 }
 
+/* check existence of id in u16id2ptr */
 int u16id2ptr_has(struct u16id2ptr *i2p, uint16_t id)
 {
 	flat_t flat;
@@ -226,6 +289,7 @@ int u16id2ptr_has(struct u16id2ptr *i2p, uint16_t id)
 	return search(&flat, id) != 0;
 }
 
+/* add the id with value ptr in u16id2ptr */
 int u16id2ptr_add(struct u16id2ptr **pi2p, uint16_t id, void *ptr)
 {
 	struct u16id2ptr *i2p;
@@ -244,6 +308,7 @@ int u16id2ptr_add(struct u16id2ptr **pi2p, uint16_t id, void *ptr)
 	return 0;
 }
 
+/* add or set the id with value ptr in u16id2ptr */
 int u16id2ptr_set(struct u16id2ptr **pi2p, uint16_t id, void *ptr)
 {
 	struct u16id2ptr *i2p;
@@ -264,6 +329,7 @@ int u16id2ptr_set(struct u16id2ptr **pi2p, uint16_t id, void *ptr)
 	return 0;
 }
 
+/* change the id with value ptr in u16id2ptr */
 int u16id2ptr_put(struct u16id2ptr *i2p, uint16_t id, void *ptr)
 {
 	uint16_t index;
@@ -277,6 +343,7 @@ int u16id2ptr_put(struct u16id2ptr *i2p, uint16_t id, void *ptr)
 	return 0;
 }
 
+/* get the value of id in u16id2ptr */
 int u16id2ptr_get(struct u16id2ptr *i2p, uint16_t id, void **pptr)
 {
 	uint16_t index;
@@ -290,6 +357,7 @@ int u16id2ptr_get(struct u16id2ptr *i2p, uint16_t id, void **pptr)
 	return 0;
 }
 
+/* remove the id in u16id2ptr */
 int u16id2ptr_drop(struct u16id2ptr **pi2p, uint16_t id, void **pptr)
 {
 	struct u16id2ptr *i2p;
@@ -311,11 +379,13 @@ int u16id2ptr_drop(struct u16id2ptr **pi2p, uint16_t id, void **pptr)
 	return 0;
 }
 
+/* count of id in u16id2ptr */
 int u16id2ptr_count(struct u16id2ptr *i2p)
 {
 	return i2p ? ((int)*(uint16_t*)i2p) : 0;
 }
 
+/* get pair at index in u16id2ptr */
 int u16id2ptr_at(struct u16id2ptr *i2p, int index, uint16_t *pid, void **pptr)
 {
 	flat_t flat;
@@ -328,6 +398,7 @@ int u16id2ptr_at(struct u16id2ptr *i2p, int index, uint16_t *pid, void **pptr)
 	return 0;
 }
 
+/* calls the function for all pair of u16id2ptr */
 void u16id2ptr_forall(struct u16id2ptr *i2p, void (*callback)(void*closure, uint16_t id, void *ptr), void *closure)
 {
 	flat_t flat;
@@ -343,21 +414,25 @@ void u16id2ptr_forall(struct u16id2ptr *i2p, void (*callback)(void*closure, uint
 /**        u16id2bool                                                **/
 /**********************************************************************/
 
+/* make the u16id2bool */
 int u16id2bool_create(struct u16id2bool **pi2b)
 {
 	return create((void**)pi2b);
 }
 
+/* destroy the u16id2bool */
 void u16id2bool_destroy(struct u16id2bool **pi2b)
 {
 	destroy((void**)pi2b);
 }
 
+/* set all values to 0 */
 void u16id2bool_clearall(struct u16id2bool **pi2b)
 {
 	dropall((void**)pi2b);
 }
 
+/* get the value at id */
 int u16id2bool_get(struct u16id2bool *i2b, uint16_t id)
 {
 	uintptr_t mask, field;
