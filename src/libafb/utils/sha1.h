@@ -28,20 +28,51 @@
 
 #pragma once
 
+/**
+ * SHA1 hash code are SHA1_DIGEST_LENGTH bytes length
+ */
 #define SHA1_DIGEST_LENGTH	20
 
-/* The SHA1 structure: */
+/**
+ * The structure used for computing a SHA1
+ */
 typedef struct {
+	/** current computation state */
 	uint32_t   state[5];
+
+	/** current length */
 	uint64_t   length;
+
+	/** internal buffer */
 	union {
+		/** as bytes */
 		uint8_t    buffer[64];
+		/** as uint32 */
 		uint32_t   blocks[16];
 	};
 } SHA1_t;
 
+/**
+ * Initialize the structure context used for computing a SHA1
+ *
+ * @param context the context to initialize
+ */
 extern void SHA1_init(SHA1_t *context);
+
+/**
+ * Update the SHA computation for the given data of len
+ *
+ * @param context the context to update
+ * @param data data of updating
+ * @param length of the update
+ */
 extern void SHA1_update(SHA1_t *context, const void *data, size_t len);
+
+/**
+ * Terminates the computation of the SHA1 of context and return its value
+ * in digest
+ *
+ * @param context the context to terminate
+ * @param digest where to store the result
+ */
 extern void SHA1_final(SHA1_t *context, uint8_t digest[SHA1_DIGEST_LENGTH]);
-
-

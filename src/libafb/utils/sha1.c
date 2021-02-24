@@ -144,18 +144,23 @@ void SHA1_final(SHA1_t *context, uint8_t digest[SHA1_DIGEST_LENGTH])
 {
 	uint32_t i;
 	uint64_t len;
-	uint8_t finalcount[8], c128 = 0200, c0 = 0;
+	uint8_t buffer[64 + 7];
 
 	len = context->length;
-	SHA1_update(context, &c128, 1);
-	while ((context->length & 63) != 56)
-	    SHA1_update(context, &c0, 1);
-
-	/* Should cause a transform() */
+	i = 0;
+	buffer[i++] = 128;
+	while (((len + i) & 63) != 56)
+		buffer[i++] = 0;
 	len <<= 3;
-	for (i = 0; i < 8; i++)
-		finalcount[i] = (uint8_t)((len >> ((7 - i) << 3)) & 255);
-	SHA1_update(context, finalcount, 8);
+	buffer[i++] = (uint8_t)((len >> 56) & 255);
+	buffer[i++] = (uint8_t)((len >> 48) & 255);
+	buffer[i++] = (uint8_t)((len >> 40) & 255);
+	buffer[i++] = (uint8_t)((len >> 32) & 255);
+	buffer[i++] = (uint8_t)((len >> 24) & 255);
+	buffer[i++] = (uint8_t)((len >> 16) & 255);
+	buffer[i++] = (uint8_t)((len >> 8) & 255);
+	buffer[i++] = (uint8_t)(len & 255);
+	SHA1_update(context, buffer, i);
 
 	/* Get the result */
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
@@ -173,6 +178,8 @@ void SHA1_final(SHA1_t *context, uint8_t digest[SHA1_DIGEST_LENGTH])
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 int main (int ac, char **av)
 {
 	char buf[400];
@@ -180,23 +187,32 @@ int main (int ac, char **av)
 	int f, i;
 	ssize_t r;
 	uint8_t d[SHA1_DIGEST_LENGTH];
+	struct stat st;
 
 	while(*++av) {
 		f = open(*av, O_RDONLY);
 		if (f < 0)
-			fprintf(stderr, "can't open %s\n", *av);
+			fprintf(stderr, "error: can't open %s\n", *av);
 		else {
-			SHA1_init(&s);
-			r = read(f, buf, sizeof buf);
-			while (r > 0) {
-				SHA1_update(&s, buf, (size_t)r);
-				r = read(f, buf, sizeof buf);
+			if (fstat(f, &st) < 0) {
+				fprintf(stderr, "error: can't stat %s\n", *av);
 			}
-			close(f);
-			SHA1_final(&s, d);
-			for (i=0 ; i < SHA1_DIGEST_LENGTH ; i++)
-				printf("%02x", (int)d[i]);
-			printf(" %s\n", *av);
+			else if ((st.st_mode & S_IFMT) != S_IFREG) {
+				fprintf(stderr, "error: not a regular file %s\n", *av);
+			}
+			else {
+				SHA1_init(&s);
+				r = read(f, buf, sizeof buf);
+				while (r > 0) {
+					SHA1_update(&s, buf, (size_t)r);
+					r = read(f, buf, sizeof buf);
+				}
+				close(f);
+				SHA1_final(&s, d);
+				for (i=0 ; i < SHA1_DIGEST_LENGTH ; i++)
+					printf("%02x", (int)d[i]);
+				printf("  %s\n", *av);
+			}
 		}
 	}
 	return 0;
