@@ -39,7 +39,14 @@
 /*****************************************************************************/
 
 /**
- * description of a data
+ * Description of a data
+ *
+ * The pointer cvt is used to link together data that result from convertion.
+ * The pointer records a circular list data. The elements of that list are
+ * linked together by the equivalency relation "convert".
+ *
+ * The conversion is thinked as reflexive, symetric and transitive.
+ * So formerly, cvt pointer record an equivalence class for "convert".
  */
 struct afb_data
 {
@@ -72,7 +79,14 @@ struct afb_data
 /***    Opacifier  ***/
 /*****************************************************************************/
 
+/**
+ * opaqueidgen records the last opaqueid generated
+ */
 static uint16_t opaqueidgen;
+
+/**
+ * When existing, the structure associates a pointer to an opaqueid
+ */
 static struct u16id2ptr *opacifier;
 
 /*****************************************************************************/
@@ -175,6 +189,60 @@ data_destroy(
 }
 
 /**
+ * search the conversion of data to the type
+ * and returns it or null.
+ *
+ * @param data the data whose type is searched (not NULL)
+ * @param type the type to search (not NULL)
+ *
+ * @return the found cached conversion data or NULL
+ */
+static
+struct afb_data *
+data_cvt_search(
+	struct afb_data *data,
+	struct afb_type *type
+) {
+	struct afb_data *i = data;
+
+	do {
+		if (i->type == type)
+			return i;
+		i = i->cvt;
+	} while (i != data);
+	return 0;
+}
+
+/**
+ * Purge unused duplicate conversions
+ */
+__attribute__((unused))
+static
+void
+data_purge_duplicates(
+	struct afb_data *data
+) {
+	struct afb_data *iter, *prev;
+
+	/* check if referenced */
+	prev = data;
+	iter = data->cvt;
+	while (iter != data) {
+		if (!HASREF(iter) && data_cvt_search(iter->cvt, iter->type) != iter) {
+			/* unreferenced and duplicated type! destroy it */
+			prev->cvt = iter->cvt;
+			data_destroy(iter);
+			iter = prev->cvt;
+		}
+		else {
+			/* next */
+			prev = iter;
+			iter = iter->cvt;
+		}
+	}
+}
+
+/**
  * release the data if it is not latent.
  * A data is latent if it is living
  * or one of its conversion is living.
@@ -184,63 +252,30 @@ void
 data_release(
 	struct afb_data *data
 ) {
-	int gr, r, del;
-	struct afb_data *i, *n, *p;
+	int hasref;
+	struct afb_data *iter, *next;
 
-	gr = HASREF(data);
-	i = data->cvt;
-	if (i != data) {
-		/* more than one element */
-		p = data;
-		for (;;) {
-			/* count global use */
-			del = 0;
-			r = HASREF(i);
-			gr += r;
-#if PREFER_MEMORY /* this optimisation reduce the use of memory in favour of speed */
-			if (r == 0) {
-				/* search if unused duplication */
-				n = i->cvt;
-				while (n != i && n->type != i->type)
-					n = n->cvt;
-				if (n != i) {
-					/*
-					 * Here n is an other instance of data
-					 * No matter of n, just knowing that
-					 * unused i has an other value is enough
-					 * to remove i.
-					 */
-					del = 1;
-				}
-			}
+#if PREFER_MEMORY /* this optimisation reduce the use of memory but is slower */
+	data_purge_duplicates(data);
 #endif
-			n = i->cvt;
-			if (del) {
-				p->cvt = n;
-				data_destroy(i);
-				if (i == data) {
-					data = n;
-					break;
-				}
-			}
-			else {
-				if (i == data)
-					break;
-				p = i;
-			}
-			i = n;
-		}
+
+	/* check if referenced */
+	hasref = HASREF(data);
+	iter = data->cvt;
+	while (hasref == 0 && iter != data) {
+		hasref = HASREF(iter);
+		iter = iter->cvt;
 	}
 
 	/* is it used ? */
-	if (gr == 0) {
+	if (hasref == 0) {
 		/* no more ref count on any data */
-		i = data;
+		iter = data;
 		do {
-			n = i->cvt;
-			data_destroy(i);
-			i = n;
-		} while (i != data);
+			next = iter->cvt;
+			data_destroy(iter);
+			iter = next;
+		} while (iter != data);
 	}
 }
 
@@ -370,31 +405,6 @@ data_cvt_merge(
 		i->cvt = data;
 		j->cvt = origin;
 	}
-}
-
-/**
- * search the conversion of data to the type
- * and returns it or null.
- *
- * @param data the data whose type is searched (not NULL)
- * @param type the type to search (not NULL)
- *
- * @return the found cached conversion data or NULL
- */
-static
-struct afb_data *
-data_cvt_search(
-	struct afb_data *data,
-	struct afb_type *type
-) {
-	struct afb_data *i = data;
-
-	do {
-		if (i->type == type)
-			return i;
-		i = i->cvt;
-	} while (i != data);
-	return 0;
 }
 
 /**
