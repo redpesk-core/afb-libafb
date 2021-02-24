@@ -158,6 +158,20 @@ static int share_is_owner(struct afb_data *data)
 /***    Internal routines  ***/
 /*****************************************************************************/
 
+static
+struct afb_data *
+data_alloc()
+{
+	return malloc(sizeof(struct afb_data));
+}
+
+static
+void
+data_free(struct afb_data *data)
+{
+	free(data);
+}
+
 /**
  * Increment reference count of data (not null)
  */
@@ -181,11 +195,13 @@ data_destroy(
 	/* cancel any opacified shadow */
 	if (data->opaqueid)
 		u16id2ptr_drop(&opacifier, data->opaqueid, 0);
+
 	/* release resource */
 	if (data->dispose)
 		data->dispose(data->closure);
+
 	/* release the data itself */
-	free(data);
+	data_free(data);
 }
 
 /**
@@ -522,6 +538,37 @@ data_value_mutable(
 	return 0;
 }
 
+int
+data_create(
+	struct afb_data **result,
+	struct afb_type *type,
+	const void *pointer,
+	size_t size,
+	void (*dispose)(void*),
+	void *closure,
+	uint16_t ref_and_flags
+) {
+	int rc;
+	struct afb_data *data;
+
+	*result = data = data_alloc();
+	if (data == NULL)
+		rc = X_ENOMEM;
+	else  {
+		data->type = type;
+		data->pointer = pointer;
+		data->size = size;
+		data->dispose = dispose;
+		data->closure = closure;
+		data->cvt = data; /* single cvt ring: itself */
+		data->ref_and_flags = ref_and_flags;
+		data->opaqueid = 0;
+		rc = 0;
+	}
+	return rc;
+}
+
+
 /*****************************************************************************/
 /***    Public routines  ***/
 /*****************************************************************************/
@@ -536,27 +583,14 @@ afb_data_create_raw(
 	void *closure
 ) {
 	int rc;
-	struct afb_data *data;
 
-	*result = data = malloc(sizeof *data);
-	if (data == NULL)
-		rc = X_ENOMEM;
-	else  {
-		data->type = type;
-		data->pointer = pointer;
-		data->size = size;
-		data->dispose = dispose;
-		data->closure = closure;
-		data->cvt = data; /* single cvt ring: itself */
-		data->ref_and_flags = INITIAL_REF_AND_FLAGS_STD;
-		data->opaqueid = 0;
-		rc = 0;
-	}
+	rc = data_create(result, type, pointer, size, dispose, closure, INITIAL_REF_AND_FLAGS_STD);
 	if (rc && dispose)
 		dispose(closure);
 
 	return rc;
 }
+
 
 int
 afb_data_create_alloc(
@@ -619,23 +653,11 @@ afb_data_create_alias(
 	struct afb_data *other
 ) {
 	int rc;
-	struct afb_data *data;
 
-	*result = data = malloc(sizeof *data);
-	if (data == NULL)
-		rc = X_ENOMEM;
-	else  {
-		data->type = type;
-		data->pointer = 0;
-		data->size = 0;
-		data->cvt = data; /* single cvt ring: itself */
-		data->ref_and_flags = INITIAL_REF_AND_FLAGS_ALIAS;
-		data->opaqueid = 0;
-		data->dispose = (void(*)(void*))afb_data_unref;
-		data->closure = other;
+	rc = data_create(result, type, NULL, 0, (void*)afb_data_unref, other, INITIAL_REF_AND_FLAGS_ALIAS);
+	if (rc == 0)
 		data_addref(other);
-		rc = 0;
-	}
+
 	return rc;
 }
 
