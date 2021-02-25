@@ -74,6 +74,9 @@ struct afb_data
 	/** reference count */
 	uint16_t refcount;
 
+	/** dependency count */
+	uint16_t depcount;
+
 	/** opaque id of the data */
 	uint16_t opaqueid;
 };
@@ -108,11 +111,14 @@ static struct u16id2ptr *opacifier;
 #define INITIAL_FLAGS_STD     (FLAG_IS_CONSTANT|FLAG_IS_VALID)
 #define INITIAL_FLAGS_ALIAS   (FLAG_IS_CONSTANT|FLAG_IS_VALID|FLAG_IS_ALIAS)
 
-#define HASREF(data)           (((data)->refcount) != 0)
-#define ADDREF(data)           __atomic_add_fetch(&data->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
-#define UNREF(data)            __atomic_sub_fetch(&data->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
+#define HASREF(data)           ((data)->refcount != 0)
+#define ADDREF(data)           __atomic_add_fetch(&(data)->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
+#define UNREF(data)            __atomic_sub_fetch(&(data)->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
 #define SET_ETERNAL(data)      ((data)->refcount = REF_COUNT_ETERNAL)
 
+#define HASDEP(data)           ((data)->depcount != 0)
+#define ADDDEP(data)           __atomic_add_fetch(&(data)->depcount, 1, __ATOMIC_RELAXED)
+#define UNDEP(data)            __atomic_sub_fetch(&(data)->depcount, 1, __ATOMIC_RELAXED)
 
 #define TEST_FLAGS(data,flag)  (__atomic_load_n(&((data)->flags), __ATOMIC_RELAXED) & (flag))
 #define SET_FLAGS(data,flag)   (__atomic_or_fetch(&((data)->flags), flag, __ATOMIC_RELAXED))
@@ -273,29 +279,56 @@ data_release(
 	struct afb_data *data
 ) {
 	int hasref;
-	struct afb_data *iter, *next;
+	struct afb_data *iter, *next, *head, *tail, *rest;
 
 #if PREFER_MEMORY /* this optimisation reduce the use of memory but is slower */
 	data_purge_duplicates(data);
 #endif
 
-	/* check if referenced */
+	/* check if cleanup is needed */
 	hasref = HASREF(data);
 	iter = data->cvt;
-	while (hasref == 0 && iter != data) {
+	while (!hasref && iter != data) {
 		hasref = HASREF(iter);
 		iter = iter->cvt;
 	}
 
-	/* is it used ? */
-	if (hasref == 0) {
-		/* no more ref count on any data */
+	/* cleanup if no more refence to the cvt */
+	if (!hasref) {
+		/* split in two parts */
+		head = NULL;
+		tail = NULL;
+		rest = NULL;
 		iter = data;
 		do {
 			next = iter->cvt;
-			data_destroy(iter);
+			if (HASDEP(iter)) {
+				/* keep that part */
+				iter->cvt = tail;
+				if (tail == NULL)
+					head = iter;
+				tail = iter;
+			}
+			else {
+				/* candidate to direct removal */
+				iter->cvt = rest;
+				rest = iter;
+			}
 			iter = next;
 		} while (iter != data);
+
+		/* ensure ring of kept part */
+		if (head != NULL)
+			head->cvt = tail;
+
+		/* destroys the removed part */
+		iter = rest;
+		while (iter != NULL) {
+			next = iter->cvt;
+			iter->cvt = iter;
+			data_destroy(iter);
+			iter = next;
+		}
 	}
 }
 
@@ -340,14 +373,7 @@ data_cvt_isolate(
 
 	i = data->cvt;
 	if (i != data) {
-		do {
-			if (IS_ALIAS(i) && data == i->closure) {
-				ADDREF(data);
-				i->dispose = (void(*)(void*))afb_data_unref;
-			}
-			i = i->cvt;
-		}
-		while (i->cvt != data);
+		do { i = i->cvt; } while (i->cvt != data);
 		i->cvt = data->cvt;
 		data->cvt = data;
 		data_release(i);
@@ -381,50 +407,12 @@ data_cvt_merge(
 	struct afb_data *origin,
 	struct afb_data *data
 ) {
-	struct afb_data *i, *j, *a;
+	struct afb_data *i, *j;
 
-	if (data->cvt == data) {
-		/*
-		 * data to add is single and distinct. This is the mainstream.
-		 */
-		a = (struct afb_data*)(IS_ALIAS(data) ? data->closure : 0);
-		for (i = origin ;; i = i->cvt) {
-			if (i == a) {
-				data->dispose = 0;
-				UNREF(i);
-			}
-			if (i->cvt == origin)
-				break;
-		}
-		i->cvt = data;
-		data->cvt = origin;
-	}
-	else if (!data_cvt_has(origin, data)) {
-		for (i = data ;; i = i->cvt) {
-			if (IS_ALIAS(i)) {
-				a = (struct afb_data*)data->closure;
-				if (!data_cvt_has(data, a)) {
-					i->dispose = 0;
-					UNREF(a);
-				}
-			}
-			if (i->cvt == origin)
-				break;
-		}
-		for (j = origin ;; j = j->cvt) {
-			if (IS_ALIAS(j)) {
-				a = (struct afb_data*)data->closure;
-				if (!data_cvt_has(data, a)) {
-					j->dispose = 0;
-					UNREF(a);
-				}
-			}
-			if (j->cvt == data)
-				break;
-		}
-		i->cvt = data;
-		j->cvt = origin;
-	}
+	for (i = origin->cvt ; i->cvt != origin ; i = i->cvt);
+	for (j = data->cvt ; j->cvt != data ; j = j->cvt);
+	i->cvt = data;
+	j->cvt = origin;
 }
 
 /**
@@ -441,6 +429,18 @@ data_unaliased(
 }
 
 /**
+ * undep the data
+ */
+static inline
+void
+data_undep(
+	struct afb_data *data
+) {
+	if (!UNDEP(data))
+		data_release(data);
+}
+
+/**
  */
 static
 void
@@ -450,14 +450,10 @@ data_make_alias(
 ) {
 	// ASSERT NOT IS_VALID(alias)
 	SET_ALIAS(alias);
+	ADDDEP(to_data);
 	alias->closure = to_data;
-	if (data_cvt_has(alias, to_data))
-		alias->dispose = 0;
-	else {
-		alias->dispose = (void(*)(void*))afb_data_unref;
-		ADDREF(to_data);
-		data_cvt_merge(alias, to_data);
-	}
+	alias->dispose = (void(*)(void*))data_undep;
+	data_cvt_merge(alias, to_data);
 }
 
 /**
@@ -567,6 +563,7 @@ data_create(
 		data->cvt = data; /* single cvt ring: itself */
 		data->flags = flags;
 		data->refcount = REF_COUNT_INCREMENT;
+		data->depcount = 0;
 		data->opaqueid = 0;
 		rc = 0;
 	}
@@ -665,9 +662,9 @@ afb_data_create_alias(
 ) {
 	int rc;
 
-	rc = data_create(result, type, NULL, 0, (void*)afb_data_unref, other, INITIAL_FLAGS_ALIAS);
+	rc = data_create(result, type, NULL, 0, (void*)data_undep, other, INITIAL_FLAGS_ALIAS);
 	if (rc == 0)
-		data_addref(other);
+		ADDDEP(other);
 
 	return rc;
 }

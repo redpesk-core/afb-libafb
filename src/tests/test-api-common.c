@@ -354,7 +354,7 @@ START_TEST (test_functional)
 	fprintf(stderr, "-> rc = %d\n", rc);
 	fprintf(stderr, "-> data_closure = %d\n", data_closure);
 	ck_assert_int_eq(0, rc);
-	ck_assert_int_eq(3, data_closure);
+	ck_assert_int_eq(NBPARAMS, data_closure);
 
 	/******** require api ********/
 	fprintf(stderr, "\n******** require api ********\n");
