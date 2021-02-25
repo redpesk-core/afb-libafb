@@ -523,8 +523,6 @@ CONVERT(json_c,json)
 	else {
 		json_object_get(object);
 		rc = afb_data_create_raw(out, type, (void*)jsonstr, sz + 1, (void*)json_object_put, object);
-		if (rc < 0)
-			json_object_put(object);
 	}
 	return rc;
 }
