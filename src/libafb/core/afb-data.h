@@ -462,3 +462,43 @@ extern
 void
 afb_data_unlock(
 	struct afb_data *data);
+
+/**
+ * Add one dependency from a data to an other. This ensures
+ * that pointers of the data @p to_data can be safely referenced
+ * by the data @p from_data
+ *
+ * @param from_data the data that depends of @p to_data
+ * @param to_data that from wich depends @p from_data
+ *
+ * @return 0 in case of success or a negative number
+ */
+extern
+int
+afb_data_dependency_add(
+	struct afb_data *from_data,
+	struct afb_data *to_data);
+
+/**
+ * Remove one dependency from a data to an other
+ *
+ * @param from_data the data that depends of @p to_data
+ * @param to_data that from wich depends @p from_data
+ *
+ * @return 0 in case of success or a negative number
+ */
+extern
+int
+afb_data_dependency_sub(
+	struct afb_data *from_data,
+	struct afb_data *to_data);
+
+/**
+ * Remove all dependencies of the @p data
+ *
+ * @param data the data whose dependencies can be cleaned
+ */
+extern
+void
+afb_data_dependency_drop_all(
+	struct afb_data *data);

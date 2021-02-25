@@ -309,6 +309,7 @@ START_TEST (test_predefine_types){
 	};
 
 	for(i=0; type_data[i].predef_type!=NULL; i++){
+		fprintf(stderr, "\n== %s ==\n", afb_type_name(type_data[i].predef_type));
 		gmask = 0;
 		r = afb_data_create_raw(&data, type_data[i].predef_type, type_data[i].buff, 0, data_dispose, i2p(i));
 		ck_assert_int_eq(r, 0);

@@ -39,6 +39,18 @@
 /*****************************************************************************/
 
 /**
+ * structure recording dependency relationship of a data to an other
+ */
+struct datadep
+{
+	/** the linked data */
+	struct afb_data *other;
+
+	/** next item if any */
+	struct datadep *next;
+};
+
+/**
  * Description of a data
  *
  * The pointer cvt is used to link together data that result from convertion.
@@ -67,6 +79,9 @@ struct afb_data
 
 	/** next conversion */
 	struct afb_data *cvt;
+
+	/** dependencies to other data */
+	struct datadep *dependof;
 
 	/** flags */
 	uint16_t flags;
@@ -165,17 +180,145 @@ static int share_is_owner(struct afb_data *data)
 }
 
 /*****************************************************************************/
+/***    dependof  ***/
+/*****************************************************************************/
+
+/** allocator of dependencies */
+static inline
+struct datadep *
+dependof_alloc()
+{
+	return malloc(sizeof(struct datadep));
+}
+
+/** freeer of dependencies */
+static inline
+void
+dependof_free(struct datadep *datadep)
+{
+	return free(datadep);
+}
+
+/**
+ * increment dependency count of the data
+ */
+static inline
+void
+data_adddep(
+	struct afb_data *data
+) {
+	ADDDEP(data);
+}
+
+static void data_release(struct afb_data *data);
+
+/**
+ * decrement dependency count of the data
+ */
+static inline
+void
+data_undep(
+	struct afb_data *data
+) {
+	if (!UNDEP(data))
+		data_release(data);
+}
+
+/**
+ * Add one explicit dependency from @p data to @p other
+ *
+ * @param data the data that has a dependency
+ * @param other dependency
+ *
+ * @return 0 in case of success or X_ENOMEM on error
+ */
+static inline
+int
+data_add_dependof(
+	struct afb_data *data,
+	struct afb_data *other
+) {
+	struct datadep *dep;
+
+	dep = dependof_alloc();
+	if (dep == NULL)
+		return X_ENOMEM;
+	dep->other = other;
+	dep->next = data->dependof;
+	data->dependof = dep;
+	data_adddep(other);
+
+	return 0;
+}
+
+/**
+ * Remove one dependency from @p data to @p other
+ *
+ * @param data the data that has a dependency
+ * @param other dependency
+ *
+ * @return 0 in case of success or X_ENOENT if no dependency was
+ * recorded from data to other
+ */
+static inline
+int
+data_del_dependof(
+	struct afb_data *data,
+	struct afb_data *other
+) {
+	struct datadep *iter, **pprv;
+
+	pprv = &data->dependof;
+	while ((iter = *pprv) != NULL) {
+		if (iter->other == other) {
+			data_undep(other);
+			*pprv = iter->next;
+			free(iter);
+			return 0;
+		}
+		pprv = &iter->next;
+	}
+	return X_ENOENT;
+}
+
+/**
+ * Remove all dependency of the data
+ *
+ * @param data the data whose dependencies are to be removed
+ */
+static inline
+void
+data_del_all_dependof(
+	struct afb_data *data
+) {
+	struct datadep *dependof, *nextdependof;
+
+	dependof = data->dependof;
+	if (dependof != NULL) {
+		data->dependof = NULL;
+		do {
+			nextdependof = dependof->next;
+			data_undep(dependof->other);
+			free(dependof);
+			dependof = nextdependof;
+		} while (dependof != NULL);
+	}
+}
+
+/*****************************************************************************/
 /***    Internal routines  ***/
 /*****************************************************************************/
 
-static
+/** data allocator */
+static inline
 struct afb_data *
 data_alloc()
 {
 	return malloc(sizeof(struct afb_data));
 }
 
-static
+/** data freeer */
+static inline
 void
 data_free(struct afb_data *data)
 {
@@ -202,6 +345,9 @@ void
 data_destroy(
 	struct afb_data *data
 ) {
+	/* clean dependencies to other data */
+	data_del_all_dependof(data);
+
 	/* cancel any opacified shadow */
 	if (data->opaqueid)
 		u16id2ptr_drop(&opacifier, data->opaqueid, 0);
@@ -383,6 +529,7 @@ data_cvt_isolate(
 /**
  * test if item is in the conversion ring of data
  */
+__attribute__((unused))
 static
 int
 data_cvt_has(
@@ -429,18 +576,6 @@ data_unaliased(
 }
 
 /**
- * undep the data
- */
-static inline
-void
-data_undep(
-	struct afb_data *data
-) {
-	if (!UNDEP(data))
-		data_release(data);
-}
-
-/**
  */
 static
 void
@@ -450,7 +585,7 @@ data_make_alias(
 ) {
 	// ASSERT NOT IS_VALID(alias)
 	SET_ALIAS(alias);
-	ADDDEP(to_data);
+	data_adddep(to_data);
 	alias->closure = to_data;
 	alias->dispose = (void(*)(void*))data_undep;
 	data_cvt_merge(alias, to_data);
@@ -538,6 +673,19 @@ data_value_mutable(
 	return 0;
 }
 
+/**
+ * common data creator
+ *
+ * @param result  pointer to the created data
+ * @param type    type of the data to create
+ * @param pointer pointer wrapped by the data
+ * @param size    size of the pointed data or 0 if it does not care
+ * @param dispose a function to release the wrapped data (can be NULL)
+ * @param closure closure for the dispose function
+ * @param flags   flags to set
+ *
+ * @return 0 in case of success or a negative number on error
+ */
 int
 data_create(
 	struct afb_data **result,
@@ -564,6 +712,7 @@ data_create(
 		data->flags = flags;
 		data->refcount = REF_COUNT_INCREMENT;
 		data->depcount = 0;
+		data->dependof = NULL;
 		data->opaqueid = 0;
 		rc = 0;
 	}
@@ -664,7 +813,7 @@ afb_data_create_alias(
 
 	rc = data_create(result, type, NULL, 0, (void*)data_undep, other, INITIAL_FLAGS_ALIAS);
 	if (rc == 0)
-		ADDDEP(other);
+		data_adddep(other);
 
 	return rc;
 }
@@ -906,6 +1055,7 @@ afb_data_set_not_volatile(
 	UNSET_VOLATILE(data);
 }
 
+/* get locker */
 static struct afb_data *lockhead(struct afb_data *data)
 {
 	struct afb_data *i = data;
@@ -919,30 +1069,35 @@ static struct afb_data *lockhead(struct afb_data *data)
 	return i;
 }
 
+/* lock for reading */
 void afb_data_lock_read(struct afb_data *data)
 {
 	data = data_unaliased(data);
 	lockany_lock_read(lockhead(data));
 }
 
+/* try lock for reading */
 int afb_data_try_lock_read(struct afb_data *data)
 {
 	data = data_unaliased(data);
 	return lockany_try_lock_read(lockhead(data));
 }
 
+/* lock for writing */
 void afb_data_lock_write(struct afb_data *data)
 {
 	data = data_unaliased(data);
 	lockany_lock_write(lockhead(data));
 }
 
+/* try lock for writing */
 int afb_data_try_lock_write(struct afb_data *data)
 {
 	data = data_unaliased(data);
 	return lockany_try_lock_write(lockhead(data));
 }
 
+/* unlock */
 void afb_data_unlock(struct afb_data *data)
 {
 	struct afb_data *head = lockhead(data_unaliased(data));
@@ -950,6 +1105,7 @@ void afb_data_unlock(struct afb_data *data)
 		UNSET_LOCKED(head);
 }
 
+/* get values for read/write */
 int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 {
 	int rc;
@@ -972,6 +1128,7 @@ int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 	return rc;
 }
 
+/* get values for read */
 int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *size)
 {
 	int rc;
@@ -992,4 +1149,22 @@ int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *s
 		rc = X_EINVAL;
 	}
 	return rc;
+}
+
+/* add dependency */
+int afb_data_dependency_add(struct afb_data *from_data, struct afb_data *to_data)
+{
+	return from_data == to_data ? X_EINVAL : data_add_dependof(from_data, to_data);
+}
+
+/* remove dependency */
+int afb_data_dependency_sub(struct afb_data *from_data, struct afb_data *to_data)
+{
+	return from_data == to_data ? X_EINVAL : data_del_dependof(from_data, to_data);
+}
+
+/* remove all dependencies */
+void afb_data_dependency_drop_all(struct afb_data *data)
+{
+	data_del_all_dependof(data);
 }
