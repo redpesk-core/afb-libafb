@@ -428,6 +428,17 @@ int afb_session_timeout(struct afb_session *session)
 	return timeout;
 }
 
+/* Set the timeout of 'session' in seconds */
+int afb_session_set_timeout(struct afb_session *session, int timeout)
+{
+	if (AFB_SESSION_TIMEOUT_IS_VALID(timeout))
+		return X_EINVAL;
+
+	session->timeout = timeout;
+	session_update_expiration(session, NOW);
+	return 0;
+}
+
 /**
  * Returns the second remaining before expiration of 'session'
  */

@@ -61,6 +61,16 @@ extern int afb_session_is_closed (struct afb_session *session);
 extern int afb_session_timeout(struct afb_session *session);
 extern int afb_session_what_remains(struct afb_session *session);
 
+/**
+ * Set the timeout of 'session' in seconds
+ *
+ * @param session the session
+ * @param timeout the timeout
+ *
+ * @return 0 in case of success or X_EINVAL if timeout is wrong
+ */
+extern int afb_session_set_timeout(struct afb_session *session, int timeout);
+
 extern int afb_session_set_language(struct afb_session *session, const char *lang);
 extern const char *afb_session_get_language(struct afb_session *session, const char *lang);
 
