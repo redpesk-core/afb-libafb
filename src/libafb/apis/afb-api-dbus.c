@@ -792,7 +792,7 @@ static void afb_api_dbus_server_listener_free(void *closure)
 	free(listener);
 }
 
-static void *afb_api_dbus_server_listener_make(void *closure)
+static int afb_api_dbus_server_listener_make(void *closure, void **value, void (**freecb)(void*), void **freeclo)
 {
 	struct origin *origin = closure;
 	struct listener *listener;
@@ -802,13 +802,13 @@ static void *afb_api_dbus_server_listener_make(void *closure)
 		listener->listener = afb_evt_listener_create(&evt_push_itf, origin);
 		if (listener->listener != NULL) {
 			listener->origin = afb_api_dbus_server_origin_addref(origin);
+			*value = *freeclo = listener;
+			*freecb = afb_api_dbus_server_listener_free;
+			return 0;
 		}
-		else {
-			free(listener);
-			listener = NULL;
-		}
+		free(listener);
 	}
-	return listener;
+	return X_ENOMEM;
 }
 
 static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, const char *sender, struct afb_session *session)
@@ -820,7 +820,7 @@ static struct listener *afb_api_dbus_server_listener_get(struct api_dbus *api, c
 	if (origin == NULL)
 		return NULL;
 
-	afb_session_cookie(session, origin, NULL, afb_api_dbus_server_listener_make, afb_api_dbus_server_listener_free, origin, Afb_Session_Cookie_Init);
+	afb_session_cookie_getinit(session, origin, NULL, afb_api_dbus_server_listener_make, origin);
 	afb_api_dbus_server_origin_unref(origin);
 	return NULL;
 }

@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <limits.h>
 
 #include <check.h>
 
@@ -141,13 +142,6 @@ END_TEST
 
 /*********************************************************************/
 /* check the handling of cookies */
-void *mkcookie_got;
-void *mkcookie(void *closure)
-{
-	mkcookie_got = closure;
-	return closure;
-}
-
 void *freecookie_got;
 void freecookie(void *item)
 {
@@ -172,49 +166,53 @@ START_TEST (check_cookies)
 	for (i = 0 ; k[i] ; i++) {
 		for (j = 0 ; k[j] ; j++) {
 			/* retrieve the previous value */
-			mkcookie_got = freecookie_got = NULL;
+			freecookie_got = NULL;
 			if (i == 0) {
 				/* never set (i = 0) */
-				afb_session_cookie(s, k[j], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Exists);
+				r = afb_session_cookie_exists(s, k[j]);
+				ck_assert(r == 0);
+				r = afb_session_cookie_get(s, k[j], (void**)&p);
+				ck_assert(r < 0);
 				ck_assert(p == NULL);
-				afb_session_cookie(s, k[j], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
-				ck_assert(p == NULL);
-				afb_session_cookie(s, k[j], (void**)&q, NULL, NULL, d, Afb_Session_Cookie_Init);
+				r = afb_session_cookie_getinit(s, k[j], (void**)&q, NULL, d);
+				ck_assert(r == 1);
 				ck_assert(q == d);
-				afb_session_cookie(s, k[j], (void**)&q, NULL, NULL, NULL, Afb_Session_Cookie_Init);
+				r = afb_session_cookie_getinit(s, k[j], (void**)&q, NULL, d);
+				ck_assert(r == 0);
 				ck_assert(q == d);
-				afb_session_cookie(s, k[j], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Set);
+				r = afb_session_cookie_set(s, k[j], NULL, NULL, NULL);
 				ck_assert(!p);
 			}
 			else {
-				afb_session_cookie(s, k[j], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Exists);
-				ck_assert(p != NULL);
-				afb_session_cookie(s, k[j], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
+				r = afb_session_cookie_exists(s, k[j]);
+				ck_assert(r == 1);
+				r = afb_session_cookie_get(s, k[j], (void**)&p);
+				ck_assert(r == 0);
 			}
-			afb_session_cookie(s, k[j], (void**)&q, mkcookie, freecookie, k[i], Afb_Session_Cookie_Set);
-			ck_assert(q == k[i]);
-			ck_assert(mkcookie_got == q);
+			afb_session_cookie_set(s, k[j], k[i], freecookie, k[i]);
 			ck_assert(freecookie_got == p);
 		}
 	}
 
 	/* drop cookies */
 	for (i = 1 ; k[i] ; i++) {
-		mkcookie_got = freecookie_got = NULL;
-		afb_session_cookie(s, k[i], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
+		freecookie_got = NULL;
+		r = afb_session_cookie_get(s, k[i], (void**)&p);
+		ck_assert(r == 0);
 		ck_assert(!freecookie_got);
-		afb_session_cookie(s, k[i], (void**)&q, NULL, NULL, NULL, Afb_Session_Cookie_Delete);
-		ck_assert(!q);
+		r = afb_session_cookie_delete(s, k[i]);
+		ck_assert(r == 0);
 		ck_assert(freecookie_got == p);
 	}
 
 	/* closing session */
-	afb_session_cookie(s, k[0], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
-	mkcookie_got = freecookie_got = NULL;
+	r = afb_session_cookie_get(s, k[0], (void**)&p);
+	ck_assert(r == 0);
+	freecookie_got = NULL;
 	afb_session_close(s);
 	ck_assert(freecookie_got == p);
-	afb_session_cookie(s, k[0], (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
-	ck_assert(!p);
+	r = afb_session_cookie_get(s, k[0], (void**)&p);
+	ck_assert(r < 0);
 	afb_session_unref(s);
 }
 END_TEST
@@ -252,6 +250,11 @@ START_TEST (check_LOA)
 			j++;
 			ck_assert_int_eq(j, afb_session_set_loa(s, k[i], j));
 		}
+		while (j <= (INT_MAX >> 2)) {
+			ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
+			j <<= 1;
+			ck_assert_int_eq(j, afb_session_set_loa(s, k[i], j));
+		}
 		ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
 	}
 
@@ -259,7 +262,7 @@ START_TEST (check_LOA)
 	while (j) {
 		for (i = 0 ; k[i] ; i++)
 			ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
-		j--;
+		j >>= 1;
 		for (i = 0 ; k[i] ; i++)
 			ck_assert_int_eq(j, afb_session_set_loa(s, k[i], j));
 	}
@@ -297,12 +300,11 @@ START_TEST (check_drop)
 
 	/* set a cookie */
 	freecookie_got = NULL;
-	afb_session_cookie(s, key, (void**)&p, NULL, freecookie, (void*)check_drop, Afb_Session_Cookie_Set);
-	ck_assert(p == check_drop);
+	afb_session_cookie_set(s, key, (void*)check_drop, freecookie, (void*)check_drop);
 	ck_assert(freecookie_got == NULL);
 
 	/* check state */
-	afb_session_cookie(s, key, (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Get);
+	afb_session_cookie_get(s, key, (void**)&p);
 	ck_assert(p == check_drop);
 	ck_assert(freecookie_got == NULL);
 	ck_assert_int_eq(4, afb_session_get_loa(s, key));
@@ -313,8 +315,8 @@ START_TEST (check_drop)
 
 	/* check new state */
 	ck_assert_int_eq(0, afb_session_get_loa(s, key));
-	afb_session_cookie(s, key, (void**)&p, NULL, NULL, NULL, Afb_Session_Cookie_Exists);
-	ck_assert(p == NULL);
+	r = afb_session_cookie_exists(s, key);
+	ck_assert(r == 0);
 
 	/* closing session */
 	afb_session_unref(s);

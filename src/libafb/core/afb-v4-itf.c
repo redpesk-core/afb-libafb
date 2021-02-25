@@ -112,7 +112,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.req_vverbose = afb_req_v4_vverbose_hookable,
 	.req_session_close = afb_req_v4_session_close_hookable,
 	.req_session_set_LOA = afb_req_v4_session_set_LOA_hookable,
-	.req_cookie = afb_req_v4_cookie_hookable,
+	.LEGACY_req_cookie = afb_req_v4_LEGACY_cookie_hookable,
 	.req_subscribe = afb_req_v4_subscribe_hookable,
 	.req_unsubscribe = afb_req_v4_unsubscribe_hookable,
 	.req_get_client_info = afb_req_v4_get_client_info_hookable,
@@ -205,6 +205,10 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.data_dependency_add = afb_data_dependency_add,
 	.data_dependency_sub = afb_data_dependency_sub,
 	.data_dependency_drop_all = afb_data_dependency_drop_all,
+	.req_cookie_set = afb_req_v4_cookie_set_hookable,
+	.req_cookie_get = afb_req_v4_cookie_get_hookable,
+	.req_cookie_getinit = afb_req_v4_cookie_getinit_hookable,
+	.req_cookie_drop = afb_req_v4_cookie_drop_hookable,
 
 /*-- END -----------------------------------*/
 };

@@ -943,6 +943,35 @@ afb_req_common_unsubscribe_hookable(
 
 /******************************************************************************/
 
+/**
+ * intermediate structure used for afb_session_cookie_init_basic
+ */
+struct memo_cookie_init_basic {
+	void *(*makecb)(void *closure); /**< memorize the creation callback */
+	void (*freecb)(void *item);     /**< memorize the destruction callback */
+	void *closure;                  /**< closure of the creation callback */
+};
+
+/**
+ * internal function for implementing afb_session_cookie_init_basic
+ */
+static int cookie_init_basic(void *closure, void **value, void (**freecb)(void*), void **freeclo)
+{
+	struct memo_cookie_init_basic *mib = closure;
+	void *val;
+
+	if (!mib->makecb)
+		val = mib->closure;
+	else {
+		val = mib->makecb(mib->closure);
+		if (val == NULL)
+			return X_ENOMEM;
+	}
+	*value = *freeclo = val;
+	*freecb = mib->freecb;
+	return 0;
+}
+
 void *
 afb_req_common_cookie_hookable(
 	struct afb_req_common *req,
@@ -952,12 +981,86 @@ afb_req_common_cookie_hookable(
 	int replace
 ) {
 	void *r;
-	afb_session_cookie(req->session, req->api, &r, maker, freeer, closure, replace);
+	struct memo_cookie_init_basic mib;
+
+	if (replace) {
+		r = maker ? maker(closure) : closure;
+		afb_session_cookie_set(req->session, req->api, r, freeer, r);
+	}
+	else {
+
+		mib.makecb = maker;
+		mib.freecb = freeer;
+		mib.closure = closure;
+
+		afb_session_cookie_getinit(req->session, req->api, &r, cookie_init_basic, &mib);
+	}
 #if WITH_AFB_HOOK
 	if (req->hookflags & afb_hook_flag_req_context_make)
 		r = afb_hook_req_context_make(req, replace, maker, freeer, closure, r);
 #endif
 	return r;
+}
+
+/* set the cookie of the api getting the request */
+int
+afb_req_common_cookie_set_hookable(
+	struct afb_req_common *req,
+	void *value,
+	void (*freecb)(void*),
+	void *freeclo
+) {
+	int rc = afb_session_cookie_set(req->session, req->api, value, freecb, freeclo);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_context_set)
+		rc = afb_hook_req_context_set(req, value, freecb, freeclo, rc);
+#endif
+	return rc;
+}
+
+
+/* get the cookie of the api getting the request */
+int
+afb_req_common_cookie_get_hookable(
+	struct afb_req_common *req,
+	void **value
+) {
+	int rc = afb_session_cookie_get(req->session, req->api, value);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_context_get)
+		rc = afb_hook_req_context_get(req, *value, rc);
+#endif
+	return rc;
+}
+
+
+/* get the cookie of the api getting the request */
+int
+afb_req_common_cookie_getinit_hookable(
+	struct afb_req_common *req,
+	void **value,
+	int (*initcb)(void *closure, void **value, void (**freecb)(void*), void **freeclo),
+	void *closure
+) {
+	int rc = afb_session_cookie_getinit(req->session, req->api, value, initcb, closure);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_context_getinit)
+		rc = afb_hook_req_context_getinit(req, *value, initcb, closure, rc);
+#endif
+	return rc;
+}
+
+/* set the cookie of the api getting the request */
+int
+afb_req_common_cookie_drop_hookable(
+	struct afb_req_common *req
+) {
+	int rc = afb_session_cookie_delete(req->session, req->api);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_context_drop)
+		rc = afb_hook_req_context_drop(req, rc);
+#endif
+	return rc;
 }
 
 int

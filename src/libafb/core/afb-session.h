@@ -31,15 +31,6 @@ struct afb_session;
 #define AFB_SESSION_TIMEOUT_DEFAULT   -2
 #define AFB_SESSION_TIMEOUT_IS_VALID(x) ((x) >= AFB_SESSION_TIMEOUT_DEFAULT)
 
-enum afb_session_cookie_operator
-{
-	Afb_Session_Cookie_Init,
-	Afb_Session_Cookie_Set,
-	Afb_Session_Cookie_Get,
-	Afb_Session_Cookie_Delete,
-	Afb_Session_Cookie_Exists
-};
-
 /**
  * Initialize the session manager with a 'max_session_count',
  * an initial common 'timeout'
@@ -117,7 +108,7 @@ extern void afb_session_unref(struct afb_session *session);
  *
  * @return the uuid of session
  */
-extern const char *afb_session_uuid (struct afb_session *session);
+extern const char *afb_session_uuid(struct afb_session *session);
 
 /**
  * Returns the local id of 'session'
@@ -126,7 +117,7 @@ extern const char *afb_session_uuid (struct afb_session *session);
  *
  * @return the local id
  */
-extern uint16_t afb_session_id (struct afb_session *session);
+extern uint16_t afb_session_id(struct afb_session *session);
 
 /**
  * Set the 'autoclose' flag of the 'session'
@@ -153,7 +144,7 @@ extern void afb_session_close(struct afb_session *session);
  *
  * @return 1 if closed or 0 if live
  */
-extern int afb_session_is_closed (struct afb_session *session);
+extern int afb_session_is_closed(struct afb_session *session);
 
 /**
  * Returns the timeout of 'session' in seconds
@@ -212,54 +203,12 @@ extern int afb_session_set_language(struct afb_session *session, const char *lan
 extern const char *afb_session_get_language(struct afb_session *session, const char *lang);
 
 /**
- * Set, get, replace, remove a cookie of 'key' for the 'session'
- *
- * The behaviour of this function depends on its parameters:
+ * drop loa and cookie of the given key
  *
  * @param session	the session
  * @param key		the key of the cookie
- * @param cookieval     where to store the cookie value
- * @param makecb	the creation function or NULL
- * @param freecb	the release function or NULL
- * @param closure	an argument for makecb or the value if makecb==NULL
- * @param operation	operation to perform
- *
- * @return 0 if cookie existed, 1 if created, a negative number on error
- *
- * The 'key' is a pointer and compared as pointers.
- *
- * For getting the current value of the cookie:
- *
- *   afb_session_cookie(session, key, &value, NULL, NULL, NULL, 0)
- *
- * For storing the value of the cookie
- *
- *   afb_session_cookie(session, key, NULL, NULL, NULL, value, 1)
  */
-extern int afb_session_cookie(struct afb_session *session, const void *key, void **cookie, void *(*makecb)(void *closure), void (*freecb)(void *item), void *closure, enum afb_session_cookie_operator oper);
-
-/**
- * Get the cookie of 'key' in the 'session'.
- *
- * @param session  the session to search in
- * @param key      the key of the data to retrieve
- *
- * @return the data staored for the key or NULL if the key isn't found
- */
-extern int afb_session_get_cookie(struct afb_session *session, const void *key, void **cookie);
-
-/**
- * Set the cookie of 'key' in the 'session' to the 'value' that can be
- * cleaned using 'freecb' (if not null).
- *
- * @param session  the session to set
- * @param key      the key of the data to store
- * @param value    the value to store at key
- * @param freecb   a function to use when the cookie value is to remove (or null)
- *
- * @return 0 in case of success or -1 in case of error
- */
-extern int afb_session_set_cookie(struct afb_session *session, const void *key, void *value, void (*freecb)(void*));
+extern void afb_session_drop_key(struct afb_session *session, const void *key);
 
 /**
  * Get the LOA value associated to session for the key
@@ -283,10 +232,93 @@ extern int afb_session_get_loa(struct afb_session *session, const void *key);
 extern int afb_session_set_loa(struct afb_session *session, const void *key, int loa);
 
 /**
- * drop loa and cookie of the given key
+ * Set the cookie of 'key' in the 'session' to the 'value' that can be
+ * cleaned using the function 'freecb' (if not null) that will receive
+ * the closure 'freeclo'.
  *
- * @param session	the session
- * @param key		the key of the cookie
+ * @param session  the session to set
+ * @param key      the key of the data to store
+ * @param value    the value to store at key
+ * @param freecb   a function to use when the cookie value is to remove (or null)
+ * @param freeclo  the value to give to freecb (can be value)
+ *
+ * @return 1 in case of creation, 0 in case of replacement or a negative error code
+ * on failure
  */
-extern void afb_session_drop_key(struct afb_session *session, const void *key);
+extern int afb_session_cookie_set(
+	struct afb_session *session,
+	const void *key,
+	void *value,
+	void (*freecb)(void *item),
+	void *freeclo
+);
 
+/**
+ * Get the cookie of 'key' in the 'session' in 'cookieval'.
+ * If no value is set, returns a negative error and set the
+ * result in 'value' to NULL.
+ *
+ * @param session   the session to set
+ * @param key       the key of the data to store
+ * @param cookieval where to store the value
+ *
+ * @return 0 in case of success or a negative error code
+ */
+extern int afb_session_cookie_get(
+	struct afb_session *session,
+	const void *key,
+	void **cookieval
+);
+
+/**
+ * Get the cookie of 'key' in the 'session' in 'cookieval'.
+ * If no value is set, create it by calling the initialization
+ * function 'initcb' with the given 'closure'. If 'initcb' is NULL,
+ * the value of 'closure' is recorded.
+ *
+ * The initalization function must set the parameters as for
+ * 'afb_session_cookie_set' and return 0. If it returns a negative
+ * error code the function fails.
+ *
+ * @param session   the session to set
+ * @param key       the key of the data to store
+ * @param cookieval where to store the value
+ * @param initcb    function for initializing the cookie (can be NULL)
+ * @param closure   closure of the initialization function or value to set
+ *
+ * @return 0 if value was set, 1 if value is created, or a negative error code
+ * on failure
+ */
+extern int afb_session_cookie_getinit(
+	struct afb_session *session,
+	const void *key,
+	void **cookieval,
+	int (*initcb)(void *closure, void **value, void (**freecb)(void*), void **freeclo),
+	void *closure
+);
+
+/**
+ * Delete the value of the cookie of 'key' in the 'session'.
+ *
+ * @param session   the session to set
+ * @param key       the key of the data to store
+ *
+ * @return 0 on success or a negative error code
+ */
+extern int afb_session_cookie_delete(
+	struct afb_session *session,
+	const void *key
+);
+
+/**
+ * Test if the value of the cookie of 'key' in the 'session' exists.
+ *
+ * @param session   the session to set
+ * @param key       the key of the data to store
+ *
+ * @return 1 if it exists or 0 if not
+ */
+extern int afb_session_cookie_exists(
+	struct afb_session *session,
+	const void *key
+);

@@ -365,6 +365,26 @@ static void hook_req_get_client_info_cb(void *closure, const struct afb_hookid *
 	_hook_req_(req, "get_client_info() -> %s", json_object_to_json_string_ext(result, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
+static void hook_req_context_set_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, void (*freecb)(void*), void *freeclo, int result)
+{
+	_hook_req_(req, "context_set(%p, %p, %p) -> %d", value, freecb, freeclo, result);
+}
+
+static void hook_req_context_get_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int result)
+{
+	_hook_req_(req, "context_get -> %d, %p", result, value);
+}
+
+static void hook_req_context_getinit_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int (*initcb)(void*,void**,void(**)(void*),void**), void *initclo, int result)
+{
+	_hook_req_(req, "context_getinit(%p, %p) -> %d, %p", initcb, initclo, result, value);
+}
+
+static void hook_req_context_drop_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result)
+{
+	_hook_req_(req, "context_drop -> %d", result);
+}
+
 static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_begin = hook_req_begin_cb,
 	.hook_req_end = hook_req_end_cb,
@@ -388,6 +408,10 @@ static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_context_make = hook_req_context_make_cb,
 	.hook_req_get_uid = hook_req_get_uid_cb,
 	.hook_req_get_client_info = hook_req_get_client_info_cb,
+	.hook_req_context_set = hook_req_context_set_cb,
+	.hook_req_context_get = hook_req_context_get_cb,
+	.hook_req_context_getinit = hook_req_context_getinit_cb,
+	.hook_req_context_drop = hook_req_context_drop_cb,
 };
 
 /******************************************************************************
@@ -536,6 +560,32 @@ struct json_object *afb_hook_req_get_client_info(const struct afb_req_common *re
 	_HOOK_XREQ_(get_client_info, req, result);
 	return result;
 }
+
+int afb_hook_req_context_set(const struct afb_req_common *req, void *value, void (*freecb)(void*), void *freeclo, int result)
+{
+	_HOOK_XREQ_(context_set, req, value, freecb, freeclo, result);
+	return result;
+}
+
+int afb_hook_req_context_get(const struct afb_req_common *req, void *value, int result)
+{
+	_HOOK_XREQ_(context_get, req, value, result);
+	return result;
+}
+
+int afb_hook_req_context_getinit(const struct afb_req_common *req, void *value, int (*initcb)(void*, void**, void(**)(void*), void**), void *initclo, int result)
+{
+	_HOOK_XREQ_(context_getinit, req, value, initcb, initclo, result);
+	return result;
+}
+
+int afb_hook_req_context_drop(const struct afb_req_common *req, int result)
+{
+	_HOOK_XREQ_(context_drop, req, result);
+	return result;
+}
+
+
 
 /******************************************************************************
  * section: hooking reqs

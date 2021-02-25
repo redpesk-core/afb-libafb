@@ -55,6 +55,7 @@
 #include "utils/wrap-json.h"
 #include "sys/verbose.h"
 #include "sys/x-mutex.h"
+#include "sys/x-errno.h"
 
 /*******************************************************************************/
 /*****  default names                                                      *****/
@@ -430,6 +431,47 @@ static void hook_req_context_make(void *closure, const struct afb_hookid *hookid
 					"result", pr);
 }
 
+static void hook_req_context_set(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, void (*freecb)(void*), void *freeclo, int result)
+{
+	char pc[50], pf[50], pv[50];
+	snprintf(pv, sizeof pv, "%p", value);
+	snprintf(pf, sizeof pf, "%p", freecb);
+	snprintf(pc, sizeof pc, "%p", freeclo);
+	hook_req(closure, hookid, req, "context_set", "{ss ss ss si}",
+					"free", pf,
+					"closure", pc,
+					"value", pv,
+					"result", result);
+}
+
+static void hook_req_context_get(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int result)
+{
+	char pv[50];
+	snprintf(pv, sizeof pv, "%p", value);
+	hook_req(closure, hookid, req, "context_get", "{ss si}",
+					"value", pv,
+					"result", result);
+}
+
+static void hook_req_context_getinit(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int (*initcb)(void*,void**,void(**)(void*),void**), void *initclo, int result)
+{
+	char pc[50], pf[50], pv[50];
+	snprintf(pv, sizeof pv, "%p", value);
+	snprintf(pf, sizeof pf, "%p", initcb);
+	snprintf(pc, sizeof pc, "%p", initclo);
+	hook_req(closure, hookid, req, "context_getinit", "{ss ss ss si}",
+					"init", pf,
+					"closure", pc,
+					"value", pv,
+					"result", result);
+}
+
+static void hook_req_context_drop(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result)
+{
+	hook_req(closure, hookid, req, "context_drop", "{si}",
+					"result", result);
+}
+
 static void hook_req_get_uid(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result)
 {
 	hook_req(closure, hookid, req, "get_uid", "{si}",
@@ -465,6 +507,10 @@ static struct afb_hook_req_itf hook_req_itf = {
 	.hook_req_context_make = hook_req_context_make,
 	.hook_req_get_uid = hook_req_get_uid,
 	.hook_req_get_client_info = hook_req_get_client_info,
+	.hook_req_context_set = hook_req_context_set,
+	.hook_req_context_get = hook_req_context_get,
+	.hook_req_context_getinit = hook_req_context_getinit,
+	.hook_req_context_drop = hook_req_context_drop,
 };
 
 /*******************************************************************************/
@@ -1120,13 +1166,18 @@ static void session_closed(void *item)
 /*
  * records the cookie of session for tracking close
  */
-static void *session_open(void *closure)
+static int session_open(void *closure, void **value, void (**freecb)(void*), void **freeclo)
 {
 	struct cookie *param = closure, *cookie;
+
 	cookie = malloc(sizeof *cookie);
-	if (cookie)
-		*cookie = *param;
-	return cookie;
+	if (!cookie)
+		return X_ENOMEM;
+
+	*cookie = *param;
+	*value = *freeclo = cookie;
+	*freecb = session_closed;
+	return 0;
 }
 
 /*
@@ -1144,7 +1195,7 @@ static struct afb_session *trace_get_session_by_uuid(struct afb_trace *trace, co
 		rc = afb_session_get(&cookie.session, uuid, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
 		if (rc >= 0) {
 			cookie.trace = trace;
-			afb_session_cookie(cookie.session, cookie.trace, NULL, session_open, session_closed, &cookie, 0);
+			afb_session_cookie_getinit(cookie.session, cookie.trace, NULL, session_open, &cookie);
 		}
 	}
 	return cookie.session;

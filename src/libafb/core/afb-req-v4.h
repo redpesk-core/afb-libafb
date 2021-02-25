@@ -130,12 +130,47 @@ afb_req_v4_verbose(
 
 extern
 void *
-afb_req_v4_cookie_hookable(
+afb_req_v4_LEGACY_cookie_hookable(
 	struct afb_req_v4 *reqv4,
 	int replace,
 	void *(*create_value)(void*),
 	void (*free_value)(void*),
 	void *create_closure
+);
+
+/* set the cookie of the api getting the request */
+extern
+int
+afb_req_v4_cookie_set_hookable(
+	struct afb_req_v4 *reqv4,
+	void *value,
+	void (*freecb)(void*),
+	void *freeclo
+);
+
+/* get the cookie of the api getting the request */
+extern
+int
+afb_req_v4_cookie_get_hookable(
+	struct afb_req_v4 *reqv4,
+	void **value
+);
+
+/* get the cookie of the api getting the request */
+extern
+int
+afb_req_v4_cookie_getinit_hookable(
+	struct afb_req_v4 *reqv4,
+	void **value,
+	int (*initcb)(void *closure, void **value, void (**freecb)(void*), void **freeclo),
+	void *closure
+);
+
+/* set the cookie of the api getting the request */
+extern
+int
+afb_req_v4_cookie_drop_hookable(
+	struct afb_req_v4 *reqv4
 );
 
 extern

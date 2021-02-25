@@ -158,7 +158,7 @@ afb_req_v4_verbose(
 }
 
 void *
-afb_req_v4_cookie_hookable(
+afb_req_v4_LEGACY_cookie_hookable(
 	struct afb_req_v4 *reqv4,
 	int replace,
 	void *(*create_value)(void*),
@@ -166,6 +166,41 @@ afb_req_v4_cookie_hookable(
 	void *create_closure
 ) {
 	return afb_req_common_cookie_hookable(reqv4->comreq, create_value, free_value, create_closure, replace);
+}
+
+/* set the cookie of the api getting the request */
+int afb_req_v4_cookie_set_hookable(
+	struct afb_req_v4 *reqv4,
+	void *value,
+	void (*freecb)(void*),
+	void *freeclo
+) {
+	return afb_req_common_cookie_set_hookable(reqv4->comreq, value, freecb, freeclo);
+}
+
+/* get the cookie of the api getting the request */
+int afb_req_v4_cookie_get_hookable(
+	struct afb_req_v4 *reqv4,
+	void **value
+) {
+	return afb_req_common_cookie_get_hookable(reqv4->comreq, value);
+}
+
+/* get the cookie of the api getting the request */
+int afb_req_v4_cookie_getinit_hookable(
+	struct afb_req_v4 *reqv4,
+	void **value,
+	int (*initcb)(void *closure, void **value, void (**freecb)(void*), void **freeclo),
+	void *closure
+) {
+	return afb_req_common_cookie_getinit_hookable(reqv4->comreq, value, initcb, closure);
+}
+
+/* set the cookie of the api getting the request */
+int afb_req_v4_cookie_drop_hookable(
+	struct afb_req_v4 *reqv4
+) {
+	return afb_req_common_cookie_drop_hookable(reqv4->comreq);
 }
 
 int

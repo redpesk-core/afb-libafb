@@ -556,15 +556,23 @@ static void f_unsubscribe(struct afb_req_common *req)
 }
 
 #if WITH_AFB_TRACE
-static void *context_create(void *closure)
-{
-	return afb_trace_create(_monitor_, NULL);
-}
-
 static void context_destroy(void *pointer)
 {
 	struct afb_trace *trace = pointer;
 	afb_trace_unref(trace);
+}
+
+static int context_create(void *closure, void **value, void (**freecb)(void*), void **freeclo)
+{
+	struct afb_trace *trace;
+
+	trace = afb_trace_create(_monitor_, NULL);
+	if (trace == NULL)
+		return X_ENOMEM;
+
+	*value = *freeclo = trace;
+	*freecb = context_destroy;
+	return 0;
 }
 
 static void f_trace_cb(void *closure, struct json_object *args)
@@ -575,7 +583,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 	struct json_object *drop = NULL;
 	struct afb_trace *trace;
 
-	afb_session_cookie(req->session, _monitor_, (void**)&trace, context_create, context_destroy, req, Afb_Session_Cookie_Init);
+	afb_session_cookie_getinit(req->session, _monitor_, (void**)&trace, context_create, req);
 	wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 	if (add) {
 		rc = afb_trace_add(req, add, trace);

@@ -365,6 +365,41 @@ afb_req_common_cookie_hookable(
 	int replace
 );
 
+/* set the cookie of the api getting the request */
+extern
+int
+afb_req_common_cookie_set_hookable(
+	struct afb_req_common *req,
+	void *value,
+	void (*freecb)(void*),
+	void *freeclo
+);
+
+/* get the cookie of the api getting the request */
+extern
+int
+afb_req_common_cookie_get_hookable(
+	struct afb_req_common *req,
+	void **value
+);
+
+/* get the cookie of the api getting the request */
+extern
+int
+afb_req_common_cookie_getinit_hookable(
+	struct afb_req_common *req,
+	void **value,
+	int (*initcb)(void *closure, void **value, void (**freecb)(void*), void **freeclo),
+	void *closure
+);
+
+/* set the cookie of the api getting the request */
+extern
+int
+afb_req_common_cookie_drop_hookable(
+	struct afb_req_common *req
+);
+
 extern
 struct json_object *
 afb_req_common_get_client_info_hookable(

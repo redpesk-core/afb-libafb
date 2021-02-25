@@ -69,25 +69,26 @@ struct afb_hookid
 #define afb_hook_flag_req_get			0x00000008
 #define afb_hook_flag_req_reply 		0x00000010
 #define afb_hook_flag_req_get_client_info	0x00000020
-#define __afb_hook_spare_1			0x00000040
-#define __afb_hook_spare_2			0x00000080
-#define afb_hook_flag_req_addref		0x00000100
-#define afb_hook_flag_req_unref			0x00000200
-#define afb_hook_flag_req_session_close		0x00000400
-#define afb_hook_flag_req_session_set_LOA	0x00000800
-#define afb_hook_flag_req_subscribe		0x00001000
-#define afb_hook_flag_req_unsubscribe		0x00002000
-#define afb_hook_flag_req_subcall		0x00004000
-#define afb_hook_flag_req_subcall_result	0x00008000
-#define afb_hook_flag_req_subcallsync		0x00010000
-#define afb_hook_flag_req_subcallsync_result	0x00020000
-#define afb_hook_flag_req_vverbose		0x00040000
-#define __afb_hook_spare_3			0x00080000
-#define afb_hook_flag_req_session_get_LOA	0x00100000
-#define afb_hook_flag_req_has_permission	0x00200000
-#define afb_hook_flag_req_get_application_id	0x00400000
-#define afb_hook_flag_req_context_make		0x00800000
-#define afb_hook_flag_req_get_uid		0x01000000
+#define afb_hook_flag_req_addref		0x00000040
+#define afb_hook_flag_req_unref			0x00000080
+#define afb_hook_flag_req_session_close		0x00000100
+#define afb_hook_flag_req_session_set_LOA	0x00000200
+#define afb_hook_flag_req_subscribe		0x00000400
+#define afb_hook_flag_req_unsubscribe		0x00000800
+#define afb_hook_flag_req_subcall		0x00001000
+#define afb_hook_flag_req_subcall_result	0x00002000
+#define afb_hook_flag_req_subcallsync		0x00004000
+#define afb_hook_flag_req_subcallsync_result	0x00008000
+#define afb_hook_flag_req_vverbose		0x00010000
+#define afb_hook_flag_req_session_get_LOA	0x00020000
+#define afb_hook_flag_req_has_permission	0x00040000
+#define afb_hook_flag_req_get_application_id	0x00080000
+#define afb_hook_flag_req_get_uid		0x00100000
+#define afb_hook_flag_req_context_make		0x00200000
+#define afb_hook_flag_req_context_set		0x00400000
+#define afb_hook_flag_req_context_get		0x00800000
+#define afb_hook_flag_req_context_getinit	0x01000000
+#define afb_hook_flag_req_context_drop		0x02000000
 
 /* common flags */
 #define afb_hook_flags_req_life		(afb_hook_flag_req_begin|afb_hook_flag_req_end)
@@ -102,7 +103,9 @@ struct afb_hookid
 
 /* extra flags */
 #define afb_hook_flags_req_ref		(afb_hook_flag_req_addref|afb_hook_flag_req_unref)
-#define afb_hook_flags_req_context	(afb_hook_flag_req_context_make)
+#define afb_hook_flags_req_context	(afb_hook_flag_req_context_make|afb_hook_flag_req_context_set\
+					|afb_hook_flag_req_context_get|afb_hook_flag_req_context_getinit\
+					|afb_hook_flag_req_context_drop)
 
 /* predefined groups */
 #define afb_hook_flags_req_common	(afb_hook_flags_req_life|afb_hook_flags_req_args|afb_hook_flag_req_reply\
@@ -134,6 +137,10 @@ struct afb_hook_req_itf {
 	void (*hook_req_context_make)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result);
 	void (*hook_req_get_uid)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result);
 	void (*hook_req_get_client_info)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, struct json_object *result);
+	void (*hook_req_context_set)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, void (*freecb)(void*), void *freeclo, int result);
+	void (*hook_req_context_get)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int result);
+	void (*hook_req_context_getinit)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int (*initcb)(void*, void**, void(**)(void*), void**), void *initclo, int result);
+	void (*hook_req_context_drop)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result);
 };
 
 extern void afb_hook_init_req(struct afb_req_common *req);
@@ -165,6 +172,10 @@ extern char *afb_hook_req_get_application_id(const struct afb_req_common *req, c
 extern void *afb_hook_req_context_make(const struct afb_req_common *req, int replace, void *(*create_value)(void*), void (*free_value)(void*), void *create_closure, void *result);
 extern int afb_hook_req_get_uid(const struct afb_req_common *req, int result);
 extern struct json_object *afb_hook_req_get_client_info(const struct afb_req_common *req, struct json_object *result);
+extern int afb_hook_req_context_set(const struct afb_req_common *req, void *value, void (*freecb)(void*), void *freeclo, int result);
+extern int afb_hook_req_context_get(const struct afb_req_common *req, void *value, int result);
+extern int afb_hook_req_context_getinit(const struct afb_req_common *req, void *value, int (*initcb)(void*, void**, void(**)(void*), void**), void *closure, int result);
+extern int afb_hook_req_context_drop(const struct afb_req_common *req, int result);
 
 /*********************************************************
 * section hooking apis
