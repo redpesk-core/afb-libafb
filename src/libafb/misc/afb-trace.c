@@ -129,11 +129,11 @@ static struct json_object *json_object_of_data_x4(struct afb_data *data)
 	struct afb_data *item;
 	struct json_object *result;
 
-	rc = afb_data_convert_to(data, &afb_type_predefined_json_c, &item);
+	rc = afb_data_convert(data, &afb_type_predefined_json_c, &item);
 	if (rc < 0)
 		result = NULL;
 	else {
-		result = (struct json_object*)afb_data_const_pointer(item);
+		result = (struct json_object*)afb_data_ro_pointer(item);
 		result = json_object_get(result);
 		afb_data_unref(item);
 	}

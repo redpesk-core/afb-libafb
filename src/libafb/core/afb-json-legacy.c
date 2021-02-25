@@ -152,9 +152,9 @@ static int do_single_any_json(
 		rc = 0;
 	}
 	else {
-		rc = afb_data_convert_to(params[0], type, &dobj);
+		rc = afb_data_convert(params[0], type, &dobj);
 		if (rc >= 0)
-			object = afb_data_const_pointer(dobj);
+			object = afb_data_ro_pointer(dobj);
 		else {
 			dobj = NULL;
 			object = defval;
@@ -255,30 +255,30 @@ do_reply_any_json(
 	const void *object;
 
 	/* extract the replied object */
-	if (nreplies < 1 || !replies[0] || afb_data_convert_to(replies[0], type, &dobj) < 0) {
+	if (nreplies < 1 || !replies[0] || afb_data_convert(replies[0], type, &dobj) < 0) {
 		dobj = NULL;
 		object = type == &afb_type_predefined_json ? "null" : NULL;
 	}
 	else {
-		object = afb_data_const_pointer(dobj);
+		object = afb_data_ro_pointer(dobj);
 	}
 
 	/* extract the replied error */
-	if (nreplies < 2 || !replies[1] || afb_data_convert_to(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
+	if (nreplies < 2 || !replies[1] || afb_data_convert(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
 		derr = NULL;
 		error = NULL;
 	}
 	else {
-		error = (const char*)afb_data_const_pointer(derr);
+		error = (const char*)afb_data_ro_pointer(derr);
 	}
 
 	/* extract the replied info */
-	if (nreplies < 3 || !replies[2] || afb_data_convert_to(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
+	if (nreplies < 3 || !replies[2] || afb_data_convert(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
 		dinf = NULL;
 		info = NULL;
 	}
 	else {
-		info = (const char*)afb_data_const_pointer(dinf);
+		info = (const char*)afb_data_ro_pointer(dinf);
 	}
 
 	/* cohercision to coherent status */

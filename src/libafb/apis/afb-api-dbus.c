@@ -357,11 +357,11 @@ static void api_dbus_client_process(void *closure, struct afb_req_common *comreq
 	creds = afb_req_common_on_behalf_cred_export(comreq) ?: "";
 	uuid = afb_session_uuid(comreq->session);
 	if (comreq->params.ndata < 1
-	 || afb_data_convert_to(comreq->params.data[0], &afb_type_predefined_json, &arg) < 0) {
+	 || afb_data_convert(comreq->params.data[0], &afb_type_predefined_json, &arg) < 0) {
 		json = "null";
 	}
 	else {
-		json = afb_data_const_pointer(arg);
+		json = afb_data_ro_pointer(arg);
 	}
 	rc = sd_bus_message_append(msg, "ssus", json, uuid, 0, creds);
 	if (rc < 0)

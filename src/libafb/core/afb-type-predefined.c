@@ -133,7 +133,7 @@
 #define GET_BASIC(stype,ctype) \
 	UNUSED_POLICY \
 	static ctype get_##stype(struct afb_data *data) {\
-		return *(const ctype*)afb_data_const_pointer(data); \
+		return *(const ctype*)afb_data_ro_pointer(data); \
 	}
 
 #define SET_BASIC(stype,ctype) \
@@ -333,7 +333,7 @@ static int make_json_copy(struct afb_data **result, const char *value) {
 
 UNUSED_POLICY
 static const char *get_json(struct afb_data *data) {
-	return (const char*)afb_data_const_pointer(data);
+	return (const char*)afb_data_ro_pointer(data);
 }
 
 /*****************************************************************************/
@@ -352,7 +352,7 @@ static int make_json_c(struct afb_data **result, struct json_object *value) {
 
 UNUSED_POLICY
 static struct json_object *get_json_c(struct afb_data *data) {
-	return (struct json_object*)afb_data_const_pointer(data);
+	return (struct json_object*)afb_data_ro_pointer(data);
 }
 
 /*****************************************************************************/
@@ -417,7 +417,7 @@ CONVERT(stringz,opaque)
 	int rc;
 	const char *s;
 
-	s = afb_data_const_pointer(in);
+	s = afb_data_ro_pointer(in);
 	rc = opaque_from_string(s, 0, type, out);
 	return rc;
 }
@@ -429,7 +429,7 @@ CONVERT(stringz,json)
 	size_t isz, osz;
 
 	/* null is still null */
-	istr = afb_data_const_pointer(in);
+	istr = afb_data_ro_pointer(in);
 	if (!istr)
 		return afb_data_create_raw(out, type, "null", 5, 0, 0);
 
@@ -472,7 +472,7 @@ CONVERT(json,json_c)
 	enum json_tokener_error jerr;
 	const char *str;
 
-	str = afb_data_const_pointer(in);
+	str = afb_data_ro_pointer(in);
 	json = json_tokener_parse_verbose(str, &jerr);
 	if (jerr != json_tokener_success)
 		json = json_object_new_string(str);
@@ -485,7 +485,7 @@ CONVERT(json,opaque)
 	int rc;
 	const char *s;
 
-	s = afb_data_const_pointer(in);
+	s = afb_data_ro_pointer(in);
 	if (*s++ != '"')
 		rc = X_EINVAL;
 	else
@@ -511,7 +511,7 @@ CONVERT(json_c,json)
 	size_t sz;
 	int rc;
 
-	object = (struct json_object *)afb_data_const_pointer(in);
+	object = (struct json_object *)afb_data_ro_pointer(in);
 #if JSON_C_VERSION_NUM >= 0x000D00
 	jsonstr = json_object_to_json_string_length(object, JSON_C_TO_STRING_NOSLASHESCAPE, &sz);
 #else
@@ -535,7 +535,7 @@ CONVERT(json_c,opaque)
 	struct json_object *object;
 	const char *s;
 
-	object = (struct json_object *)afb_data_const_pointer(in);
+	object = (struct json_object *)afb_data_ro_pointer(in);
 	if (!json_object_is_type(object, json_type_string))
 		rc = X_EINVAL;
 	else {

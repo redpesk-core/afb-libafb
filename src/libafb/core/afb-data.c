@@ -699,7 +699,7 @@ afb_data_unref(
 
 /* Get the pointer. */
 const void*
-afb_data_const_pointer(
+afb_data_ro_pointer(
 	struct afb_data *data
 ) {
 	data = data_value_constant(data);
@@ -717,7 +717,7 @@ afb_data_size(
 
 /* add conversion from other data */
 int
-afb_data_convert_to(
+afb_data_convert(
 	struct afb_data *data,
 	struct afb_type *type,
 	struct afb_data **result

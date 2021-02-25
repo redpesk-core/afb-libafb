@@ -179,7 +179,7 @@ START_TEST (check_data)
 	s = afb_data_create_raw(&data, type1, buffer, size, dor, i2p(m));
 	ck_assert(s == 0);
 	ck_assert(type1 == afb_data_type(data));
-	ck_assert(buffer == afb_data_const_pointer(data));
+	ck_assert(buffer == afb_data_ro_pointer(data));
 	ck_assert(size == afb_data_size(data));
 	gmask = 0;
 	afb_data_unref(data);
@@ -200,7 +200,7 @@ static void tconv(struct afb_type *from, struct afb_type *to, int cvt, int drop)
 	rc = afb_data_create_raw(&dfrom, from, 0, 0, cvdrop, i2p(rc));
 	ck_assert_int_eq(rc, 0);
 	gmask = cvtmask = dropmask = 0;
-	rc = afb_data_convert_to(dfrom, to, &dto);
+	rc = afb_data_convert(dfrom, to, &dto);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(cvtmask, cvt);
 	afb_data_unref(dfrom);
@@ -233,7 +233,7 @@ START_TEST (check_cache)
 	rc = afb_data_create_raw(&data, type1, 0, 0, cvdrop, i2p(10));
 
 	// make a first convertion
-	rc = afb_data_convert_to(data, type2, &convertedData);
+	rc = afb_data_convert(data, type2, &convertedData);
 
 	// check that the convertion went wel
 	ck_assert_int_eq(rc, 0);
@@ -249,7 +249,7 @@ START_TEST (check_cache)
 	// on the output doesn't generate a new conversation but just point
 	// to the previously generated result meaning that the convertion
 	// has correctly been stored in the cache
-	rc = afb_data_convert_to(data, type2, &convertedDataBis);
+	rc = afb_data_convert(data, type2, &convertedDataBis);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(gmask, 0);
 	ck_assert_ptr_eq(convertedData, convertedDataBis);
@@ -278,7 +278,7 @@ void predefconv(struct afb_type *from, struct afb_type *to){
 
 	r = afb_data_create_raw(&data, from, &i, 0, data_dispose, i2p(1));
 	ck_assert_int_eq(r, 0);
-	r = afb_data_convert_to(data, &afb_type_predefined_i64, &result);
+	r = afb_data_convert(data, &afb_type_predefined_i64, &result);
 	ck_assert_int_eq(r, 0);
 }
 
@@ -314,7 +314,7 @@ START_TEST (test_predefine_types){
 		ck_assert_int_eq(r, 0);
 		for(j=0; type_data[j].predef_type!=NULL; j++){
 			fprintf(stderr, "testing convertion from %s to %s => ", afb_type_name(type_data[i].predef_type), afb_type_name(type_data[j].predef_type));
-			r = afb_data_convert_to(data, type_data[j].predef_type, &result);
+			r = afb_data_convert(data, type_data[j].predef_type, &result);
 			if (r == X_ENOENT) {
 				fprintf(stderr, "no convertion available !\n");
 				ck_assert_ptr_eq(result, NULL);

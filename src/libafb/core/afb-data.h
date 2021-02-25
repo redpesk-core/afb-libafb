@@ -199,7 +199,7 @@ afb_data_unref(
  */
 extern
 const void*
-afb_data_const_pointer(
+afb_data_ro_pointer(
 	struct afb_data *data
 );
 
@@ -226,7 +226,7 @@ afb_data_size(
  */
 extern
 int
-afb_data_convert_to(
+afb_data_convert(
 	struct afb_data *data,
 	struct afb_type *type,
 	struct afb_data **result

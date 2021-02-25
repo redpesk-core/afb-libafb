@@ -151,7 +151,7 @@ void testCB(void *closure1, void *closure2, void *closure3, int a, unsigned int 
     unsigned int i;
 	fprintf(stderr, "testCB was called\n");
 	for (i=0; i<b; i++) {
-		verbDataGval += p2i(afb_data_const_pointer(data[i]));
+		verbDataGval += p2i(afb_data_ro_pointer(data[i]));
 	}
 }
 
@@ -279,7 +279,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -293,7 +293,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -307,7 +307,7 @@ START_TEST (test)
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	ck_assert_int_eq(status, 0);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -321,7 +321,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -335,7 +335,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -349,7 +349,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -363,7 +363,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -377,7 +377,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
@@ -391,7 +391,7 @@ START_TEST (test)
 	ck_assert_int_eq(status, 0);
 	ck_assert_int_eq(NBPARAMS-1, nreplies);
 	for (i=0; i<nreplies; i++) {
-		ck_assert_int_eq(i+1, p2i(afb_data_const_pointer(replies[i])));
+		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
 	afb_params_unref(nreplies, replies);
