@@ -92,12 +92,12 @@ async_cb_status_final(
 static int reply_error(struct afb_req_common *req, int status, const char *arg)
 {
 	const char *text;
-	struct afb_data *reply[3];
+	struct afb_data *reply[4];
 
 	/* FIXME */
 	text = afb_error_text(status);
 	afb_json_legacy_make_reply_json_c(reply, 0, text, 0, 0, arg, 0, 0);
-	afb_req_common_reply_hookable(req, status, 3, reply);
+	afb_req_common_reply_hookable(req, status, 4, reply);
 	return status;
 }
 

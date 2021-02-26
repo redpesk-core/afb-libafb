@@ -48,6 +48,20 @@ static const char _success_[] = "success";
 
 /**********************************************************************/
 
+static struct afb_data *legacy_tag_data(int addref)
+{
+	static const char tagname[] = "legacy-tag";
+	static struct afb_data *tag = NULL;
+	if (tag == NULL) {
+		afb_data_create_raw(&tag, &afb_type_predefined_stringz, tagname, sizeof tagname, NULL, NULL);
+		if (tag)
+			afb_data_set_constant(tag);
+	}
+	return addref ? tag : afb_data_addref(tag);
+}
+
+/**********************************************************************/
+
 int
 afb_json_legacy_make_data_json_c(
 	struct afb_data **result,
@@ -129,6 +143,47 @@ afb_json_legacy_make_data_stringz_mode(
 }
 
 /**********************************************************************/
+
+static int merge_as_json_array(
+	struct afb_data **result,
+	unsigned ndatas,
+	struct afb_data * const datas[]
+) {
+	int rc;
+	unsigned idx;
+	struct afb_data *cvtdata;
+	struct json_object *array, *cvtobj;
+
+	/* create the array */
+	array = json_object_new_array();
+	if (array == NULL) {
+		*result = NULL;
+		return X_ENOMEM;
+	}
+
+	/* create the result data */
+	rc = afb_data_create_raw(result, &afb_type_predefined_json_c, array, 0, (void*)json_object_put, array);
+	if (rc < 0)
+		return rc;
+
+	/* fill the array */
+	for (idx = 0 ; idx < ndatas ; idx++) {
+		rc = afb_data_convert(datas[idx], &afb_type_predefined_json_c, &cvtdata);
+		if (rc >= 0) {
+			cvtobj = (void*)afb_data_ro_pointer(cvtdata);
+			cvtobj = json_object_get(cvtobj);
+			afb_data_unref(cvtdata);
+		}
+		else {
+			/* LOG ERROR ? */
+			cvtobj = NULL;
+		}
+		json_object_array_add(array, cvtobj);
+	}
+
+	return 0;
+}
+
 /**
  * Unpack the data compatible with legacy versions V1, V2, V3.
  */
@@ -142,17 +197,26 @@ static int do_single_any_json(
 	const void *defval
 ) {
 	int rc;
-	struct afb_data *dobj;
+	struct afb_data *dobj, *dmerge;
 	const void *object;
 
 	/* extract the object */
-	if (nparams < 1 || !params[0]) {
+	if (nparams < 1 || (nparams == 1 && params[0] == NULL)) {
 		dobj = NULL;
 		object = defval;
 		rc = 0;
 	}
 	else {
-		rc = afb_data_convert(params[0], type, &dobj);
+		if (nparams == 1) {
+			rc = afb_data_convert(params[0], type, &dobj);
+		}
+		else {
+			rc = merge_as_json_array(&dmerge, nparams, params);
+			if (rc >= 0) {
+				rc = afb_data_convert(dmerge, type, &dobj);
+				afb_data_unref(dmerge);
+			}
+		}
 		if (rc >= 0)
 			object = afb_data_ro_pointer(dobj);
 		else {
@@ -250,35 +314,67 @@ do_reply_any_json(
 	void (*callback)(void*, const void*, const char*, const char*),
 	struct afb_type *type
 ) {
-	struct afb_data *dobj, *derr, *dinf;
+	int rc;
+	struct afb_data *dobj, *derr, *dinf, *ddat;
 	const char *error, *info;
 	const void *object;
 
-	/* extract the replied object */
-	if (nreplies < 1 || !replies[0] || afb_data_convert(replies[0], type, &dobj) < 0) {
+	if (nreplies != 4 || replies[3] != legacy_tag_data(0)) {
+		/* not a legacy reply! merge replies in one array */
 		dobj = NULL;
 		object = type == &afb_type_predefined_json ? "null" : NULL;
-	}
-	else {
-		object = afb_data_ro_pointer(dobj);
-	}
-
-	/* extract the replied error */
-	if (nreplies < 2 || !replies[1] || afb_data_convert(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
+		if (nreplies == 1) {
+			if (replies[0]) {
+				rc = afb_data_convert(replies[0], type, &ddat);
+				if (rc >= 0) {
+					dobj = ddat;
+					object = afb_data_ro_pointer(dobj);
+				}
+			}
+		}
+		else if (nreplies > 1) {
+			rc = merge_as_json_array(&ddat, nreplies, replies);
+			if (rc >= 0) {
+				rc = afb_data_convert(ddat, type, &dobj);
+				afb_data_unref(ddat);
+				if (rc >= 0)
+					object = afb_data_ro_pointer(dobj);
+				else
+					dobj = NULL;
+			}
+		}
 		derr = NULL;
 		error = NULL;
-	}
-	else {
-		error = (const char*)afb_data_ro_pointer(derr);
-	}
-
-	/* extract the replied info */
-	if (nreplies < 3 || !replies[2] || afb_data_convert(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
 		dinf = NULL;
 		info = NULL;
 	}
 	else {
-		info = (const char*)afb_data_ro_pointer(dinf);
+		/* extract the replied object */
+		if (nreplies < 1 || !replies[0] || afb_data_convert(replies[0], type, &dobj) < 0) {
+			dobj = NULL;
+			object = type == &afb_type_predefined_json ? "null" : NULL;
+		}
+		else {
+			object = afb_data_ro_pointer(dobj);
+		}
+
+		/* extract the replied error */
+		if (nreplies < 2 || !replies[1] || afb_data_convert(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
+			derr = NULL;
+			error = NULL;
+		}
+		else {
+			error = (const char*)afb_data_ro_pointer(derr);
+		}
+
+		/* extract the replied info */
+		if (nreplies < 3 || !replies[2] || afb_data_convert(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
+			dinf = NULL;
+			info = NULL;
+		}
+		else {
+			info = (const char*)afb_data_ro_pointer(dinf);
+		}
 	}
 
 	/* cohercision to coherent status */
@@ -297,7 +393,6 @@ do_reply_any_json(
 
 	return 0; /* TODO: process allocation errors */
 }
-
 
 /**
  * Unpack the data of a reply to extract the reply compatible with
@@ -375,7 +470,7 @@ int afb_json_legacy_get_reply_sync(
 /**********************************************************************/
 int
 afb_json_legacy_make_reply_json_string(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	const char *object, void (*dobj)(void*), void *cobj,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
@@ -389,6 +484,8 @@ afb_json_legacy_make_reply_json_string(
 			rc = afb_data_create_raw(&params[2], &afb_type_predefined_stringz, info, SLEN(info), dinf, cinf);
 			if (rc < 0)
 				afb_data_unref(params[1]);
+			else
+				params[3] = legacy_tag_data(1);
 		}
 		if (rc < 0)
 			afb_data_unref(params[0]);
@@ -398,7 +495,7 @@ afb_json_legacy_make_reply_json_string(
 
 int
 afb_json_legacy_make_reply_json_c(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	struct json_object *object,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
@@ -412,6 +509,8 @@ afb_json_legacy_make_reply_json_c(
 			rc = afb_data_create_raw(&params[2], &afb_type_predefined_stringz, info, SLEN(info), dinf, cinf);
 			if (rc < 0)
 				afb_data_unref(params[1]);
+			else
+				params[3] = legacy_tag_data(1);
 		}
 		if (rc < 0)
 			afb_data_unref(params[0]);
@@ -419,22 +518,9 @@ afb_json_legacy_make_reply_json_c(
 	return rc;
 }
 
-/**
- * Create in params the data of the legacy reply corresponding
- * to the given object, strings and modes.
- *
- * @param params   the parameters to create, an array of at least 3 data
- * @param object   the JSON-C object to return or NULL
- * @param error    the error text if error or NULL
- * @param info     the informative test or NULL
- * @param mode_error  The mode of the error string (static/copy/free)
- * @param mode_info   The mode of the info string (static/copy/free)
- *
- * @return 0 in case of success or an error code negative
- */
 int
 afb_json_legacy_make_reply_json_c_mode(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	struct json_object *object,
 	const char *error,
 	const char *info,
@@ -450,6 +536,8 @@ afb_json_legacy_make_reply_json_c_mode(
 			rc = afb_json_legacy_make_data_stringz_mode(&params[2], info, mode_info);
 			if (rc < 0)
 				afb_data_unref(params[1]);
+			else
+				params[3] = legacy_tag_data(1);
 		}
 		if (rc < 0)
 			afb_data_unref(params[0]);
@@ -473,10 +561,10 @@ afb_json_legacy_req_reply_hookable(
 	const char *error,
 	const char *info
 ) {
-	struct afb_data *reply[3];
+	struct afb_data *reply[4];
 
 	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Copy);
-	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 3, reply);
+	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 4, reply);
 }
 
 void
@@ -487,14 +575,14 @@ afb_json_legacy_req_vreply_hookable(
 	const char *fmt,
 	va_list args
 ) {
-	struct afb_data *reply[3];
+	struct afb_data *reply[4];
 	char *info;
 
 	if (fmt == NULL || vasprintf(&info, fmt, args) < 0)
 		info = NULL;
 
 	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Free);
-	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 3, reply);
+	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 4, reply);
 }
 
 /**************************************************************************/

@@ -298,7 +298,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 	int rc;
 	struct dbus_memo *memo;
 	const char *json, *error, *info;
-	struct afb_data *params[3];
+	struct afb_data *params[4];
 
 	/* retrieve the recorded data */
 	memo = userdata;
@@ -322,7 +322,7 @@ static int api_dbus_client_on_reply(sd_bus_message *message, void *userdata, sd_
 			/* failing to have the answer */
 			afb_req_common_reply_internal_error_hookable(memo->comreq, rc);
 		} else {
-			afb_req_common_reply_hookable(memo->comreq, LEGACY_STATUS(error), 3, params);
+			afb_req_common_reply_hookable(memo->comreq, LEGACY_STATUS(error), 4, params);
 		}
 	}
 	api_dbus_client_memo_destroy(memo);

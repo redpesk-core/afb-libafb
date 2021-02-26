@@ -140,7 +140,7 @@ afb_json_legacy_get_reply_sync(
 extern
 int
 afb_json_legacy_make_reply_json_string(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	const char *object, void (*dobj)(void*), void *cobj,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
@@ -149,16 +149,29 @@ afb_json_legacy_make_reply_json_string(
 extern
 int
 afb_json_legacy_make_reply_json_c(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	struct json_object *object,
 	const char *error, void (*derr)(void*), void *cerr,
 	const char *info, void (*dinf)(void*), void *cinf
 );
 
+/**
+ * Create in params the data of the legacy reply corresponding
+ * to the given object, strings and modes.
+ *
+ * @param params   the parameters to create, an array of at least 4 data
+ * @param object   the JSON-C object to return or NULL
+ * @param error    the error text if error or NULL
+ * @param info     the informative test or NULL
+ * @param mode_error  The mode of the error string (static/copy/free)
+ * @param mode_info   The mode of the info string (static/copy/free)
+ *
+ * @return 0 in case of success or an error code negative
+ */
 extern
 int
 afb_json_legacy_make_reply_json_c_mode(
-	struct afb_data *params[],
+	struct afb_data *params[4],
 	struct json_object *object,
 	const char *error,
 	const char *info,
