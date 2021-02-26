@@ -213,6 +213,9 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 /*-- EXTRA FUNCTIONS -----------------------------------*/
 
 	.req_session_get_LOA = afb_req_v4_session_get_LOA_hookable,
+	.data_dependency_add = afb_data_dependency_add,
+	.data_dependency_sub = afb_data_dependency_sub,
+	.data_dependency_drop_all = afb_data_dependency_drop_all,
 
 /*-- END -----------------------------------*/
 };
