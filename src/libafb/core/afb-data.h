@@ -198,7 +198,7 @@ afb_data_unref(
  * @return the pointer of the data
  */
 extern
-const void*
+void*
 afb_data_ro_pointer(
 	struct afb_data *data
 );
@@ -389,7 +389,7 @@ extern
 int
 afb_data_get_constant(
 	struct afb_data *data,
-	const void **pointer,
+	void **pointer,
 	size_t *size);
 
 /**

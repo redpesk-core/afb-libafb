@@ -847,12 +847,12 @@ afb_data_unref(
 }
 
 /* Get the pointer. */
-const void*
+void*
 afb_data_ro_pointer(
 	struct afb_data *data
 ) {
 	data = data_value_constant(data);
-	return data ? data->pointer : NULL;
+	return data ? (void*)data->pointer : NULL;
 }
 
 /* Get the size. */
@@ -1129,14 +1129,14 @@ int afb_data_get_mutable(struct afb_data *data, void **pointer, size_t *size)
 }
 
 /* get values for read */
-int afb_data_get_constant(struct afb_data *data, const void **pointer, size_t *size)
+int afb_data_get_constant(struct afb_data *data, void **pointer, size_t *size)
 {
 	int rc;
 
 	data = data_value_constant(data);
 	if (data) {
 		if (pointer)
-			*pointer = data->pointer;
+			*pointer = (void*)data->pointer;
 		if (size)
 			*size = data->size;
 		rc = 0;
