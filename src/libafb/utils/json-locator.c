@@ -30,6 +30,25 @@
 
 #include "json-locator.h"
 
+#if JSON_C_MINOR_VERSION < 13 /************* DONT IMPLEMENT LOCATOR *********/
+
+int json_locator_from_file(struct json_object **jso, const char *filename)
+{
+	*jso = json_object_from_file(filename);
+	return *jso ? 0 : -ENOMEM;
+}
+
+const char *json_locator_locate(struct json_object *jso, unsigned *linenum)
+{
+	return NULL;
+}
+
+void json_locator_copy(struct json_object *from, struct json_object *to)
+{
+}
+
+#else /************* IMPLEMENT LOCATOR *************************/
+
 #define COUNT 2000
 
 struct block
@@ -535,6 +554,8 @@ void json_locator_copy(struct json_object *from, struct json_object *to)
 		}
 	}
 }
+
+#endif /************* IMPLEMENT LOCATOR *************************/
 
 /**
  * Structure recording the path path of the expansion
