@@ -777,11 +777,13 @@ error:
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
-	const int one_second = 1000000; /* 1000000 us = 1000 ms = 1s */
-	const int delay_short = 1000; /* 1000 us = 1 ms */
-	const int delay_long = 100000; /* 100000 us = 100 ms */
+	const long one_second  = 1000000000; /* 1000 000 000 ns = 1000 ms = 1s */
+	const long delay_long  =  100000000; /*  100 000 000 ns = 100 ms */
+	const long delay_short =    1000000; /*    1 000 000 ns = 1 ms */
 
-	int cpt = 0, delay, jobcnt, idle;
+	int jobcnt, idle, rc;
+	struct timespec ts;
+	long cpt = 0, delay;
 
 	for(;;) {
 		/* get the current counters */
@@ -795,7 +797,7 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 		}
 		x_mutex_unlock(&mutex);
 
-		/* compute next delay or exit if diled as expected */
+		/* compute next delay or exit if idle as expected */
 		if (!idle)
 			delay = delay_short;
 		else {
@@ -817,7 +819,11 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 		 * condition.
 		 */
 		cpt += delay;
-		usleep((useconds_t)delay);
+		ts.tv_sec = 0;
+		ts.tv_nsec = delay;
+		rc = nanosleep(&ts, &ts);
+		if (rc < 0)
+			cpt -= ts.tv_nsec;
 
 		/* handle timeout decount (coarse grained timeout) */
 		if (cpt >= one_second) {

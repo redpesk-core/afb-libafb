@@ -39,6 +39,14 @@
 
 /*********************************************************************/
 
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
+
+/*********************************************************************/
+
 #define NB_TEST_JOBS 3 // must be >= 3
 
 #define i2p(x)  ((void*)((intptr_t)(x)))
@@ -228,7 +236,7 @@ START_TEST(job_delayed)
 		fprintf(stderr, "wait to reach %dms after start...    ", DELAY*i);
 		t = getnow();
 		while((getnow()-start) < (long unsigned int)(DELAY*i))
-			usleep(100);
+			nsleep(100);
 		fprintf(stderr, "slept %ldms\n", getnow()-t);
 
 		// then check that the job is now available

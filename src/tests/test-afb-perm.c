@@ -45,6 +45,14 @@
 #include "core/afb-sched.h"
 #include "sys/ev-mgr.h"
 
+/*********************************************************************/
+
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
+
 
 #define BUF_SIZE 1024
 #define SESSION_NAME "testSession"
@@ -149,7 +157,7 @@ void startDemonCynagora(){
 		fprintf(stderr, "ERROR : Cynagora Deamon fork failed ! returned %d\n", gpid);
 	}
 	fprintf(stderr, "cynagora deamon starting on Id : %d\n", gpid);
-	usleep(500000);
+	nsleep(500000);
 }
 
 void stopDemonCynagora(){

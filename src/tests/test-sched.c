@@ -41,6 +41,14 @@
 
 /*********************************************************************/
 
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
+
+/*********************************************************************/
+
 #define i2p(x)  ((void*)((intptr_t)(x)))
 #define p2i(x)  ((int)((intptr_t)(x)))
 
@@ -345,7 +353,7 @@ void test_start_sched_adapt(int sig, void * arg){
         while(afb_jobs_get_pending_count() != 0){
             fprintf(stderr, "[%d] pending jobs = %d\n", r, afb_jobs_get_pending_count());
             fflush(stderr);
-            usleep(250000);
+            nsleep(250000);
             r++;
         }
 
@@ -361,7 +369,7 @@ void test_start_sched_adapt(int sig, void * arg){
             fprintf(stderr, "\npending jobs = %d\nrunning job %d\nlast job = %d\n", afb_jobs_get_pending_count(), gval.runingJobs, gval.lastJob);
             fflush(stderr);
             pthread_mutex_unlock(&gval.mutex);
-            usleep(250000);
+            nsleep(250000);
         }
 
         pthread_mutex_lock(&gval.mutex);

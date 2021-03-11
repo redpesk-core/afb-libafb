@@ -28,6 +28,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <check.h>
 
@@ -61,6 +62,14 @@
 #include "core/afb-sched.h"
 #include "core/afb-sig-monitor.h"
 
+
+/*********************************************************************/
+
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
 
 /*********************************************************************/
 /* afb_req_common requirement */
@@ -354,7 +363,7 @@ START_TEST (process)
 	afb_req_common_process(req, test_apiset);
 
 	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		usleep(10);
+		nsleep(10);
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -435,7 +444,7 @@ START_TEST(process_on_behalf)
 	);
 
 	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		usleep(10);
+		nsleep(10);
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -451,7 +460,7 @@ START_TEST(process_on_behalf)
 	ck_assert_ptr_null(req->credentials);
 
 	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		usleep(10);
+		nsleep(10);
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	//ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -651,7 +660,7 @@ START_TEST(replay)
 	gval = 0;
 
 	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		usleep(10);
+		nsleep(10);
 
 	ck_assert_int_eq(gval, dataChecksum);
 
@@ -674,7 +683,7 @@ START_TEST(replay)
 	gval = 0;
 
 	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		usleep(10);
+		nsleep(10);
 
 	ck_assert_int_eq(gval, dataChecksum);
 

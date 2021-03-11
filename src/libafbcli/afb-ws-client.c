@@ -211,14 +211,18 @@ static int writeall(int fd, const void *buffer, size_t size)
 {
 	size_t offset;
 	ssize_t ssz;
+	struct timespec ts;
 
 	offset = 0;
 	while (size > offset) {
 		ssz = write(fd, buffer + offset, size - offset);
 		if (ssz >= 0)
 			offset += (size_t)ssz;
-		else if (errno == EAGAIN)
-			usleep(10000);
+		else if (errno == EAGAIN) {
+			ts.tv_sec = 0;
+			ts.tv_nsec = 10000000;
+			nanosleep(&ts, NULL);
+		}
 		else if (errno != EINTR)
 			return -1;
 	}

@@ -41,6 +41,14 @@
 
 /*********************************************************************/
 
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
+
+/*********************************************************************/
+
 #define TRUE 1
 #define FALSE 0
 
@@ -232,7 +240,7 @@ START_TEST(sigterm_test)
 	}
 	else {
 		fprintf(stderr, "job with gpid %d sleeping for 10000µs\n", (int)gpid);
-		usleep(10000);
+		nsleep(10000);
 		fprintf(stderr, "afb_jobs_get_pending_count = %d\n", afb_jobs_get_pending_count());
 		kill(gpid, SIGTERM);
 		apid = wait(&status);
