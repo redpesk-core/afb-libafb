@@ -418,18 +418,25 @@ int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, con
 int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax)
 {
 	char buffer[PATH_MAX];
+	const char *target;
 	struct locale_root *root;
-	int rc;
+	int rc = 0;
 
-	rc = snprintf(buffer, sizeof buffer, "%s/%s", basepath, alias);
-	if (rc < 0 || rc >= (int)(sizeof buffer)) {
-		ERROR("can't make path %s/%s", basepath, alias);
-		rc = 0;
-	} else {
-		root = locale_root_create_path(buffer);
+	if (basepath == NULL)
+		target = alias;
+	else {
+		rc = snprintf(buffer, sizeof buffer, "%s/%s", basepath, alias);
+		if (rc > 0 && rc < (int)(sizeof buffer))
+			target = buffer;
+		else {
+			ERROR("can't make path %s/%s", basepath, alias);
+			target = NULL;
+		}
+	}
+	if (target != NULL) {
+		root = locale_root_create_path(target);
 		if (root == NULL) {
-			ERROR("can't connect to directory %s: %m", alias);
-			rc = 0;
+			ERROR("can't connect to directory %s: %m", target);
 		} else {
 			rc = afb_hsrv_add_alias_root(hsrv, prefix, root, priority, relax);
 			locale_root_unref(root);
