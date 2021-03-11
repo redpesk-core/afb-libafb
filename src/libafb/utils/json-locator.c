@@ -229,11 +229,13 @@ static void *my_realloc(void *ptr, size_t size, const void *caller)
 {
 	void *result;
 
+	restore_hooks();
 	if (ptr)
 		deltag(ptr);
-	restore_hooks();
 	result = realloc(ptr, size);
 	if (result)
+		addtag(result, size, malloc);
+	else if (ptr)
 		addtag(ptr, size, malloc);
 	set_my_hooks();
 	return result;

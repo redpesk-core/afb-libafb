@@ -724,7 +724,7 @@ static int vunpack(struct json_object *object, const char *desc, va_list args, i
 				ignore--;
 			break;
 		case '!':
-			if (*d != xacc[0])
+			if (*d != xacc[0] || top == NULL)
 				goto invalid_character;
 			if (!ignore && top->index != top->count)
 				goto incomplete;

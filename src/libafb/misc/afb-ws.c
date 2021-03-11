@@ -357,23 +357,32 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 		} else {
 			dsz -= rc;
 			if (dsz == 0)
-				return sz;
+				return sz; /* all is read */
 
+			/* skip fully written blocs */
 			i = 0;
 			while (rc >= (ssize_t)iov2[i].iov_len)
 				rc -= (ssize_t)iov2[i++].iov_len;
 
 			iovcnt -= i;
-			if (iov2 != iov)
+			if (iov2 != iov) {
+				/* copied block */
 				iov2 += i;
-			else {
-				iov += i;
-				iov2 = alloca((unsigned)iovcnt * sizeof *iov2);
-				for (i = 0 ; i < iovcnt ; i++)
-					iov2[i] = iov[i];
+				iov2->iov_base += rc;
+				iov2->iov_len -= (size_t)rc;
 			}
-			iov2->iov_base += rc;
-			iov2->iov_len -= (size_t)rc;
+			else if (rc == 0) {
+				/* initial block */
+				iov2 += i;
+				iov += i;
+			}
+			else {
+				/* needed copy block */
+				iov2 = alloca((unsigned)iovcnt * sizeof *iov2);
+				memcpy(iov2, &iov[i], (unsigned)iovcnt * sizeof *iov2);
+				iov2->iov_base += rc;
+				iov2->iov_len -= (size_t)rc;
+			}
 		}
 		pfd.fd = ws->fd;
 		pfd.events = POLLOUT;

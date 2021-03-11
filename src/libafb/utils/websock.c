@@ -489,36 +489,37 @@ loop:
 
 static void unmask(struct websock * ws, void *buffer, size_t size)
 {
-	uint32_t mask, *b32;
-	uint8_t m, *b8;
+	union { uint32_t u32; uint8_t u8[4]; } umask;
+	uint32_t *b32;
+	uint8_t u8, *b8;
 
-	mask = ws->mask;
+	umask.u32 = ws->mask;
 	b8 = buffer;
 	while (size && ((sizeof(uint32_t) - 1) & (uintptr_t) b8)) {
-		m = ((uint8_t *) & mask)[0];
-		((uint8_t *) & mask)[0] = ((uint8_t *) & mask)[1];
-		((uint8_t *) & mask)[1] = ((uint8_t *) & mask)[2];
-		((uint8_t *) & mask)[2] = ((uint8_t *) & mask)[3];
-		((uint8_t *) & mask)[3] = m;
-		*b8++ ^= m;
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*b8++ ^= u8;
 		size--;
 	}
 	b32 = (uint32_t *) b8;
 	while (size >= sizeof(uint32_t)) {
-		*b32++ ^= mask;
+		*b32++ ^= umask.u32;
 		size -= sizeof(uint32_t);
 	}
 	b8 = (uint8_t *) b32;
 	while (size) {
-		m = ((uint8_t *) & mask)[0];
-		((uint8_t *) & mask)[0] = ((uint8_t *) & mask)[1];
-		((uint8_t *) & mask)[1] = ((uint8_t *) & mask)[2];
-		((uint8_t *) & mask)[2] = ((uint8_t *) & mask)[3];
-		((uint8_t *) & mask)[3] = m;
-		*b8++ ^= m;
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*b8++ ^= u8;
 		size--;
 	}
-	ws->mask = mask;
+	ws->mask = umask.u32;
 }
 
 ssize_t websock_read(struct websock * ws, void *buffer, size_t size)

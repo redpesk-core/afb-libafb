@@ -141,8 +141,10 @@ static int make_api_dbus_3(struct api_dbus **papi, int system, const char *path,
 	/* choose the bus */
 	afb_sched_acquire_event_manager();
 	sdbus = (system ? afb_systemd_get_system_bus : afb_systemd_get_user_bus)();
-	if (sdbus == NULL)
+	if (sdbus == NULL) {
+		rc = X_ECANCELED;
 		goto error2;
+	}
 
 	api->sdbus = sdbus;
 	*papi = api;

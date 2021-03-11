@@ -75,38 +75,39 @@ static size_t default_maxlength = WS_DEFAULT_MAXLENGTH;
 static uint32_t unmask(uint32_t mask, char *buffer, size_t count)
 {
 	uint32_t *b32;
-	char m, *b8, *m8;
+	uint8_t u8, *b8;
+	union { uint32_t u32; uint8_t u8[4]; } umask;
 
 	/* ensure uint32_t alignment */
-	m8 = (char*)&mask;
-	b8 = buffer;
+	umask.u32 = mask;
+	b8 = (uint8_t*)buffer;
 	while (count && ((sizeof(uint32_t) - 1) & (uintptr_t) b8)) {
-		m = m8[0];
-		m8[0] = m8[1];
-		m8[1] = m8[2];
-		m8[2] = m8[3];
-		m8[3] = m;
-		*b8++ ^= m;
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*b8++ ^= u8;
 		count--;
 	}
 	/* uint32_ aligned xors */
 	b32 = (uint32_t*)b8;
 	while (count >= sizeof(uint32_t)) {
-		*b32++ ^= mask;
+		*b32++ ^= umask.u32;
 		count -= sizeof(uint32_t);
 	}
 	/* terminates */
-	b8 = (char*)b32;
+	b8 = (uint8_t*)b32;
 	while (count) {
-		m = m8[0];
-		m8[0] = m8[1];
-		m8[1] = m8[2];
-		m8[2] = m8[3];
-		m8[3] = m;
-		*b8++ ^= m;
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*b8++ ^= u8;
 		count--;
 	}
-	return mask;
+	return umask.u32;
 }
 
 

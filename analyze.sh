@@ -1,5 +1,10 @@
 #!/bin/sh
 
-cppcheck src/libafb
+doit() {
 
-clang --analyze --analyzer-output text -I build/src -I src/libafb src/libafb/*/*.c
+	cppcheck src/libafb
+
+	clang --analyze --analyzer-output text -I src/libafb -I build/src/libafb src/libafb/*/*.c
+}
+
+doit |& tee analyze.output

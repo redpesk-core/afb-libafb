@@ -66,7 +66,7 @@ size_t jsonstr_string_escape(char *dest, size_t destlenmax, const char *string, 
 	char c;
 
 	/* copy until end */
-	for(i = r = 0 ; i < stringlenmax  && r < destlenmax && (c = string[i]); i++, r++) {
+	for(i = r = 0 ; i < stringlenmax && (c = string[i]) && r < destlenmax; i++, r++) {
 		if (32 > (unsigned char)c) {
 			/* escaping control character */
 			dest[r] = '\\';

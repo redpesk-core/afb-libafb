@@ -213,6 +213,8 @@ static int sig_create(struct evmgr *evmgr)
 error2:
 	close(efd);
 error:
+	evmgr->sigfdev = NULL;
+	evmgr->osigfd = -1;
 	return rc;
 }
 #else
@@ -245,6 +247,8 @@ error2:
 	close(fds[0]);
 	close(fds[1]);
 error:
+	evmgr->sigfdev = NULL;
+	evmgr->osigfd = -1;
 	return -1;
 }
 #endif

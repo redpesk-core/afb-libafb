@@ -189,6 +189,7 @@ static void load_extension_cb(void *closure, struct json_object *value)
 	const char *pathstr, *uidstr;
 
 	pathstr = NULL;
+	rc = X_EINVAL;
 	if (json_object_is_type(value, json_type_string)) {
 		pathstr = json_object_get_string(value);
 		uidstr = NULL;
@@ -203,7 +204,6 @@ static void load_extension_cb(void *closure, struct json_object *value)
 	}
 	else {
 		ERROR("Invalid extension specifier %s", json_object_get_string(value));
-		rc = X_EINVAL;
 		pathstr = NULL;
 	}
 	if (pathstr != NULL) {
