@@ -94,8 +94,18 @@ INSTALL(FILES
 )
 
 # install pkgconfig file
-list(JOIN deps " " PCREQUIRES)
-list(JOIN privs " " PCLIBSPRIV)
+
+#list(JOIN deps " " PCREQUIRES)
+set(PCREQUIRES "")
+foreach(x IN LISTS deps)
+	string(APPEND PCREQUIRES " " ${x})
+endforeach(x)
+
+#list(JOIN privs " " PCLIBSPRIV)
+set(PCLIBSPRIV "")
+foreach(x IN LISTS privs)
+	string(APPEND PCLIBSPRIV " " ${x})
+endforeach(x)
 
 CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
 INSTALL(FILES
