@@ -1052,7 +1052,7 @@ int afb_hreq_init_cookie(int port, const char *path, int maxage)
 	rc = asprintf(&cookie_name, "%s-%d", long_key_for_uuid, port);
 	if (rc < 0)
 		return 0;
-	rc = asprintf(&cookie_attr, "; Path=%s; Max-Age=%d; HttpOnly",
+	rc = asprintf(&cookie_attr, "; Path=%s; Max-Age=%d; HttpOnly; SameSite=Strict",
 			path ?: "/", maxage);
 	if (rc < 0)
 		return 0;
