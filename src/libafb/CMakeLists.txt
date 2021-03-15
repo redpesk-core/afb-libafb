@@ -26,18 +26,22 @@ configure_file(libafb-config.h.in libafb-config.h @ONLY)
 
 ###########################################################################
 
-file(GLOB LIBAFBSRCS
-	core/*.c
-	utils/*.c
-	sys/*.c
-	http/*.c
-	apis/*.c
-	misc/*.c
-	wsapi/*.c
-	wsj1/*.c
-	extend/*.c
-	tls/*.c
+INSTALL(FILES
+		libafb.h
+		${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h
+	DESTINATION
+		${CMAKE_INSTALL_INCLUDEDIR}/libafb
 )
+foreach(entry core utils sys http apis misc wsapi wsj1 extend tls)
+	file(GLOB hdr ${entry}/*.h)
+	INSTALL(FILES ${hdr} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb/${entry})
+	INSTALL(FILES afb-${entry}.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb)
+	file(GLOB src ${entry}/*.c)
+	list(APPEND LIBAFBSRCS ${src})
+endforeach(entry)
+
+###########################################################################
+
 set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ###########################################################################
@@ -68,30 +72,6 @@ TARGET_LINK_LIBRARIES(libafbso
 	-Wl,--gc-sections
 )
 INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-# install header files
-INSTALL(DIRECTORY
-		core
-		utils
-		sys
-		http
-		apis
-		misc
-		wsapi
-		wsj1
-		extend
-		tls
-	DESTINATION
-		${CMAKE_INSTALL_INCLUDEDIR}/libafb
-	FILES_MATCHING PATTERN
-		*/*.h
-)
-
-INSTALL(FILES
-		${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h
-	DESTINATION
-		${CMAKE_INSTALL_INCLUDEDIR}/libafb
-)
 
 # install pkgconfig file
 
