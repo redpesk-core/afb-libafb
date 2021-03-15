@@ -32,6 +32,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <sys/un.h>
+#include <time.h>
 
 #include <systemd/sd-event.h>
 
