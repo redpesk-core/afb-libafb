@@ -1,7 +1,7 @@
 # Core library of Application Framework Binder
 
-This project provides the library for building microservice architecture
-binder like
+This project provides the library for building microservice architecture.
+This library is at the core of the AFB-binder.
 
 This project is available here <https://github.com/redpesk-core/afb-libafb>.
 
@@ -26,7 +26,9 @@ It can use the other libraries:
 - libsystemd (LGPL-2.1+):
   management of events
 - libmicrohttpd (LGPL-2.1+):
-  for HTTP serveur and WebSocket negociation
+  for HTTP server and WebSocket negociation
+- GnuTls (LGPLv2.1+)
+  For TLS encryption
 
 ## Building
 
@@ -43,7 +45,7 @@ But the simplest way to build and install libafb is the use the
 script mkbuild.sh as below:
 
 ```sh
-./mkbuild.sh -p /usr/local install
+./mkbuild.sh --prefix /usr/local install
 ```
 
 ## Deploy test code coverage
