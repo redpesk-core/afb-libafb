@@ -204,7 +204,7 @@ dependof_free(struct datadep *datadep)
  */
 static inline
 void
-data_adddep(
+data_inc_depcount(
 	struct afb_data *data
 ) {
 	ADDDEP(data);
@@ -217,7 +217,7 @@ static void data_release(struct afb_data *data);
  */
 static inline
 void
-data_undep(
+data_dec_depcount(
 	struct afb_data *data
 ) {
 	if (!UNDEP(data))
@@ -246,7 +246,7 @@ data_add_dependof(
 	dep->other = other;
 	dep->next = data->dependof;
 	data->dependof = dep;
-	data_adddep(other);
+	data_inc_depcount(other);
 
 	return 0;
 }
@@ -271,7 +271,7 @@ data_del_dependof(
 	pprv = &data->dependof;
 	while ((iter = *pprv) != NULL) {
 		if (iter->other == other) {
-			data_undep(other);
+			data_dec_depcount(other);
 			*pprv = iter->next;
 			free(iter);
 			return 0;
@@ -298,7 +298,7 @@ data_del_all_dependof(
 		data->dependof = NULL;
 		do {
 			nextdependof = dependof->next;
-			data_undep(dependof->other);
+			data_dec_depcount(dependof->other);
 			free(dependof);
 			dependof = nextdependof;
 		} while (dependof != NULL);
@@ -585,9 +585,9 @@ data_make_alias(
 ) {
 	// ASSERT NOT IS_VALID(alias)
 	SET_ALIAS(alias);
-	data_adddep(to_data);
+	data_inc_depcount(to_data);
 	alias->closure = to_data;
-	alias->dispose = (void(*)(void*))data_undep;
+	alias->dispose = (void(*)(void*))data_dec_depcount;
 	data_cvt_merge(alias, to_data);
 }
 
@@ -811,9 +811,9 @@ afb_data_create_alias(
 ) {
 	int rc;
 
-	rc = data_create(result, type, NULL, 0, (void*)data_undep, other, INITIAL_FLAGS_ALIAS);
+	rc = data_create(result, type, NULL, 0, (void*)data_dec_depcount, other, INITIAL_FLAGS_ALIAS);
 	if (rc == 0)
-		data_adddep(other);
+		data_inc_depcount(other);
 
 	return rc;
 }
