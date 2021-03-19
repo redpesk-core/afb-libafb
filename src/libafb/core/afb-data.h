@@ -206,6 +206,20 @@ afb_data_ro_pointer(
 );
 
 /**
+ * Gets a read/write pointer to the data.
+ * Returns NULL if the data is constant.
+ *
+ * @param data the data
+ *
+ * @return the pointer of the data (can be NULL)
+ */
+extern
+void*
+afb_data_ro_pointer(
+	struct afb_data *data
+);
+
+/**
  * Get the size of the data
  *
  * @param data the data
@@ -504,3 +518,35 @@ extern
 void
 afb_data_dependency_drop_all(
 	struct afb_data *data);
+
+/**
+ * Checks whether the 'data' is valid or not.
+ *
+ * @param data the data to check
+ *
+ * @return 0 if not valid or 1 if valid.
+ */
+static inline
+int
+afb_data_is_valid(
+	struct afb_data *data
+) {
+	return data != 0;
+}
+
+/**
+ * Replace 'data' with the given 'value', taking care to unreference
+ * the data.
+ *
+ * @param data address of the data to assign
+ * @param value value to assign to the data
+ */
+static inline
+void
+afb_data_assign(
+	struct afb_data **data,
+	struct afb_data *value
+) {
+	afb_data_unref(*data);
+	*data = value;
+}

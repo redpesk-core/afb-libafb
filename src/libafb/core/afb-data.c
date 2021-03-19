@@ -855,6 +855,15 @@ afb_data_ro_pointer(
 	return data ? (void*)data->pointer : NULL;
 }
 
+/* Get the pointer. */
+void*
+afb_data_rw_pointer(
+	struct afb_data *data
+) {
+	data = data_value_mutable(data);
+	return data ? (void*)data->pointer : NULL;
+}
+
 /* Get the size. */
 size_t
 afb_data_size(
