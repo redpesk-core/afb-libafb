@@ -745,7 +745,7 @@ afb_data_create_raw(
 
 /* allocates a data */
 int
-afb_data_create_alloc(
+afb_data_create_alloc0(
 	struct afb_data **result,
 	struct afb_type *type,
 	void **pointer,
@@ -776,13 +776,13 @@ afb_data_create_alloc(
 
 /* allocate data */
 int
-afb_data_create_alloc0(
+afb_data_create_alloc(
 	struct afb_data **result,
 	struct afb_type *type,
 	void **pointer,
 	size_t size
 ) {
-	return afb_data_create_alloc(result, type, pointer, size, 1);
+	return afb_data_create_alloc0(result, type, pointer, size, 1);
 }
 
 /* allocate data copy */
@@ -796,7 +796,7 @@ afb_data_create_copy(
 	int rc;
 	void *p;
 
-	rc = afb_data_create_alloc(result, type, &p, size, 0);
+	rc = afb_data_create_alloc0(result, type, &p, size, 0);
 	if (rc >= 0 && size)
 		memcpy(p, pointer, size);
 	return rc;

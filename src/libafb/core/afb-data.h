@@ -79,7 +79,7 @@ afb_data_create_raw(
  */
 extern
 int
-afb_data_create_alloc(
+afb_data_create_alloc0(
 	struct afb_data **result,
 	struct afb_type *type,
 	void **pointer,
@@ -105,7 +105,7 @@ afb_data_create_alloc(
  */
 extern
 int
-afb_data_create_alloc0(
+afb_data_create_alloc(
 	struct afb_data **result,
 	struct afb_type *type,
 	void **pointer,
