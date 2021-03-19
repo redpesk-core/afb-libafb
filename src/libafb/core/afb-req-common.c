@@ -42,7 +42,7 @@
 #include "core/afb-auth.h"
 #include "core/afb-calls.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
@@ -211,17 +211,17 @@ static void set_args(
 		if (!dest) {
 			ERROR("fail to allocate memory for afb_req_common_arg");
 			dest = args->local;
-			afb_params_unref(ndata - REQ_COMMON_NARGS_MAX, &data[REQ_COMMON_NARGS_MAX]);
+			afb_data_array_unref(ndata - REQ_COMMON_NARGS_MAX, &data[REQ_COMMON_NARGS_MAX]);
 			ndata = REQ_COMMON_NARGS_MAX;
 		}
 	}
 	args->ndata = ndata;
 	args->data = dest;
-	afb_params_copy(ndata, data, dest);
+	afb_data_array_copy(ndata, data, dest);
 }
 
 static void clean_args(struct afb_req_common_arg * args){
-	afb_params_unref(args->ndata, args->data);
+	afb_data_array_unref(args->ndata, args->data);
 	if (args->data != args->local)
 		free(args->data);
 }
@@ -847,7 +847,7 @@ do_reply(
 	struct afb_data * const replies[]
 ) {
 	req->queryitf->reply(req, status, nreplies, replies);
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 }
 
 #endif
@@ -874,7 +874,7 @@ afb_req_common_reply_hookable(
 	if (req->replied) {
 		/* it is an error to reply more than one time */
 		ERROR("reply called more than one time!!");
-		afb_params_unref(nreplies, replies);
+		afb_data_array_unref(nreplies, replies);
 	}
 	else {
 		/* first reply, so emit it */

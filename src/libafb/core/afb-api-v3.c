@@ -41,7 +41,7 @@
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
@@ -451,7 +451,7 @@ static int x3_api_call_sync_hookable(
 			rc = afb_calls_call_sync(&apiv3->comapi, api, verb, 1, &data, &status, &nreplies, replies);
 		}
 		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
-		afb_params_unref(nreplies, replies);
+		afb_data_array_unref(nreplies, replies);
 	}
 	return rc;
 }

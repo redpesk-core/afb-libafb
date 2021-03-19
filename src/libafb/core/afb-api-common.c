@@ -38,7 +38,7 @@
 #include "core/afb-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-hook.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
@@ -474,11 +474,11 @@ afb_api_common_event_broadcast_hookable(
 
 #if WITH_AFB_HOOK
 	if (comapi->hookflags & afb_hook_flag_api_event_broadcast) {
-		afb_params_addref(nparams, params);
+		afb_data_array_addref(nparams, params);
 		afb_hook_api_event_broadcast_before(comapi, name, nparams, params);
 		r = afb_api_common_event_broadcast(comapi, name, nparams, params);
 		afb_hook_api_event_broadcast_after(comapi, name, nparams, params, r);
-		afb_params_unref(nparams, params);
+		afb_data_array_unref(nparams, params);
 	}
 	else
 #endif

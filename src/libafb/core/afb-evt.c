@@ -33,7 +33,7 @@
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "sys/verbose.h"
 #include "core/afb-sched.h"
 #include "utils/uuid.h"
@@ -186,7 +186,7 @@ make_evt_broadcasted(
 	jb = malloc(sizeof *jb + nparams * sizeof jb->data.params[0] + sz);
 	if (jb) {
 		jb->data.nparams = (uint16_t)nparams;
-		afb_params_copy(nparams, params, jb->data.params);
+		afb_data_array_copy(nparams, params, jb->data.params);
 		jb->hop = hop;
 		memcpy(jb->uuid, uuid, sizeof jb->uuid);
 		jb->data.name = name = (char*)&jb->data.params[nparams];
@@ -194,7 +194,7 @@ make_evt_broadcasted(
 		jb->data.eventid = 0;
 		return jb;
 	}
-	afb_params_unref(nparams, params);
+	afb_data_array_unref(nparams, params);
 	return 0;
 }
 
@@ -206,7 +206,7 @@ void
 destroy_evt_broadcasted(
 	struct afb_evt_broadcasted *jb
 ) {
-	afb_params_unref(jb->data.nparams, jb->data.params);
+	afb_data_array_unref(jb->data.nparams, jb->data.params);
 	free(jb);
 }
 
@@ -227,12 +227,12 @@ make_evt_pushed(
 	if (je) {
 		je->evt = afb_evt_addref(evt);
 		je->data.nparams = (uint16_t)nparams;
-		afb_params_copy(nparams, params, je->data.params);
+		afb_data_array_copy(nparams, params, je->data.params);
 		je->data.name = evt->fullname;
 		je->data.eventid = evt->id;
 		return je;
 	}
-	afb_params_unref(nparams, params);
+	afb_data_array_unref(nparams, params);
 	return 0;
 }
 
@@ -245,7 +245,7 @@ destroy_evt_pushed(
 	struct afb_evt_pushed *je
 ) {
 	afb_evt_unref(je->evt);
-	afb_params_unref(je->data.nparams, je->data.params);
+	afb_data_array_unref(je->data.nparams, je->data.params);
 	free(je);
 }
 
@@ -363,13 +363,13 @@ int afb_evt_rebroadcast_name_hookable(const char *event, unsigned nparams, struc
 {
 	int result;
 
-	afb_params_addref(nparams, params);
+	afb_data_array_addref(nparams, params);
 	afb_hook_evt_broadcast_before(event, 0, nparams, params);
 
 	result = afb_evt_rebroadcast_name(event, nparams, params, uuid, hop);
 
 	afb_hook_evt_broadcast_after(event, 0, nparams, params, result);
-	afb_params_unref(nparams, params);
+	afb_data_array_unref(nparams, params);
 
 	return result;
 }
@@ -431,7 +431,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 	int rc;
 
 	if (!evt->watchs) {
-		afb_params_unref(nparams, params);
+		afb_data_array_unref(nparams, params);
 		return 0;
 	}
 
@@ -742,7 +742,7 @@ int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data
 
 	/* lease the parameters */
 	if (evt->hookflags & afb_hook_flag_evt_push_after) {
-		afb_params_addref(nparams, params);
+		afb_data_array_addref(nparams, params);
 	}
 
 	/* hook before push */
@@ -756,7 +756,7 @@ int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data
 	/* hook after push */
 	if (evt->hookflags & afb_hook_flag_evt_push_after) {
 		afb_hook_evt_push_after(evt->fullname, evt->id,  nparams, params, result);
-		afb_params_unref(nparams, params);
+		afb_data_array_unref(nparams, params);
 	}
 
 	return result;
@@ -773,7 +773,7 @@ int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb
 
 	/* lease the parameters if needed */
 	if (evt->hookflags & afb_hook_flag_evt_broadcast_after) {
-		afb_params_addref(nparams, params);
+		afb_data_array_addref(nparams, params);
 	}
 
 	/* hook before broadcast */
@@ -786,7 +786,7 @@ int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb
 	/* hook after broadcast */
 	if (evt->hookflags & afb_hook_flag_evt_broadcast_after) {
 		afb_hook_evt_broadcast_after(evt->fullname, evt->id, nparams, params, result);
-		afb_params_unref(nparams, params);
+		afb_data_array_unref(nparams, params);
 	}
 
 	return result;

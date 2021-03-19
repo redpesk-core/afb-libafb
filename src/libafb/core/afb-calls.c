@@ -33,7 +33,7 @@
 #include "core/afb-data.h"
 #include "core/afb-calls.h"
 #include "core/afb-evt.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-api-common.h"
 #include "core/afb-hook.h"
 #include "core/afb-session.h"
@@ -194,7 +194,7 @@ process(
 	req = malloc(lenapi + lenverb + sizeof *req);
 	if (!req) {
 		/* error! out of memory */
-		afb_params_unref(nparams, params);
+		afb_data_array_unref(nparams, params);
 		ERROR("out of memory");
 		callback(closure1, closure2, closure3, X_ENOMEM, 0, NULL);
 		return;
@@ -270,8 +270,7 @@ static void call_sync_leave(void *closure1, void *closure2, void *closure3, int 
 		if (ps->replies) {
 			if (nreplies > *ps->nreplies)
 				nreplies = *ps->nreplies;
-			afb_params_copy(nreplies, replies, ps->replies);
-			afb_params_addref(nreplies, replies);
+			afb_data_array_copy_addref(nreplies, replies, ps->replies);
 		}
 		*ps->nreplies = nreplies;
 	}

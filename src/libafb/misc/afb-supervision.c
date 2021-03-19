@@ -42,7 +42,7 @@
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
 #include "misc/afb-trace.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-session.h"
 #include "misc/afb-supervision.h"
 #include "misc/afb-supervisor.h"
@@ -407,7 +407,7 @@ static void process_cb(void *closure, struct json_object *args)
 					json_object_get(args);
 					comreq->apiname = api;
 					comreq->verbname = verb;
-					afb_params_unref(comreq->params.ndata, comreq->params.data);
+					afb_data_array_unref(comreq->params.ndata, comreq->params.data);
 					comreq->params.data[0] = data;
 					comreq->params.ndata = 1;
 					xapi->itf->process(xapi->closure, comreq);

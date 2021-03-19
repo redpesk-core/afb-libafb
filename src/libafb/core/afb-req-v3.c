@@ -42,7 +42,7 @@
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
 #include "core/afb-json-legacy.h"
@@ -373,7 +373,7 @@ x2_req_subcall_sync_hookable(
 					api, verb, 1, &data,
 					&status, &nreplies, replies, req->comreq, flags);
 		afb_json_legacy_get_reply_sync(status, nreplies, replies, object, error, info);
-		afb_params_unref(nreplies, replies);
+		afb_data_array_unref(nreplies, replies);
 	}
 	return result;
 }

@@ -45,7 +45,7 @@
 #include "core/afb-type.h"
 #include "core/afb-evt.h"
 #include "core/afb-type-predefined.h"
-#include "core/afb-params.h"
+#include "core/afb-data-array.h"
 
 
 
@@ -208,7 +208,7 @@ START_TEST (test)
 
 	// Test req_calls_call
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL);
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -218,7 +218,7 @@ START_TEST (test)
 
 	// Test req_calls_subcall
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_subcall(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL, &req, 0);
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -228,7 +228,7 @@ START_TEST (test)
 
 	// Test req_calls_subscribe_cb
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
     afb_calls_call(&comapi, name, "subscribe", NBPARAMS, params, testCB, NULL, NULL, NULL);
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -238,7 +238,7 @@ START_TEST (test)
 
 	// Test req_calls_unsubscribe_cb
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call(&comapi, name, "unsubscribe", NBPARAMS, params, testCB, NULL, NULL, NULL);
     RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -248,7 +248,7 @@ START_TEST (test)
 
 	// test afb_calls_call_hooking
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call_hooking(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL);
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -258,7 +258,7 @@ START_TEST (test)
 
 	// Test afb_calls_subcall_hooking
 	verbDataGval = dataClosureGval = 0;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_subcall_hooking(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL, &req, 0);
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
@@ -272,7 +272,7 @@ START_TEST (test)
 
 	// test sync call
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_call_sync(&comapi, name, "call", NBPARAMS, params, &status, &nreplies, replies));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -282,11 +282,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync subscribe
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_call_sync(&comapi, name, "subscribe", NBPARAMS, params, &status, &nreplies, replies));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -296,11 +296,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync unsubscribe
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_call_sync(&comapi, name, "unsubscribe", NBPARAMS, params, &status, &nreplies, replies));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -310,11 +310,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync subcall
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_subcall_sync(&comapi, name, "call", NBPARAMS, params, &status, &nreplies, replies, &req, afb_req_subcall_pass_events));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -324,11 +324,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync subcall subscribe
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_subcall_sync(&comapi, name, "subscribe", NBPARAMS, params, &status, &nreplies, replies, &req, afb_req_subcall_pass_events));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -338,11 +338,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync subcall unsubscribe
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_subcall_sync(&comapi, name, "unsubscribe", NBPARAMS, params, &status, &nreplies, replies, &req, afb_req_subcall_pass_events));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -352,11 +352,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync call hooking
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_call_sync_hooking(&comapi, name, "call", NBPARAMS, params, &status, &nreplies, replies));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -366,11 +366,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test sync subcall hooking
 	nreplies = NBPARAMS+1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_subcall_sync_hooking(&comapi, name, "call", NBPARAMS, params, &status, &nreplies, replies, &req, 0));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -380,11 +380,11 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
 	// test the handling of a table of reply smaller than expected
 	nreplies = NBPARAMS-1;
-	afb_params_addref(NBPARAMS, params); // increase params referensing to reuse it after
+	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	ck_assert_int_eq(0, afb_calls_call_sync(&comapi, name, "call", NBPARAMS, params, &status, &nreplies, replies));
 	fprintf(stderr, "nreplyes = %d\n", nreplies);
 	fprintf(stderr, "status = %d\n", status);
@@ -394,9 +394,9 @@ START_TEST (test)
 		ck_assert_int_eq(i+1, p2i(afb_data_ro_pointer(replies[i])));
 		ck_assert_ptr_eq(replies[i], params[i]);
 	}
-	afb_params_unref(nreplies, replies);
+	afb_data_array_unref(nreplies, replies);
 
-	afb_params_unref(NBPARAMS, params);
+	afb_data_array_unref(NBPARAMS, params);
 
 	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
 

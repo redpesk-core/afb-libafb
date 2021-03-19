@@ -38,7 +38,6 @@
 #include "core/afb-auth.h"
 #include "core/afb-calls.h"
 #include "core/afb-data.h"
-#include "core/afb-params.h"
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
 #include "core/afb-hook.h"
