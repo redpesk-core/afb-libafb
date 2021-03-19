@@ -22,6 +22,10 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <sys/types.h>
+#include "../sys/x-buf.h"
+
 #define WS_CODE_OK                1000
 #define WS_CODE_GOING_AWAY        1001
 #define WS_CODE_PROTOCOL_ERROR    1002

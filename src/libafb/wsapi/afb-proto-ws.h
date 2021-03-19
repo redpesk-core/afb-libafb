@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 /*
  * Defined since version 3, the value AFB_PROTO_WS_VERSION can be used to
  * track versions of afb-proto-ws. History:

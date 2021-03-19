@@ -23,6 +23,9 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
+
 struct afb_ws;
 struct iovec;
 

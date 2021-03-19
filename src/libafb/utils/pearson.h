@@ -23,4 +23,6 @@
 
 #pragma once
 
+#include <stdint.h>
+
 extern uint8_t pearson4(const char *text);

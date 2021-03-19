@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+
 /**
  * SHA1 hash code are SHA1_DIGEST_LENGTH bytes length
  */

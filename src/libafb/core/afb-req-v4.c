@@ -182,7 +182,7 @@ afb_req_v4_logmask(
 	return reqv4->logmask;
 }
 
-afb_api_x4_t
+struct afb_api_v4 *
 afb_req_v4_api(
 	struct afb_req_v4 *reqv4
 ) {

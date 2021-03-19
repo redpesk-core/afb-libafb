@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <sys/types.h>
+
 struct iovec;
 
 #define WEBSOCKET_CODE_OK                1000

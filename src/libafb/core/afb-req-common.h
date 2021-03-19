@@ -25,6 +25,7 @@
 
 #include <libafb/libafb-config.h>
 
+#include <stdint.h>
 #include <stdarg.h>
 
 struct json_object;

@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <stddef.h>
+
 /**
  * Definition of the type of callback functions for @see expand_vars_function
  *

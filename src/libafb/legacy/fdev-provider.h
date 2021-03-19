@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct fdev;
 
 struct fdev_itf

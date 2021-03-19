@@ -28,6 +28,8 @@
 
 #if WITH_DYNAMIC_BINDING
 
+#include "../sys/x-dynlib.h"
+
 struct afb_apiset;
 struct json_object;
 

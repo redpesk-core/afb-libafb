@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct afb_auth;
 struct json_object;
 

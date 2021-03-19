@@ -23,6 +23,7 @@
 
 #pragma once
 
+#define _GNU_SOURCE /* for secure_getenv */
 #include <dlfcn.h>
 #include <stdlib.h>
 

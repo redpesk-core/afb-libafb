@@ -26,6 +26,7 @@
 #include "afb-apis.h"
 #include "afb-core.h"
 #include "afb-extend.h"
+#include "afb-extension.h"
 #include "afb-http.h"
 #include "afb-legacy.h"
 #include "afb-misc.h"

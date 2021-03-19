@@ -23,7 +23,8 @@
 
 #pragma once
 
-struct afb_req_common;
+#include "afb-req-common.h"
+
 struct afb_api_v4;
 struct afb_verb_v4;
 
@@ -102,7 +103,7 @@ afb_req_v4_logmask(
 );
 
 extern
-afb_api_x4_t
+struct afb_api_v4 *
 afb_req_v4_api(
 	struct afb_req_v4 *reqv4
 );

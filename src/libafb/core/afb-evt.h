@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #include "../utils/uuid.h"
 
 struct afb_event_x2;

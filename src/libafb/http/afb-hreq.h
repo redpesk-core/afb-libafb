@@ -27,6 +27,8 @@
 
 #if WITH_LIBMICROHTTPD
 
+#include <stddef.h>
+
 struct json_object;
 struct json_tokener;
 

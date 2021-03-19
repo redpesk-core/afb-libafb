@@ -28,7 +28,7 @@
 
 #if WITH_DBUS_TRANSPARENCY
 
-struct afb_req_itf;
+struct afb_apiset;
 
 extern int afb_api_dbus_add_client(const char *path, struct afb_apiset *declare_set, struct afb_apiset *call_set);
 

@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 /*
  * Defined since version 1, the value AFB_WSAPI_VERSION can be used to
  * track versions of afb-wsapi. History:
@@ -37,6 +39,7 @@ struct afb_wsapi;
 struct afb_wsapi_call;
 struct afb_wsapi_describe;
 struct afb_wsapi_msg;
+struct json_object;
 
 typedef unsigned char afb_wsapi_uuid_t[16];
 

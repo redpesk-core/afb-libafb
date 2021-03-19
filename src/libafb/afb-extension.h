@@ -1,6 +1,4 @@
-#!/bin/bash
-
-HEAD='/*
+/*
  * Copyright (C) 2015-2021 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
@@ -25,18 +23,4 @@ HEAD='/*
 
 #pragma once
 
-'
-
-supincs=
-set -o pipefail
-cd $(dirname $0)
-for entry in *; do
-	if [ -d $entry ]; then
-		if incs=$(ls -1 $entry/*.h 2>/dev/null | sed 's/.*/#include "&"/'); then
-			echo "${HEAD}${incs}" > "afb-$entry.h"
-			supincs="${supincs}afb-$entry.h;"
-		fi
-	fi
-done
-
-echo "${HEAD}$(echo -n ${supincs}|tr ';' '\n'|sed 's/.*/#include "&"/')" > libafb.h
+#include "extend/afb-extension.h"

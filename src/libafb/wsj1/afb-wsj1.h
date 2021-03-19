@@ -23,6 +23,9 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+
 struct afb_wsj1;
 struct afb_wsj1_msg;
 

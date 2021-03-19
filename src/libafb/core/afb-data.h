@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stddef.h>
+
 struct afb_data;
 struct afb_type;
 

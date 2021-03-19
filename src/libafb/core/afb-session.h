@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct afb_session;
 
 #define AFB_SESSION_TIMEOUT_INFINITE  -1

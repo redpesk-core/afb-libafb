@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct u16id2ptr;
 struct u16id2bool;
 

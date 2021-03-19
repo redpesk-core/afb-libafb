@@ -30,6 +30,8 @@
 
 struct afb_trace;
 struct afb_req_common;
+struct afb_session;
+struct json_object;
 
 extern struct afb_trace *afb_trace_create(const char *api, struct afb_session *bound);
 

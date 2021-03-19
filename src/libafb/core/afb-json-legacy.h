@@ -23,13 +23,17 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdarg.h>
+
+#include "afb-string-mode.h"
+#include "../utils/uuid.h"
+
 struct json_object;
-
-#include <afb/afb-arg.h>
-
-#include "../core/afb-string-mode.h"
-#include "../core/afb-req-common.h"
-#include "../core/afb-evt.h"
+struct afb_data;
+struct afb_evt;
+struct afb_req_common;
 
 /**********************************************************************/
 

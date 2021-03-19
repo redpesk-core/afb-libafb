@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct afb_token;
 
 extern int afb_token_get(struct afb_token **token, const char *tokenstring);

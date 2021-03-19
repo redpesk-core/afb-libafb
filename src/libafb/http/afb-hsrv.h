@@ -28,6 +28,8 @@
 
 #if WITH_LIBMICROHTTPD
 
+#include <stdint.h>
+
 struct afb_hsrv;
 struct afb_hreq;
 struct locale_root;
