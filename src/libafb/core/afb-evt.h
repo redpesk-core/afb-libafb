@@ -106,3 +106,18 @@ extern void afb_evt_update_hooks();
 extern struct afb_event_x2 *afb_evt_make_x2(struct afb_evt *evt);
 extern struct afb_evt *afb_evt_of_x2(struct afb_event_x2 *eventx2);
 extern struct afb_event_x2 *afb_evt_as_x2(struct afb_evt *evt);
+
+/**
+ * Checks whether the 'event' is valid or not.
+ *
+ * @param event the event to check
+ *
+ * @return 0 if not valid or 1 if valid.
+ */
+static inline
+int
+afb_evt_is_valid(
+	struct afb_evt *evt
+) {
+	return !!evt;
+}

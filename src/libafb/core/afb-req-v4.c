@@ -134,6 +134,22 @@ void afb_req_v4_vverbose_hookable(
 	afb_req_common_vverbose_hookable(reqv4->comreq, level, file, line, func, fmt, args);
 }
 
+void
+afb_req_v4_verbose(
+	struct afb_req_v4 *reqv4,
+	int level,
+	const char *file,
+	int line,
+	const char * func,
+	const char *fmt,
+	...
+) {
+	va_list args;
+	va_start(args, fmt);
+	afb_req_v4_vverbose_hookable(reqv4, level, file, line, func, fmt, args);
+	va_end(args);
+}
+
 void *
 afb_req_v4_cookie_hookable(
 	struct afb_req_v4 *reqv4,

@@ -218,6 +218,46 @@ afb_api_v4_vverbose_hookable(
 	va_list args
 );
 
+/**
+ * Send to the journal with the log 'level' a message described
+ * by 'fmt' and following parameters.
+ *
+ * 'file', 'line' and 'func' are indicators of position of the code in source files
+ * (see macros __FILE__, __LINE__ and __func__).
+ *
+ * 'level' is defined by syslog standard:
+ *      EMERGENCY         0        System is unusable
+ *      ALERT             1        Action must be taken immediately
+ *      CRITICAL          2        Critical conditions
+ *      ERROR             3        Error conditions
+ *      WARNING           4        Warning conditions
+ *      NOTICE            5        Normal but significant condition
+ *      INFO              6        Informational
+ *      DEBUG             7        Debug-level messages
+ *
+ * @param api the api that collects the logging message
+ * @param level the level of the message
+ * @param file the source file that logs the messages or NULL
+ * @param line the line in the source file that logs the message
+ * @param func the name of the function in the source file that logs (or NULL)
+ * @param fmt the format of the message as in printf
+ * @param ... the arguments to the format string of the message
+ *
+ * @see syslog
+ * @see printf
+ */
+extern
+void
+afb_api_verbose(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char *func,
+	const char *fmt,
+	...
+);
+
 extern
 struct json_object *
 afb_api_v4_settings_hookable(

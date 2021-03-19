@@ -257,6 +257,23 @@ afb_api_v4_vverbose_hookable(
 	afb_api_common_vverbose_hookable(&apiv4->comapi, level, file, line, function, fmt, args);
 }
 
+
+void
+afb_api_v4_verbose(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char * func,
+	const char *fmt,
+	...
+) {
+	va_list args;
+	va_start(args, fmt);
+	afb_api_v4_vverbose_hookable(apiv4, level, file, line, func, fmt, args);
+	va_end(args);
+}
+
 int
 afb_api_v4_post_job_hookable(
 	struct afb_api_v4 *apiv4,

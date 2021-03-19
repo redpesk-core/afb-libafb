@@ -28,6 +28,21 @@
 struct afb_api_v4;
 struct afb_verb_v4;
 
+/**
+ * Checks whether the request 'req' is valid or not.
+ *
+ * @param req the request to check
+ *
+ * @return 0 if not valid or 1 if valid.
+ */
+static inline
+int
+afb_req_v4_is_valid(
+	struct afb_req_v4 *reqv4
+) {
+	return !!reqv4;
+}
+
 extern
 void
 afb_req_v4_process(
@@ -59,6 +74,45 @@ afb_req_v4_vverbose_hookable(
 	const char *func,
 	const char *fmt,
 	va_list args
+);
+
+/**
+ * Send associated to 'req' a message described by 'fmt' and following parameters
+ * to the journal for the verbosity 'level'.
+ *
+ * 'file', 'line' and 'func' are indicators of position of the code in source files
+ * (see macros __FILE__, __LINE__ and __func__).
+ *
+ * 'level' is defined by syslog standard:
+ *      EMERGENCY         0        System is unusable
+ *      ALERT             1        Action must be taken immediately
+ *      CRITICAL          2        Critical conditions
+ *      ERROR             3        Error conditions
+ *      WARNING           4        Warning conditions
+ *      NOTICE            5        Normal but significant condition
+ *      INFO              6        Informational
+ *      DEBUG             7        Debug-level messages
+ *
+ * @param req the request
+ * @param level the level of the message
+ * @param file the source filename that emits the message or NULL
+ * @param line the line number in the source filename that emits the message
+ * @param func the name of the function that emits the message or NULL
+ * @param fmt the message format as for printf
+ * @param ... the arguments of the format 'fmt'
+ *
+ * @see printf
+ * @see afb_req_vverbose
+ */
+__attribute__((format(printf, 6, 7)))
+void
+afb_req_v4_verbose(
+	struct afb_req_v4 *reqv4,
+	int level, const char *file,
+	int line,
+	const char * func,
+	const char *fmt,
+	...
 );
 
 extern
