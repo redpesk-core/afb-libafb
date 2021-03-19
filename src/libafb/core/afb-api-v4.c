@@ -29,7 +29,7 @@
 
 #include <json-c/json.h>
 
-#include "core/afb-v4.h"
+#include "core/afb-v4-itf.h"
 
 #include "containerof.h"
 

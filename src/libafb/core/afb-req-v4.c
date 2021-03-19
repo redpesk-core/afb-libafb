@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "afb-v4.h"
+#include "afb-v4-itf.h"
 
 #include "sys/x-errno.h"
 #include "core/afb-apiset.h"

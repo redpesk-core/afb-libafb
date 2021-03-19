@@ -54,5 +54,5 @@
 #include "core/afb-type.h"
 #include "core/afb-type-internal.h"
 #include "core/afb-type-predefined.h"
-#include "core/afb-v4.h"
+#include "core/afb-v4-itf.h"
 #include "core/containerof.h"

@@ -25,7 +25,7 @@
 #pragma once
 
 #include "afb-api-common.h"
-#include "afb-v4.h"
+#include "afb-v4-itf.h"
 
 struct afb_apiset;
 struct afb_api_v4;

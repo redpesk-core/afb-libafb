@@ -37,6 +37,8 @@
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding-v4.h>
 
+extern int afb_v4_itf_type_register(struct afb_type **type, const char *name, afb_type_flags_x4_t flags);
+
 #if WITH_DYNAMIC_BINDING
 
 #include "../sys/x-dynlib.h"
@@ -60,5 +62,6 @@ struct afb_v4_dynlib_info
 };
 
 extern void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, afb_api_x4_t rootapi);
+extern int afb_v4_itf_setup_shared_object(afb_api_x4_t root, void *handle);
 
 #endif

@@ -32,7 +32,7 @@
 
 #include <json-c/json.h>
 
-#include "core/afb-v4.h"
+#include "core/afb-v4-itf.h"
 
 #include "sys/x-dynlib.h"
 #include "core/afb-apiname.h"

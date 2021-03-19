@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "core/afb-v4.h"
+#include "core/afb-v4-itf.h"
 
 typedef struct afb_verb_v4		afb_verb_t;
 typedef struct afb_binding_v4		afb_binding_t;

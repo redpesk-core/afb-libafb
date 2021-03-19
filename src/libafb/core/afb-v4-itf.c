@@ -23,7 +23,7 @@
 
 #include "libafb-config.h"
 
-#include "afb-v4.h"
+#include "afb-v4-itf.h"
 
 #include "afb-data.h"
 #include "afb-req-v4.h"
@@ -38,9 +38,8 @@
 
 /***********************************************************/
 
-static
 int
-x4_api_type_register(
+afb_v4_itf_type_register(
 	struct afb_type **type,
 	const char *name,
 	afb_type_flags_x4_t flags
@@ -57,9 +56,8 @@ x4_api_type_register(
 	}
 }
 
-static
 int
-x4_api_setup_shared_object(
+afb_v4_itf_setup_shared_object(
 	afb_api_x4_t root,
 	void *handle
 ) {
@@ -135,7 +133,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 /*-- TYPE ------------------------------------------*/
 
 	.type_lookup = afb_type_lookup,
-	.type_register = x4_api_type_register,
+	.type_register = afb_v4_itf_type_register,
 	.type_name = afb_type_name,
 	.type_set_family = afb_type_set_family,
 	.type_add_converter = afb_type_add_converter,
@@ -169,7 +167,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.create_api = afb_api_v4_new_api_hookable,
 	.job_post = afb_api_v4_post_job_hookable,
 	.alias_api = afb_api_v4_add_alias_hookable,
-	.setup_shared_object = x4_api_setup_shared_object,
+	.setup_shared_object = afb_v4_itf_setup_shared_object,
 
 /*-- PREDEFINED TYPES -----------------------------------*/
 
