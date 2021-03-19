@@ -88,6 +88,16 @@ extern int afb_type_register(struct afb_type **result, const char *name, int str
 extern struct afb_type *afb_type_get(const char *name);
 
 /**
+ * Lookup for an existing type
+ *
+ * @param type pointer to the type returned if found
+ * @param name name of the searched type
+ *
+ * @return 0 in case of success or a negative error code
+ */
+extern int afb_type_lookup(struct afb_type **type, const char *name);
+
+/**
  * Get the name of a type
  *
  * @param type the type whose name is queried

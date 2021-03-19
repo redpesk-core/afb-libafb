@@ -59,15 +59,6 @@ x4_api_type_register(
 
 static
 int
-x4_api_type_lookup(
-	struct afb_type **type,
-	const char *name
-) {
-	return (*type = afb_type_get(name)) ? 0 : X_ENOENT;
-}
-
-static
-int
 x4_api_setup_shared_object(
 	afb_api_x4_t root,
 	void *handle
@@ -143,7 +134,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 
 /*-- TYPE ------------------------------------------*/
 
-	.type_lookup = x4_api_type_lookup,
+	.type_lookup = afb_type_lookup,
 	.type_register = x4_api_type_register,
 	.type_name = afb_type_name,
 	.type_set_family = afb_type_set_family,

@@ -130,6 +130,11 @@ struct afb_type *afb_type_get(const char *name)
 	return type;
 }
 
+int afb_type_lookup(struct afb_type **type, const char *name)
+{
+	return (*type = afb_type_get(name)) ? 0 : X_ENOENT;
+}
+
 const char *afb_type_name(struct afb_type *type)
 {
 	return type->name;
