@@ -39,6 +39,7 @@ foreach(entry core utils sys http apis misc wsapi wsj1 extend tls)
 	file(GLOB src ${entry}/*.c)
 	list(APPEND LIBAFBSRCS ${src})
 endforeach(entry)
+INSTALL(FILES afb-extension.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb)
 
 ###########################################################################
 

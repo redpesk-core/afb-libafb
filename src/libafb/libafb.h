@@ -28,7 +28,6 @@
 #include "afb-extend.h"
 #include "afb-extension.h"
 #include "afb-http.h"
-#include "afb-legacy.h"
 #include "afb-misc.h"
 #include "afb-sys.h"
 #include "afb-tls.h"
