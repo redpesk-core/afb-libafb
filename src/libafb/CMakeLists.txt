@@ -26,20 +26,26 @@ configure_file(libafb-config.h.in libafb-config.h @ONLY)
 
 ###########################################################################
 
-INSTALL(FILES
-		libafb.h
-		${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h
-	DESTINATION
-		${CMAKE_INSTALL_INCLUDEDIR}/libafb
-)
+macro(installfiles dest)
+	install(FILES ${ARGN} DESTINATION ${dest})
+endmacro(installfiles)
+
+set(DESTHDR ${CMAKE_INSTALL_INCLUDEDIR}/libafb)
+
+macro(installheader)
+	installfiles(${DESTHDR} ${ARGV})
+endmacro(installheader)
+
+installheader(${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h)
+installheader(libafb.h afb-extension.h afb-v4.h)
+
 foreach(entry core utils sys http apis misc wsapi wsj1 extend tls)
 	file(GLOB hdr ${entry}/*.h)
-	INSTALL(FILES ${hdr} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb/${entry})
-	INSTALL(FILES afb-${entry}.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb)
+	installfiles(${DESTHDR}/${entry} ${hdr})
+	installheader(afb-${entry}.h)
 	file(GLOB src ${entry}/*.c)
 	list(APPEND LIBAFBSRCS ${src})
 endforeach(entry)
-INSTALL(FILES afb-extension.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libafb)
 
 ###########################################################################
 

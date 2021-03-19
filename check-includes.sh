@@ -24,9 +24,11 @@ done
 ls -1 afb-*.h |
 while read h; do
 	if ! grep -q -- "^#include \"$h\"" libafb.h; then
-		if [[ $h != afb-legacy.h ]]; then
-			echo missing include to $h
-		fi
+		case $h in
+		afb-legacy.h) ;;
+		afb-v4.h) ;;
+		*) echo missing include to $h;;
+		esac
 	fi
 done
 
