@@ -27,6 +27,7 @@ struct afb_req_common;
 struct afb_api_v3;
 struct afb_api_x3;
 struct afb_verb_v3;
+struct afb_req_v3;
 
 extern
 void
@@ -35,4 +36,17 @@ afb_req_v3_process(
 	struct afb_api_v3 *api,
 	struct afb_api_x3 *apix3,
 	const struct afb_verb_v3 *verbv3
+);
+
+/**
+ * Get the common request linked to reqv3
+ *
+ * @param reqv3 the req to query
+ *
+ * @return the common request attached to the request
+ */
+extern
+struct afb_req_common *
+afb_req_v3_get_common(
+	struct afb_req_v3 *reqv3
 );

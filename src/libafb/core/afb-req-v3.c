@@ -82,6 +82,15 @@ struct afb_req_v3
 
 /******************************************************************************/
 
+struct afb_req_common *
+afb_req_v3_get_common(
+	struct afb_req_v3 *reqv3
+) {
+	return reqv3->comreq;
+}
+
+/******************************************************************************/
+
 static inline struct afb_req_v3 *req_v3_from_req_x2(struct afb_req_x2 *req)
 {
 	return containerof(struct afb_req_v3, x2, req);

@@ -79,6 +79,13 @@ struct afb_req_v4
 
 /******************************************************************************/
 
+struct afb_req_common *
+afb_req_v4_get_common(
+	struct afb_req_v4 *reqv4
+) {
+	return reqv4->comreq;
+}
+
 struct afb_req_v4 *afb_req_v4_addref(struct afb_req_v4 *reqv4)
 {
 	__atomic_add_fetch(&reqv4->refcount, 1, __ATOMIC_RELAXED);

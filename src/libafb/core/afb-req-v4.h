@@ -43,6 +43,19 @@ afb_req_v4_is_valid(
 	return !!reqv4;
 }
 
+/**
+ * Get the common request linked to reqv4
+ *
+ * @param reqv4 the req to query
+ *
+ * @return the common request attached to the request
+ */
+extern
+struct afb_req_common *
+afb_req_v4_get_common(
+	struct afb_req_v4 *reqv4
+);
+
 extern
 void
 afb_req_v4_process(
