@@ -338,13 +338,7 @@ static time_t sessionset_cleanup (int force)
 	return now;
 }
 
-/**
- * Initialize the session manager with a 'max_session_count',
- * an initial common 'timeout'
- *
- * @param max_session_count  maximum allowed session count in the same time
- * @param timeout            the initial default timeout of sessions
- */
+/* Initialize the session manager */
 int afb_session_init (int max_session_count, int timeout)
 {
 	/* init the sessionset (after cleanup) */
@@ -361,10 +355,7 @@ int afb_session_init (int max_session_count, int timeout)
 	return 0;
 }
 
-/**
- * Iterate the sessions and call 'callback' with
- * the 'closure' for each session.
- */
+/* Iterate the sessions */
 void afb_session_foreach(void (*callback)(void *closure, struct afb_session *session), void *closure)
 {
 	struct afb_session *session;
@@ -380,9 +371,7 @@ void afb_session_foreach(void (*callback)(void *closure, struct afb_session *ses
 	sessionset_unlock();
 }
 
-/**
- * Cleanup the sessionset of its closed or expired sessions
- */
+/* Cleanup the sessionset of its closed or expired sessions */
 void afb_session_purge()
 {
 	sessionset_lock();
@@ -404,17 +393,13 @@ struct afb_session *afb_session_search (const char *uuid)
 
 }
 
-/**
- * Creates a new session with 'timeout'
- */
+/* Creates a new session with 'timeout' */
 int afb_session_create (struct afb_session **session, int timeout)
 {
 	return afb_session_get(session, NULL, timeout, NULL);
 }
 
-/**
- * Returns the timeout of 'session' in seconds
- */
+/* Returns the timeout of 'session' in seconds */
 int afb_session_timeout(struct afb_session *session)
 {
 	int timeout;
@@ -435,13 +420,16 @@ int afb_session_set_timeout(struct afb_session *session, int timeout)
 		return X_EINVAL;
 
 	session->timeout = timeout;
-	session_update_expiration(session, NOW);
 	return 0;
 }
 
-/**
- * Returns the second remaining before expiration of 'session'
- */
+/* update the expiration of the session */
+void afb_session_touch(struct afb_session *session)
+{
+	session_update_expiration(session, NOW);
+}
+
+/* Returns the second remaining before expiration of 'session' */
 int afb_session_what_remains(struct afb_session *session)
 {
 	int diff = (int)(session->expiration - NOW);
@@ -533,15 +521,7 @@ void afb_session_close (struct afb_session *session)
 	session_unlock(session);
 }
 
-/**
- * Set the 'autoclose' flag of the 'session'
- *
- * A session whose autoclose flag is true will close as
- * soon as it is no more referenced.
- *
- * @param session    the session to set
- * @param autoclose  the value to set
- */
+/* Set the 'autoclose' flag of the 'session' */
 void afb_session_set_autoclose(struct afb_session *session, int autoclose)
 {
 	session->autoclose = !!autoclose;
@@ -650,32 +630,7 @@ static void checkcookie(struct cookie *cookie, struct cookie **prv)
 	}
 }
 
-/**
- * Set, get, replace, remove a cookie of 'key' for the 'session'
- *
- * The behaviour of this function depends on its parameters:
- *
- * @param session	the session
- * @param key		the key of the cookie
- * @param cookieval     where to store the cookie value
- * @param makecb	the creation function or NULL
- * @param freecb	the release function or NULL
- * @param closure	an argument for makecb or the value if makecb==NULL
- * @param operation	operation to perform
- *
- * @return 0 if cookie existed, 1 if created, a negative number on error
- *
- * The 'key' is a pointer and compared as pointers.
- *
- * For getting the current value of the cookie:
- *
- *   afb_session_cookie(session, key, &value, NULL, NULL, NULL, 0)
- *
- * For storing the value of the cookie
- *
- *   afb_session_cookie(session, key, NULL, NULL, NULL, value, 1)
- */
-
+/* Set, get, replace, remove a cookie of 'key' for the 'session' */
 int afb_session_cookie(
 	struct afb_session *session,
 	const void *key,
@@ -781,43 +736,19 @@ int afb_session_cookie(
 	return rc;
 }
 
-/**
- * Get the cookie of 'key' in the 'session'.
- *
- * @param session  the session to search in
- * @param key      the key of the data to retrieve
- *
- * @return the data staored for the key or NULL if the key isn't found
- */
+/* Get the cookie of 'key' in the 'session' */
 int afb_session_get_cookie(struct afb_session *session, const void *key, void **cookie)
 {
 	return afb_session_cookie(session, key, cookie, NULL, NULL, NULL, Afb_Session_Cookie_Get);
 }
 
-/**
- * Set the cookie of 'key' in the 'session' to the 'value' that can be
- * cleaned using 'freecb' (if not null).
- *
- * @param session  the session to set
- * @param key      the key of the data to store
- * @param value    the value to store at key
- * @param freecb   a function to use when the cookie value is to remove (or null)
- *
- * @return 0 in case of success or -1 in case of error
- */
+/* Set the cookie of 'key' */
 int afb_session_set_cookie(struct afb_session *session, const void *key, void *value, void (*freecb)(void*))
 {
 	return afb_session_cookie(session, key, NULL, NULL, freecb, value, Afb_Session_Cookie_Set);
 }
 
-/**
- * Set the language attached to the session
- *
- * @param session the session to set
- * @param lang    the language specifiction to set to session
- *
- * @return 0 in case of success or -1 in case of error
- */
+/* Set the language attached to the session */
 int afb_session_set_language(struct afb_session *session, const char *lang)
 {
 	char *oldl, *newl;
@@ -832,27 +763,13 @@ int afb_session_set_language(struct afb_session *session, const char *lang)
 	return 0;
 }
 
-/**
- * Get the language attached to the session
- *
- * @param session the session to query
- * @param lang    a default language specifiction
- *
- * @return the langauage specification to use for session
- */
+/* Get the language attached to the session */
 const char *afb_session_get_language(struct afb_session *session, const char *lang)
 {
 	return session->lang ?: lang;
 }
 
-/**
- * Get the LOA value associated to session for the key
- *
- * @param session	the session
- * @param key		the key of the cookie
- *
- * @return the loa value for the key
- */
+/* Get the LOA value associated to session for the key */
 int afb_session_get_loa(struct afb_session *session, const void *key)
 {
 	int rc;
@@ -875,15 +792,7 @@ int afb_session_get_loa(struct afb_session *session, const void *key)
 	return rc;
 }
 
-/**
- * Set the LOA value associated to session for the key
- *
- * @param session	the session
- * @param key		the key of the cookie
- * @param loa           the loa to set
- *
- * @return the loa value for the key or a negative number if error
- */
+/* Set the LOA value associated to session for the key */
 int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 {
 	int rc;
@@ -912,12 +821,7 @@ int afb_session_set_loa(struct afb_session *session, const void *key, int loa)
 	return rc;
 }
 
-/**
- * drop loa and cookie of the given key
- *
- * @param session	the session
- * @param key		the key of the cookie
- */
+/* drop loa and cookie of the given key */
 void afb_session_drop_key(struct afb_session *session, const void *key)
 {
 	struct cookie *cookie, **prv;
