@@ -21,39 +21,22 @@
  * $RP_END_LICENSE$
  */
 
+
 #pragma once
 
-#include "core/afb-api-common.h"
-#include "core/afb-apiname.h"
-#include "core/afb-apiset.h"
-#include "core/afb-api-v3.h"
-#include "core/afb-api-v4.h"
-#include "core/afb-auth.h"
-#include "core/afb-calls.h"
-#include "core/afb-common.h"
-#include "core/afb-cred.h"
-#include "core/afb-data.h"
-#include "core/afb-data-array.h"
-#include "core/afb-error-text.h"
-#include "core/afb-ev-mgr.h"
-#include "core/afb-evt.h"
-#include "core/afb-global.h"
-#include "core/afb-hook-flags.h"
-#include "core/afb-hook.h"
-#include "core/afb-jobs.h"
-#include "core/afb-json-legacy.h"
-#include "core/afb-perm.h"
-#include "core/afb-permission-text.h"
-#include "core/afb-req-common.h"
-#include "core/afb-req-v3.h"
-#include "core/afb-req-v4.h"
-#include "core/afb-sched.h"
-#include "core/afb-session.h"
-#include "core/afb-sig-monitor.h"
-#include "core/afb-string-mode.h"
-#include "core/afb-token.h"
-#include "core/afb-type.h"
-#include "core/afb-type-internal.h"
-#include "core/afb-type-predefined.h"
-#include "core/afb-v4-itf.h"
-#include "core/containerof.h"
+struct afb_api_common;
+struct afb_apiset;
+
+/**
+ * Returns the instance of the global API
+ */
+extern
+struct afb_api_common *
+afb_global_api();
+
+/**
+ * Initialize the global API
+ */
+extern
+void
+afb_global_api_init(struct afb_apiset *callset);
