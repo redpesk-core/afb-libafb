@@ -123,8 +123,8 @@ static struct u16id2ptr *opacifier;
 #define REF_COUNT_ETERNAL      1
 #define REF_COUNT_INCREMENT    2
 
-#define INITIAL_FLAGS_STD     (FLAG_IS_CONSTANT|FLAG_IS_VALID)
-#define INITIAL_FLAGS_ALIAS   (FLAG_IS_CONSTANT|FLAG_IS_VALID|FLAG_IS_ALIAS)
+#define INITIAL_FLAGS_STD     (FLAG_IS_VALID)
+#define INITIAL_FLAGS_ALIAS   (FLAG_IS_VALID|FLAG_IS_ALIAS)
 
 #define HASREF(data)           ((data)->refcount != 0)
 #define ADDREF(data)           __atomic_add_fetch(&(data)->refcount, REF_COUNT_INCREMENT, __ATOMIC_RELAXED)
