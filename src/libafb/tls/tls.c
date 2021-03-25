@@ -155,20 +155,31 @@ static void do_write(struct tls *tls, struct tls_flow *in, struct tls_flow *out)
 
 static void do_read_write(struct tls *tls, struct tls_flow *in, struct tls_flow *out)
 {
-	unsigned len;
 	ssize_t ssz;
+	unsigned len, loop = 1;
 
-	len = in->clen;
-	if (len < sizeof in->buffer) {
-		ssz = in == &tls->crypt
-			? gnutls_record_recv(tls->session, &in->buffer[len], sizeof in->buffer - len)
-			: read(in->fd, &in->buffer[len], sizeof in->buffer - len);
-		if (ssz > 0) {
-			len += (unsigned)ssz;
-			in->clen = len;
+	while(loop) {
+		len = in->clen;
+		if (len < sizeof in->buffer) {
+			if (in == &tls->crypt) {
+				ssz = gnutls_record_recv(tls->session, &in->buffer[len], sizeof in->buffer - len);
+				loop = ssz > 0 || ssz == GNUTLS_E_INTERRUPTED;
+			}
+			else {
+				ssz = read(in->fd, &in->buffer[len], sizeof in->buffer - len);
+				loop = ssz > 0 || (ssz < 0 && errno == EINTR);
+			}
+			if (ssz > 0) {
+				len += (unsigned)ssz;
+				in->clen = len;
+			}
+			else
+				len += loop; /* ensure an extra loop if INTR */
 		}
+		if (in->clen)
+			do_write(tls, in, out);
+		loop = loop && len > in->clen;
 	}
-	do_write(tls, in, out);
 }
 
 static void do_decrypt(struct tls *tls)
