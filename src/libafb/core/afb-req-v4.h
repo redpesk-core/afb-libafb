@@ -119,7 +119,7 @@ afb_req_v4_vverbose_hookable(
  */
 __attribute__((format(printf, 6, 7)))
 void
-afb_req_v4_verbose(
+afb_req_v4_verbose_hookable(
 	struct afb_req_v4 *reqv4,
 	int level, const char *file,
 	int line,

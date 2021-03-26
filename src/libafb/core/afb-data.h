@@ -215,7 +215,7 @@ afb_data_ro_pointer(
  */
 extern
 void*
-afb_data_ro_pointer(
+afb_data_rw_pointer(
 	struct afb_data *data
 );
 
