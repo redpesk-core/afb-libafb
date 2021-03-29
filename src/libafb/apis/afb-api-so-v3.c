@@ -34,6 +34,7 @@
 #include <afb/afb-binding-v3.h>
 
 #include "sys/x-dynlib.h"
+#include "sys/x-errno.h"
 #include "core/afb-apiname.h"
 #include "core/afb-string-mode.h"
 #include "apis/afb-api-so-v3.h"

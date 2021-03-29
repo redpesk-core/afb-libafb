@@ -21,21 +21,52 @@
  * $RP_END_LICENSE$
  */
 
-#pragma once
-
+#define _GNU_SOURCE /* for secure_getenv */
 
 #include <libafb/libafb-config.h>
 
 #if WITH_EXTENSION || WITH_DYNAMIC_BINDING
 
-typedef struct { void *handle; } x_dynlib_t;
+#include <stdlib.h>
+#include <dlfcn.h>
 
-extern int x_dynlib_open(const char *filename, x_dynlib_t *dynlib, int global, int lazy);
+#include "x-dynlib.h"
+#include "x-errno.h"
 
-extern void x_dynlib_close(x_dynlib_t *dynlib);
+int x_dynlib_open(const char *filename, x_dynlib_t *dynlib, int global, int lazy)
+{
+	int flags;
+	char *notdeep;
 
-extern int x_dynlib_symbol(x_dynlib_t *dynlib, const char* name, void** ptr);
+	/* compute the dlopen flags */
+	flags = lazy ? RTLD_LAZY : RTLD_NOW;
+	flags |= global ? RTLD_GLOBAL : RTLD_LOCAL;
 
-extern const char* x_dynlib_error(const x_dynlib_t *dynlib);
+	/* For ASan mode, export AFB_NO_RTLD_DEEPBIND=1, to disable RTLD_DEEPBIND */
+	notdeep = secure_getenv("AFB_NO_RTLD_DEEPBIND");
+	if (!notdeep || notdeep[0] != '1' || notdeep[1])
+		flags |= RTLD_DEEPBIND;
+
+	/* open the library now */
+	dynlib->handle = dlopen(filename, flags);
+	return dynlib->handle ? 0 : X_ENODATA;
+}
+
+void x_dynlib_close(x_dynlib_t *dynlib)
+{
+	dlclose(dynlib->handle);
+}
+
+int x_dynlib_symbol(x_dynlib_t *dynlib, const char* name, void** ptr)
+{
+	void *p = dlsym(dynlib->handle, name);
+	*ptr = p;
+	return p ? 0 : X_ENOENT;
+}
+
+const char* x_dynlib_error(const x_dynlib_t *dynlib)
+{
+	return dlerror();
+}
 
 #endif

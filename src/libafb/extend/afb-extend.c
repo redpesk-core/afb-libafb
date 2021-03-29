@@ -34,6 +34,7 @@
 
 #include "sys/verbose.h"
 #include "sys/x-dynlib.h"
+#include "sys/x-errno.h"
 #include "utils/wrap-json.h"
 #include "core/afb-v4-itf.h"
 

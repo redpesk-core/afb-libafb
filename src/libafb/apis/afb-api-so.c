@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 
 #include "sys/x-dynlib.h"
+#include "sys/x-errno.h"
 #include "apis/afb-api-so.h"
 #include "apis/afb-api-so-v3.h"
 #include "apis/afb-api-so-v4.h"
