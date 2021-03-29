@@ -906,7 +906,9 @@ afb_data_convert(
 		else {
 			/* conversion */
 			rc = afb_type_convert_data(data->type, v, type, &r);
-			if (rc >= 0 && !afb_data_is_volatile(data)) {
+			if (rc < 0)
+				r = 0;
+			else if (!afb_data_is_volatile(data)) {
 				data_cvt_merge(data, r);
 				rc = 0;
 			}
