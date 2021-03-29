@@ -23,4 +23,7 @@
 
 #pragma once
 
+#include "afb-core.h"
+#include "afb-http.h"
+
 #include "extend/afb-extension.h"
