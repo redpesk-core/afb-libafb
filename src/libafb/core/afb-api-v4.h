@@ -104,7 +104,8 @@ extern
 int
 afb_api_v4_set_binding_fields(
 	struct afb_api_v4 *apiv4,
-	const struct afb_binding_v4 *desc
+	const struct afb_binding_v4 *desc,
+	afb_api_callback_x4_t mainctl
 );
 
 extern

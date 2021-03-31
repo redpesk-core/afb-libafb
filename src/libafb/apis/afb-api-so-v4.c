@@ -74,7 +74,7 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 	*iniv4->dlv4.root = api;
 
 	/* record the description */
-	rc = afb_api_v4_set_binding_fields(api, iniv4->dlv4.desc);
+	rc = afb_api_v4_set_binding_fields(api, iniv4->dlv4.desc, iniv4->dlv4.mainctl);
 	if (rc >= 0 && iniv4->dlv4.mainctl) {
 		/* call the pre init routine safely */
 		memset(&ctlarg, 0, sizeof ctlarg);

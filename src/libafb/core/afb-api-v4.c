@@ -1013,14 +1013,15 @@ afb_api_v4_del_verb(
 int
 afb_api_v4_set_binding_fields(
 	struct afb_api_v4 *apiv4,
-	const struct afb_binding_v4 *desc
+	const struct afb_binding_v4 *desc,
+	afb_api_callback_x4_t mainctl
 ) {
 	int rc;
 	struct afb_api_common *comapi;
 
 	apiv4->userdata = desc->userdata;
 	apiv4->verbs.statics = desc->verbs;
-	apiv4->mainctl = desc->mainctl;
+	apiv4->mainctl = mainctl;
 
 	rc = 0;
 	comapi = &apiv4->comapi;
