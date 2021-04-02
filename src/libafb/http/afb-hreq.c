@@ -430,7 +430,7 @@ int afb_hreq_redirect_to_ending_slash_if_needed(struct afb_hreq *hreq)
 }
 
 #if WITH_OPENAT
-int afb_hreq_reply_file_if_exist(struct afb_hreq *hreq, int dirfd, const char *filename)
+int afb_hreq_reply_file_at_if_exist(struct afb_hreq *hreq, int dirfd, const char *filename)
 {
 	int rc;
 	int fd;
@@ -473,7 +473,7 @@ int afb_hreq_reply_file_if_exist(struct afb_hreq *hreq, int dirfd, const char *f
 			int i = 0;
 			while (indexes[i] != NULL) {
 				if (faccessat(fd, indexes[i], R_OK, 0) == 0) {
-					rc = afb_hreq_reply_file_if_exist(hreq, fd, indexes[i]);
+					rc = afb_hreq_reply_file_at_if_exist(hreq, fd, indexes[i]);
 					break;
 				}
 				i++;
@@ -534,9 +534,9 @@ int afb_hreq_reply_file_if_exist(struct afb_hreq *hreq, int dirfd, const char *f
 	return 1;
 }
 
-int afb_hreq_reply_file(struct afb_hreq *hreq, int dirfd, const char *filename)
+int afb_hreq_reply_file_at(struct afb_hreq *hreq, int dirfd, const char *filename)
 {
-	int rc = afb_hreq_reply_file_if_exist(hreq, dirfd, filename);
+	int rc = afb_hreq_reply_file_at_if_exist(hreq, dirfd, filename);
 	if (rc == 0)
 		afb_hreq_reply_error(hreq, MHD_HTTP_NOT_FOUND);
 	return 1;

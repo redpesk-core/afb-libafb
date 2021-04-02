@@ -68,9 +68,9 @@ extern int afb_hreq_valid_tail(struct afb_hreq *request);
 extern void afb_hreq_reply_error(struct afb_hreq *request, unsigned int status);
 
 #if WITH_OPENAT
-extern int afb_hreq_reply_file_if_exist(struct afb_hreq *request, int dirfd, const char *filename);
+extern int afb_hreq_reply_file_at_if_exist(struct afb_hreq *request, int dirfd, const char *filename);
 
-extern int afb_hreq_reply_file(struct afb_hreq *request, int dirfd, const char *filename);
+extern int afb_hreq_reply_file_at(struct afb_hreq *request, int dirfd, const char *filename);
 #endif
 
 extern int afb_hreq_reply_locale_file_if_exist(struct afb_hreq *hreq, struct locale_search *search, const char *filename);

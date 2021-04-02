@@ -79,7 +79,7 @@ struct hsrv_handler {
 	int priority;
 };
 
-struct hsrv_alias {
+struct hsrv_alias_locale_root {
 	struct locale_root *root;
 	int relax;
 };
@@ -340,10 +340,10 @@ static struct hsrv_handler *new_handler(
 	return head;
 }
 
-static int handle_alias(struct afb_hreq *hreq, void *data)
+static int handle_alias_locale_root(struct afb_hreq *hreq, void *data)
 {
 	int rc;
-	struct hsrv_alias *da = data;
+	struct hsrv_alias_locale_root *da = data;
 	struct locale_search *search;
 
 	if (hreq->method != afb_method_get) {
@@ -382,13 +382,13 @@ int afb_hsrv_add_handler(
 
 int afb_hsrv_add_alias_root(struct afb_hsrv *hsrv, const char *prefix, struct locale_root *root, int priority, int relax)
 {
-	struct hsrv_alias *da;
+	struct hsrv_alias_locale_root *da;
 
 	da = malloc(sizeof *da);
 	if (da != NULL) {
 		da->root = root;
 		da->relax = relax;
-		if (afb_hsrv_add_handler(hsrv, prefix, handle_alias, da, priority)) {
+		if (afb_hsrv_add_handler(hsrv, prefix, handle_alias_locale_root, da, priority)) {
 			locale_root_addref(root);
 			return 1;
 		}
