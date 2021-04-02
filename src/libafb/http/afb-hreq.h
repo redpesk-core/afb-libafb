@@ -67,6 +67,8 @@ extern int afb_hreq_valid_tail(struct afb_hreq *request);
 
 extern void afb_hreq_reply_error(struct afb_hreq *request, unsigned int status);
 
+extern int afb_hreq_reply_file(struct afb_hreq *hreq, const char *filename, int relax);
+
 #if WITH_OPENAT
 extern int afb_hreq_reply_file_at_if_exist(struct afb_hreq *request, int dirfd, const char *filename);
 
