@@ -46,6 +46,7 @@ extern int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dir
 #endif
 extern int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax);
 extern int afb_hsrv_add_alias_root(struct afb_hsrv *hsrv, const char *prefix, struct locale_root *root, int priority, int relax);
+extern int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix, const char *dirname, int priority, int relax);
 extern int afb_hsrv_add_handler(struct afb_hsrv *hsrv, const char *prefix, int (*handler) (struct afb_hreq *, void *), void *data, int priority);
 extern int afb_hsrv_add_interface(struct afb_hsrv *hsrv, const char *uri);
 extern int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t port);

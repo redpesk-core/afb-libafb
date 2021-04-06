@@ -445,6 +445,82 @@ int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const cha
 	return rc;
 }
 
+/*****************************************************************************/
+
+/**
+ * Records an alias to a directory
+ */
+struct hsrv_alias_dirname {
+	int relax;        /* Is the alias relax? */
+	unsigned dirlen;  /* Length of the directory name (without nul) */
+	char dirname[];   /* The aliased directory name (path) */
+};
+
+/**
+ * Internal handler for alias to directories
+ */
+static int handle_alias_dirname(struct afb_hreq *hreq, void *data)
+{
+	struct hsrv_alias_dirname *da = data;
+	char path[PATH_MAX + 1];
+	unsigned len, tlen;
+	unsigned err = 0;
+
+	/* check the method */
+	if (hreq->method != afb_method_get)
+		err = MHD_HTTP_METHOD_NOT_ALLOWED;
+
+	/* check the length */
+	else if (da->dirlen + hreq->lentail >= sizeof path)
+		err = MHD_HTTP_URI_TOO_LONG;
+
+	/* checked action */
+	else {
+		/* compute the dealiased path */
+		len = da->dirlen;
+		memcpy(path, da->dirname, len);
+		tlen = (unsigned)hreq->lentail;
+		if (tlen > 0)
+			memcpy(&path[len], &hreq->tail[1], --tlen);
+		path[len + tlen] = 0;
+
+		/* reply the path now */
+		return afb_hreq_reply_file(hreq, path, da->relax);
+	}
+
+	/* ignore errors if relaxed */
+	if (da->relax)
+		return 0;
+
+	/* report the error to the client */
+	afb_hreq_reply_error(hreq, err);
+	return 1;
+}
+
+int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix, const char *dirname, int priority, int relax)
+{
+	size_t dirlen;
+	struct hsrv_alias_dirname *da;
+	int rc = 0;
+
+	if (dirname != NULL) {
+		dirlen = strlen(dirname);
+		if (dirlen <= UINT_MAX) {
+			da = malloc(dirlen + 1 + sizeof *da);
+			if (da != NULL) {
+				da->relax = relax;
+				da->dirlen = (unsigned)dirlen;
+				memcpy(da->dirname, dirname, 1 + dirlen);
+				if (afb_hsrv_add_handler(hsrv, prefix, handle_alias_dirname, da, priority))
+					return 1;
+				free(da);
+			}
+		}
+	}
+	ERROR("can't create alias of %s to dirname %s", prefix, dirname);
+	return rc;
+}
+
 int afb_hsrv_set_cache_timeout(struct afb_hsrv *hsrv, int duration)
 {
 	int rc;
