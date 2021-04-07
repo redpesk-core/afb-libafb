@@ -36,6 +36,7 @@
 #include <afb/afb-binding-v4.h>
 
 #include "core/afb-data.h"
+#include "core/afb-data-array.h"
 #include "core/afb-type.h"
 #include "core/afb-type-predefined.h"
 #include "sys/x-errno.h"
@@ -334,6 +335,87 @@ END_TEST
 
 /*********************************************************************/
 
+static struct afb_type *deptype1, *deptype2, *deptype3;
+
+static unsigned depflags = 0;
+
+static void depdrop1(void *closure)
+{
+	depflags += 1;
+}
+
+static void depdrop2(void *closure)
+{
+	depflags += 10;
+}
+
+static void depdrop3(void *closure)
+{
+	depflags += 100;
+}
+
+static int cvtdep12(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
+{
+	int rc = afb_data_create_raw(to, deptype2, to, 0, depdrop2, 0);
+	ck_assert_int_eq(rc, 0);
+	rc = afb_data_dependency_add(*to, from);
+	ck_assert_int_eq(rc, 0);
+	depflags += 1000;
+	return 0;
+}
+
+static int cvtdep23(void *closure, struct afb_data *from, struct afb_type *type, struct afb_data **to)
+{
+	int rc = afb_data_create_raw(to, deptype3, to, 0, depdrop3, 0);
+	ck_assert_int_eq(rc, 0);
+	rc = afb_data_dependency_add(*to, from);
+	ck_assert_int_eq(rc, 0);
+	depflags += 10000;
+	return 0;
+}
+
+START_TEST (check_depend)
+{
+	struct afb_data *data, *result;
+	int rc;
+
+	rc = afb_type_register(&deptype1, "deptype1", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_register(&deptype2, "deptype2", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_register(&deptype3, "deptype3", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(deptype1, deptype2, cvtdep12, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(deptype2, deptype3, cvtdep23, 0);
+	ck_assert_int_eq(rc, 0);
+
+	depflags = 0;
+	rc = afb_data_create_raw(&data, deptype1, &data, 0, depdrop1, 0);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(depflags, 0);
+
+	rc = afb_data_array_convert(1, &data, &deptype3, &result);
+	ck_assert_int_eq(rc, 0);
+	ck_assert_int_eq(depflags, 11000);
+
+	afb_data_notify_changed(result);
+	ck_assert_int_eq(depflags, 11000);
+
+	afb_data_unref(data);
+	ck_assert_int_eq(depflags, 11000);
+
+	afb_data_unref(result);
+	ck_assert_int_eq(depflags, 11111);
+}
+END_TEST
+
+/*********************************************************************/
+
 static Suite *suite;
 static TCase *tcase;
 
@@ -358,5 +440,6 @@ int main(int ac, char **av)
 			addtest(check_convert);
 			addtest(check_cache);
 			addtest(test_predefine_types);
+			addtest(check_depend);
 	return !!srun();
 }

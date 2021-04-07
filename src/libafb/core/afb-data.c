@@ -505,6 +505,20 @@ void
 data_cvt_changed(
 	struct afb_data *data
 ) {
+#if 1
+	data_cvt_isolate(data);
+#else
+/*
+This part is removed mainly because it was calling data_destroy without
+checking that the data is bound as the dependency of other data (the depcount)
+
+However, it is a corner case of difficult. What should be done of
+a changed data that is linked by conversion to other data?
+
+Before the change that removed the code below, the idea was to invalidate
+the converted data and to automatically restore it by conversion of the
+new fresh data.
+*/
 	struct afb_data *i, *p;
 
 	p = data;
@@ -524,6 +538,7 @@ data_cvt_changed(
 		}
 		i = p->cvt;
 	}
+#endif
 }
 
 /**
