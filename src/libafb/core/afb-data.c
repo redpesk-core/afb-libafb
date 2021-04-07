@@ -479,6 +479,25 @@ data_release(
 }
 
 /**
+ * remove any conversion of that data
+ */
+static
+void
+data_cvt_isolate(
+	struct afb_data *data
+) {
+	struct afb_data *i;
+
+	i = data->cvt;
+	if (i != data) {
+		do { i = i->cvt; } while (i->cvt != data);
+		i->cvt = data->cvt;
+		data->cvt = data;
+		data_release(i);
+	}
+}
+
+/**
  * invalidate any conversion of this data
  */
 static
@@ -504,25 +523,6 @@ data_cvt_changed(
 			data_destroy(i);
 		}
 		i = p->cvt;
-	}
-}
-
-/**
- * remove any conversion of that data
- */
-static
-void
-data_cvt_isolate(
-	struct afb_data *data
-) {
-	struct afb_data *i;
-
-	i = data->cvt;
-	if (i != data) {
-		do { i = i->cvt; } while (i->cvt != data);
-		i->cvt = data->cvt;
-		data->cvt = data;
-		data_release(i);
 	}
 }
 
