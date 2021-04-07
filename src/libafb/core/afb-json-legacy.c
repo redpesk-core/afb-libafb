@@ -57,7 +57,7 @@ static struct afb_data *legacy_tag_data(int addref)
 		if (tag)
 			afb_data_set_constant(tag);
 	}
-	return addref ? tag : afb_data_addref(tag);
+	return addref ? afb_data_addref(tag) : tag;
 }
 
 /**********************************************************************/
