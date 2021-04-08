@@ -481,7 +481,7 @@ static int handle_alias_dirname(struct afb_hreq *hreq, void *data)
 		memcpy(path, da->dirname, len);
 		tlen = (unsigned)hreq->lentail;
 		if (tlen > 0)
-			memcpy(&path[len], &hreq->tail[1], --tlen);
+			memcpy(&path[len], hreq->tail, tlen);
 		path[len + tlen] = 0;
 
 		/* reply the path now */
@@ -505,6 +505,8 @@ int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix, const 
 
 	if (dirname != NULL) {
 		dirlen = strlen(dirname);
+		while (dirlen > 1 && dirname[dirlen - 1] == '/')
+			dirlen = dirlen -1;
 		if (dirlen <= UINT_MAX) {
 			da = malloc(dirlen + 1 + sizeof *da);
 			if (da != NULL) {
