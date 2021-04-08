@@ -3,6 +3,7 @@ global:
 	afb_ws_client_connect_wsj1;
 	afb_ws_client_connect_api;
 	afb_ws_client_connect_wsapi;
+	afb_ws_client_connect_to_sd_event;
 	afb_ws_client_serve;
 	afb_wsj1_*;
 	afb_proto_ws_*;

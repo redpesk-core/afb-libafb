@@ -671,8 +671,10 @@ int afb_ws_client_serve(struct sd_event *eloop, const char *uri, int (*onclient)
 				lcb->closure = closure;
 				strcpy(lcb->uri, uri);
 				rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, server_listen_callback, lcb, 1, 1);
-				if (rc >= 0)
+				if (rc >= 0) {
+					afb_ev_mgr_prepare();
 					return 0;
+				}
 				close(fd);
 			}
 			free(lcb);
