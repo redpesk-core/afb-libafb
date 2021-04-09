@@ -15,8 +15,10 @@ while :; do
 	shift
 done
 
-mkdir -p "$h/$bd" || exit
-cd "$h/$bd" || exit
+cd "$h"
+h=$(pwd)
+mkdir -p "$bd" || exit
+cd "$bd" || exit
 
 $force && { rm -r * 2>/dev/null || rm CMakeCache.txt 2>/dev/null; }
 test -f CMakeCache.txt -a -f Makefile || \
@@ -70,7 +72,7 @@ cmake \
 	-DWITH_THREAD_LOCAL=${WITH_THREAD_LOCAL:=ON} \
 	-DWITH_LIBMAGIC=${WITH_LIBMAGIC:=ON} \
 	-DARCH32=${ARCH32:=OFF} \
-	..
+	"$h"
 
 make -j "$@"
 
