@@ -60,6 +60,7 @@
 #include "utils/namecmp.h"
 
 #define SIZE_RESPONSE_BUFFER   8192
+#define SIZE_COOKIE_BUFFER     250
 
 static int global_reqids = 0;
 
@@ -175,22 +176,28 @@ static int validsubpath(const char *subpath)
 	return 1;
 }
 
+/**
+ * Add cookie header to the response
+ *
+ * @param hreq the request
+ * @param response the response
+ */
 static void set_response_cookie(struct afb_hreq *hreq, struct MHD_Response *response)
 {
 	int rc;
-	char *cookie;
+	char cookie[SIZE_COOKIE_BUFFER + 1];
 	const char *uuid;
 	int res;
 
+	/* search the uuid of the session if any */
 	uuid = hreq->comreq.session ? afb_session_uuid(hreq->comreq.session) : NULL;
 	if (uuid != NULL) {
-		rc = asprintf(&cookie, "%s=%s%s", cookie_name, uuid, cookie_attr);
-		if (rc < 0)
+		/* set a cookie for the the session */
+		rc = snprintf(cookie, sizeof cookie, "%s=%s%s", cookie_name, uuid, cookie_attr);
+		if (rc <= 0 || rc > SIZE_COOKIE_BUFFER)
 			res = MHD_NO;
-		else {
+		else
 			res = MHD_add_response_header(response, MHD_HTTP_HEADER_SET_COOKIE, cookie);
-			free(cookie);
-		}
 		if (res == MHD_NO)
 			ERROR("unable to set cookie");
 	}
