@@ -203,26 +203,39 @@ static void set_response_cookie(struct afb_hreq *hreq, struct MHD_Response *resp
 	}
 }
 
+/**
+ * Send a reply to the request
+ *
+ * @param hreq the request
+ * @param status HTTP status code of the reply
+ * @param response content of the response
+ * @param args variable arguments list of key/value pairs of companion header
+ */
 static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_Response *response, va_list args)
 {
 	const char *k, *v;
 
-	if (hreq->replied != 0)
+	/* Check replying status */
+	if (hreq->replied != 0) {
+		ERROR("Already replied HTTP request");
 		return;
+	}
+	hreq->replied = 1;
 
+	/* add extra headers */
 	k = va_arg(args, const char *);
 	while (k != NULL) {
 		v = va_arg(args, const char *);
 		MHD_add_response_header(response, k, v);
 		k = va_arg(args, const char *);
 	}
-
-
 	set_response_cookie(hreq, response);
+
+	/* send the response */
 	MHD_queue_response(hreq->connection, status, response);
 	MHD_destroy_response(response);
 
-	hreq->replied = 1;
+	/* hack if suspended ! */
 	if (hreq->suspended != 0) {
 		MHD_resume_connection (hreq->connection);
 		hreq->suspended = 0;
@@ -721,9 +734,9 @@ void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_
 
 	wqp = add_query_part ? url_with_query(hreq, url) : NULL;
 	to = wqp ? : url;
+	DEBUG("%s redirect from [%s] to [%s]", permanent ? "permanent" : "temporary", hreq->url, url);
 	afb_hreq_reply_static(hreq, redir, 0, NULL,
 			MHD_HTTP_HEADER_LOCATION, to, NULL);
-	DEBUG("redirect from [%s] to [%s]", hreq->url, url);
 	free(wqp);
 }
 
