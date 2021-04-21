@@ -78,15 +78,20 @@ static char *cookie_name = NULL;
 static char *cookie_attr = NULL;
 static char *tmp_pattern = NULL;
 
-/*
+/**
  * Structure for storing key/values read from POST requests
  */
 struct hreq_data {
-	struct hreq_data *next;	/* chain to next data */
-	char *key;		/* key name */
-	size_t length;		/* length of the value (used for appending) */
-	char *value;		/* the value (or original filename) */
-	char *path;		/* path of the file saved */
+	/** link to next data */
+	struct hreq_data *next;
+	/* length of the value (used for appending) */
+	size_t length;
+	/* the value (or original filename) */
+	char *value;
+	/* path of the file saved */
+	char *path;
+	/** key name */
+	char key[];
 };
 
 static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[]);
@@ -97,25 +102,37 @@ const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
 	.unref = req_destroy
 };
 
+/**
+ * Get from the request 'hreq' the data structure of name 'key'.
+ *
+ * @param hreq the request
+ * @param key  the key to search
+ * @param create create the structure if not existing
+ *
+ * @return the found structure if found or NULL if not found when create is zero
+ * or on allocation error if create isn't zero
+ */
 static struct hreq_data *get_data(struct afb_hreq *hreq, const char *key, int create)
 {
-	struct hreq_data *data = hreq->data;
-	while (data != NULL) {
-		if (!namecmp(data->key, key))
-			return data;
+	size_t sz;
+	struct hreq_data *data;
+
+	/* search the existing data */
+	data = hreq->data;
+	while (data != NULL && namecmp(data->key, key))
 		data = data->next;
-	}
-	if (create) {
-		data = calloc(1, sizeof *data);
+
+	/* create a new data on need */
+	if (data == NULL && create) {
+		sz = 1 + strlen(key);
+		data = malloc(sz + sizeof *data);
 		if (data != NULL) {
-			data->key = strdup(key);
-			if (data->key == NULL) {
-				free(data);
-				data = NULL;
-			} else {
-				data->next = hreq->data;
-				hreq->data = data;
-			}
+			memcpy(data->key, key, sz);
+			data->length = 0;
+			data->value = NULL;
+			data->path = NULL;
+			data->next = hreq->data;
+			hreq->data = data;
 		}
 	}
 	return data;
@@ -358,7 +375,6 @@ static void req_destroy(struct afb_req_common *comreq)
 			unlink(data->path);
 			free(data->path);
 		}
-		free(data->key);
 		free(data->value);
 		free(data);
 	}
