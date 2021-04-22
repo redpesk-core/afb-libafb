@@ -1,0 +1,18 @@
+Next version
+------------
+
+	features
+		- add reply code if available in wsj1
+
+	minors/details
+		- saved bytes in http keys for data
+		- avoid allocation for setting cookies
+		- emit error on second HTTP reply trial
+		- improve generation of json string in afb-json-legacy
+
+
+Version 4.0.0 or 4.0.1
+----------------------
+
+this is the base version
+
