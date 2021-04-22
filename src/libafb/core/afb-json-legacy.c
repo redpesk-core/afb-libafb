@@ -712,15 +712,22 @@ static size_t escjson_strlen(const char *string)
 }
 
 /**
+ */
+struct mkmsgstr
+{
+	const char *string;
+	size_t size;
+	char escape;
+};
+
+/**
  * make a string by concatenating a sequence of strings
  * each being optionnaly escaped as JSON string
  *
  * @param result   address where to store the resulting string pointer
  * @param length   place to store the computed length
  * @param count    count of strings to concatenate
- * @param strings  array of the strings to concatenate
- * @param sizes    size after copy of each concatenated string
- * @param escapes  bitfields of escape flags
+ * @param defstr   array defining the strings to concatenate
  *
  * @return 0 in case of success or a negative error code
  */
@@ -730,9 +737,7 @@ make_msg_string(
 	char **result,
 	size_t *length,
 	int count,
-	const char *strings[],
-	size_t sizes[],
-	unsigned escapes
+	struct mkmsgstr *defstr
 ) {
 	size_t s;
 	int i;
@@ -741,7 +746,7 @@ make_msg_string(
 	/* compute the length */
 	s = 0;
 	for (i = 0 ; i < count ; i++)
-		s += sizes[i];
+		s += defstr[i].size;
 	if (length)
 		*length = s;
 
@@ -752,7 +757,7 @@ make_msg_string(
 
 	/* copy with/without escaping */
 	for (i = 0 ; i < count ; i++)
-		iter = (((escapes >> i) & 1) ? escjson_stpcpy : stpcpy)(iter, strings[i]);
+		iter = (defstr[i].escape ? escjson_stpcpy : stpcpy)(iter, defstr[i].string);
 
 	return 0;
 }
@@ -778,50 +783,56 @@ mkmsg_reply_cb(
 	static const char msg_end_response[] = "}";
 
 	struct mkmsg *mm = closure;
-	const char *strings[10]; /* 7 is enough */
-	size_t sizes[10];
-	unsigned escapes;
+
+	struct mkmsgstr defstr[10]; /* 9 is enough */
 	int n;
 
-	escapes = 0;
-	strings[0] = msg_head;
-	sizes[0] = sizeof(msg_head) - 1;
+	defstr[0].string = msg_head;
+	defstr[0].size = sizeof(msg_head) - 1;
+	defstr[0].escape = 0;
+
 	if (error) {
-		strings[1] = error;
-		sizes[1] = escjson_strlen(error);
-		escapes = 1 << 1;
+		defstr[1].string = error;
+		defstr[1].size = escjson_strlen(error);
+		defstr[1].escape = 1;
 	}
 	else {
-		strings[1] = _success_;
-		sizes[1] = sizeof(_success_) - 1;
+		defstr[1].string = _success_;
+		defstr[1].size = sizeof(_success_) - 1;
+		defstr[1].escape = 0;
 	}
 	n = 2;
 	if (info) {
-		strings[2] = msg_info;
-		sizes[2] = sizeof(msg_info) - 1;
-		strings[3] = info;
-		sizes[3] = escjson_strlen(info);
-		escapes |= 1 << 3;
+		defstr[2].string = msg_info;
+		defstr[2].size = sizeof(msg_info) - 1;
+		defstr[2].escape = 0;
+
+		defstr[3].string = info;
+		defstr[3].size = escjson_strlen(info);
+		defstr[3].escape = 1;
+
 		n = 4;
 	}
 	if (object && strcmp(object, "null")) {
-		strings[n] = msg_response;
-		sizes[n] = sizeof(msg_response) - 1;
-		n++;
-		strings[n] = object;
-		sizes[n] = strlen(object);
-		n++;
-		strings[n] = msg_end_response;
-		sizes[n] = sizeof(msg_end_response) - 1;
-		n++;
+		defstr[n].string = msg_response;
+		defstr[n].size = sizeof(msg_response) - 1;
+		defstr[n++].escape = 0;
+
+		defstr[n].string = object;
+		defstr[n].size = strlen(object);
+		defstr[n++].escape = 0;
+
+		defstr[n].string = msg_end_response;
+		defstr[n].size = sizeof(msg_end_response) - 1;
+		defstr[n++].escape = 0;
 	}
 	else {
-		strings[n] = msg_no_response;
-		sizes[n] = sizeof(msg_no_response) - 1;
-		n++;
+		defstr[n].string = msg_no_response;
+		defstr[n].size = sizeof(msg_no_response) - 1;
+		defstr[n++].escape = 0;
 	}
 
-	mm->rc = make_msg_string(&mm->message, &mm->length, n, strings, sizes, escapes);
+	mm->rc = make_msg_string(&mm->message, &mm->length, n, defstr);
 }
 
 int
@@ -856,32 +867,43 @@ mkmsg_event_cb(
 
 	struct mkmsg *mm = closure1;
 	const char *event = closure2;
-	const char *strings[10]; /* 5 is enough */
-	size_t sizes[10];
-	unsigned escapes;
+
+	struct mkmsgstr defstr[10]; /* 5 is enough */
+
 	int n;
 
-	strings[0] = msg_head;
-	sizes[0] = sizeof(msg_head) - 1;
-	strings[1] = event;
-	sizes[1] = escjson_strlen(event);
+	defstr[0].string = msg_head;
+	defstr[0].size = sizeof(msg_head) - 1;
+	defstr[0].escape = 0;
+
+	defstr[1].string = event;
+	defstr[1].size = escjson_strlen(event);
+	defstr[1].escape = 1;
+
 	if (object) {
-		strings[2] = msg_data;
-		sizes[2] = sizeof(msg_data) - 1;
-		strings[3] = object;
-		sizes[3] = strlen(object);
-		strings[4] = msg_end_data;
-		sizes[4] = sizeof(msg_end_data) - 1;
+		defstr[2].string = msg_data;
+		defstr[2].size = sizeof(msg_data) - 1;
+		defstr[2].escape = 0;
+
+		defstr[3].string = object;
+		defstr[3].size = strlen(object);
+		defstr[3].escape = 0;
+
+		defstr[4].string = msg_end_data;
+		defstr[4].size = sizeof(msg_end_data) - 1;
+		defstr[4].escape = 0;
+
 		n = 5;
 	}
 	else {
-		strings[2] = msg_no_data;
-		sizes[2] = sizeof(msg_no_data) - 1;
+		defstr[2].string = msg_no_data;
+		defstr[2].size = sizeof(msg_no_data) - 1;
+		defstr[2].escape = 0;
+
 		n = 3;
 	}
-	escapes = 1 << 1;
 
-	mm->rc = make_msg_string(&mm->message, &mm->length, n, strings, sizes, escapes);
+	mm->rc = make_msg_string(&mm->message, &mm->length, n, defstr);
 }
 
 int
