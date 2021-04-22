@@ -778,12 +778,14 @@ mkmsg_reply_cb(
 ) {
 	static const char msg_head[] = "{\"jtype\":\"afb-reply\",\"request\":{\"status\":\"";
 	static const char msg_info[] = "\",\"info\":\"";
-	static const char msg_no_response[] = "\"}}";
-	static const char msg_response[] = "\"},\"response\":";
+	static const char msg_code[] = "\",\"code\":";
+	static const char msg_no_response[] = "}}";
+	static const char msg_response[] = "},\"response\":";
 	static const char msg_end_response[] = "}";
 
 	struct mkmsg *mm = closure;
 
+	char code[30]; /* enough even for 64 bit values */
 	struct mkmsgstr defstr[10]; /* 9 is enough */
 	int n;
 
@@ -813,6 +815,14 @@ mkmsg_reply_cb(
 
 		n = 4;
 	}
+
+	defstr[n].string = msg_code;
+	defstr[n].size = sizeof(msg_code) - 1;
+	defstr[n++].escape = 0;
+	defstr[n].string = code;
+	defstr[n].size = (size_t)snprintf(code, sizeof code, "%d", mm->rc);
+	defstr[n++].escape = 0;
+
 	if (object && strcmp(object, "null")) {
 		defstr[n].string = msg_response;
 		defstr[n].size = sizeof(msg_response) - 1;
@@ -846,6 +856,7 @@ afb_json_legacy_make_msg_string_reply(
 	struct mkmsg mm;
 	int rc;
 
+	mm.rc = status;
 	rc = afb_json_legacy_do_reply_json_string(&mm, status, nreplies, replies, mkmsg_reply_cb);
 
 	*message = mm.message;
