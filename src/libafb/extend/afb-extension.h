@@ -82,15 +82,15 @@ struct afb_extension_manifest
 
 /**
  * Macro for defining the extension for the current
- * version and the givene name.
+ * version and the given name.
  *
- * @param extname name to give to the extension
+ * @param extname name to give to the extension (a string)
  */
 #define AFB_EXTENSION(extname) \
 	struct afb_extension_manifest AfbExtensionManifest = { \
 		.magic = AFB_EXTENSION_MAGIC, \
 		.version = AFB_EXTENSION_VERSION, \
-		.name = #extname \
+		.name = extname \
 	};
 
 /* some forward declarations */

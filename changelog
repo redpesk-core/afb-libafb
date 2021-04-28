@@ -3,6 +3,8 @@ Next version
 
 	features
 		- add reply code if available in wsj1
+		- Enforce use of strings to define extensions
+		  in macro AFB_EXTENSION
 
 	minors/details
 		- saved bytes in http keys for data

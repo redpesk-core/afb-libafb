@@ -39,6 +39,9 @@ struct hreq_data;
 struct afb_hsrv;
 struct locale_search;
 
+/**
+ * Record of an HTTP query
+ */
 struct afb_hreq {
 	struct afb_req_common comreq;
 	struct afb_hsrv *hsrv;
