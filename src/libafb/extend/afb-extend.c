@@ -139,7 +139,7 @@ static int load_extension(const char *path, int failstops, const char *uid)
 			rc = X_EEXIST;
 		} else {
 			afb_v4_connect_dynlib(&handle, &infov4, 0);
-			if (infov4.root || infov4.desc || infov4.mainctl) {
+			if (infov4.root || infov4.desc || infov4.mainctl || infov4.itfrev != 0) {
 				ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
 				ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
 				if (infov4.root)

@@ -220,11 +220,6 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 /**********************************************************/
 
 /**
- * Name of the structure of callbacks
- */
-static const char afb_api_so_v4r1_itf[] = "afbBindingV4r1_itf";
-
-/**
  * Name of the pointer to the structure of callbacks
  */
 static const char afb_api_so_v4r1_itfptr[] = "afbBindingV4r1_itfptr";
@@ -244,10 +239,17 @@ static const char afb_api_so_v4_root[] = "afbBindingV4root";
  */
 static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
 
+/**
+ * Name of the manifest interface version : "afbBindingV4_itfversion"
+ */
+static const char afb_api_so_v4_itfrevision[] = "afbBindingV4_itf_revision";
 
+/**
+ * default ITF VERSION
+ */
 void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, afb_api_x4_t rootapi)
 {
-	struct afb_binding_x4r1_itf *itf1;
+	short *ptritfrev;
 	const struct afb_binding_x4r1_itf **itfptr1;
 
 	/* retrieves important exported symbols */
@@ -257,16 +259,10 @@ void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, 
 
 	/* retrieves interfaces */
 	info->itfrev = 0;
-	x_dynlib_symbol(dynlib, afb_api_so_v4r1_itf, (void**)&itf1);
 	x_dynlib_symbol(dynlib, afb_api_so_v4r1_itfptr, (void**)&itfptr1);
-	if (itf1) {
-		info->itfrev = 1;
-		*itf1 = afb_v4_itf;
-		if (itfptr1)
-			*itfptr1 = itf1;
-	}
-	else if (itfptr1) {
-		info->itfrev = 1;
+	if (itfptr1) {
+		x_dynlib_symbol(dynlib, afb_api_so_v4_itfrevision, (void**)&ptritfrev);
+		info->itfrev = ptritfrev ? *ptritfrev : 1;
 		*itfptr1 = &afb_v4_itf;
 	}
 

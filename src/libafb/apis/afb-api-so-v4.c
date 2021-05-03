@@ -150,7 +150,7 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	INFO("binding [%s] looks like an AFB binding V4", path);
 
 	/* check interface */
-	if (!iniv4.dlv4.itfrev) {
+	if (iniv4.dlv4.itfrev == 0) {
 		ERROR("binding [%s] incomplete symbol set: interface is missing", path);
 		rc = X_EINVAL;
 		goto error;
@@ -162,6 +162,18 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 		rc = X_EINVAL;
 		goto error;
 	}
+
+	/* check the interface revision */
+	if (iniv4.dlv4.itfrev > AFB_BINDING_X4R1_ITF_CURRENT_REVISION) {
+		ERROR("binding [%s] interface v4 revision %d isn't supported (greater than %d)",
+				path, (int)iniv4.dlv4.itfrev, AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
+		rc = X_EINVAL;
+		goto error;
+	}
+
+	if (iniv4.dlv4.itfrev < AFB_BINDING_X4R1_ITF_CURRENT_REVISION)
+		NOTICE("binding [%s] interface v4 revision %d lesser than current %d",
+				path, iniv4.dlv4.itfrev, AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
 
 	if (iniv4.dlv4.desc) {
 		/* case where a main API is described */
