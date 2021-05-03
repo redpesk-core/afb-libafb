@@ -11,6 +11,7 @@ Next version
     - avoid allocation for setting cookies
     - emit error on second HTTP reply trial
     - improve generation of json string in afb-json-legacy
+    - always provide predefined basic types
 
 
 Version 4.0.0 or 4.0.1

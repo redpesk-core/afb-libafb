@@ -175,14 +175,12 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.type_stringz = &afb_type_predefined_stringz,
 	.type_json = &afb_type_predefined_json,
 	.type_json_c = &afb_type_predefined_json_c,
-#if !NO_BASIC_PREDEFINED_TYPES
 	.type_bool = &afb_type_predefined_bool,
 	.type_i32 = &afb_type_predefined_i32,
 	.type_u32 = &afb_type_predefined_u32,
 	.type_i64 = &afb_type_predefined_i64,
 	.type_u64 = &afb_type_predefined_u64,
 	.type_double = &afb_type_predefined_double,
-#endif
 
 /*-- FD's EVENT HANDLING -----------------------------------*/
 

@@ -551,12 +551,6 @@ PREDEFINED_OPERATION(json_c)
 
 PREDEFINED_TYPE(json_c, 0, 0, &PREDEF(json));
 
-#if NO_BASIC_PREDEFINED_TYPES
-
-/*****************************************************************************/
-extern struct afb_type ALIAS(json_c) _afb_type_head_of_predefineds_;
-
-#else
 /*****************************************************************************/
 /* PREDEFINED bool */
 
@@ -876,5 +870,3 @@ PREDEFINED_TYPE(double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));
 /*****************************************************************************/
 
 extern struct afb_type ALIAS(double) _afb_type_head_of_predefineds_;
-
-#endif

@@ -43,15 +43,11 @@ extern struct afb_type afb_type_predefined_stringz;
 extern struct afb_type afb_type_predefined_json;
 extern struct afb_type afb_type_predefined_json_c;
 
-#if !NO_BASIC_PREDEFINED_TYPES
-
 extern struct afb_type afb_type_predefined_bool;
 extern struct afb_type afb_type_predefined_i32;
 extern struct afb_type afb_type_predefined_u32;
 extern struct afb_type afb_type_predefined_i64;
 extern struct afb_type afb_type_predefined_u64;
 extern struct afb_type afb_type_predefined_double;
-
-#endif
 
 /*****************************************************************************/
