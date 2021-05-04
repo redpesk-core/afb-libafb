@@ -265,7 +265,7 @@ afb_req_common_set_session(
 	struct afb_session *osession;
 
 	osession = req->session;
-	req->session = afb_session_addref(session);
+	req->session = afb_session_touch(afb_session_addref(session));
 	afb_session_unref(osession);
 }
 
@@ -279,6 +279,7 @@ afb_req_common_set_session_string(
 
 	osession = req->session;
 	rc = afb_session_get(&req->session, string, AFB_SESSION_TIMEOUT_DEFAULT, NULL);
+	afb_session_touch(req->session);
 	afb_session_unref(osession);
 	return rc;
 }

@@ -90,7 +90,7 @@ extern struct afb_session *afb_session_search (const char *uuid);
  *
  * @param session the session
  *
- * @return the session
+ * @return the given session
  */
 extern struct afb_session *afb_session_addref(struct afb_session *session);
 
@@ -168,8 +168,10 @@ extern int afb_session_what_remains(struct afb_session *session);
  * Update the expiration of the session from now
  *
  * @param session the session
+ *
+ * @return the given session
  */
-extern void afb_session_touch(struct afb_session *session);
+extern struct afb_session *afb_session_touch(struct afb_session *session);
 
 /**
  * Set the timeout of 'session' in seconds.

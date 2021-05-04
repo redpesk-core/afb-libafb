@@ -428,9 +428,11 @@ int afb_session_set_timeout(struct afb_session *session, int timeout)
 }
 
 /* update the expiration of the session */
-void afb_session_touch(struct afb_session *session)
+struct afb_session *afb_session_touch(struct afb_session *session)
 {
-	session_update_expiration(session, NOW);
+	if (session)
+		session_update_expiration(session, NOW);
+	return session;
 }
 
 /* Returns the second remaining before expiration of 'session' */

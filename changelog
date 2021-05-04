@@ -6,6 +6,9 @@ Next version
     - Enforce use of strings to define extensions in macro AFB_EXTENSION
     - Check revision of the version of interface v4
 
+  fixes
+    - update timeout of sessions on requests
+
   minors/details
     - saved bytes in http keys for data
     - avoid allocation for setting cookies
