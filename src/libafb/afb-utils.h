@@ -38,5 +38,6 @@
 #include "utils/u16id.h"
 #include "utils/uuid.h"
 #include "utils/websock.h"
+#include "utils/wrap-base64.h"
 #include "utils/wrap-json.h"
 #include "utils/ws.h"
