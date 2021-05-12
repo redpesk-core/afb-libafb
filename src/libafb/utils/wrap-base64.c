@@ -135,7 +135,7 @@ int wrap_base64_decode(
 	char c;
 
 	/* allocate enougth output */
-	result = malloc(datalen);
+	result = malloc(datalen + 1);
 	if (result == NULL)
 		return wrap_base64_nomem;
 
@@ -182,11 +182,12 @@ int wrap_base64_decode(
 		}
 	}
 	/* terminate */
-	*decoded = realloc(result, out);
+	*decoded = realloc(result, out + 1);
 	if (out && *decoded == NULL) {
 		free(result);
 		return wrap_base64_nomem;
 	}
+	decoded[out] = 0; /* add zero at end to make life sweeter */
 	*decodedlen = out;
 	return wrap_base64_ok;
 }
