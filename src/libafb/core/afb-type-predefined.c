@@ -64,11 +64,17 @@
 /*****************************************************************************/
 /*****************************************************************************/
 
+/** external variable name for 'stype' */
 #define PREDEF(stype) afb_type_predefined_##stype
 
+/** export 'stype' definition with the given name 'asvar' */
 #define EXPORT_AS(stype,asvar) \
 	extern struct afb_type __attribute__((alias("predefined_" #stype))) asvar
+
+/** export the predefined type 'stype' */
 #define EXPORT_PREDEF(stype)  EXPORT_AS(stype,PREDEF(stype))
+
+/** declare a convertion routine from 'ftype' tot 'ttype' */
 #define CONVERT(ftype,ttype) \
 	UNUSED_POLICY \
 	static int convert_##ftype##_to_##ttype(\
@@ -78,6 +84,7 @@
 		struct afb_data **out \
 	)
 
+/** declare an updata routine from 'ftype' tot 'ttype' */
 #define UPDATE(ftype,ttype) \
 	UNUSED_POLICY \
 	static int update_##ftype##_to_##ttype(\
@@ -87,126 +94,58 @@
 		struct afb_data *to \
 	)
 
+/** declare array of operation for 'stype' */
 #define PREDEFINED_OPERATION(stype) \
 		static const struct opdesc opcvt_##stype[] =
 
+/** add in 'ftype' operations the convert to 'ttype' */
 #define CONVERT_TO(ftype,ttype) \
 	{ .kind = Convert_To, .type = &PREDEF(ttype), \
 	  .converter = convert_##ftype##_to_##ttype, .closure = 0 }
 
+/** add in 'ttype' operations the convert from 'ttype' */
 #define CONVERT_FROM(ftype,ttype) \
 	{ .kind = Convert_From, .type = &PREDEF(ftype), \
 	  .converter = convert_##ftype##_to_##ttype, .closure = 0 }
 
+/** add in 'ftype' operations the update to 'ttype' */
 #define UPDATE_TO(ftype,ttype) \
 	{ .kind = Update_To, .type = &PREDEF(ttype), \
 	  .updater = update_##ftype##_to_##ttype, .closure = 0 }
 
+/** add in 'ttype' operations the update from 'ttype' */
 #define UPDATE_FROM(ftype,ttype) \
 	{ .kind = Update_From, .type = &PREDEF(ftype), \
 	  .updater = update_##ftype##_to_##ttype, .closure = 0 }
 
+/** add in 'ftype' operations the convert and update to 'ttype' */
 #define TRANSFORM_TO(ftype,ttype) \
 	CONVERT_TO(ftype,ttype), \
 	UPDATE_TO(ftype,ttype)
 
+/** add in 'ttype' operations the convert and update from 'ftype' */
 #define TRANSFORM_FROM(ftype,ttype) \
 	CONVERT_FROM(ftype,ttype), \
 	UPDATE_FROM(ftype,ttype)
 
-#define PREDEFINED_TYPE(stype,flag,super,nxt) \
+/**
+ * Declare and export the predefined 'stype'.
+ * Set its flags to 'FLAGS' bitwise-or FLAG_IS_PREDEFINED.
+ * Set its family to 'FAMILY'.
+ * Set the link to next to NEXT.
+ * Declare the operations (see PREDEFINED_OPERATION)
+ */
+#define PREDEFINED_TYPE(stype,FLAGS,FAMILY,NEXT) \
 	EXPORT_PREDEF(stype);  \
 	static const struct afb_type predefined_##stype = \
 	{ \
 		.name = AFB_PREFIX_PREDEF_TYPE #stype, \
-		.next = nxt, \
+		.next = NEXT, \
 		.operations = (struct opdesc*)opcvt_##stype,\
-		.family = super, \
-		.flags = FLAG_IS_PREDEFINED | flag, \
+		.family = FAMILY, \
+		.flags = FLAG_IS_PREDEFINED | FLAGS, \
 		.op_count = (uint16_t)(sizeof opcvt_##stype / sizeof opcvt_##stype[0]) \
 	}
-
-#define MAKE_BASIC(stype,ctype) \
-	UNUSED_POLICY \
-	static int make_##stype(struct afb_data **result, ctype value) { \
-		return afb_data_create_copy(result, &PREDEF(stype), &value, sizeof value); \
-	}
-
-#define GET_BASIC(stype,ctype) \
-	UNUSED_POLICY \
-	static ctype get_##stype(struct afb_data *data) {\
-		return *(const ctype*)afb_data_ro_pointer(data); \
-	}
-
-#define SET_BASIC(stype,ctype) \
-	UNUSED_POLICY \
-	static int set_##stype(struct afb_data *data, ctype value) {\
-		ctype *ptr; \
-		int rc = afb_data_get_mutable(data, (void**)&ptr, 0); \
-		if (rc >= 0) \
-			*ptr = value; \
-		return rc; \
-	}
-
-#define DECLARE_BASIC(stype,ctype) \
-	MAKE_BASIC(stype,ctype) \
-	GET_BASIC(stype,ctype) \
-	SET_BASIC(stype,ctype)
-
-#define CONVERT_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
-	static int make_##stype_to(struct afb_data **result, ctype_to value); \
-	static ctype_from get_##stype_from(struct afb_data *data); \
-	UNUSED_POLICY \
-	CONVERT(stype_from,stype_to) { \
-		return make_##stype_to(out, (ctype_to)get_##stype_from(in)); \
-	}
-
-#define UPDATE_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
-	static int set_##stype_to(struct afb_data *to, ctype_to value); \
-	static ctype_from get_##stype_from(struct afb_data *data); \
-	UNUSED_POLICY \
-	UPDATE(stype_from,stype_to) { \
-		return set_##stype_to(to, (ctype_to)get_##stype_from(in)); \
-	}
-
-#define TRANSFORM_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
-	CONVERT_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
-	UPDATE_BASIC(stype_from,ctype_from,stype_to,ctype_to)
-
-#define EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
-	UNUSED_POLICY \
-	static int extract_##stype_to##_of_##stype_from(\
-		ctype_from from,\
-		ctype_to *to \
-	)
-
-#define CONVERT_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
-	static int make_##stype_to(struct afb_data **result, ctype_to value); \
-	static int extract_##stype_to##_of_##stype_from(ctype_from from,ctype_to *to); \
-	static ctype_from get_##stype_from(struct afb_data *data); \
-	UNUSED_POLICY \
-	CONVERT(stype_from,stype_to) { \
-		ctype_to value; \
-		ctype_from from = get_##stype_from(in); \
-		int rc = extract_##stype_to##_of_##stype_from(from, &value); \
-		return rc < 0 ? rc : make_##stype_to(out, value); \
-	}
-
-#define UPDATE_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
-	static int set_##stype_to(struct afb_data *to, ctype_to value); \
-	static int extract_##stype_to##_of_##stype_from(ctype_from from,ctype_to *to); \
-	static ctype_from get_##stype_from(struct afb_data *data); \
-	UNUSED_POLICY \
-	UPDATE(stype_from,stype_to) { \
-		ctype_to value; \
-		ctype_from from = get_##stype_from(in); \
-		int rc = extract_##stype_to##_of_##stype_from(from, &value); \
-		return rc < 0 ? rc : set_##stype_to(to, value); \
-	}
-
-#define TRANSFORM_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
-	CONVERT_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
-	UPDATE_EXTRACT(stype_from,ctype_from,stype_to,ctype_to)
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -575,6 +514,116 @@ PREDEFINED_OPERATION(json_c)
 	};
 
 PREDEFINED_TYPE(json_c, 0, 0, &PREDEF(json));
+
+/*****************************************************************************/
+/*****************************************************************************/
+/**                                                                         **/
+/**         PREDEFINED BASIC TYPES                                          **/
+/**                                                                         **/
+/*****************************************************************************/
+/*****************************************************************************/
+
+/** declare a function creating a data of 'stype' the the copied value of 'ctype' */
+#define MAKE_BASIC(stype,ctype) \
+	UNUSED_POLICY \
+	static int make_##stype(struct afb_data **result, ctype value) { \
+		return afb_data_create_copy(result, &PREDEF(stype), &value, sizeof value); \
+	}
+
+/** declare a function creating get the 'ctype' value of a data of 'stype' */
+#define GET_BASIC(stype,ctype) \
+	UNUSED_POLICY \
+	static ctype get_##stype(struct afb_data *data) {\
+		return *(const ctype*)afb_data_ro_pointer(data); \
+	}
+
+/** declare a function updating the the 'ctype' value of a data of 'stype' */
+#define SET_BASIC(stype,ctype) \
+	UNUSED_POLICY \
+	static int set_##stype(struct afb_data *data, ctype value) {\
+		ctype *ptr; \
+		int rc = afb_data_get_mutable(data, (void**)&ptr, 0); \
+		if (rc >= 0) \
+			*ptr = value; \
+		return rc; \
+	}
+
+/** declare the 3 functions for creating, getting, updating data of 'stype' with values of 'ctype' */
+#define DECLARE_BASIC(stype,ctype) \
+	MAKE_BASIC(stype,ctype) \
+	GET_BASIC(stype,ctype) \
+	SET_BASIC(stype,ctype)
+
+/** declare a function creating a data of 'stype_to' of value of 'ctype_to'
+ * from the value of type 'ctype_from' held by the data of 'stype_from'.
+ * Use C conversion. */
+#define CONVERT_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
+	static int make_##stype_to(struct afb_data **result, ctype_to value); \
+	static ctype_from get_##stype_from(struct afb_data *data); \
+	UNUSED_POLICY \
+	CONVERT(stype_from,stype_to) { \
+		return make_##stype_to(out, (ctype_to)get_##stype_from(in)); \
+	}
+
+/** declare a function updating a data of 'stype_to' of value of 'ctype_to'
+ * from the value of type 'ctype_from' held by the data of 'stype_from'
+ * Use C conversion. */
+#define UPDATE_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
+	static int set_##stype_to(struct afb_data *to, ctype_to value); \
+	static ctype_from get_##stype_from(struct afb_data *data); \
+	UNUSED_POLICY \
+	UPDATE(stype_from,stype_to) { \
+		return set_##stype_to(to, (ctype_to)get_##stype_from(in)); \
+	}
+
+/** declare the 2 convertion and updating functions using C conversion */
+#define TRANSFORM_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
+	CONVERT_BASIC(stype_from,ctype_from,stype_to,ctype_to) \
+	UPDATE_BASIC(stype_from,ctype_from,stype_to,ctype_to)
+
+/** declare a function converting value of 'ctype_from' to value of 'ctype_to'
+ * needed when the convertion isn't hold by C or if error are to be detected */
+#define EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
+	UNUSED_POLICY \
+	static int extract_##stype_to##_of_##stype_from(\
+		ctype_from from,\
+		ctype_to *to \
+	)
+
+/** declare a function creating a data of 'stype_to' of value of 'ctype_to'
+ * from the value of type 'ctype_from' held by the data of 'stype_from'.
+ * Use EXTRACT conversion. */
+#define CONVERT_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
+	static int make_##stype_to(struct afb_data **result, ctype_to value); \
+	static int extract_##stype_to##_of_##stype_from(ctype_from from,ctype_to *to); \
+	static ctype_from get_##stype_from(struct afb_data *data); \
+	UNUSED_POLICY \
+	CONVERT(stype_from,stype_to) { \
+		ctype_to value; \
+		ctype_from from = get_##stype_from(in); \
+		int rc = extract_##stype_to##_of_##stype_from(from, &value); \
+		return rc < 0 ? rc : make_##stype_to(out, value); \
+	}
+
+/** declare a function updating a data of 'stype_to' of value of 'ctype_to'
+ * from the value of type 'ctype_from' held by the data of 'stype_from'
+ * Use EXTRACT conversion. */
+#define UPDATE_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
+	static int set_##stype_to(struct afb_data *to, ctype_to value); \
+	static int extract_##stype_to##_of_##stype_from(ctype_from from,ctype_to *to); \
+	static ctype_from get_##stype_from(struct afb_data *data); \
+	UNUSED_POLICY \
+	UPDATE(stype_from,stype_to) { \
+		ctype_to value; \
+		ctype_from from = get_##stype_from(in); \
+		int rc = extract_##stype_to##_of_##stype_from(from, &value); \
+		return rc < 0 ? rc : set_##stype_to(to, value); \
+	}
+
+/** declare the 2 convertion and updating functions using EXTRACT conversion */
+#define TRANSFORM_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
+	CONVERT_EXTRACT(stype_from,ctype_from,stype_to,ctype_to) \
+	UPDATE_EXTRACT(stype_from,ctype_from,stype_to,ctype_to)
 
 /*****************************************************************************/
 /* PREDEFINED bool */
