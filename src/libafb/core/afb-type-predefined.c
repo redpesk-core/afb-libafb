@@ -65,8 +65,10 @@
 /*****************************************************************************/
 
 #define PREDEF(stype) afb_type_predefined_##stype
-#define ALIAS(stype)  __attribute__((alias("predefined_" #stype)))
 
+#define EXPORT_AS(stype,asvar) \
+	extern struct afb_type __attribute__((alias("predefined_" #stype))) asvar
+#define EXPORT_PREDEF(stype)  EXPORT_AS(stype,PREDEF(stype))
 #define CONVERT(ftype,ttype) \
 	UNUSED_POLICY \
 	static int convert_##ftype##_to_##ttype(\
@@ -113,7 +115,7 @@
 	UPDATE_FROM(ftype,ttype)
 
 #define PREDEFINED_TYPE(stype,flag,super,nxt) \
-	extern struct afb_type ALIAS(stype) PREDEF(stype);  \
+	EXPORT_PREDEF(stype);  \
 	static const struct afb_type predefined_##stype = \
 	{ \
 		.name = AFB_PREFIX_PREDEF_TYPE #stype, \
@@ -892,4 +894,4 @@ PREDEFINED_TYPE(double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));
 
 /*****************************************************************************/
 
-extern struct afb_type ALIAS(double) _afb_type_head_of_predefineds_;
+EXPORT_AS(double,_afb_type_head_of_predefineds_);
