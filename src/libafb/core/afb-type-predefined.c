@@ -278,6 +278,29 @@ opaque_to_string(
 /*****************************************************************************/
 /*****************************************************************************/
 /**                                                                         **/
+/**                   ANY STRING HELPERS                                    **/
+/**                                                                         **/
+/*****************************************************************************/
+/*****************************************************************************/
+
+UNUSED_POLICY
+static int make_static(struct afb_data **result, struct afb_type *type, const char *value, size_t length) {
+	return afb_data_create_raw(result, type, value, length, 0, 0);
+}
+
+UNUSED_POLICY
+static int make_str_static(struct afb_data **result, struct afb_type *type, const char *value) {
+	return make_static(result, type, value, 1 + strlen(value));
+}
+
+UNUSED_POLICY
+static int make_str_copy(struct afb_data **result, struct afb_type *type, const char *value) {
+	return afb_data_create_copy(result, type, value, 1 + strlen(value));
+}
+
+/*****************************************************************************/
+/*****************************************************************************/
+/**                                                                         **/
 /**                   STRINZ HELPERS                                        **/
 /**                                                                         **/
 /*****************************************************************************/
@@ -285,22 +308,22 @@ opaque_to_string(
 
 UNUSED_POLICY
 static int make_stringz_static_length(struct afb_data **result, const char *value, size_t length) {
-	return afb_data_create_raw(result, &PREDEF(stringz), value, length + 1, 0, 0);
+	return make_static(result, &PREDEF(stringz), value, 1 + length);
 }
 
 UNUSED_POLICY
 static int make_stringz_static(struct afb_data **result, const char *value) {
-	return make_stringz_static_length(result, value, strlen(value));
+	return make_str_static(result, &PREDEF(stringz), value);
 }
 
 UNUSED_POLICY
 static int make_stringz_copy_length(struct afb_data **result, const char *value, size_t length) {
-	return afb_data_create_copy(result, &PREDEF(stringz), value, length + 1);
+	return afb_data_create_copy(result, &PREDEF(stringz), value, 1 + length);
 }
 
 UNUSED_POLICY
 static int make_stringz_copy(struct afb_data **result, const char *value) {
-	return make_stringz_copy_length(result, value, strlen(value));
+	return make_str_copy(result, &PREDEF(stringz), value);
 }
 
 /*****************************************************************************/
@@ -313,12 +336,12 @@ static int make_stringz_copy(struct afb_data **result, const char *value) {
 
 UNUSED_POLICY
 static int make_json_static_length(struct afb_data **result, const char *value, size_t length) {
-	return afb_data_create_raw(result, &PREDEF(json), value, length + 1, 0, 0);
+	return make_static(result, &PREDEF(json), value, 1 + length);
 }
 
 UNUSED_POLICY
 static int make_json_static(struct afb_data **result, const char *value) {
-	return make_json_static_length(result, value, strlen(value));
+	return make_str_static(result, &PREDEF(json), value);
 }
 
 UNUSED_POLICY
@@ -328,7 +351,7 @@ static int make_json_copy_length(struct afb_data **result, const char *value, si
 
 UNUSED_POLICY
 static int make_json_copy(struct afb_data **result, const char *value) {
-	return make_json_copy_length(result, value, strlen(value));
+	return make_str_copy(result, &PREDEF(json), value);
 }
 
 UNUSED_POLICY
