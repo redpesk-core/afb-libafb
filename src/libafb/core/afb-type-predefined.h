@@ -39,6 +39,7 @@ static inline int afb_type_is_predefined(const char *typename)
 /*****************************************************************************/
 
 extern struct afb_type afb_type_predefined_opaque;
+extern struct afb_type afb_type_predefined_bytearray;
 extern struct afb_type afb_type_predefined_stringz;
 extern struct afb_type afb_type_predefined_json;
 extern struct afb_type afb_type_predefined_json_c;

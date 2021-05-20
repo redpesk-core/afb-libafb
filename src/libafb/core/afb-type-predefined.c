@@ -374,6 +374,15 @@ PREDEFINED_OPERATION(opaque)
 PREDEFINED_TYPE(opaque, FLAG_IS_OPAQUE, 0, 0);
 
 /*****************************************************************************/
+/* PREDEFINED BYTEARRAY */
+
+PREDEFINED_OPERATION(bytearray)
+	{
+	};
+
+PREDEFINED_TYPE(bytearray, FLAG_IS_SHAREABLE | FLAG_IS_STREAMABLE, 0, &PREDEF(opaque));
+
+/*****************************************************************************/
 /* PREDEFINED STRINGZ */
 
 CONVERT(stringz,opaque)
@@ -424,7 +433,7 @@ PREDEFINED_OPERATION(stringz)
 		CONVERT_TO(stringz, json)
 	};
 
-PREDEFINED_TYPE(stringz, FLAG_IS_STREAMABLE, 0, &PREDEF(opaque));
+PREDEFINED_TYPE(stringz, FLAG_IS_STREAMABLE, &PREDEF(bytearray), &PREDEF(bytearray));
 
 /*****************************************************************************/
 /* PREDEFINED JSON */

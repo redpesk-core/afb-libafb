@@ -34,6 +34,7 @@
 /*-- PREDEFINED ------------------------------------------*/
 
 #define AFB_PREDEFINED_TYPE_OPAQUE	(&afb_type_predefined_opaque)
+#define AFB_PREDEFINED_TYPE_BYTEARRAY	(&afb_type_predefined_bytearray)
 #define AFB_PREDEFINED_TYPE_STRINGZ	(&afb_type_predefined_stringz)
 #define AFB_PREDEFINED_TYPE_JSON	(&afb_type_predefined_json)
 #define AFB_PREDEFINED_TYPE_JSON_C	(&afb_type_predefined_json_c)

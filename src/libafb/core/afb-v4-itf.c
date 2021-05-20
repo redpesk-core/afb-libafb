@@ -208,6 +208,10 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.req_cookie_getinit = afb_req_v4_cookie_getinit_hookable,
 	.req_cookie_drop = afb_req_v4_cookie_drop_hookable,
 
+/*-- BEGIN OF VERSION 4r1  REVISION  2 --------------------*/
+
+	.type_bytearray = &afb_type_predefined_bytearray,
+
 /*-- END -----------------------------------*/
 };
 
