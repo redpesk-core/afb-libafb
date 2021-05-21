@@ -212,7 +212,9 @@ afb_req_common_async_pop(
 }
 
 
-static void set_args(
+static
+void
+set_args(
 	unsigned ndata,
 	struct afb_data * const data[],
 	struct afb_req_common_arg * args
@@ -225,9 +227,9 @@ static void set_args(
 		dest = malloc(ndata * sizeof *dest);
 		if (!dest) {
 			ERROR("fail to allocate memory for afb_req_common_arg");
-			dest = args->local;
 			afb_data_array_unref(ndata - REQ_COMMON_NDATA_DEF, &data[REQ_COMMON_NDATA_DEF]);
 			ndata = REQ_COMMON_NDATA_DEF;
+			dest = args->local;
 		}
 	}
 	args->ndata = ndata;
@@ -235,10 +237,15 @@ static void set_args(
 	afb_data_array_copy(ndata, data, dest);
 }
 
-static void clean_args(struct afb_req_common_arg * args){
-	afb_data_array_unref(args->ndata, args->data);
-	if (args->data != args->local)
-		free(args->data);
+static
+void
+clean_args(struct afb_req_common_arg * args){
+	if (args->ndata) {
+		afb_data_array_unref(args->ndata, args->data);
+		if (args->data != args->local)
+			free(args->data);
+		args->ndata = 0;
+	}
 }
 
 void
@@ -266,9 +273,9 @@ afb_req_common_prepare_forwarding(
 	unsigned nparams,
 	struct afb_data * const params[]
 ) {
-	clean_args(&req->params);
 	req->apiname = apiname;
 	req->verbname = verbname;
+	clean_args(&req->params);
 	set_args(nparams, params, &req->params);
 }
 
