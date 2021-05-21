@@ -155,32 +155,6 @@ int afb_type_is_opaque(const struct afb_type *type)
 	return IS_OPAQUE(type);
 }
 
-/**
- * Search in the operation list the operation matching the given kind and type.
- *
- * @param odsc   list of operation to be searched
- * @param kind   the kind of operation searched
- * @param type   the type searched
- *
- * @return the found operation or NULL
- */
-static
-struct opdesc *
-searchop(
-	struct afb_type *base_type,
-	enum opkind kind,
-	const struct afb_type *type
-) {
-	struct opdesc *odsc = base_type->operations;
-	struct opdesc *end = &odsc[base_type->op_count];
-	while (odsc != end) {
-		if (odsc->kind == kind && odsc->type == type)
-			return odsc;
-		odsc++;
-	}
-	return 0;
-}
-
 static
 int
 operate(
@@ -191,9 +165,11 @@ operate(
 	int convert
 ) {
 	int rc;
-	struct opdesc *odsc, *op, *opend;
-	struct afb_type *type, *t;
+	struct opdesc *op, *opend;
+	struct opdesc *op2, *opend2;
+	struct afb_type *type, *t, *midtyp;
 	struct afb_data *xdata;
+	enum opkind opk;
 
 	/*
 	 * Search direct conversion
@@ -206,22 +182,30 @@ operate(
 	type = from_type;
 	while (type) {
 		/* search forward */
-		odsc = searchop(type, convert ? Convert_To : Update_To, to_type);
-		if (odsc) {
-			rc = convert
-				? odsc->converter(odsc->closure, from_data, to_type, to_data)
-				: odsc->updater(odsc->closure, from_data, to_type, *to_data);
-			if (rc >= 0)
-				return rc;
+		opk = convert ? Convert_To : Update_To;
+		op = type->operations;
+		opend = &op[type->op_count];
+		for ( ; op != opend ; op++) {
+			if (op->kind == opk && op->type == to_type) {
+				rc = convert
+					? op->converter(op->closure, from_data, to_type, to_data)
+					: op->updater(op->closure, from_data, to_type, *to_data);
+				if (rc >= 0)
+					return rc;
+			}
 		}
 		/* search backward */
-		odsc = searchop(to_type, convert ? Convert_From : Update_From, type);
-		if (odsc) {
-			rc = convert
-				? odsc->converter(odsc->closure, from_data, to_type, to_data)
-				: odsc->updater(odsc->closure, from_data, to_type, *to_data);
-			if (rc >= 0)
-				return rc;
+		opk = convert ? Convert_From : Update_From;
+		op = to_type->operations;
+		opend = &op[to_type->op_count];
+		for ( ; op != opend ; op++) {
+			if (op->kind == opk && op->type == type) {
+				rc = convert
+					? op->converter(op->closure, from_data, to_type, to_data)
+					: op->updater(op->closure, from_data, to_type, *to_data);
+				if (rc >= 0)
+					return rc;
+			}
 		}
 		/* not found, try an ancestor if one exists */
 		type = type->family;
@@ -251,57 +235,78 @@ operate(
 		for ( ; op != opend ; op++) {
 			if (op->kind != Convert_To)
 				continue;
+			midtyp = op->type;
 			/*
-			 * the original type converts to middle type op->type,
-			 * search how it can convert to target type to_type
+			 * the original type converts to middle type,
+			 * search how to_type can convert or update from middle type
 			 */
-			odsc = convert
-				? (searchop(to_type, Convert_From, op->type)
-					?: searchop(op->type, Convert_To, to_type))
-				: (searchop(to_type, Update_From, op->type)
-					?: searchop(op->type, Update_To, to_type));
-			if (!odsc)
-				continue;
-			rc = op->converter(op->closure, from_data, op->type, &xdata);
-			if (rc < 0)
-				continue;
-			rc = convert
-				? odsc->converter(odsc->closure, xdata, to_type, to_data)
-				: odsc->updater(odsc->closure, xdata, to_type, *to_data);
-			afb_data_unref(xdata);
-			if (rc >= 0)
-				return rc;
+			opk = convert ? Convert_From : Update_From;
+			op2 = to_type->operations;
+			opend2 = &op2[to_type->op_count];
+			for ( ; op2 != opend2 ; op2++) {
+				if (op2->kind == opk && op2->type == midtyp) {
+					rc = op->converter(op->closure, from_data, midtyp, &xdata);
+					if (rc >= 0) {
+						rc = convert
+							? op2->converter(op2->closure, xdata, to_type, to_data)
+							: op2->updater(op2->closure, xdata, to_type, *to_data);
+						afb_data_unref(xdata);
+						if (rc >= 0)
+							return rc;
+					}
+				}
+			}
+			/*
+			 * the original type converts to middle type,
+			 * search how middle type can convert or update to to_type
+			 */
+			opk = convert ? Convert_To : Update_To;
+			op2 = midtyp->operations;
+			opend2 = &op2[midtyp->op_count];
+			for ( ; op2 != opend2 ; op2++) {
+				if (op2->kind == opk && op2->type == to_type) {
+					rc = op->converter(op->closure, from_data, midtyp, &xdata);
+					if (rc >= 0) {
+						rc = convert
+							? op2->converter(op2->closure, xdata, to_type, to_data)
+							: op2->updater(op2->closure, xdata, to_type, *to_data);
+						afb_data_unref(xdata);
+						if (rc >= 0)
+							return rc;
+					}
+				}
+			}
 		}
 		/* search backward: the middle type is given by a convert/update-from */
+		opk = convert ? Convert_From : Update_From;
 		op = to_type->operations;
 		opend = &op[to_type->op_count];
 		for ( ; op != opend ; op++) {
+			if (op->kind != opk)
+				continue;
+			midtyp = op->type;
 			/*
-			 * if the target type converts/updates from middle type op->type,
+			 * if the target type converts/updates from middle type,
 			 * search how it can convert from original type from_type.
 			 * note that after forward search, some possibilities were already
 			 * checked (i.e. Convert_To).
 			 */
-			if (convert) {
-				if (op->kind != Convert_From)
-					continue;
-				odsc = searchop(op->type, Convert_From, type);
-			} else {
-				if (op->kind != Update_From)
-					continue;
-				odsc = searchop(op->type, Convert_From, type);
+			opk = convert ? Convert_From : Update_From;
+			op2 = midtyp->operations;
+			opend2 = &op2[midtyp->op_count];
+			for ( ; op2 != opend2 ; op2++) {
+				if (op2->kind == Convert_From && op2->type == type) {
+					rc = op2->converter(op2->closure, from_data, midtyp, &xdata);
+					if (rc >= 0) {
+						rc = convert
+							? op->converter(op->closure, xdata, to_type, to_data)
+							: op->updater(op->closure, xdata, to_type, *to_data);
+						afb_data_unref(xdata);
+						if (rc >= 0)
+							return rc;
+					}
+				}
 			}
-			if (!odsc)
-				continue;
-			rc = odsc->converter(odsc->closure, from_data, op->type, &xdata);
-			if (rc < 0)
-				continue;
-			rc = convert
-				? op->converter(op->closure, xdata, to_type, to_data)
-				: op->updater(op->closure, xdata, to_type, *to_data);
-			afb_data_unref(xdata);
-			if (rc >= 0)
-				return rc;
 		}
 		type = type->family;
 	}
@@ -312,28 +317,43 @@ operate(
 	 * The indirect conversion searched here are the one that carry
 	 * both operations otherwise it already had been found.
 	 */
-	for (type = known_types ; type ; type = type->next) {
+	opk = convert ? Convert_To : Update_To;
+	for (midtyp = known_types ; midtyp ; midtyp = midtyp->next) {
 		/* avoid already checked types */
-		for (t = from_type; t && t != type; t = t->family);
-		if (t || type == to_type)
+		if (midtyp == to_type)
+			continue;
+		for (t = from_type; t && t != midtyp; t = t->family);
+		if (t)
 			continue;
 
 		/* check if it can be a middle type */
-		op = searchop(type, Convert_From, from_type);
-		if (!op)
-			continue;
-		odsc = searchop(type, convert ? Convert_To : Update_To, to_type);
-		if (!odsc)
-			continue;
-		rc = op->converter(op->closure, from_data, type, &xdata);
-		if (rc < 0)
-			continue;
-		rc = convert
-			? odsc->converter(odsc->closure, xdata, to_type, to_data)
-			: odsc->updater(odsc->closure, xdata, to_type, *to_data);
-		afb_data_unref(xdata);
-		if (rc >= 0)
-			return rc;
+		op = midtyp->operations;
+		opend = &op[midtyp->op_count];
+		for ( ; op != opend ; op++) {
+			if (op->kind != Convert_From || op->type != from_type)
+				continue;
+			/*
+			 * if the target type converts/updates from middle type,
+			 * search how it can convert from original type from_type.
+			 * note that after forward search, some possibilities were already
+			 * checked (i.e. Convert_To).
+			 */
+			op2 = midtyp->operations;
+			opend2 = &op2[midtyp->op_count];
+			for ( ; op2 != opend2 ; op2++) {
+				if (op2->kind == opk && op2->type == to_type) {
+					rc = op->converter(op->closure, from_data, midtyp, &xdata);
+					if (rc >= 0) {
+						rc = convert
+							? op2->converter(op2->closure, xdata, to_type, to_data)
+							: op2->updater(op2->closure, xdata, to_type, *to_data);
+						afb_data_unref(xdata);
+						if (rc >= 0)
+							return rc;
+					}
+				}
+			}
+		}
 	}
 
 	/* nothing found */
@@ -374,16 +394,13 @@ add_op(
 ) {
 	struct opdesc *desc;
 
-	desc = searchop(type, kind, totype);
-	if (!desc) {
-		desc = realloc(type->operations, (1 + type->op_count) * sizeof *desc);
-		if (!desc)
-			return X_ENOMEM;
-		type->operations = desc;
-		desc += type->op_count++;
-		desc->kind = kind;
-		desc->type = totype;
-	}
+	desc = realloc(type->operations, (1 + type->op_count) * sizeof *desc);
+	if (!desc)
+		return X_ENOMEM;
+	type->operations = desc;
+	desc += type->op_count++;
+	desc->kind = kind;
+	desc->type = totype;
 	desc->callback = callback;
 	desc->closure = closure;
 	return 0;

@@ -84,6 +84,8 @@ static struct afb_type *type5;
 
 static struct afb_type *type7, *type8, *type9;
 
+static struct afb_type *type4, *type6;
+
 static
 void
 init_types()
@@ -113,6 +115,12 @@ init_types()
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_type_register(&type9, "type9", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_register(&type4, "type4", 0, 0, 0);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_register(&type6, "type6", 0, 0, 0);
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_type_add_converter(type1, type2, t2t, i2p(12));
@@ -161,6 +169,18 @@ init_types()
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_type_add_converter(type5, type9, t2t, i2p(59));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type4, &afb_type_predefined_i32, t2t, i2p(49));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(&afb_type_predefined_i32, type6, t2t, i2p(96));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(&afb_type_predefined_i64, type4, t2t, i2p(84));
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_type_add_converter(type4, &afb_type_predefined_bytearray, t2t, i2p(49));
 	ck_assert_int_eq(rc, 0);
 }
 
@@ -219,6 +239,8 @@ START_TEST (check_convert)
 	tconv(type1, type7, 1557, 13);
 	tconv(type2, type8, 2558, 15);
 	tconv(type3, type9, 3559, 17);
+	tconv(type4, type6, 4996, 19);
+	tconv(&afb_type_predefined_i64, &afb_type_predefined_bytearray, 8449, 21);
 }
 END_TEST
 
