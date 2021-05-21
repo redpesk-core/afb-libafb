@@ -140,6 +140,7 @@ int wrap_base64_decode(
 		return wrap_base64_nomem;
 
 	/* decode the input */
+	u16 = 0;
 	for (iin = in = out = 0 ; in < datalen ; in++) {
 		c = data[in];
 		if (c == '=')
