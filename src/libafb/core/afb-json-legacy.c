@@ -32,12 +32,15 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 
+#include <afb/afb-errno.h>
+
 #include "core/afb-type.h"
 #include "core/afb-type-predefined.h"
 #include "core/afb-data.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
+#include "core/afb-error-text.h"
 #include "utils/jsonstr.h"
 #include "sys/x-errno.h"
 #include "sys/verbose.h"
@@ -319,7 +322,48 @@ do_reply_any_json(
 	const char *error, *info;
 	const void *object;
 
-	if (nreplies != 4 || replies[3] != legacy_tag_data(0)) {
+	if (nreplies == 4 && replies[3] == legacy_tag_data(0)) {
+		/* extract the replied object */
+		if (!replies[0] || afb_data_convert(replies[0], type, &dobj) < 0) {
+			dobj = NULL;
+			object = type == &afb_type_predefined_json ? "null" : NULL;
+		}
+		else {
+			object = afb_data_ro_pointer(dobj);
+		}
+
+		/* extract the replied error */
+		if (!replies[1] || afb_data_convert(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
+			derr = NULL;
+			error = NULL;
+		}
+		else {
+			error = (const char*)afb_data_ro_pointer(derr);
+		}
+
+		/* extract the replied info */
+		if (!replies[2] || afb_data_convert(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
+			dinf = NULL;
+			info = NULL;
+		}
+		else {
+			info = (const char*)afb_data_ro_pointer(dinf);
+		}
+	}
+	else if (AFB_IS_BINDER_ERROR(status) && nreplies <= 1) {
+		/* not a legacy reply but a standard libafb error */
+		dobj = NULL;
+		object = type == &afb_type_predefined_json ? "null" : NULL;
+		derr = NULL;
+		error = afb_error_text(status);
+		if (nreplies && replies[0] && afb_data_convert(replies[0], &afb_type_predefined_stringz, &dinf) >= 0)
+			info = (const char*)afb_data_ro_pointer(dinf);
+		else {
+			dinf = NULL;
+			info = NULL;
+		}
+	}
+	else {
 		/* not a legacy reply! merge replies in one array */
 		dobj = NULL;
 		object = type == &afb_type_predefined_json ? "null" : NULL;
@@ -347,34 +391,6 @@ do_reply_any_json(
 		error = NULL;
 		dinf = NULL;
 		info = NULL;
-	}
-	else {
-		/* extract the replied object */
-		if (nreplies < 1 || !replies[0] || afb_data_convert(replies[0], type, &dobj) < 0) {
-			dobj = NULL;
-			object = type == &afb_type_predefined_json ? "null" : NULL;
-		}
-		else {
-			object = afb_data_ro_pointer(dobj);
-		}
-
-		/* extract the replied error */
-		if (nreplies < 2 || !replies[1] || afb_data_convert(replies[1], &afb_type_predefined_stringz, &derr) < 0) {
-			derr = NULL;
-			error = NULL;
-		}
-		else {
-			error = (const char*)afb_data_ro_pointer(derr);
-		}
-
-		/* extract the replied info */
-		if (nreplies < 3 || !replies[2] || afb_data_convert(replies[2], &afb_type_predefined_stringz, &dinf) < 0) {
-			dinf = NULL;
-			info = NULL;
-		}
-		else {
-			info = (const char*)afb_data_ro_pointer(dinf);
-		}
 	}
 
 	/* cohercision to coherent status */

@@ -43,12 +43,12 @@
 #include "core/afb-calls.h"
 #include "core/afb-data.h"
 #include "core/afb-data-array.h"
+#include "core/afb-type-predefined.h"
 #include "core/afb-evt.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
 #include "core/afb-hook.h"
 #include "core/afb-req-common.h"
-#include "core/afb-error-text.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-sched.h"
 #include "core/afb-session.h"
@@ -89,56 +89,71 @@ async_cb_status_final(
 
 /******************************************************************************/
 
-static int reply_error(struct afb_req_common *req, int status, const char *arg)
+static int reply_error(struct afb_req_common *req, int status)
 {
-	const char *text;
-	struct afb_data *reply[4];
+	afb_req_common_reply_hookable(req, status, 0, 0);
+	return status;
+}
 
-	/* FIXME */
-	text = afb_error_text(status);
-	afb_json_legacy_make_reply_json_c(reply, 0, text, 0, 0, arg, 0, 0);
-	afb_req_common_reply_hookable(req, status, 4, reply);
+/**
+ * Returns a predefined error with text
+ *
+ * @param req    the request receiving the error
+ * @param status the error status
+ * @param text   an argument to the error
+ *
+ * @return the value status
+ */
+static int reply_error_text(struct afb_req_common *req, int status, const char *text)
+{
+	int rc;
+	struct afb_data *data;
+
+	if (!text)
+		return reply_error(req, status);
+	rc = afb_data_create_raw(&data, &afb_type_predefined_stringz, text, 1 + strlen(text), 0, 0);
+	afb_req_common_reply_hookable(req, status, rc >= 0, &data);
 	return status;
 }
 
 int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_OUT_OF_MEMORY, NULL);
+	return reply_error(req, AFB_ERRNO_OUT_OF_MEMORY);
 }
 
 int afb_req_common_reply_internal_error_hookable(struct afb_req_common *req, int error)
 {
-	return reply_error(req, AFB_ERRNO_INTERNAL_ERROR, NULL);
+	return reply_error(req, AFB_ERRNO_INTERNAL_ERROR);
 }
 
 int afb_req_common_reply_unavailable_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_NOT_AVAILABLE, NULL);
+	return reply_error(req, AFB_ERRNO_NOT_AVAILABLE);
 }
 
 int afb_req_common_reply_api_unknown_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_UNKNOWN_API, NULL);
+	return reply_error(req, AFB_ERRNO_UNKNOWN_API);
 }
 
 int afb_req_common_reply_api_bad_state_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_BAD_API_STATE, NULL);
+	return reply_error(req, AFB_ERRNO_BAD_API_STATE);
 }
 
 int afb_req_common_reply_verb_unknown_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_UNKNOWN_VERB, NULL);
+	return reply_error(req, AFB_ERRNO_UNKNOWN_VERB);
 }
 
 int afb_req_common_reply_invalid_token_error_hookable(struct afb_req_common *req)
 {
-	return reply_error(req, AFB_ERRNO_INVALID_TOKEN, NULL);
+	return reply_error(req, AFB_ERRNO_INVALID_TOKEN);
 }
 
 int afb_req_common_reply_insufficient_scope_error_hookable(struct afb_req_common *req, const char *scope)
 {
-	return reply_error(req, AFB_ERRNO_INSUFFICIENT_SCOPE, scope);
+	return reply_error_text(req, AFB_ERRNO_INSUFFICIENT_SCOPE, scope);
 }
 
 const char *afb_req_common_on_behalf_cred_export(struct afb_req_common *req)
@@ -746,7 +761,7 @@ afb_req_common_unref(
 ) {
 	if (req && !__atomic_sub_fetch(&req->refcount, 1, __ATOMIC_RELAXED)) {
 		if (!req->replied) {
-			reply_error(req, AFB_ERRNO_NO_REPLY, 0);
+			reply_error(req, AFB_ERRNO_NO_REPLY);
 			if (__atomic_load_n(&req->refcount, __ATOMIC_RELAXED)) {
 				/* replying may have the side effect to re-increment
 				** the reference count, showing a delayed usage of
