@@ -39,8 +39,6 @@ struct afb_data;
 struct afb_auth;
 struct afb_event_x2;
 
-#define REQ_COMMON_NARGS_MAX  8
-
 struct afb_req_common_query_itf
 {
 	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[]);
@@ -50,7 +48,14 @@ struct afb_req_common_query_itf
 };
 
 /**
- * Internal data for args
+ * Default count of statically allocated data in structure
+ */
+#if !defined(REQ_COMMON_NDATA_DEF)
+# define REQ_COMMON_NDATA_DEF  8
+#endif
+
+/**
+ * Internal data holder for arguments and replies
  */
 struct afb_req_common_arg
 {
@@ -61,7 +66,7 @@ struct afb_req_common_arg
 	struct afb_data **data;
 
 	/** preallocated local data */
-	struct afb_data *local[REQ_COMMON_NARGS_MAX];
+	struct afb_data *local[REQ_COMMON_NDATA_DEF];
 };
 
 

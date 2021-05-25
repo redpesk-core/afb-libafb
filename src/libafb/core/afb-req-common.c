@@ -204,15 +204,15 @@ static void set_args(
 ) {
 	struct afb_data **dest;
 
-	if (ndata <= REQ_COMMON_NARGS_MAX)
+	if (ndata <= REQ_COMMON_NDATA_DEF)
 		dest = args->local;
 	else {
 		dest = malloc(ndata * sizeof *dest);
 		if (!dest) {
 			ERROR("fail to allocate memory for afb_req_common_arg");
 			dest = args->local;
-			afb_data_array_unref(ndata - REQ_COMMON_NARGS_MAX, &data[REQ_COMMON_NARGS_MAX]);
-			ndata = REQ_COMMON_NARGS_MAX;
+			afb_data_array_unref(ndata - REQ_COMMON_NDATA_DEF, &data[REQ_COMMON_NDATA_DEF]);
+			ndata = REQ_COMMON_NDATA_DEF;
 		}
 	}
 	args->ndata = ndata;
