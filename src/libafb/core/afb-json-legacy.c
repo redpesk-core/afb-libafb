@@ -51,6 +51,9 @@ static const char _success_[] = "success";
 
 /**********************************************************************/
 
+/**
+ * internal data used for tagging legacy replies
+ */
 static struct afb_data *legacy_tag_data(int addref)
 {
 	static const char tagname[] = "legacy-tag";
@@ -65,6 +68,7 @@ static struct afb_data *legacy_tag_data(int addref)
 
 /**********************************************************************/
 
+/* see afb-json-legacy.h */
 int
 afb_json_legacy_make_data_json_c(
 	struct afb_data **result,
@@ -73,6 +77,7 @@ afb_json_legacy_make_data_json_c(
 	return afb_data_create_raw(result, &afb_type_predefined_json_c, object, 0, (void*)json_object_put, object);
 }
 
+/* see afb-json-legacy.h */
 int
 afb_json_legacy_make_data_stringz_len_mode(
 	struct afb_data **data,
@@ -127,6 +132,7 @@ afb_json_legacy_make_data_stringz_len_mode(
 	return rc;
 }
 
+/* see afb-json-legacy.h */
 int
 afb_json_legacy_make_data_stringz_mode(
 	struct afb_data **data,
@@ -147,6 +153,16 @@ afb_json_legacy_make_data_stringz_mode(
 
 /**********************************************************************/
 
+/**
+ * Creates a json-c array whose items are the json-c representation
+ * of datas.
+ *
+ * @param result  pointer to store the result
+ * @param ndatas  count of data in datas
+ * @param datas   array of data
+ *
+ * @return 0 on success or a negative error code
+ */
 static int merge_as_json_array(
 	struct afb_data **result,
 	unsigned ndatas,
@@ -728,11 +744,17 @@ static size_t escjson_strlen(const char *string)
 }
 
 /**
+ * Record a string for making messages
  */
 struct mkmsgstr
 {
+	/** the string to add in the message terminated with zero */
 	const char *string;
+
+	/** escaped size of the string */
 	size_t size;
+
+	/** flag not zero if the string is to escape */
 	char escape;
 };
 
@@ -778,13 +800,23 @@ make_msg_string(
 	return 0;
 }
 
+/**
+ * record result of making string
+ */
 struct mkmsg {
+	/** status of making the string */
 	int rc;
+	/** sent status for replies */
 	int status;
+	/** created message string */
 	char *message;
+	/** length of the created string */
 	size_t length;
 };
 
+/**
+ * Callback creating the reply message
+ */
 static
 void
 mkmsg_reply_cb(
@@ -881,6 +913,9 @@ afb_json_legacy_make_msg_string_reply(
 	return rc >= 0 ? mm.rc : rc;
 }
 
+/**
+ * Callback creating the event message
+ */
 static
 void
 mkmsg_event_cb(

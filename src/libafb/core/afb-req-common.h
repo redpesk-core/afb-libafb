@@ -40,11 +40,29 @@ struct afb_type;
 struct afb_auth;
 struct afb_event_x2;
 
+/**
+ * Interface of the requests
+ */
 struct afb_req_common_query_itf
 {
+	/**
+	 * callback receiving the reply to the request
+	 */
 	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[]);
+
+	/**
+	 * callback receiving the unreferenced event
+	 */
 	void (*unref)(struct afb_req_common *req);
+
+	/**
+	 * callback receiving subscribe requests
+	 */
 	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
+
+	/**
+	 * callback receiving unsubscribe requests
+	 */
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
 };
 
@@ -85,7 +103,8 @@ struct afb_req_common_arg
  */
 struct afb_req_common
 {
-	uint16_t refcount;		/**< current ref count */
+	/** current ref count */
+	uint16_t refcount;
 
 	uint16_t replied: 1,		/**< is replied? */
 	         created: 1,            /**< session created */
@@ -96,38 +115,49 @@ struct afb_req_common
 	         asyncount: 4;          /**< count of async items */
 
 #if WITH_AFB_HOOK
-	unsigned hookflags;		/**< flags for hooking */
-	unsigned hookindex;		/**< hook index of the request if hooked */
+	/** flags for hooking */
+	unsigned hookflags;
+	/** hook index of the request if hooked */
+	unsigned hookindex;
 #endif
 	/** preallocated stack for asynchronous processing */
 	void *asyncitems[REQ_COMMON_NASYNC];
 
+	/** session */
+	struct afb_session *session;
 
-	struct afb_session *session;	/**< session */
-	struct afb_token *token;	/**< token */
+	/** token */
+	struct afb_token *token;
+
 #if WITH_CRED
-	struct afb_cred *credentials;	/**< credential */
+	/** credential */
+	struct afb_cred *credentials;
 #endif
+	/** request api name */
 	const char *apiname;
+
+	/** request verb name */
 	const char *verbname;
 
-	const struct afb_api_item *api;	/**< api item of the request */
+	/** api item of the request */
+	const struct afb_api_item *api;
 
-	const struct afb_req_common_query_itf *queryitf; /**< interface of req implementation functions */
+	/** interface of req implementation functions */
+	const struct afb_req_common_query_itf *queryitf;
 
-	/** the parameters */
+	/** the parameters (arguments) of the request */
 	struct afb_req_common_arg params;
 
 #if WITH_REPLY_JOB
-	/** the reply */
+	/** the reply status */
 	int status;
 
-	/** the replies */
+	/** the reply data */
 	struct afb_req_common_arg replies;
 #endif
 };
 
-/* initialisation and processing of req */
+/* reply of errors */
 
 extern int afb_req_common_reply_out_of_memory_error_hookable(struct afb_req_common *req);
 
@@ -144,6 +174,8 @@ extern int afb_req_common_reply_verb_unknown_error_hookable(struct afb_req_commo
 extern int afb_req_common_reply_invalid_token_error_hookable(struct afb_req_common *req);
 
 extern int afb_req_common_reply_insufficient_scope_error_hookable(struct afb_req_common *req, const char *scope);
+
+/* initialisation and processing of req */
 
 extern const char *afb_req_common_on_behalf_cred_export(struct afb_req_common *req);
 
