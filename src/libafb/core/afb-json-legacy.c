@@ -764,6 +764,7 @@ make_msg_string(
 
 struct mkmsg {
 	int rc;
+	int status;
 	char *message;
 	size_t length;
 };
@@ -820,7 +821,7 @@ mkmsg_reply_cb(
 	defstr[n].size = sizeof(msg_code) - 1;
 	defstr[n++].escape = 0;
 	defstr[n].string = code;
-	defstr[n].size = (size_t)snprintf(code, sizeof code, "%d", mm->rc);
+	defstr[n].size = (size_t)snprintf(code, sizeof code, "%d", mm->status);
 	defstr[n++].escape = 0;
 
 	if (object && strcmp(object, "null")) {
@@ -856,7 +857,7 @@ afb_json_legacy_make_msg_string_reply(
 	struct mkmsg mm;
 	int rc;
 
-	mm.rc = status;
+	mm.status = status;
 	rc = afb_json_legacy_do_reply_json_string(&mm, status, nreplies, replies, mkmsg_reply_cb);
 
 	*message = mm.message;
