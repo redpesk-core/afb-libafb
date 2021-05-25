@@ -69,6 +69,15 @@ struct afb_req_common_arg
 	struct afb_data *local[REQ_COMMON_NDATA_DEF];
 };
 
+/**
+ * Default count of stack of asynchronous
+ */
+#if !defined(REQ_COMMON_NASYNC)
+# define REQ_COMMON_NASYNC  7
+#endif
+#if REQ_COMMON_NASYNC > 15 /* only 4 bits for asyncount */
+# error "REQ_COMMON_NASYNC greater than 15"
+#endif
 
 /**
  * Internal data for requests
@@ -89,7 +98,9 @@ struct afb_req_common
 	unsigned hookflags;		/**< flags for hooking */
 	unsigned hookindex;		/**< hook index of the request if hooked */
 #endif
-	void *asyncitems[7];
+	/** preallocated stack for asynchronous processing */
+	void *asyncitems[REQ_COMMON_NASYNC];
+
 
 	struct afb_session *session;	/**< session */
 	struct afb_token *token;	/**< token */
