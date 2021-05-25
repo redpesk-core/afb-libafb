@@ -61,6 +61,17 @@ afb_json_legacy_make_data_json_c(
 );
 
 /**********************************************************************/
+
+/**
+ * Call 'callback' with the JSON string representation
+ * of the parameters.
+ *
+ * @param nparam  count of data in arra params
+ * @param params  array of the input data
+ * @param closure closure for the callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do_single_json_string(
@@ -70,6 +81,16 @@ afb_json_legacy_do_single_json_string(
 	void *closure
 );
 
+/**
+ * Call 'callback' with the json-c object representation
+ * of the parameters.
+ *
+ * @param nparam  count of data in arra params
+ * @param params  array of the input data
+ * @param closure closure for the callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do_single_json_c(
@@ -79,6 +100,19 @@ afb_json_legacy_do_single_json_c(
 	void *closure
 );
 
+/**
+ * Call 'callback' with the JSON string representation
+ * of the parameters.
+ *
+ * Same as afb_json_legacy_do_single_json_string but with 2 closures.
+ *
+ * @param nparam   count of data in arra params
+ * @param params   array of the input data
+ * @param closure1 first closure for the callback
+ * @param closure2 second closure for the callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do2_single_json_string(
@@ -89,6 +123,19 @@ afb_json_legacy_do2_single_json_string(
 	const void *closure2
 );
 
+/**
+ * Call 'callback' with the json-c object representation
+ * of the parameters.
+ *
+ * Same as afb_json_legacy_do_single_json_c but with 2 closures.
+ *
+ * @param nparam   count of data in arra params
+ * @param params   array of the input data
+ * @param closure1 first closure for the callback
+ * @param closure2 second closure for the callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do2_single_json_c(
@@ -99,6 +146,15 @@ afb_json_legacy_do2_single_json_c(
 	const void *closure2
 );
 
+/**
+ * Get the json-c object representation of the parameters.
+ *
+ * @param nparam   count of data in arra params
+ * @param params   array of the input data
+ * @param obj      pointer for storing the result
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_get_single_json_c(
@@ -108,6 +164,20 @@ afb_json_legacy_get_single_json_c(
 );
 
 /**********************************************************************/
+
+/**
+ * Interpret the reply given by (status, nreplies, replies) in terms
+ * of bindings 1, 2 and 3 (object, error, info) and call the callback
+ * with it. The object is expected as a json-c object.
+ *
+ * @param closure  closure to the callback
+ * @param status   status of the reply
+ * @param nreplies count of data in array replies
+ * @param replies  array of replied data
+ * @param callback called callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do_reply_json_c(
@@ -118,6 +188,19 @@ afb_json_legacy_do_reply_json_c(
 	void (*callback)(void*, struct json_object*, const char*, const char*)
 );
 
+/**
+ * Interpret the reply given by (status, nreplies, replies) in terms
+ * of bindings 1, 2 and 3 (object, error, info) and call the callback
+ * with it.
+ *
+ * @param closure  closure to the callback
+ * @param status   status of the reply
+ * @param nreplies count of data in array replies
+ * @param replies  array of replied data
+ * @param callback called callback
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_do_reply_json_string(
@@ -128,6 +211,20 @@ afb_json_legacy_do_reply_json_string(
 	void (*callback)(void*, const char*, const char*, const char*)
 );
 
+/**
+ * Interpret the reply given by (status, nreplies, replies) in terms
+ * of bindings 1, 2 and 3 (object, error, info) and return items for
+ * synchronous call.
+ *
+ * @param status   status of the reply
+ * @param nreplies count of data in array replies
+ * @param replies  array of replied data
+ * @param object   pointer to store the extracted json-c object
+ * @param error    pointer to store the extracted error string
+ * @param info     pointer to store the extracted info string
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_get_reply_sync(
@@ -141,6 +238,10 @@ afb_json_legacy_get_reply_sync(
 
 /**********************************************************************/
 
+/**
+ * Create a V4 array of data in params using the given v1,2,3
+ * object, error and info.
+ */
 extern
 int
 afb_json_legacy_make_reply_json_string(
@@ -237,6 +338,19 @@ afb_json_legacy_event_broadcast_hookable(
 );
 
 /**********************************************************************/
+
+/**
+ * Get the JSON message compatible with protocol afb-wsj1 from the reply.
+ * The returned message string must be freed by the caller.
+ *
+ * @param message  pointer for storing created reply string
+ * @param length   pointer for storing length of created reply string
+ * @param status   replied status
+ * @param nreplies count of data of the array replies
+ * @param replies  array of data of the reply
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_make_msg_string_reply(
@@ -247,6 +361,18 @@ afb_json_legacy_make_msg_string_reply(
 	struct afb_data * const replies[]
 );
 
+/**
+ * Get the JSON message compatible with protocol afb-wsj1 from the event.
+ * The returned message string must be freed by the caller.
+ *
+ * @param message  pointer for storing created reply string
+ * @param length   pointer for storing length of created reply string
+ * @param status   replied status
+ * @param nparams  count of data of the array params
+ * @param params   array of data of the event
+ *
+ * @return 0 on success or a negative error code
+ */
 extern
 int
 afb_json_legacy_make_msg_string_event(

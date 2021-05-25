@@ -89,6 +89,15 @@ async_cb_status_final(
 
 /******************************************************************************/
 
+/**
+ * Returns a predefined error
+ *
+ * @param req    the request receiving the error
+ * @param status the error status
+ * @param arg    an argument to the error
+ *
+ * @return the value status
+ */
 static int reply_error(struct afb_req_common *req, int status)
 {
 	afb_req_common_reply_hookable(req, status, 0, 0);
