@@ -779,7 +779,10 @@ afb_data_create_alloc0(
 	}
 	else {
 		/* create the data */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 		rc = afb_data_create_raw(result, type, p, size, share_free, p);
+#pragma GCC diagnostic pop
 		if (rc < 0)
 			p = NULL;
 		else if (zeroes)
