@@ -112,7 +112,7 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 		}
 		if (!a.entry)
 			a.entry = a.desc->preinit;
-		else if (a.desc->preinit) {
+		else if (a.desc->preinit && a.desc->preinit != a.entry) {
 			ERROR("binding [%s] clash: you can't define %s and %s.preinit, choose only one",
 				path, afb_api_so_v3_entry, afb_api_so_v3_desc);
 			rc = X_EINVAL;

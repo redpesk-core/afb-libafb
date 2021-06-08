@@ -77,7 +77,7 @@ const afb_binding_t afbBindingExport = {
 
 #endif
 /**************************************************************************/
-#if defined(BUG16) /* both entry and preinit */
+#if defined(BUG16) /* both entry and preinit but the same, not more a bug! */
 
 #define AFB_BINDING_VERSION 4
 #include <afb/afb-binding.h>
@@ -176,3 +176,24 @@ const afb_binding_t afbBindingExport = {
 
 #endif
 /**************************************************************************/
+#if defined(BUG22) /* both entry and preinit but not the same */
+
+#define AFB_BINDING_VERSION 4
+#include <afb/afb-binding.h>
+
+int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
+{
+	return 0;
+}
+
+int afbBindingEntry2(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
+{
+	return 0;
+}
+
+const afb_binding_t afbBindingExport = {
+	.api = "bug22",
+	.mainctl = afbBindingEntry2
+};
+
+#endif

@@ -191,7 +191,8 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 		/* get the main routine */
 		if (!iniv4.dlv4.mainctl)
 			iniv4.dlv4.mainctl = iniv4.dlv4.desc->mainctl;
-		else if (iniv4.dlv4.desc->mainctl) {
+		else if (iniv4.dlv4.desc->mainctl
+		      && iniv4.dlv4.desc->mainctl != iniv4.dlv4.mainctl) {
 			ERROR("binding [%s] clash of entries", path);
 			rc = X_EINVAL;
 			goto error;

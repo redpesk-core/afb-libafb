@@ -155,19 +155,21 @@ START_TEST (dirty_test)
 {
 #if WITH_DYNAMIC_BINDING
 
+	int i, n;
 	bgTest bugArg;
-	const int suposed_result[] = {
+	const int expected_result[] = {
 		/*bug11*/	-14,
 		/*bug12*/	0,
 		/*bug13*/	-22,
 		/*bug14*/	-22,
 		/*bug15*/	-22,
-		/*bug16*/	-22,
+		/*bug16*/	1,
 		/*bug17*/	-11,
 		/*bug18*/	-11,
 		/*bug19*/	-14,
 		/*bug20*/	-11,
 		/*bug21*/	-14,
+		/*bug22*/	-22,
 	};
 
 	// activate signal monitoring
@@ -177,8 +179,10 @@ START_TEST (dirty_test)
 	bugArg.call_set = afb_apiset_create("tata", 1);
 
 	// Test bugs one by one with sig monitor to avoid test to break on an error
-	for(bugArg.nb=BUG_OFFSET; bugArg.nb<=21; bugArg.nb++){
-		bugArg.expected_result = suposed_result[bugArg.nb-BUG_OFFSET];
+	n = (int)(sizeof expected_result / sizeof *expected_result);
+	for(i = 0 ; i < n ; i++) {
+		bugArg.nb = BUG_OFFSET + i;
+		bugArg.expected_result = expected_result[i];
 		afb_sig_monitor_run(0, bug_test, &bugArg);
 	}
 #endif
