@@ -211,6 +211,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 /*-- BEGIN OF VERSION 4r1  REVISION  2 --------------------*/
 
 	.type_bytearray = &afb_type_predefined_bytearray,
+	.req_param_convert = afb_req_v4_param_convert,
 
 /*-- END -----------------------------------*/
 };

@@ -143,6 +143,7 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_req_get_client_info         afb_req_v4_get_client_info_hookable
 #define afb_req_check_permission        afb_req_v4_check_permission_hookable
 #define afb_req_parameters              afb_req_v4_parameters
+#define afb_req_param_convert           afb_req_v4_param_convert
 #define afb_req_reply                   afb_req_v4_reply_hookable
 #define afb_req_subcall                 afb_req_v4_subcall_hookable
 #define afb_req_subcall_sync            afb_req_v4_subcall_sync_hookable

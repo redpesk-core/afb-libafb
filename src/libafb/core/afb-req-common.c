@@ -966,6 +966,34 @@ afb_req_common_unsubscribe_hookable(
 
 /******************************************************************************/
 
+int
+afb_req_common_param_convert(
+	struct afb_req_common *req,
+	unsigned index,
+	struct afb_type *type,
+	struct afb_data **result
+) {
+	int rc;
+	struct afb_data *before, *after;
+
+	after = NULL;
+	if (index >= req->params.ndata)
+		rc = -X_EINVAL;
+	else {
+		before = req->params.data[index];
+		rc = afb_data_convert(before, type, &after);
+		if (rc >= 0) {
+			req->params.data[index] = after;
+			afb_data_unref(before);
+		}
+	}
+	if (result != NULL)
+		*result = after;
+	return rc;
+}
+
+/******************************************************************************/
+
 /**
  * intermediate structure used for afb_session_cookie_init_basic
  */

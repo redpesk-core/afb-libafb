@@ -35,6 +35,7 @@ struct afb_cred;
 struct afb_apiset;
 struct afb_api_item;
 struct afb_data;
+struct afb_type;
 
 struct afb_auth;
 struct afb_event_x2;
@@ -284,6 +285,34 @@ int
 afb_req_common_unsubscribe(
 	struct afb_req_common *req,
 	struct afb_evt *evt
+);
+
+/******************************************************************************/
+
+/**
+ * Convert a parameter of the request to a given type and return it.
+ *
+ * The converted result is substituted to the previous parameter.
+ * There is no need to unreference the returned data as it becomes
+ * part of the request and will be released .
+ *
+ * Previous value of the parameter is automatically unreferenced.
+ * If you want keep it, you have to first reference it using afb_data_addref.
+ *
+ * @param req the request
+ * @param index index of the parameter to convert
+ * @param type  target type of the conversion
+ * @param result where to store the result (can be NULL)
+ *
+ * @return 0 in case of success, a negative code on error
+ */
+extern
+int
+afb_req_common_param_convert(
+	struct afb_req_common *req,
+	unsigned index,
+	struct afb_type *type,
+	struct afb_data **result
 );
 
 /******************************************************************************/

@@ -9,6 +9,7 @@ Next version
     - Remove cookie's attribute 'Secure'
     - improve error handling compatibility with v4
     - Allow providing more than one converter for a given couple of types
+    - implement conversion of parameters of requests
 
   fixes
     - update timeout of sessions on requests

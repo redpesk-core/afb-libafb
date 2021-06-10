@@ -320,6 +320,16 @@ afb_req_v4_parameters(
 	return reqv4->comreq->params.ndata;
 }
 
+int
+afb_req_v4_param_convert(
+	struct afb_req_v4 *reqv4,
+	unsigned index,
+	struct afb_type *type,
+	struct afb_data **result
+) {
+	return afb_req_common_param_convert(reqv4->comreq, index, type, result);
+}
+
 void
 afb_req_v4_reply_hookable(
 	struct afb_req_v4 *reqv4,
