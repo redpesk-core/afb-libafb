@@ -332,7 +332,13 @@ struct ev_fd *ev_fd_addref(struct ev_fd *efd)
 
 void ev_fd_unref(struct ev_fd *efd)
 {
+	int rc;
 	if (efd && !__atomic_sub_fetch(&efd->refcount, 1, __ATOMIC_RELAXED)) {
+		if (efd->is_active && efd->is_set) {
+			rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
+			if (rc == 0)
+				efd->is_set = 0;
+		}
 		efd->is_active = 0;
 		efd->is_deleted = 1;
 		if (efd->mgr)
@@ -357,10 +363,30 @@ uint32_t ev_fd_events(struct ev_fd *efd)
 
 void ev_fd_set_events(struct ev_fd *efd, uint32_t events)
 {
+	int rc = 0;
+	struct epoll_event ev;
+
 	if (efd->events != events) {
-		efd->events = events;
-		efd->has_changed = 1;
-		efd->mgr->efds_changed = 1;
+		ev.data.ptr = efd;
+		ev.events = efd->events = events;
+		if (efd->is_active) {
+			if (efd->is_set)
+				rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_MOD, efd->fd, &ev);
+			else {
+				rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_ADD, efd->fd, &ev);
+				if (rc == 0)
+					efd->is_set = 1;
+			}
+		}
+		else if (efd->is_set) {
+			rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
+			if (rc == 0)
+				efd->is_set = 0;
+		}
+		if (rc < 0) {
+			efd->has_changed = 1;
+			efd->mgr->efds_changed = 1;
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-Next version
+Next version (4.0.2)
 ------------
 
   features
@@ -13,6 +13,7 @@ Next version
 
   fixes
     - update timeout of sessions on requests
+    - early setting of event listeners, needed for concurrency
 
   minors/details
     - saved bytes in http keys for data
