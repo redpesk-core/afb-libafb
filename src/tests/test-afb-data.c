@@ -297,7 +297,7 @@ void data_dispose(void * closure){
 void predefconv(struct afb_type *from, struct afb_type *to){
 	struct afb_data *data, *result;
 	int r;
-	uint64_t i;
+	uint64_t i = 0;
 
 	r = afb_data_create_raw(&data, from, &i, 0, data_dispose, i2p(1));
 	ck_assert_int_eq(r, 0);
