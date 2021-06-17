@@ -243,7 +243,7 @@ static const char afb_api_so_v4_root[] = "afbBindingV4root";
 static const char afb_api_so_v4_entry[] = "afbBindingV4entry";
 
 /**
- * Name of the manifest interface version : "afbBindingV4_itfversion"
+ * Name of the manifest interface version : "afbBindingV4_itf_revision"
  */
 static const char afb_api_so_v4_itfrevision[] = "afbBindingV4_itf_revision";
 
