@@ -22,9 +22,9 @@
 ## $RP_END_LICENSE$
 ##
 
-Name: afb-libafb
-Description: Client library for communicating
-Version: @LIBAFB_VERSION@
+Name: libafb
+Description: afb-libafb core library
+Version: @PROJECT_VERSION@
 URL: @PROJECT_URL@
 
 Requires: @PCREQUIRES@

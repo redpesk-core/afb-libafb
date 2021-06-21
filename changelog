@@ -1,5 +1,15 @@
-Next version (4.0.2)
-------------
+Next Version (4.0.3?)
+---------------------
+
+  features
+
+  fixes
+   - add release in pc files
+
+  minors/details
+
+Version 4.0.2
+-------------
 
   features
     - add reply code if available in wsj1
