@@ -154,6 +154,23 @@ afb_api_v4_del_verb(
 );
 
 extern
+int
+afb_api_v4_event_handler_add(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
+	void *closure
+);
+
+extern
+int
+afb_api_v4_event_handler_del(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void **closure
+);
+
+extern
 void
 afb_api_v4_process_call(
 	struct afb_api_v4 *api,

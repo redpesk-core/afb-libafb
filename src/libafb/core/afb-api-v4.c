@@ -574,7 +574,7 @@ afb_api_v4_event_handler_add_hookable(
 	void (*callback)(void*,const char*,unsigned,struct afb_data * const[],struct afb_api_v4*),
 	void *closure
 ) {
-	int r = afb_api_common_event_handler_add(&apiv4->comapi, pattern, callback, closure);
+	int r = afb_api_v4_event_handler_add(apiv4, pattern, callback, closure);
 
 #if WITH_AFB_HOOK
 	if (apiv4->comapi.hookflags & afb_hook_flag_api_event_handler_add)
@@ -590,7 +590,7 @@ afb_api_v4_event_handler_del_hookable(
 	const char *pattern,
 	void **closure
 ) {
-	int r = afb_api_common_event_handler_del(&apiv4->comapi, pattern, closure);
+	int r = afb_api_v4_event_handler_del(apiv4, pattern, closure);
 
 #if WITH_AFB_HOOK
 	if (apiv4->comapi.hookflags & afb_hook_flag_api_event_handler_del)
@@ -752,6 +752,25 @@ static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const cha
 		v++;
 	}
 	return 0;
+}
+
+int
+afb_api_v4_event_handler_add(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
+	void *closure
+) {
+	return afb_api_common_event_handler_add(&api->comapi, pattern, callback, closure);
+}
+
+int
+afb_api_v4_event_handler_del(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void **closure
+) {
+	return afb_api_common_event_handler_del(&api->comapi, pattern, closure);
 }
 
 void
