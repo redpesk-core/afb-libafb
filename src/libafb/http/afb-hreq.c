@@ -951,8 +951,9 @@ static void make_params(struct afb_hreq *hreq)
 {
 	struct hreq_data *hdat;
 	struct json_object *obj, *val;
+	struct afb_data *data;
 
-	if (hreq->comreq.params.data == NULL) {
+	if (hreq->comreq.params.ndata == 0 && hreq->json == NULL) {
 		obj = json_object_new_object();
 		if (obj != NULL) {
 			MHD_get_connection_values (hreq->connection, MHD_GET_ARGUMENT_KIND, (void*)_iterargs_, obj);
@@ -970,8 +971,11 @@ static void make_params(struct afb_hreq *hreq)
 				json_object_object_add(obj, hdat->key, val);
 			}
 		}
-		afb_json_legacy_make_data_json_c(hreq->comreq.params.data, obj);
-		hreq->comreq.params.ndata = 1;
+		hreq->json = obj;
+	}
+	if (hreq->comreq.params.ndata == 0) {
+		afb_json_legacy_make_data_json_c(&data, json_object_get(hreq->json));
+		afb_req_common_set_params(&hreq->comreq, 1, &data);
 	}
 }
 
