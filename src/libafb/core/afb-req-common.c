@@ -275,6 +275,16 @@ afb_req_common_init(
 }
 
 void
+afb_req_common_set_params(
+	struct afb_req_common *req,
+	unsigned nparams,
+	struct afb_data * const params[]
+) {
+	clean_args(&req->params);
+	set_args(nparams, params, &req->params);
+}
+
+void
 afb_req_common_prepare_forwarding(
 	struct afb_req_common *req,
 	const char *apiname,
