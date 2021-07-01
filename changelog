@@ -1,13 +1,12 @@
-Next Version (4.0.3?)
----------------------
+Version 4.0.3
+-------------
 
   features
+   - add function handling event within api v4 (for extensions)
 
   fixes
    - add release version in pc files
    - Fix POST/HTTP requests
-
-  minors/details
 
 Version 4.0.2
 -------------
