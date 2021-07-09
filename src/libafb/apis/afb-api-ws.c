@@ -54,7 +54,7 @@ struct api_ws_server
 
 static void client_on_hangup(struct afb_stub_ws *client)
 {
-	const char *apiname = afb_stub_ws_name(client);
+	const char *apiname = afb_stub_ws_apiname(client);
 	WARNING("Disconnected of API %s", apiname);
 	afb_monitor_api_disconnected(apiname);
 }
@@ -130,7 +130,7 @@ int afb_api_ws_add_client_weak(const char *uri, struct afb_apiset *declare_set, 
 
 static void server_on_hangup(struct afb_stub_ws *server)
 {
-	const char *apiname = afb_stub_ws_name(server);
+	const char *apiname = afb_stub_ws_apiname(server);
 	INFO("Disconnection of client of API %s", apiname);
 	afb_stub_ws_unref(server);
 }

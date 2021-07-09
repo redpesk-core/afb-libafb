@@ -32,13 +32,32 @@ extern struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname
 
 extern struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset);
 
+/**
+ * Decrement the count of reference to the stub and drop its used resources
+ * if the count reaches zero.
+ *
+ * @param stubws the stub object
+ */
 extern void afb_stub_ws_unref(struct afb_stub_ws *stubws);
 
+/**
+ * Increment the count of reference to the stub
+ *
+ * @param stubws the stub object
+ */
 extern void afb_stub_ws_addref(struct afb_stub_ws *stubws);
+
+/**
+ * Apiname of the stub
+ *
+ * @param stubws the stub object
+ *
+ * @return the apiname of the stub
+ */
+extern const char *afb_stub_ws_apiname(struct afb_stub_ws *stubws);
 
 extern void afb_stub_ws_set_on_hangup(struct afb_stub_ws *stubws, void (*on_hangup)(struct afb_stub_ws*));
 
-extern const char *afb_stub_ws_name(struct afb_stub_ws *stubws);
 
 extern struct afb_api_item afb_stub_ws_client_api(struct afb_stub_ws *stubws);
 

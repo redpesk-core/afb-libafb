@@ -139,7 +139,7 @@ struct afb_stub_ws
 	char apiname[];
 };
 
-static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, int fd, uint8_t server);
+static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, uint8_t server);
 
 /******************* ws request part for server *****************/
 
@@ -221,7 +221,7 @@ static struct afb_proto_ws *client_get_proto(struct afb_stub_ws *stubws)
 	if (proto == NULL && stubws->robust.reopen) {
 		fd = stubws->robust.reopen(stubws->robust.closure);
 		if (fd >= 0)
-			proto = afb_stub_ws_create_proto(stubws, fd, 1);
+			proto = create_proto(stubws, fd, 1);
 	}
 	return proto;
 }
@@ -743,7 +743,16 @@ static int enqueue_processing(struct afb_proto_ws *proto, void (*callback)(int s
 
 /*****************************************************/
 
-static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws, int fd, uint8_t is_client)
+/**
+ * Create the protocol handler for the given socket
+ *
+ * @param stubws the stub object
+ * @param fd fileno of the socket
+ * @param is_client boolean true for a client, false for a server
+ *
+ * @return the created protocol or NULL on error
+ */
+static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, uint8_t is_client)
 {
 	struct afb_proto_ws *proto;
 
@@ -758,13 +767,26 @@ static struct afb_proto_ws *afb_stub_ws_create_proto(struct afb_stub_ws *stubws,
 	return proto;
 }
 
-static struct afb_stub_ws *afb_stub_ws_create(int fd, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
+/**
+ * Creation of a wsapi web-socket stub either client or server for an api
+ *
+ * @param fd file descriptor of the socket
+ * @param apiname name of the api stubbed
+ * @param apiset apiset for declaring if client or serving if server
+ * @param is_client boolean true for creating client stub and false for creating a server stub
+ *
+ * @return a handle on the created stub object
+ */
+static struct afb_stub_ws *create_stub_ws(int fd, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
 {
 	struct afb_stub_ws *stubws;
 
+	/* allocation */
 	stubws = calloc(1, sizeof *stubws + 1 + strlen(apiname));
 	if (stubws) {
-		if (afb_stub_ws_create_proto(stubws, fd, is_client)) {
+		/* create the underlying protocol object */
+		if (create_proto(stubws, fd, is_client)) {
+			/* terminate initialization */
 			stubws->refcount = 1;
 			stubws->is_client = is_client;
 			strcpy(stubws->apiname, apiname);
@@ -776,59 +798,75 @@ static struct afb_stub_ws *afb_stub_ws_create(int fd, const char *apiname, struc
 	return NULL;
 }
 
+/* creates a client stub */
 struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname, struct afb_apiset *apiset)
 {
-	return afb_stub_ws_create(fd, apiname, apiset, 1);
+	return create_stub_ws(fd, apiname, apiset, 1);
 }
 
+/* creates a server stub */
 struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset)
 {
 	struct afb_stub_ws *stubws;
 
-	stubws = afb_stub_ws_create(fd, apiname, apiset, 0);
+	/* create the stub */
+	stubws = create_stub_ws(fd, apiname, apiset, 0);
 	if (stubws) {
 #if WITH_CRED
+		/*
+		 * creds of the peer are not changing
+		 * except if passed to other processes
+		 * TODO check how to track changes if needed
+		 */
 		afb_cred_create_for_socket(&stubws->cred, fd);
 #endif
+		/* add event listener for propagating events */
 		stubws->listener = afb_evt_listener_create(&server_event_itf, stubws);
 		if (stubws->listener != NULL)
-			return stubws;
+			return stubws; /* success! */
 		afb_stub_ws_unref(stubws);
 	}
 	return NULL;
 }
 
+/* sub one reference and free resources if falling to zero */
 void afb_stub_ws_unref(struct afb_stub_ws *stubws)
 {
 	if (stubws && !__atomic_sub_fetch(&stubws->refcount, 1, __ATOMIC_RELAXED)) {
 
+		/* release the robustification */
 		if (stubws->is_client) {
 			stubws->robust.reopen = NULL;
 			if (stubws->robust.release)
 				stubws->robust.release(stubws->robust.closure);
 		}
 
+		/* cleanup */
 		disconnect(stubws);
 		afb_apiset_unref(stubws->apiset);
 		free(stubws);
 	}
 }
 
+/* add one reference */
 void afb_stub_ws_addref(struct afb_stub_ws *stubws)
 {
 	__atomic_add_fetch(&stubws->refcount, 1, __ATOMIC_RELAXED);
 }
 
+/* return the api name */
+const char *afb_stub_ws_apiname(struct afb_stub_ws *stubws)
+{
+	return stubws->apiname;
+}
+
+/* set a hangup handler */
 void afb_stub_ws_set_on_hangup(struct afb_stub_ws *stubws, void (*on_hangup)(struct afb_stub_ws*))
 {
 	stubws->on_hangup = on_hangup;
 }
 
-const char *afb_stub_ws_name(struct afb_stub_ws *stubws)
-{
-	return stubws->apiname;
-}
-
+/* return the api object for declaring apiname in apiset */
 struct afb_api_item afb_stub_ws_client_api(struct afb_stub_ws *stubws)
 {
 	struct afb_api_item api;
@@ -840,11 +878,13 @@ struct afb_api_item afb_stub_ws_client_api(struct afb_stub_ws *stubws)
 	return api;
 }
 
+/* declares the client api in apiset */
 int afb_stub_ws_client_add(struct afb_stub_ws *stubws, struct afb_apiset *apiset)
 {
 	return afb_apiset_add(apiset, stubws->apiname, afb_stub_ws_client_api(stubws));
 }
 
+/* set robustification functions */
 void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, int (*reopen)(void*), void *closure, void (*release)(void*))
 {
 	assert(stubws->is_client); /* check client */
