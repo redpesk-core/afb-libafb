@@ -39,7 +39,7 @@ endmacro(installheader)
 installheader(${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h)
 installheader(libafb.h afb-extension.h afb-v4.h)
 
-foreach(entry core utils sys http apis misc wsapi wsj1 extend tls)
+foreach(entry core utils sys http apis misc wsapi wsj1 extend tls rpc)
 	file(GLOB hdr ${entry}/*.h)
 	installfiles(${DESTHDR}/${entry} ${hdr})
 	installheader(afb-${entry}.h)

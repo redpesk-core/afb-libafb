@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2021 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,9 +23,8 @@
 
 #pragma once
 
-#include "apis/afb-api-dbus.h"
-#include "apis/afb-api-so.h"
-#include "apis/afb-api-so-v3.h"
-#include "apis/afb-api-so-v4.h"
-#include "apis/afb-api-ws.h"
-#include "apis/afb-api-rpc.h"
+#include "rpc/afb-rpc.h"
+#include "rpc/afb-rpc-sock.h"
+#include "rpc/afb-rpc-v0.h"
+#include "rpc/afb-rpc-v1.h"
+#include "rpc/afb-rpc-v2.h"

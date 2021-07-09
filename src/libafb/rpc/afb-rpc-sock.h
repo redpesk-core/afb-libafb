@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2021 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,9 +23,26 @@
 
 #pragma once
 
-#include "apis/afb-api-dbus.h"
-#include "apis/afb-api-so.h"
-#include "apis/afb-api-so-v3.h"
-#include "apis/afb-api-so-v4.h"
-#include "apis/afb-api-ws.h"
-#include "apis/afb-api-rpc.h"
+
+typedef struct afb_rpc_coder afb_rpc_coder_t;
+typedef struct afb_rpc_decoder afb_rpc_decoder_t;
+
+/**
+ * Receive as much as data as possible
+ *
+ * @param sockfd the i/o socket
+ * @param decoder the decoder object to init from receive
+ *
+ * @return the count of buffer waiting on success or a negative error code
+ */
+extern int afb_rpc_sock_recv_decoder(int sockfd, afb_rpc_decoder_t *decoder);
+
+/**
+ * Send the coded buffers to the socket
+ *
+ * @param sockfd the i/o socket
+ * @param coder the coder object to send
+ *
+ * @return 0 success or a negative error code
+ */
+extern int afb_rpc_sock_send_coder(int sockfd, afb_rpc_coder_t *coder);

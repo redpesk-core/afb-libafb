@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2021 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -21,11 +21,13 @@
  * $RP_END_LICENSE$
  */
 
+
 #pragma once
 
-#include "apis/afb-api-dbus.h"
-#include "apis/afb-api-so.h"
-#include "apis/afb-api-so-v3.h"
-#include "apis/afb-api-so-v4.h"
-#include "apis/afb-api-ws.h"
-#include "apis/afb-api-rpc.h"
+struct afb_apiset;
+
+extern int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong);
+extern int afb_api_rpc_add_client_strong(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set);
+extern int afb_api_rpc_add_client_weak(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set);
+
+extern int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set);
