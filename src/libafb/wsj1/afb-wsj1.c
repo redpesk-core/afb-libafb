@@ -165,7 +165,9 @@ static void wsj1_on_hangup(struct afb_wsj1 *wsj1)
 		len = asprintf(&text, "[%d,\"%s\",%s]", RETERR, call->id, error_object_str);
 		if (len > 0) {
 			msg = wsj1_msg_make(wsj1, text, (size_t)len);
-			if (msg != NULL) {
+			if (msg == NULL)
+				free(text);
+			else {
 				call->callback(call->closure, msg);
 				afb_wsj1_msg_unref(msg);
 			}
@@ -310,7 +312,7 @@ static struct afb_wsj1_msg *wsj1_msg_make(struct afb_wsj1 *wsj1, char *text, siz
 
 	/* scan */
 	s = wsj1_msg_scan(text, items, 10, &n);
-	if (s <= 0)
+	if (s <= 0 || n < 1)
 		goto bad_header;
 
 	/* scans code: 2|3|4|5 */
@@ -375,7 +377,6 @@ bad_header:
 	free(msg);
 
 alloc_error:
-	free(text);
 	return NULL;
 }
 
@@ -387,6 +388,7 @@ static void wsj1_on_text(struct afb_wsj1 *wsj1, char *text, size_t size)
 	/* allocate */
 	msg = wsj1_msg_make(wsj1, text, size);
 	if (msg == NULL) {
+		free(text);
 		afb_ws_close(wsj1->ws, WEBSOCKET_CODE_POLICY_VIOLATION, NULL);
 		return;
 	}
