@@ -389,7 +389,7 @@ static void wsj1_on_text(struct afb_wsj1 *wsj1, char *text, size_t size)
 	msg = wsj1_msg_make(wsj1, text, size);
 	if (msg == NULL) {
 		free(text);
-		afb_ws_close(wsj1->ws, WEBSOCKET_CODE_POLICY_VIOLATION, NULL);
+		afb_ws_close(wsj1->ws, WEBSOCKET_CODE_POLICY_VIOLATION, "invalid-frame");
 		return;
 	}
 
@@ -402,7 +402,7 @@ static void wsj1_on_text(struct afb_wsj1 *wsj1, char *text, size_t size)
 	case RETERR:
 		call = wsj1_call_search(wsj1, msg->id, 1);
 		if (call == NULL)
-			afb_ws_close(wsj1->ws, WEBSOCKET_CODE_POLICY_VIOLATION, NULL);
+			afb_ws_close(wsj1->ws, WEBSOCKET_CODE_POLICY_VIOLATION, "unbound-call-id");
 		else
 			call->callback(call->closure, msg);
 		free(call);
