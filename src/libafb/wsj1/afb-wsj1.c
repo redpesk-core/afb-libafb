@@ -226,7 +226,7 @@ static struct wsj1_call *wsj1_call_create(struct afb_wsj1 *wsj1, void (*on_reply
 }
 
 
-static int wsj1_msg_scan(char *text, size_t items[10][2])
+static int wsj1_msg_scan(char *text, size_t items[10][2], int *nval)
 {
 	char *pos, *beg, *end, c;
 	int aux, n = 0;
@@ -272,10 +272,12 @@ static int wsj1_msg_scan(char *text, size_t items[10][2])
 		}
 	}
 	while(*++pos == ' ');
-	if (*pos) goto bad_scan;
-	return n;
+	if (*pos)
+		goto bad_scan;
+	return *nval = n;
 
 bad_scan:
+	*nval = n;
 	return -1;
 }
 
@@ -297,7 +299,7 @@ static char *wsj1_msg_parse_string(char *text, size_t offset, size_t size)
 static struct afb_wsj1_msg *wsj1_msg_make(struct afb_wsj1 *wsj1, char *text, size_t size)
 {
 	size_t items[10][2];
-	int n;
+	int n, s;
 	struct afb_wsj1_msg *msg;
 	char *verb;
 
@@ -307,8 +309,8 @@ static struct afb_wsj1_msg *wsj1_msg_make(struct afb_wsj1 *wsj1, char *text, siz
 		goto alloc_error;
 
 	/* scan */
-	n = wsj1_msg_scan(text, items);
-	if (n <= 0)
+	s = wsj1_msg_scan(text, items, &n);
+	if (s <= 0)
 		goto bad_header;
 
 	/* scans code: 2|3|4|5 */
