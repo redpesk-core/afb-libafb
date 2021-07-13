@@ -226,7 +226,7 @@ static struct wsj1_call *wsj1_call_create(struct afb_wsj1 *wsj1, void (*on_reply
 }
 
 
-static int wsj1_msg_scan(char *text, size_t items[10][2], int *nval)
+static int wsj1_msg_scan(char *text, size_t items[][2], int count, int *nval)
 {
 	char *pos, *beg, *end, c;
 	int aux, n = 0;
@@ -242,7 +242,7 @@ static int wsj1_msg_scan(char *text, size_t items[10][2], int *nval)
 	while(*pos == ' ') pos++;
 	if (*pos != ']') {
 		for (;;) {
-			if (n == 10)
+			if (n >= count)
 				goto bad_scan;
 			beg = pos;
 			aux = 0;
@@ -309,7 +309,7 @@ static struct afb_wsj1_msg *wsj1_msg_make(struct afb_wsj1 *wsj1, char *text, siz
 		goto alloc_error;
 
 	/* scan */
-	s = wsj1_msg_scan(text, items, &n);
+	s = wsj1_msg_scan(text, items, 10, &n);
 	if (s <= 0)
 		goto bad_header;
 
