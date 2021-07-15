@@ -63,15 +63,6 @@ struct server_req {
 	char strings[];			/**< for storing strings */
 };
 
-/**
- * structure for jobs of describing
- */
-struct server_describe
-{
-	struct afb_stub_ws *stubws;
-	struct afb_proto_ws_describe *describe;
-};
-
 /******************* stub description for client or servers ******************/
 
 struct afb_stub_ws
