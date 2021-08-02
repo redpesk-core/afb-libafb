@@ -455,7 +455,7 @@ static int get_from_file(struct json_object **object, const char *filename, FILE
 		while (tagiter != NULL) {
 			tagnext = tagiter->other;
 			free(tagiter);
-			tagiter = tagnext;
+			tagiter = tagnext == tagfile ? NULL : tagnext;
 		}
 	}
 	else {
@@ -473,6 +473,8 @@ static int get_from_file(struct json_object **object, const char *filename, FILE
 			}
 			tagiter = tagnext;
 		}
+		if (tagfile->refcount == 0)
+			free(tagfile);
 
 		/* record the result */
 		*object = obj;
