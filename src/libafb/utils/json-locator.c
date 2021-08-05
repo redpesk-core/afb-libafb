@@ -445,6 +445,11 @@ static int get_from_file(struct json_object **object, const char *filename, FILE
 						rc = 0;
 						stop = 1;
 					}
+					else if (json_tokener_get_error(tok) != json_tokener_continue) {
+						/* tokenizer has an error */
+						rc = -EBADMSG;
+						stop = 1;
+					}
 				}
 			}
 		}
