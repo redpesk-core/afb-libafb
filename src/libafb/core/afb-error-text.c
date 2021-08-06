@@ -21,6 +21,8 @@
  * $RP_END_LICENSE$
  */
 
+#include <string.h>
+
 #include "afb-error-text.h"
 
 #include <afb/afb-errno.h>
@@ -77,4 +79,37 @@ const char *afb_error_text(int code)
 		return text_disconnected;
 	}
 	return text_internal_error;
+}
+
+int afb_error_code(const char *error)
+{
+	if (!error)
+		return 0;
+	if (!strcmp(error, text_unknown_api))
+		return AFB_ERRNO_UNKNOWN_API;
+	if (!strcmp(error, text_unknown_verb))
+		return AFB_ERRNO_UNKNOWN_VERB;
+	if (!strcmp(error, text_not_available))
+		return AFB_ERRNO_NOT_AVAILABLE;
+	if (!strcmp(error, text_unauthorized))
+		return AFB_ERRNO_UNAUTHORIZED;
+	if (!strcmp(error, text_invalid_token))
+		return AFB_ERRNO_INVALID_TOKEN;
+	if (!strcmp(error, text_forbidden))
+		return AFB_ERRNO_FORBIDDEN;
+	if (!strcmp(error, text_insufficient_scope))
+		return AFB_ERRNO_INSUFFICIENT_SCOPE;
+	if (!strcmp(error, text_internal_error))
+		return AFB_ERRNO_BAD_API_STATE;
+	if (!strcmp(error, text_not_replied))
+		return AFB_ERRNO_NO_REPLY;
+	if (!strcmp(error, text_invalid_request))
+		return AFB_ERRNO_INVALID_REQUEST;
+	if (!strcmp(error, text_no_item))
+		return AFB_ERRNO_NO_ITEM;
+	if (!strcmp(error, text_bad_state))
+		return AFB_ERRNO_BAD_STATE;
+	if (!strcmp(error, text_disconnected))
+		return AFB_ERRNO_DISCONNECTED;
+	return AFB_ERRNO_INTERNAL_ERROR;
 }
