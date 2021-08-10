@@ -92,11 +92,17 @@ struct afb_type
 	struct opdesc *operations;
 
 	/** count of operations */
-	uint16_t op_count;
+	uint8_t op_count;
 
 	/** flags */
-	uint16_t flags;
+	uint8_t flags;
+
+	/** typeid (compatible with rpcv2) */
+	uint16_t typeid;
 };
+
+#define TYPE_OP_COUNT_MAX  UINT8_MAX
+#define TYPEID_MAX         0x3fff
 
 /*****************************************************************************/
 

@@ -135,7 +135,7 @@
  * Set the link to next to NEXT.
  * Declare the operations (see PREDEFINED_OPERATION)
  */
-#define PREDEFINED_TYPE(stype,FLAGS,FAMILY,NEXT) \
+#define PREDEFINED_TYPE(stype,ID,FLAGS,FAMILY,NEXT) \
 	EXPORT_PREDEF(stype);  \
 	static const struct afb_type predefined_##stype = \
 	{ \
@@ -144,6 +144,7 @@
 		.operations = (struct opdesc*)opcvt_##stype,\
 		.family = FAMILY, \
 		.flags = FLAG_IS_PREDEFINED | FLAGS, \
+		.typeid = ID, \
 		.op_count = (uint16_t)(sizeof opcvt_##stype / sizeof opcvt_##stype[0]) \
 	}
 
@@ -371,7 +372,7 @@ PREDEFINED_OPERATION(opaque)
 		CONVERT_TO(opaque, json_c)
 	};
 
-PREDEFINED_TYPE(opaque, FLAG_IS_OPAQUE, 0, 0);
+PREDEFINED_TYPE(opaque, Afb_Typeid_Predefined_Opaque, FLAG_IS_OPAQUE, 0, 0);
 
 /*****************************************************************************/
 /* PREDEFINED BYTEARRAY */
@@ -380,7 +381,7 @@ PREDEFINED_OPERATION(bytearray)
 	{
 	};
 
-PREDEFINED_TYPE(bytearray, FLAG_IS_SHAREABLE | FLAG_IS_STREAMABLE, 0, &PREDEF(opaque));
+PREDEFINED_TYPE(bytearray, Afb_Typeid_Predefined_Bytearray, FLAG_IS_SHAREABLE | FLAG_IS_STREAMABLE, 0, &PREDEF(opaque));
 
 /*****************************************************************************/
 /* PREDEFINED STRINGZ */
@@ -433,7 +434,7 @@ PREDEFINED_OPERATION(stringz)
 		CONVERT_TO(stringz, json)
 	};
 
-PREDEFINED_TYPE(stringz, FLAG_IS_STREAMABLE, &PREDEF(bytearray), &PREDEF(bytearray));
+PREDEFINED_TYPE(stringz, Afb_Typeid_Predefined_Stringz, FLAG_IS_STREAMABLE, &PREDEF(bytearray), &PREDEF(bytearray));
 
 /*****************************************************************************/
 /* PREDEFINED JSON */
@@ -472,7 +473,7 @@ PREDEFINED_OPERATION(json)
 		CONVERT_TO(json, json_c)
 	};
 
-PREDEFINED_TYPE(json, FLAG_IS_STREAMABLE, &PREDEF(stringz), &PREDEF(stringz));
+PREDEFINED_TYPE(json, Afb_Typeid_Predefined_Json, FLAG_IS_STREAMABLE, &PREDEF(stringz), &PREDEF(stringz));
 
 /*****************************************************************************/
 /* PREDEFINED JSON-C */
@@ -522,7 +523,7 @@ PREDEFINED_OPERATION(json_c)
 		CONVERT_TO(json_c, json)
 	};
 
-PREDEFINED_TYPE(json_c, 0, 0, &PREDEF(json));
+PREDEFINED_TYPE(json_c, Afb_Typeid_Predefined_Json_C, 0, 0, &PREDEF(json));
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -696,7 +697,7 @@ PREDEFINED_OPERATION(bool)
 		TRANSFORM_TO(bool, double)
 	};
 
-PREDEFINED_TYPE(bool, FLAG_IS_SHAREABLE, 0, &PREDEF(json_c));
+PREDEFINED_TYPE(bool, Afb_Typeid_Predefined_Bool, FLAG_IS_SHAREABLE, 0, &PREDEF(json_c));
 
 /*****************************************************************************/
 /* PREDEFINED i32 */
@@ -752,7 +753,7 @@ PREDEFINED_OPERATION(i32)
 		TRANSFORM_TO(i32, double)
 	};
 
-PREDEFINED_TYPE(i32, FLAG_IS_SHAREABLE, 0, &PREDEF(bool));
+PREDEFINED_TYPE(i32, Afb_Typeid_Predefined_I32, FLAG_IS_SHAREABLE, 0, &PREDEF(bool));
 
 /*****************************************************************************/
 /* PREDEFINED u32 */
@@ -810,7 +811,7 @@ PREDEFINED_OPERATION(u32)
 		TRANSFORM_TO(u32, double)
 	};
 
-PREDEFINED_TYPE(u32, FLAG_IS_SHAREABLE, 0, &PREDEF(i32));
+PREDEFINED_TYPE(u32, Afb_Typeid_Predefined_U32, FLAG_IS_SHAREABLE, 0, &PREDEF(i32));
 
 /*****************************************************************************/
 /* PREDEFINED i64 */
@@ -864,7 +865,7 @@ PREDEFINED_OPERATION(i64)
 		TRANSFORM_TO(i64, double)
 	};
 
-PREDEFINED_TYPE(i64, FLAG_IS_SHAREABLE, 0, &PREDEF(u32));
+PREDEFINED_TYPE(i64, Afb_Typeid_Predefined_I64, FLAG_IS_SHAREABLE, 0, &PREDEF(u32));
 
 /*****************************************************************************/
 /* PREDEFINED u64 */
@@ -898,7 +899,7 @@ PREDEFINED_OPERATION(u64)
 		TRANSFORM_TO(u64, double)
 	};
 
-PREDEFINED_TYPE(u64, FLAG_IS_SHAREABLE, 0, &PREDEF(i64));
+PREDEFINED_TYPE(u64, Afb_Typeid_Predefined_U64, FLAG_IS_SHAREABLE, 0, &PREDEF(i64));
 
 /*****************************************************************************/
 /* PREDEFINED double */
@@ -948,7 +949,7 @@ PREDEFINED_OPERATION(double)
 		TRANSFORM_FROM(json_c, double)
 	};
 
-PREDEFINED_TYPE(double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));
+PREDEFINED_TYPE(double, Afb_Typeid_Predefined_Double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));
 
 /*****************************************************************************/
 

@@ -29,6 +29,7 @@
 
 #include "afb-type.h"
 #include "afb-type-internal.h"
+#include "afb-type-predefined.h"
 #include "afb-data.h"
 
 #include "sys/x-errno.h"
@@ -40,6 +41,9 @@
 
 /* the types */
 static struct afb_type *known_types = &_afb_type_head_of_predefineds_;
+
+/* the ids */
+static uint16_t last_typeid = Afb_Typeid_First_Userid;
 
 /*****************************************************************************/
 
@@ -79,7 +83,6 @@ static struct afb_type *search_type_locked(const char *name)
 	return type;
 }
 
-
 int afb_type_register(struct afb_type **result, const char *name, int streamable, int shareable, int opaque)
 {
 	int rc;
@@ -90,6 +93,10 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 	if (type) {
 		type = 0;
 		rc = X_EEXIST;
+	}
+	else if (last_typeid > TYPEID_MAX) {
+		type = 0;
+		rc = X_ECANCELED;
 	}
 	else {
 		type = malloc(sizeof *type);
@@ -108,6 +115,7 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 			else
 				type->flags = 0;
 			type->op_count = 0;
+			type->typeid = last_typeid++;
 			type->next = known_types;
 			known_types = type;
 			rc = 0;
@@ -439,4 +447,11 @@ int afb_type_add_updater(
 	if (!IS_PREDEFINED(totype))
 		return add_op(totype, Update_From, type, updater, closure);
 	return X_EINVAL;
+}
+
+/* Get the typeid */
+uint16_t afb_typeid(
+	const struct afb_type *type
+) {
+	return type->typeid;
 }

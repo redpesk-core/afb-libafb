@@ -188,3 +188,12 @@ afb_type_update_data(
 	struct afb_type *to_type,
 	struct afb_data *to_data
 );
+
+/**
+ * Get the typeid
+ *
+ * @param type type whose id is queried
+ *
+ * @return Return the typeid to 'type'
+ */
+extern uint16_t afb_typeid(const struct afb_type *type);

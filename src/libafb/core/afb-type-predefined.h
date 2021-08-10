@@ -52,3 +52,28 @@ extern struct afb_type afb_type_predefined_u64;
 extern struct afb_type afb_type_predefined_double;
 
 /*****************************************************************************/
+
+enum afb_typeids
+{
+	Afb_Typeid_Predefined_None = 0,
+	Afb_Typeid_Predefined_Opaque,
+	Afb_Typeid_Predefined_Bytearray,
+	Afb_Typeid_Predefined_Stringz,
+	Afb_Typeid_Predefined_Json,
+	Afb_Typeid_Predefined_Json_C,
+	Afb_Typeid_Predefined_Bool,
+	Afb_Typeid_Predefined_I8,
+	Afb_Typeid_Predefined_U8,
+	Afb_Typeid_Predefined_I16,
+	Afb_Typeid_Predefined_U16,
+	Afb_Typeid_Predefined_I32,
+	Afb_Typeid_Predefined_U32,
+	Afb_Typeid_Predefined_I64,
+	Afb_Typeid_Predefined_U64,
+	Afb_Typeid_Predefined_Float,
+	Afb_Typeid_Predefined_Double,
+	Afb_Typeid_Last_Predefined = Afb_Typeid_Predefined_Double,
+	Afb_Typeid_First_Userid
+};
+
+/*****************************************************************************/
