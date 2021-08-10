@@ -97,19 +97,16 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 			rc = X_ENOMEM;
 		else {
 			type->name = name;
-			if (opaque) {
-				SET_OPAQUE(type);
-			}
-			else if (streamable) {
-				SET_STREAMABLE(type);
-				SET_SHAREABLE(type);
-			}
-			else if (shareable) {
-				SET_SHAREABLE(type);
-			}
 			type->operations = 0;
 			type->family = 0;
-			type->flags = 0;
+			if (opaque)
+				type->flags = FLAG_IS_OPAQUE;
+			else if (streamable)
+				type->flags = FLAG_IS_STREAMABLE|FLAG_IS_SHAREABLE;
+			else if (shareable)
+				type->flags = FLAG_IS_SHAREABLE;
+			else
+				type->flags = 0;
 			type->op_count = 0;
 			type->next = known_types;
 			known_types = type;
