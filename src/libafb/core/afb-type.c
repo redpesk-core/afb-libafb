@@ -391,6 +391,8 @@ add_op(
 ) {
 	struct opdesc *desc;
 
+	if (type->op_count == TYPE_OP_COUNT_MAX)
+		return X_ECANCELED;
 	desc = realloc(type->operations, (1 + type->op_count) * sizeof *desc);
 	if (!desc)
 		return X_ENOMEM;
