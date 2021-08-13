@@ -155,6 +155,9 @@ struct afb_stub_rpc
 	/* version of the protocol */
 	uint8_t version;
 
+	/* flag disallowing packing */
+	uint8_t unpack;
+
 	/* count of ids */
 	uint16_t idcount;
 
@@ -1110,8 +1113,11 @@ static int make_session_id(struct afb_stub_rpc *stub, struct afb_session *sessio
 		rc2 = u16id2bool_set(&stub->session_flags, sid, 1);
 		if (rc2 < 0)
 			rc = rc2;
-		else if (rc2 == 0)
+		else if (rc2 == 0) {
 			rc = send_session_create(stub, sid, afb_session_uuid(session));
+			if (rc >= 0 && stub->unpack)
+				emit(stub);
+		}
 	}
 
 	*id = sid;
@@ -1133,8 +1139,11 @@ static int make_token_id(struct afb_stub_rpc *stub, struct afb_token *token, uin
 		rc2 = u16id2bool_set(&stub->token_flags, tid, 1);
 		if (rc2 < 0)
 			rc = rc2;
-		else if (rc2 == 0)
+		else if (rc2 == 0) {
 			rc = send_token_create(stub, tid, afb_token_string(token));
+			if (rc >= 0 && stub->unpack)
+				emit(stub);
+		}
 	}
 
 	*id = tid;
@@ -2204,6 +2213,11 @@ int afb_stub_rpc_offer(struct afb_stub_rpc *stub)
 		emit(stub);
 	}
 	return rc;
+}
+
+void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack)
+{
+	stub->unpack = unpack != 0;
 }
 
 #if WITH_CRED

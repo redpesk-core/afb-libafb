@@ -216,6 +216,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 				else {
 					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
 					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+					afb_stub_rpc_set_unpack(stub, 1);
 					rc = 0;
 				}
 			}
@@ -303,6 +304,7 @@ static void server_accept(struct server *server, int fd)
 				else {
 					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
 					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+					afb_stub_rpc_set_unpack(stub, 1);
 					rc = 0;
 				}
 			}

@@ -55,7 +55,7 @@ extern struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub);
  */
 extern const char *afb_stub_rpc_apiname(struct afb_stub_rpc *stub);
 
-
+extern void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack);
 
 
 extern int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset *declare_set);
