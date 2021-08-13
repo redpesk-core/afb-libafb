@@ -493,7 +493,7 @@ static void send_event_push_v1_cb(void *closure1, struct json_object *object, co
 	struct afb_stub_rpc *stub = rd->stub;
 	rd->rc = afb_rpc_v1_code_event_push(&stub->coder, rd->eventid, json_object_to_json_string(object));
 	if (rd->rc >= 0)
-		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object);
+		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
 }
 
 static int send_event_push_v1(struct afb_stub_rpc *stub, uint16_t eventid, unsigned nparams, struct afb_data * const params[])
@@ -522,7 +522,7 @@ static void send_event_broadcast_v1_cb(void *closure1, struct json_object *objec
 	struct afb_stub_rpc *stub = rd->stub;
 	rd->rc = afb_rpc_v1_code_event_broadcast(&stub->coder, rd->eventname, json_object_to_json_string(object), rd->uuid, rd->hop);
 	if (rd->rc >= 0)
-		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object);
+		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
 }
 
 static int send_event_broadcast_v1(struct afb_stub_rpc *stub, const char *eventname, unsigned nparams, struct afb_data * const params[], const unsigned char uuid[16], uint8_t hop)
@@ -567,7 +567,7 @@ static void send_call_reply_v1_cb(void *closure, struct json_object *object, con
 	jstr = json_object_to_json_string_length(object, 0, &length);
 	rd->rc = afb_rpc_v1_code_reply(&stub->coder,  rd->callid, jstr, (uint32_t)(length + 1), error, info);
 	if (rd->rc >= 0)
-		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object/*addref?*/);
+		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
 }
 
 static int send_call_reply_v1(struct afb_stub_rpc *stub, int status, unsigned nreplies, struct afb_data * const replies[], uint16_t callid)
@@ -602,7 +602,7 @@ static void send_call_request_v1_cb(void *closure1, struct json_object *object, 
 	jstr = json_object_to_json_string_length(object, 0, &length);
 	rd->rc = afb_rpc_v1_code_call(&stub->coder, rd->callid, rd->verbname, jstr, (uint32_t)(length + 1), rd->sessionid, rd->tokenid, rd->usrcreds);
 	if (rd->rc >= 0)
-		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object/*addref?*/);
+		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
 }
 
 static int send_call_request_v1(
