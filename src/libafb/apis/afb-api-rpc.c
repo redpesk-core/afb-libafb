@@ -34,6 +34,7 @@
 #include "core/afb-apiset.h"
 #include "apis/afb-api-rpc.h"
 #include "misc/afb-socket.h"
+#include "misc/afb-ws.h"
 #include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
 #include "wsapi/afb-stub-rpc.h"
@@ -50,6 +51,15 @@ struct server
 	uint16_t offapi;		/* api name of the interface */
 	char uri[];			/* the uri of the server socket */
 };
+
+/******************************************************************************/
+/***       U R I   PREFIX                                                   ***/
+/******************************************************************************/
+
+static const char *prefix_ws_remove(const char *uri)
+{
+	return (uri[0] == 'w' && uri[1] == 's' && uri[2] == '+') ? &uri[3] : uri;
+}
 
 /******************************************************************************/
 /***       C L I E N T                                                      ***/
@@ -131,15 +141,50 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 	free(buffer);
 }
 
+static void notify_ws(void *closure, struct afb_stub_rpc *stub)
+{
+	struct afb_ws *ws = closure;
+	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
+	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
+	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+	if (rc > 0) {
+		afb_ws_binary_v(ws, iovs, rc);
+		afb_rpc_coder_output_dispose(coder);
+	}
+}
+
+static void on_ws_binary(void *closure, char *buffer, size_t size)
+{
+	struct afb_stub_rpc *stub = closure;
+	afb_stub_rpc_receive(stub, buffer, size);
+}
+
+static void on_ws_hangup(void *closure)
+{
+	struct afb_stub_rpc *stub = closure;
+	afb_stub_rpc_unref(stub);
+	/* no way to remove afb-ws structure from here */
+}
+
+static struct afb_ws_itf wsitf =
+{
+	.on_close = 0,
+	.on_text = 0,
+	.on_binary = on_ws_binary,
+	.on_error = 0,
+	.on_hangup = on_ws_hangup
+};
+
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
 	struct afb_stub_rpc *stub;
-	const char *api;
+	const char *api, *turi;
 	int rc, fd;
 	struct ev_fd *efd;
 
 	/* check the api name */
-	api = afb_socket_api(uri);
+	turi = prefix_ws_remove(uri);
+	api = afb_socket_api(turi);
 	if (api == NULL || !afb_apiname_is_valid(api)) {
 		ERROR("invalid (too long) rpc client uri %s", uri);
 		rc = X_EINVAL;
@@ -147,29 +192,45 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	/* open the socket */
-	rc = afb_socket_open(uri, 0);
+	rc = afb_socket_open(turi, 0);
 	if (rc >= 0) {
 		/* create the client stub */
 		fd = rc;
 		stub = afb_stub_rpc_create(api, call_set);
 		if (!stub) {
-			ERROR("can't setup client rpc service to %s", uri);
-			close(fd);
+			ERROR("can't create client rpc service to %s", uri);
 			rc = X_ENOMEM;
 		} else {
-			rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, stub, 0, 1);
-			if (rc >= 0) {
-				if (afb_stub_rpc_client_add(stub, declare_set) >= 0) {
+			if (uri == turi) {
+				rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, stub, 0, 1);
+				if (rc >= 0) {
 					afb_stub_rpc_emit_set_notify(stub, notify, (void*)(intptr_t)fd);
 					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+				}
+			}
+			else {
+				struct afb_ws *ws = afb_ws_create(fd, &wsitf, stub);
+				if (ws == NULL)
+					rc = X_ENOMEM;
+				else {
+					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
+					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+					rc = 0;
+				}
+			}
+			if (rc < 0)
+				ERROR("can't setup client rpc service to %s", uri);
+			else {
+				rc = afb_stub_rpc_client_add(stub, declare_set);
+				if (rc >= 0) {
 					afb_stub_rpc_offer(stub);
 					return 0;
 				}
 				ERROR("can't add the client to the apiset for service %s", uri);
 			}
 			afb_stub_rpc_unref(stub);
-			rc = X_ENOMEM;
 		}
+		close(fd);
 	}
 error:
 	return strong ? rc : 0;
@@ -212,17 +273,32 @@ static void server_accept(struct server *server, int fd)
 		ERROR("can't accept connection to %s: %m", server->uri);
 	} else {
 		stub = afb_stub_rpc_create(&server->uri[server->offapi], server->apiset);
-		if (!stub)
+		if (!stub) {
 			ERROR("can't serve accepted connection to %s", server->uri);
+			close(fdc);
+		}
 		else {
-			rc = afb_ev_mgr_add_fd(&efd, fdc, EPOLLIN, onevent, stub, 0, 1);
+			if (server->uri == prefix_ws_remove(server->uri)) {
+				rc = afb_ev_mgr_add_fd(&efd, fdc, EPOLLIN, onevent, stub, 0, 1);
+				if (rc >= 0) {
+					afb_stub_rpc_emit_set_notify(stub, notify, (void*)(intptr_t)fdc);
+					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+				}
+			}
+			else {
+				struct afb_ws *ws = afb_ws_create(fdc, &wsitf, stub);
+				if (ws == NULL)
+					rc = X_ENOMEM;
+				else {
+					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
+					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+					rc = 0;
+				}
+			}
 			if (rc < 0) {
 				ERROR("can't serve connection to %s", server->uri);
 				afb_stub_rpc_unref(stub);
-			}
-			else {
-				afb_stub_rpc_emit_set_notify(stub, notify, (void*)(intptr_t)fdc);
-				afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
+				close(fdc);
 			}
 		}
 	}
@@ -254,7 +330,7 @@ static int server_connect(struct server *server)
 	server_disconnect(server);
 
 	/* request the service object name */
-	rc = afb_socket_open(server->uri, 1);
+	rc = afb_socket_open(prefix_ws_remove(server->uri), 1);
 	if (rc < 0)
 		ERROR("can't create socket %s", server->uri);
 	else {
@@ -286,7 +362,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	/* check the api name */
-	api = afb_socket_api(uri);
+	api = afb_socket_api(prefix_ws_remove(uri));
 	if (api == NULL || !afb_apiname_is_valid(api)) {
 		ERROR("invalid api name in rpc uri %s", uri);
 		rc = X_EINVAL;
