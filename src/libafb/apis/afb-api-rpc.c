@@ -33,6 +33,7 @@
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "apis/afb-api-rpc.h"
+#include "core/afb-cred.h"
 #include "misc/afb-socket.h"
 #include "misc/afb-ws.h"
 #include "misc/afb-monitor.h"
@@ -278,6 +279,16 @@ static void server_accept(struct server *server, int fd)
 			close(fdc);
 		}
 		else {
+#if WITH_CRED
+			/*
+			* creds of the peer are not changing
+			* except if passed to other processes
+			* TODO check how to track changes if needed
+			*/
+			struct afb_cred *cred;
+			afb_cred_create_for_socket(&cred, fdc); /* TODO: check retcode */
+			afb_stub_rpc_set_cred(stub, cred);
+#endif
 			if (server->uri == prefix_ws_remove(server->uri)) {
 				rc = afb_ev_mgr_add_fd(&efd, fdc, EPOLLIN, onevent, stub, 0, 1);
 				if (rc >= 0) {

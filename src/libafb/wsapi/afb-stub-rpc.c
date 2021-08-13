@@ -2206,6 +2206,13 @@ int afb_stub_rpc_offer(struct afb_stub_rpc *stub)
 	return rc;
 }
 
+#if WITH_CRED
+void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cred)
+{
+	afb_cred_unref(__atomic_exchange_n(&stub->cred, cred, __ATOMIC_RELAXED));
+}
+#endif
+
 /*****************************************************/
 /*****************************************************/
 
