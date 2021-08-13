@@ -105,7 +105,7 @@ static int write_uint8_uint16_str(afb_rpc_coder_t *coder, uint8_t x1, uint16_t x
 	return rc;
 }
 
-static int readbin(afb_rpc_decoder_t *decoder, const void **value, size_t *length, int nulok, int isString)
+static int readbin(afb_rpc_decoder_t *decoder, const void **value, uint32_t *length, int nulok, int isString)
 {
 	const void *ptr;
 	uint32_t len;
@@ -116,7 +116,7 @@ static int readbin(afb_rpc_decoder_t *decoder, const void **value, size_t *lengt
 		return rc;
 
 	if (len) {
-		rc = afb_rpc_decoder_read_pointer(decoder, &ptr, (size_t)len);
+		rc = afb_rpc_decoder_read_pointer(decoder, &ptr, len);
 		if (rc < 0)
 			return rc;
 	}
@@ -130,22 +130,22 @@ static int readbin(afb_rpc_decoder_t *decoder, const void **value, size_t *lengt
 		return X_EPROTO;
 
 	if (length)
-		*length = (size_t)len;
+		*length = len;
 
 	return rc;
 }
 
-static int read_string(afb_rpc_decoder_t *decoder, const char **value, size_t *length)
+static int read_string(afb_rpc_decoder_t *decoder, const char **value, uint32_t *length)
 {
 	return readbin(decoder, (const void **)value, length, 0, 1);
 }
 
-static int read_nullstring(afb_rpc_decoder_t *decoder, const char **value, size_t *length)
+static int read_nullstring(afb_rpc_decoder_t *decoder, const char **value, uint32_t *length)
 {
 	return readbin(decoder, (const void **)value, length, 1, 1);
 }
 
-static int read_binary(afb_rpc_decoder_t *decoder, const void **value, size_t *length)
+static int read_binary(afb_rpc_decoder_t *decoder, const void **value, uint32_t *length)
 {
 	return readbin(decoder, value, length, 1, 0);
 }
@@ -371,7 +371,7 @@ static int read_on_call(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 	if (rc >= 0)
 		rc = afb_rpc_decoder_read_uint16(decoder, &msg->call.tokenid);
 	if (rc >= 0)
-		rc = read_binary(decoder, (const void**)&msg->call.data, (size_t*)&msg->call.data_len);
+		rc = read_binary(decoder, (const void**)&msg->call.data, &msg->call.data_len);
 	if (rc >= 0)
 		rc = read_nullstring(decoder, &msg->call.user_creds, NULL);
 	if (rc >= 0)
@@ -387,7 +387,7 @@ static int read_on_reply(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 	if (rc >= 0)
 		rc = read_nullstring(decoder, &msg->reply.info, NULL);
 	if (rc >= 0)
-		rc = read_binary(decoder, (const void**)&msg->reply.data, (size_t*)&msg->call.data_len);
+		rc = read_binary(decoder, (const void**)&msg->reply.data, &msg->reply.data_len);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_reply;
 	return rc;
