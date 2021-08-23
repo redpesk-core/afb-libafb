@@ -56,6 +56,8 @@ if(check_FOUND)
 	addtest(json-locator)
 	addtest(wsapi)
 	addtest(afb-evt)
+	addtest(afb-rpc-coder)
+	addtest(afb-rpc-decoder)
 
 	add_subdirectory(test-bindings)
 	addtest(api-so-v4)
