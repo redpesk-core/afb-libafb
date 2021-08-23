@@ -54,7 +54,10 @@ enum type {
 	Type_L4,
 
 	/** type Unix */
-	Type_Unix
+	Type_Unix,
+
+	/** type char */
+	Type_Char
 };
 
 /**
@@ -66,7 +69,7 @@ struct entry
 	const char *prefix;
 
 	/** the type of the entry */
-	unsigned type: 2;
+	unsigned type: 3;
 
 	/** should not set SO_REUSEADDR for servers */
 	unsigned noreuseaddr: 1;
@@ -96,6 +99,10 @@ static struct entry entries[] = {
 	{
 		.prefix = "unix:",
 		.type = Type_Unix
+	},
+	{
+		.prefix = "char:",
+		.type = Type_Char
 	}
 };
 
@@ -385,7 +392,7 @@ end:
  */
 static int open_uri(const char *uri, int server, const char *scheme)
 {
-	int fd, offset;
+	int fd, offset, rc;
 	struct entry *e;
 	const char *api;
 
@@ -421,6 +428,9 @@ static int open_uri(const char *uri, int server, const char *scheme)
 		fd = open_l4(uri, server);
 		break;
 #endif
+	case Type_Char:
+		fd = open(uri, O_RDWR);
+		break;
 	default:
 		fd = X_ENOTSUP;
 		break;
@@ -432,8 +442,13 @@ static int open_uri(const char *uri, int server, const char *scheme)
 	fcntl(fd, F_SETFD, FD_CLOEXEC);
 	fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (server) {
-		if (!e->nolisten)
-			listen(fd, BACKLOG);
+		if (!e->nolisten) {
+			rc = listen(fd, BACKLOG);
+			if (rc < 0) {
+				close(fd);
+				fd = rc;
+			}
+		}
 	}
 	return fd;
 }
