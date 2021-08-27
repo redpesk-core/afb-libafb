@@ -156,7 +156,7 @@ afb_data_create_alias(
 );
 
 /**
- * Get the typenum of the data
+ * Get the type of the data
  *
  * @param data the data to query
  *

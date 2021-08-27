@@ -51,6 +51,8 @@
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
 #include "core/containerof.h"
+#include "core/afb-data.h"
+#include "core/afb-type-predefined.h"
 
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
@@ -892,6 +894,24 @@ int afb_hreq_post_add_file(struct afb_hreq *hreq, const char *key, const char *f
 	return !size;
 }
 
+#if MHD_VERSION < 0x00097302
+static ssize_t data_reader(void *cls, uint64_t pos, char *buf, size_t max)
+{
+	struct afb_data *data = cls;
+	void *head;
+	size_t size;
+	afb_data_get_constant(data, &head, &size);
+	if (pos >= size)
+		return MHD_CONTENT_READER_END_OF_STREAM;
+	size -= pos;
+	if (size > max)
+		size = max;
+	memcpy(buf, pos+(char*)head, size);
+	return (ssize_t)size;
+}
+#endif
+
+
 static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
@@ -903,9 +923,26 @@ static void req_reply(struct afb_req_common *comreq, int status, unsigned nrepli
 	unsigned int http_status;
 
 	/* create the reply */
-	afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
-
-	response = MHD_create_response_from_buffer(length, message, MHD_RESPMEM_MUST_FREE);
+	if (nreplies == 1 && afb_data_type(replies[0]) == &afb_type_predefined_bytearray) {
+#if MHD_VERSION < 0x00097302
+		response = MHD_create_response_from_callback(
+				afb_data_size(replies[0]),
+				afb_data_size(replies[0]),
+				data_reader,
+				afb_data_addref(replies[0]),
+				(MHD_ContentReaderFreeCallback)afb_data_unref);
+#else
+		response = MHD_create_response_from_buffer_with_free_callback_cls(
+				afb_data_size(replies[0]),
+				afb_data_ro_pointer(replies[0]),
+				(MHD_ContentReaderFreeCallback)afb_data_unref,
+				afb_data_addref(replies[0]));
+#endif
+	}
+	else {
+		afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
+		response = MHD_create_response_from_buffer(length, message, MHD_RESPMEM_MUST_FREE);
+	}
 
 	/* handle authorisation feedback */
 	switch (status) {
