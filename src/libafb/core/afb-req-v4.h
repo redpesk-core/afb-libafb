@@ -320,3 +320,18 @@ afb_req_v4_subcall_sync_hookable(
 	unsigned *nreplies,
 	struct afb_data *replies[]
 );
+
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_id(
+	struct afb_req_v4 *reqv4,
+	int id,
+	void **result
+);
+
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_name(
+	struct afb_req_v4 *reqv4,
+	const char *name,
+	void **result
+);
+

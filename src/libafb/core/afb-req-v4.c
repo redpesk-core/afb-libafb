@@ -407,6 +407,28 @@ afb_req_v4_subcall_sync_hookable(
 			status, nreplies, replies, reqv4->comreq, flags);
 }
 
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_id(
+	struct afb_req_v4 *reqv4,
+	int id,
+	void **result
+) {
+	if (result)
+		*result = NULL;
+	return X_ENOTSUP;
+}
+
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_name(
+	struct afb_req_v4 *reqv4,
+	const char *name,
+	void **result
+) {
+	if (result)
+		*result = NULL;
+	return X_ENOTSUP;
+}
+
 /******************************************************************************/
 
 static void call_checked_v4(void *closure, int status)

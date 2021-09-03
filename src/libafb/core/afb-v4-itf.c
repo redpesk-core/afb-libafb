@@ -209,10 +209,19 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.req_cookie_drop = afb_req_v4_cookie_drop_hookable,
 
 /*-- BEGIN OF VERSION 4r1  REVISION  2 --------------------*/
+#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 2
 
 	.type_bytearray = &afb_type_predefined_bytearray,
 	.req_param_convert = afb_req_v4_param_convert,
 
+#endif
+/*-- BEGIN OF VERSION 4r1  REVISION  3 --------------------*/
+#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 3
+
+	.req_interface_by_id = afb_req_v4_interface_by_id,
+	.req_interface_by_name = afb_req_v4_interface_by_name,
+
+#endif
 /*-- END -----------------------------------*/
 };
 
