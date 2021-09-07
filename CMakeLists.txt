@@ -136,7 +136,7 @@ set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
 include(FindThreads)
 find_package(Threads)
 
-PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding)
+PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.0.3)
 PKG_CHECK_MODULES(json-c REQUIRED json-c)
 
 if(WITH_LIBMICROHTTPD)
