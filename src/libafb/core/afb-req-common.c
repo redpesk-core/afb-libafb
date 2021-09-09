@@ -379,6 +379,40 @@ afb_req_common_cleanup(
 #endif
 }
 
+static
+int
+get_interface(
+	struct afb_req_common *req,
+	int id,
+	const char *name,
+	void **result
+) {
+	int rc;
+	void *itf;
+
+	rc = req->queryitf->interface ? req->queryitf->interface(req, id, name, &itf) : X_ENOENT;
+	if (result)
+		*result = rc >= 0 ? itf : NULL;
+	return rc;
+}
+
+int
+afb_req_common_interface_by_id(
+	struct afb_req_common *req,
+	int id,
+	void **result
+) {
+	return get_interface(req, id, NULL, result);
+}
+
+int
+afb_req_common_interface_by_name(
+	struct afb_req_common *req,
+	const char *name,
+	void **result
+) {
+	return get_interface(req, 0, name, result);
+}
 
 #if WITH_REQ_PROCESS_ASYNC
 /**

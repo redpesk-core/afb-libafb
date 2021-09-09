@@ -897,6 +897,7 @@ const struct afb_req_common_query_itf afb_api_dbus_req_common_itf = {
 	.unref = dbus_req_destroy,
 	.subscribe = dbus_req_subscribe,
 	.unsubscribe = dbus_req_unsubscribe,
+	.interface = NULL
 };
 
 /******************* server part **********************************/

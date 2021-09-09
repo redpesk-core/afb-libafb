@@ -152,7 +152,8 @@ const struct afb_req_common_query_itf req_call_itf = {
 	.unref = req_calls_destroy_cb,
 	.reply = req_calls_reply_cb,
 	.subscribe = req_calls_subscribe_cb,
-	.unsubscribe = req_calls_unsubscribe_cb
+	.unsubscribe = req_calls_unsubscribe_cb,
+	.interface = NULL
 };
 
 /******************************************************************************/
@@ -441,7 +442,8 @@ const struct afb_req_common_query_itf req_calls_hookable_itf = {
 	.unref = req_calls_destroy_cb,
 	.reply = req_calls_reply_hookable_cb,
 	.subscribe = req_calls_subscribe_cb,
-	.unsubscribe = req_calls_unsubscribe_cb
+	.unsubscribe = req_calls_unsubscribe_cb,
+	.interface = NULL
 };
 
 static void req_subcalls_reply_hookable_cb(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
@@ -455,7 +457,8 @@ const struct afb_req_common_query_itf req_subcalls_hookable_itf = {
 	.unref = req_calls_destroy_cb,
 	.reply = req_subcalls_reply_hookable_cb,
 	.subscribe = req_calls_subscribe_cb,
-	.unsubscribe = req_calls_unsubscribe_cb
+	.unsubscribe = req_calls_unsubscribe_cb,
+	.interface = NULL
 };
 
 void

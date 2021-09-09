@@ -116,7 +116,8 @@ struct afb_req_common_query_itf test_queryitf =
 	.reply = test_reply,
 	.unref = test_unref,
 	.subscribe = test_subscribe,
-	.unsubscribe = test_unsubscribe
+	.unsubscribe = test_unsubscribe,
+	.interface = NULL
 };
 
 struct afb_req_common comreq;

@@ -413,9 +413,7 @@ int afb_req_v4_interface_by_id(
 	int id,
 	void **result
 ) {
-	if (result)
-		*result = NULL;
-	return X_ENOTSUP;
+	return afb_req_common_interface_by_id(reqv4->comreq, id, result);
 }
 
 /** get a specialized interface for the request req */
@@ -424,9 +422,7 @@ int afb_req_v4_interface_by_name(
 	const char *name,
 	void **result
 ) {
-	if (result)
-		*result = NULL;
-	return X_ENOTSUP;
+	return afb_req_common_interface_by_name(reqv4->comreq, name, result);
 }
 
 /******************************************************************************/

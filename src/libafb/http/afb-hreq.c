@@ -102,7 +102,10 @@ static void req_destroy(struct afb_req_common *comreq);
 
 const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
 	.reply = req_reply,
-	.unref = req_destroy
+	.unref = req_destroy,
+	.subscribe = NULL,
+	.unsubscribe = NULL,
+	.interface = NULL
 };
 
 /**

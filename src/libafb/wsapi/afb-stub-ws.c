@@ -198,7 +198,8 @@ static const struct afb_req_common_query_itf server_req_req_common_itf = {
 	.reply = server_req_reply_cb,
 	.unref = server_req_destroy_cb,
 	.subscribe = server_req_subscribe_cb,
-	.unsubscribe = server_req_unsubscribe_cb
+	.unsubscribe = server_req_unsubscribe_cb,
+	.interface = NULL
 };
 
 /******************* client part **********************************/

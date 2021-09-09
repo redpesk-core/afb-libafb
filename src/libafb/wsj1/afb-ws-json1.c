@@ -99,7 +99,8 @@ const struct afb_req_common_query_itf afb_ws_json1_req_common_itf = {
 	.reply = wsreq_reply,
 	.subscribe = wsreq_subscribe,
 	.unsubscribe = wsreq_unsubscribe,
-	.unref = wsreq_destroy
+	.unref = wsreq_destroy,
+	.interface = NULL
 };
 
 /* the interface for events */

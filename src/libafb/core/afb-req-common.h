@@ -64,6 +64,11 @@ struct afb_req_common_query_itf
 	 * callback receiving unsubscribe requests
 	 */
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
+
+	/**
+	 * callback for retrieving an interface
+	 */
+	int (*interface)(struct afb_req_common *req, int id, const char *name, void **result);
 };
 
 /**
@@ -274,6 +279,22 @@ extern
 void
 afb_req_common_cleanup(
 	struct afb_req_common *req
+);
+
+extern
+int
+afb_req_common_interface_by_id(
+	struct afb_req_common *req,
+	int id,
+	void **result
+);
+
+extern
+int
+afb_req_common_interface_by_name(
+	struct afb_req_common *req,
+	const char *name,
+	void **result
 );
 
 /******************************************************************************/

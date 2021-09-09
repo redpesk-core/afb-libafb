@@ -1091,7 +1091,8 @@ static const struct afb_req_common_query_itf incall_common_itf = {
 	.reply = incall_reply_cb,
 	.unref = incall_destroy_cb,
 	.subscribe = incall_subscribe_cb,
-	.unsubscribe = incall_unsubscribe_cb
+	.unsubscribe = incall_unsubscribe_cb,
+	.interface = NULL
 };
 
 /**************************************************************************
