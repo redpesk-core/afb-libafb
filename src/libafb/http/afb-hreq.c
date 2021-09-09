@@ -903,7 +903,7 @@ static ssize_t data_reader(void *cls, uint64_t pos, char *buf, size_t max)
 	size_t size;
 	afb_data_get_constant(data, &head, &size);
 	if (pos >= size)
-		return MHD_CONTENT_READER_END_OF_STREAM;
+		return (ssize_t)MHD_CONTENT_READER_END_OF_STREAM;
 	size -= pos;
 	if (size > max)
 		size = max;
