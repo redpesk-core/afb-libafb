@@ -220,6 +220,7 @@ static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_
 	/* Check replying status */
 	if (hreq->replied != 0) {
 		ERROR("Already replied HTTP request");
+		MHD_destroy_response(response);
 		return;
 	}
 	hreq->replied = 1;
@@ -911,71 +912,83 @@ static ssize_t data_reader(void *cls, uint64_t pos, char *buf, size_t max)
 }
 #endif
 
-
-static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
+static void do_reply(struct afb_hreq *hreq, unsigned int code, struct afb_data *data, const char *type, const char **headers)
 {
-	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
 	struct MHD_Response *response;
-	char *message;
-	const char *optkey = NULL;
-	const char *optval = NULL;
-	size_t length;
-	unsigned int http_status;
 
 	/* create the reply */
-	if (nreplies == 1 && afb_data_type(replies[0]) == &afb_type_predefined_bytearray) {
 #if MHD_VERSION < 0x00097302
-		response = MHD_create_response_from_callback(
-				afb_data_size(replies[0]),
-				afb_data_size(replies[0]),
-				data_reader,
-				afb_data_addref(replies[0]),
-				(MHD_ContentReaderFreeCallback)afb_data_unref);
+	response = MHD_create_response_from_callback(
+			afb_data_size(data),
+			afb_data_size(data),
+			data_reader,
+			afb_data_addref(data),
+			(MHD_ContentReaderFreeCallback)afb_data_unref);
 #else
-		response = MHD_create_response_from_buffer_with_free_callback_cls(
-				afb_data_size(replies[0]),
-				afb_data_ro_pointer(replies[0]),
-				(MHD_ContentReaderFreeCallback)afb_data_unref,
-				afb_data_addref(replies[0]));
+	response = MHD_create_response_from_buffer_with_free_callback_cls(
+			afb_data_size(data),
+			afb_data_ro_pointer(data),
+			(MHD_ContentReaderFreeCallback)afb_data_unref,
+			afb_data_addref(data));
 #endif
-	}
-	else {
-		afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
-		response = MHD_create_response_from_buffer(length, message, MHD_RESPMEM_MUST_FREE);
-	}
+	if (type != NULL)
+		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type);
+
+	for ( ; headers && headers[0] && headers[1] ; headers += 2)
+		MHD_add_response_header(response, headers[0], headers[1]);
+
+	afb_hreq_reply(hreq, code, response, NULL);
+}
+
+static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data *const replies[])
+{
+	struct afb_hreq *hreq = containerof(struct afb_hreq, comreq, comreq);
+	char *message;
+	size_t length;
+	struct afb_data *data;
+	const char *headers[3] = { NULL, NULL, NULL };
+	unsigned int code;
 
 	/* handle authorisation feedback */
 	switch (status) {
 	case AFB_ERRNO_INTERNAL_ERROR:
 	case AFB_ERRNO_OUT_OF_MEMORY:
-		http_status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		code = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		break;
 	case AFB_ERRNO_UNKNOWN_API:
 	case AFB_ERRNO_UNKNOWN_VERB:
-		http_status = MHD_HTTP_NOT_FOUND;
+		code = MHD_HTTP_NOT_FOUND;
 		break;
 	case AFB_ERRNO_NOT_AVAILABLE:
-		http_status = MHD_HTTP_NOT_IMPLEMENTED;
+		code = MHD_HTTP_NOT_IMPLEMENTED;
 		break;
 	case AFB_ERRNO_UNAUTHORIZED:
 	case AFB_ERRNO_INVALID_TOKEN:
-		optkey = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
-		optval = "error=\"invalid_token\"";
-		afb_hreq_reply(hreq, MHD_HTTP_UNAUTHORIZED, response, MHD_HTTP_HEADER_WWW_AUTHENTICATE, "error=\"invalid_token\"", NULL);
-		http_status = MHD_HTTP_UNAUTHORIZED;
+		headers[0] = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
+		headers[1] = "error=\"invalid_token\"";
+		code = MHD_HTTP_UNAUTHORIZED;
 		break;
 	case AFB_ERRNO_FORBIDDEN:
 	case AFB_ERRNO_INSUFFICIENT_SCOPE:
 	case AFB_ERRNO_BAD_API_STATE:
-		optkey = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
-		optval = "error=\"insufficient_scope\"";
-		http_status = MHD_HTTP_FORBIDDEN;
+		headers[0] = MHD_HTTP_HEADER_WWW_AUTHENTICATE;
+		headers[1] = "error=\"insufficient_scope\"";
+		code = MHD_HTTP_FORBIDDEN;
 		break;
 	default:
-		http_status = MHD_HTTP_OK;
+		code = MHD_HTTP_OK;
 		break;
 	}
-	afb_hreq_reply(hreq, http_status, response, optkey, optval, NULL);
+
+	/* create the reply */
+	if (nreplies == 1 && afb_data_type(replies[0]) == &afb_type_predefined_bytearray)
+		data = afb_data_addref(replies[0]);
+	else {
+		afb_json_legacy_make_msg_string_reply(&message, &length, status, nreplies, replies);
+		afb_data_create_raw(&data, &afb_type_predefined_bytearray, message, length, free, message);
+	}
+
+	do_reply(hreq, code, data, NULL, headers);
 }
 
 static int _iterargs_(struct json_object *obj, enum MHD_ValueKind kind, const char *key, const char *value)
