@@ -97,15 +97,19 @@ struct hreq_data {
 	char key[];
 };
 
+/**
+ * implementation of the afb_req_common interface
+ */
 static void req_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[]);
 static void req_destroy(struct afb_req_common *comreq);
+static int  req_interface(struct afb_req_common *req, int id, const char *name, void **result);
 
 const struct afb_req_common_query_itf afb_hreq_req_common_query_itf = {
 	.reply = req_reply,
 	.unref = req_destroy,
 	.subscribe = NULL,
 	.unsubscribe = NULL,
-	.interface = NULL
+	.interface = req_interface
 };
 
 /**
@@ -1119,6 +1123,71 @@ struct afb_hreq *afb_hreq_create()
 		hreq->reqid = ++global_reqids;
 	}
 	return hreq;
+}
+
+/**
+ * implementation of the specific afb_itf_req_http_x4 interface
+ */
+#include "core/afb-v4-itf.h"
+#include "core/afb-req-v4.h"
+#include <afb/interfaces/afb-itf-req-http.h>
+
+static int itf_header(struct afb_req_v4 *req, const char *name, const char **value);
+static int itf_redirect(struct afb_req_v4 *req, const char *url, int absolute, int permanent);
+static int itf_reply(struct afb_req_v4 *req, int code, struct afb_data *data, const char *type, const char **headers);
+
+static int hreq_of_req_v4(struct afb_req_v4 *reqv4, struct afb_hreq **hreq)
+{
+	struct afb_req_common *comreq;
+	if (!reqv4 || !(comreq = afb_req_v4_get_common(reqv4)) || comreq->queryitf != &afb_hreq_req_common_query_itf)
+		return X_EINVAL;
+	*hreq = containerof(struct afb_hreq, comreq, comreq);
+	return 0;
+}
+
+static int itf_header(struct afb_req_v4 *req, const char *name, const char **value)
+{
+	struct afb_hreq *hreq;
+	int rc = hreq_of_req_v4(req, &hreq);
+	if (rc == 0) {
+		const char *v = afb_hreq_get_header(hreq, name);
+		*value = v;
+		if (!v)
+			rc = X_ENOENT;
+	}
+	return rc;
+}
+
+static int itf_redirect(struct afb_req_v4 *req, const char *url, int add_query_part, int permanent)
+{
+	struct afb_hreq *hreq;
+	int rc = hreq_of_req_v4(req, &hreq);
+	if (rc == 0)
+		afb_hreq_redirect_to(hreq, url, add_query_part, permanent);
+	return rc;
+}
+
+static int itf_reply(struct afb_req_v4 *req, int code, struct afb_data *data, const char *type, const char **headers)
+{
+	struct afb_hreq *hreq;
+	int rc = hreq_of_req_v4(req, &hreq);
+	if (rc == 0)
+		do_reply(hreq, (unsigned)code, data, type, headers);
+	return rc;
+}
+
+static const struct afb_itf_req_http_x4v1 itf_req_http_x4v1 = {
+	.header = itf_header,
+	.redirect = itf_redirect,
+	.reply = itf_reply
+};
+
+static int req_interface(struct afb_req_common *req, int id, const char *name, void **result)
+{
+	if (id != AFB_ITF_ID_REQ_HTTP_X4V1 && (!name || strcmp(name, AFB_ITF_NAME_REQ_HTTP_X4V1)))
+		return X_ENOENT;
+	*result = (void*)&itf_req_http_x4v1;
+	return 0;
 }
 
 #endif
