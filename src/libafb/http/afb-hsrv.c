@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <sys/stat.h>
+#include <pthread.h>
 
 #include <json-c/json.h>
 #include <microhttpd.h>
@@ -237,10 +238,13 @@ static mhd_result_t access_handler(
 	}
 
 	if (hreq->scanned != 0) {
+#define SUSPEND_REQUESTS 1 /* TODO: check why setting it to zero leads to crashes in LMHD */
+#if SUSPEND_REQUESTS
 		if (hreq->replied == 0 && hreq->suspended == 0) {
 			MHD_suspend_connection (connection);
 			hreq->suspended = 1;
 		}
+#endif
 		return MHD_YES;
 	}
 
@@ -253,10 +257,12 @@ static mhd_result_t access_handler(
 	while (iter) {
 		if (afb_hreq_unprefix(hreq, iter->prefix, iter->length)) {
 			if (iter->handler(hreq, iter->data)) {
+#if SUSPEND_REQUESTS
 				if (hreq->replied == 0 && hreq->suspended == 0) {
 					MHD_suspend_connection (connection);
 					hreq->suspended = 1;
 				}
+#endif
 				return MHD_YES;
 			}
 			hreq->tail = hreq->url;
@@ -278,15 +284,35 @@ static void end_handler(void *cls, struct MHD_Connection *connection, void **rec
 	struct afb_hreq *hreq;
 
 	hreq = *recordreq;
-	if (hreq) {
+	if (hreq)
 		afb_hreq_unref(hreq);
-	}
 }
 
 void afb_hsrv_run(struct afb_hsrv *hsrv)
 {
+	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+	static char running = 0;
+	static char again = 0;
+
         MHD_UNSIGNED_LONG_LONG to;
-        do { MHD_run(hsrv->httpd); } while(MHD_get_timeout(hsrv->httpd, &to) == MHD_YES && !to);
+	int loop;
+
+	pthread_mutex_lock(&mutex);
+	if(running) {
+		again = 1;
+	}
+	else {
+		running = 1;
+		do {
+			again = 0;
+			pthread_mutex_unlock(&mutex);
+			MHD_run(hsrv->httpd);
+			pthread_mutex_lock(&mutex);
+			loop = MHD_get_timeout(hsrv->httpd, &to) == MHD_YES && !to;
+		} while(loop || again);
+		running = 0;
+	}
+	pthread_mutex_unlock(&mutex);
 }
 
 static void listen_callback(struct ev_fd *efd, int fd, uint32_t revents, void *hsrv)
