@@ -922,14 +922,14 @@ static void do_reply(struct afb_hreq *hreq, unsigned int code, struct afb_data *
 			afb_data_size(data),
 			afb_data_size(data),
 			data_reader,
-			afb_data_addref(data),
+			data,
 			(MHD_ContentReaderFreeCallback)afb_data_unref);
 #else
 	response = MHD_create_response_from_buffer_with_free_callback_cls(
 			afb_data_size(data),
 			afb_data_ro_pointer(data),
 			(MHD_ContentReaderFreeCallback)afb_data_unref,
-			afb_data_addref(data));
+			data);
 #endif
 	if (type != NULL)
 		MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE, type);
