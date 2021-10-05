@@ -162,6 +162,20 @@ int afb_type_is_opaque(const struct afb_type *type)
 
 static
 int
+match_family(
+	struct afb_type *type,
+	struct afb_type *family
+) {
+	while (type) {
+		if (type == family)
+			return 1;
+		type = type->family;
+	}
+	return 0;
+}
+
+static
+int
 operate(
 	struct afb_type *from_type,
 	struct afb_data *from_data,
@@ -191,7 +205,7 @@ operate(
 		op = type->operations;
 		opend = &op[type->op_count];
 		for ( ; op != opend ; op++) {
-			if (op->kind == opk && op->type == to_type) {
+			if (op->kind == opk && match_family(op->type, to_type)) {
 				rc = convert
 					? op->converter(op->closure, from_data, to_type, to_data)
 					: op->updater(op->closure, from_data, to_type, *to_data);
