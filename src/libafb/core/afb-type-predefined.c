@@ -428,13 +428,33 @@ CONVERT(stringz,json)
 	return afb_data_create_raw(out, type, ostr, 3 + osz, free, ostr);
 }
 
+CONVERT(stringz,bytearray)
+{
+	void *ptr;
+	size_t sz;
+	int rc;
+
+	rc = afb_data_get_constant(in, &ptr, &sz);
+
+	if (rc >= 0) {
+		rc = afb_data_create_raw(out, type, ptr, sz - !!sz, 0, 0);
+		if (rc >= 0) {
+			rc = afb_data_dependency_add(*out, in);
+			if (rc < 0)
+				afb_data_unref(*out);
+		}
+	}
+	return rc;
+}
+
 PREDEFINED_OPERATION(stringz)
 	{
 		CONVERT_TO(stringz, opaque),
+		CONVERT_TO(stringz, bytearray),
 		CONVERT_TO(stringz, json)
 	};
 
-PREDEFINED_TYPE(stringz, Afb_Typeid_Predefined_Stringz, FLAG_IS_STREAMABLE, &PREDEF(bytearray), &PREDEF(bytearray));
+PREDEFINED_TYPE(stringz, Afb_Typeid_Predefined_Stringz, FLAG_IS_STREAMABLE, 0, &PREDEF(bytearray));
 
 /*****************************************************************************/
 /* PREDEFINED JSON */
