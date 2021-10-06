@@ -31,6 +31,22 @@
 
 #include <json-c/json.h>
 
+#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
+#define JSON_C_TO_STRING_NOSLASHESCAPE 0
+#endif
+#if JSON_C_VERSION_NUM < 0x000D00
+static inline
+const char *
+json_object_to_json_string_length(
+	struct json_object *object, int flags, size_t *length
+) {
+	const char *jsonstr = json_object_to_json_string_ext(object, flags);
+	if (length)
+		*length = jsonstr ? strlen(jsonstr) : 0;
+	return jsonstr;
+}
+#endif
+
 #include <afb/afb-event-x2.h>
 #include <afb/afb-binding-x4.h>
 #include <afb/afb-errno.h>
