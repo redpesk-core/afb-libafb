@@ -82,7 +82,7 @@ extern void u16id2bool_clearall(struct u16id2bool **pi2b);
 /**
  * Get the value associated with the @p id in @i2b.
  * The default value if @p id isn't currently set is 0.
- * 
+ *
  * Because it doesn't alter the array, the array has to be given.
  *
  * @param pi2b pointer to the array to be destroyed

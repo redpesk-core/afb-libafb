@@ -178,7 +178,7 @@ START_TEST (test_functional)
         .add = test_ev_itf_add_cb,
         .remove = test_ev_itf_remove_cb
     };
-    struct afb_evt_listener * ev_listener[NB_LISTENER];    
+    struct afb_evt_listener * ev_listener[NB_LISTENER];
     struct afb_evt * evt;
 
     int cb_closure[NB_LISTENER] = {0}, rc, i;

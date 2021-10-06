@@ -1571,7 +1571,7 @@ static int decode_reply_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_reply_t *ms
 	unsigned ndata = 4;
 	int rc, rc2;
 	int status = afb_error_code(msg->error);
-	
+
 	rc = afb_json_legacy_make_reply_json_string(datas, /* TODO improve that decoding to handle V4 wrapped on rpcv1 */
 			msg->data, inblock_unref_cb, inblock_addref(stub->receive.current_inblock),
 			msg->error, inblock_unref_cb, inblock_addref(stub->receive.current_inblock),
