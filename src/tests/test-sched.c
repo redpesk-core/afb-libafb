@@ -503,10 +503,10 @@ int main(int ac, char **av)
 {
 	mksuite("sched");
 		addtcase("sched");
-            addtest(test_async);
-            addtest(test_sync);
-            addtest(test_sched_enter);
-            addtest(test_sched_adapt);
-            addtest(test_evmgr);
+			addtest(test_async);
+			addtest(test_sync);
+			addtest(test_sched_enter);
+			addtest(test_sched_adapt);
+			addtest(test_evmgr);
 	return !!srun();
 }

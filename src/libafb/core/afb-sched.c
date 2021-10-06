@@ -201,8 +201,8 @@ static void dump_thread_enter(struct thread *thr)
 	static unsigned idgen = 0;
 
 	thr->id = ++idgen & ((1U << ID_BIT_COUNT) - 1);
-	PDBG("=== ENTER %u %d/%d\n", (unsigned)thr->id, started_thread_count, allowed_thread_count);
-	THREAD_STATE_SET(thr, ts_Idle);
+	thr->state = thr->statesave = ts_Idle;
+	PDBG("=== ENTER %u %d/%d state=%s\n", (unsigned)thr->id, started_thread_count, allowed_thread_count, state_names[thr->state]);
 }
 
 
