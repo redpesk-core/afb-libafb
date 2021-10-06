@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
@@ -45,12 +46,26 @@
 #include "sys/x-errno.h"
 #include "sys/x-uio.h"
 
+#define RECEIVE_BLOCK_LENGTH 4080
+#define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
+#define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
+
+/**
+ * Structure holding server data
+ */
 struct server
 {
-	struct afb_apiset *apiset;	/* the apiset for calling */
-	struct ev_fd *efd;		/* ev_fd handler */
-	uint16_t offapi;		/* api name of the interface */
-	char uri[];			/* the uri of the server socket */
+	/** the apiset for calling */
+	struct afb_apiset *apiset;
+
+	/** ev_fd handler */
+	struct ev_fd *efd;
+
+	/** api name of the interface */
+	uint16_t offapi;
+
+	/** the uri of the server socket */
+	char uri[];
 };
 
 /******************************************************************************/
@@ -66,7 +81,7 @@ static const char *prefix_ws_remove(const char *uri)
 /***       C L I E N T                                                      ***/
 /******************************************************************************/
 
-#if JUNK
+#if 0 /* TODO manage reopening */
 static void client_on_hangup(struct afb_stub_rpc *client)
 {
 	const char *apiname = afb_stub_rpc_apiname(client);
@@ -89,19 +104,31 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct afb_stub_rpc *stub = closure;
 	void *buffer;
+	size_t esz;
 	ssize_t sz;
+	int rc, avail;
 
 	if (revents & EPOLLHUP) {
 		afb_stub_rpc_unref(stub);
 		ev_fd_unref(efd);
 	}
 	else if (revents & EPOLLIN) {
-		/* TODO: rework that basic implementation */
-		buffer = malloc(4080);
+#if QUERY_RCV_SIZE
+		rc = ioctl(fd, FIONREAD, &avail);
+		esz = rc < 0 ? RECEIVE_BLOCK_LENGTH : (size_t)(unsigned)avail;
+#else
+		esz = RECEIVE_BLOCK_LENGTH;
+#endif
+		buffer = malloc(esz);
 		if (buffer != NULL) {
-			sz = recv(fd, buffer, 4080, MSG_DONTWAIT);
+#if USE_SND_RCV
+			sz = recv(fd, buffer, esz, MSG_DONTWAIT);
+#else
+			sz = read(fd, buffer, esz);
+#endif
 			if (sz >= 0) {
-				buffer = realloc(buffer, (size_t)sz);
+				if (esz > (size_t)sz)
+					buffer = realloc(buffer, (size_t)sz);
 				afb_stub_rpc_receive(stub, buffer, (size_t)sz);
 			}
 			else {
@@ -123,6 +150,7 @@ static void notify(void *closure, struct afb_stub_rpc *stub)
 	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
 	if (rc > 0) {
 		int fd = (int)(intptr_t)closure;
+#if USE_SND_RCV
 		struct msghdr msg = {
 			.msg_name       = NULL,
 			.msg_namelen    = 0,
@@ -133,6 +161,9 @@ static void notify(void *closure, struct afb_stub_rpc *stub)
 			.msg_flags      = 0
 		};
 		sendmsg(fd, &msg, 0);
+#else
+		writev(fd, iovs, rc);
+#endif
 		afb_rpc_coder_output_dispose(coder);
 	}
 }
