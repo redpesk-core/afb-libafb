@@ -243,7 +243,7 @@ static void try_connect_supervisor_job(int signum, void *args)
 static void on_sighup(int signum)
 {
 	INFO("Supervision received a SIGHUP");
-	afb_sched_post_job(NULL, 0, 0, try_connect_supervisor_job, NULL);
+	afb_sched_post_job(NULL, 0, 0, try_connect_supervisor_job, NULL, Afb_Sched_Mode_Normal);
 }
 
 /**

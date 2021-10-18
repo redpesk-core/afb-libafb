@@ -248,7 +248,7 @@ static void evloop_release(void *me)
  */
 static int evloop_get(void *me)
 {
-	return evmgr && ev_mgr_try_change_holder(evmgr, 0, me) == me;
+	return (evmgr || ev_mgr_create(&evmgr) >= 0) && ev_mgr_try_change_holder(evmgr, 0, me) == me;
 }
 
 /**
@@ -304,6 +304,8 @@ static void thread_run(int ismain)
 
 		/* get a job */
 		job = afb_jobs_dequeue(&delayms);
+		PDBG("JOB=%p delayms=%ld ismain=%d allowed_thread_count=%d in_event_loop=%d hold_request_count=%d\n",
+			job, delayms, ismain, allowed_thread_count, in_event_loop, hold_request_count);
 		if (job) {
 			/* run the job */
 			THREAD_STATE_SET(&me, ts_Running);
@@ -326,7 +328,7 @@ static void thread_run(int ismain)
 			me.stop = 1;
 
 		/* no job, no stop, check if event loop waits handling */
-		} else if (!hold_request_count && allowed_thread_count && !in_event_loop && evloop_get(&me)) {
+		} else if (!hold_request_count && !in_event_loop && (allowed_thread_count || delayms>0) && evloop_get(&me)) {
 
 			/* setup event loop */
 			in_event_loop = 1;
@@ -411,32 +413,28 @@ static int start_one_thread()
 /**
  * Adapt the current threading to current job requirement
  */
-static void adapt(int delayed)
+static void adapt(enum afb_sched_mode mode)
 {
 	DUMP_THREAD_STATES;
-	if (delayed && in_event_loop) {
-		PDBG("    >>>> WAKEUP FOR DELAYED\n");
-		evloop_wakeup();
-	}
-	if (waiting_thread_count) {
-		PDBG("    >>>> SIGNAL\n");
-		waiting_thread_count--;
-		x_cond_signal(&cond);
-	}
-	else if (started_thread_count < allowed_thread_count) {
-		PDBG("    >>>> START-THREAD\n");
-		start_one_thread();
-	}
-	else if (in_event_loop && !delayed) {
-		PDBG("    >>>> WAKEUP\n");
-		evloop_wakeup();
-	}
-	else if (!started_thread_count) {
-		PDBG("    >>>> START-THREAD-EXTRA\n");
-		start_one_thread();
+	if (mode == Afb_Sched_Mode_Normal) {
+		if (in_event_loop) {
+			PDBG("    >>>> WAKEUP\n");
+			evloop_wakeup();
+		}
+		else {
+			PDBG("    >>>> NOTHING\n");
+		}
 	}
 	else {
-		PDBG("    >>>> NOTHING\n");
+		if (waiting_thread_count) {
+			PDBG("    >>>> SIGNAL\n");
+			waiting_thread_count--;
+			x_cond_signal(&cond);
+		}
+		else {
+			PDBG("    >>>> START-THREAD\n");
+			start_one_thread();
+		}
 	}
 }
 
@@ -449,11 +447,12 @@ static int post_job(
 	long delayms,
 	int timeout,
 	void (*callback)(int, void*),
-	void *arg
+	void *arg,
+	enum afb_sched_mode mode
 ) {
 	int rc = afb_jobs_post(group, delayms, timeout, callback, arg);
 	if (rc >= 0)
-		adapt(delayms > 0);
+		adapt(mode); //delayms > 0);
 	return rc;
 }
 
@@ -463,12 +462,13 @@ int afb_sched_post_job(
 	long delayms,
 	int timeout,
 	void (*callback)(int, void*),
-	void *arg
+	void *arg,
+	enum afb_sched_mode mode
 ) {
 	int rc;
 
 	x_mutex_lock(&mutex);
-	rc = post_job(group, delayms, timeout, callback, arg);
+	rc = post_job(group, delayms, timeout, callback, arg, mode);
 	x_mutex_unlock(&mutex);
 	return rc;
 }
@@ -512,7 +512,7 @@ static void do_sync_cb(int signum, void *closure)
 	else {
 		x_cond_init(&sync->condsync);
 		x_mutex_lock(&mutex);
-		rc = post_job(sync->group, 0, sync->timeout, sync->handler, sync);
+		rc = post_job(sync->group, 0, sync->timeout, sync->handler, sync, Afb_Sched_Mode_Start);
 		if (rc >= 0) {
 			x_cond_wait(&sync->condsync, &mutex);
 			rc = 0;

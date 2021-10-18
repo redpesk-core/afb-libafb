@@ -265,7 +265,7 @@ afb_api_common_post_job(
 	void *group
 ) {
 	/* TODO: translate group ~ api */
-	return afb_sched_post_job(group, delayms, timeout, callback, argument);
+	return afb_sched_post_job(group, delayms, timeout, callback, argument, Afb_Sched_Mode_Normal);
 }
 
 int

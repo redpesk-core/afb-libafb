@@ -125,6 +125,22 @@ const char apiname[] = "hello";
 const char verbname[] = "hello";
 
 /*********************************************************************/
+/* job scheduling */
+
+static void sched_jobs_cb(int sig, void * arg)
+{
+	if (afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 1)
+		afb_sched_post_job(NULL, 100, 0, sched_jobs_cb, NULL, Afb_Sched_Mode_Normal);
+	else
+		afb_sched_exit(0, NULL);
+}
+
+static void sched_jobs()
+{
+	ck_assert_int_eq(0, afb_sched_start(1, 1, 100, sched_jobs_cb, NULL));
+}
+
+/*********************************************************************/
 /* Test Callbacks */
 
 int gval;
@@ -337,8 +353,6 @@ START_TEST (process)
 
 	fprintf(stderr, "\n### Processing Request...\n");
 
-	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
-
 	type1 = afb_type_get("type1");
 	if(!type1){
 		rc = afb_type_register(&type1, "type1", 0, 0, 0);
@@ -363,8 +377,7 @@ START_TEST (process)
 
 	afb_req_common_process(req, test_apiset);
 
-	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		nsleep(10);
+	sched_jobs();
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -444,8 +457,7 @@ START_TEST(process_on_behalf)
 		1
 	);
 
-	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		nsleep(10);
+	sched_jobs();
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -460,8 +472,7 @@ START_TEST(process_on_behalf)
 	afb_req_common_process_on_behalf(req, test_apiset, NULL);
 	ck_assert_ptr_null(req->credentials);
 
-	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		nsleep(10);
+	sched_jobs();
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	//ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -614,10 +625,10 @@ START_TEST(check_perm)
 	ck_assert_int_eq(gval, 1);
 
 	// initialisation of the scheduler
-    ck_assert_int_eq(afb_sig_monitor_init(1), 0);
+	ck_assert_int_eq(afb_sig_monitor_init(1), 0);
 
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
+	ev = afb_sched_acquire_event_manager();
+	ck_assert(ev != NULL);
 
 	gval = 0;
 	ck_assert_int_eq(afb_sched_start(10, 1, 10, test_check_perm, &req),0);
@@ -660,8 +671,7 @@ START_TEST(replay)
 
 	gval = 0;
 
-	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		nsleep(10);
+	sched_jobs();
 
 	ck_assert_int_eq(gval, dataChecksum);
 
@@ -683,8 +693,7 @@ START_TEST(replay)
 
 	gval = 0;
 
-	while(afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 0)
-		nsleep(10);
+	sched_jobs();
 
 	ck_assert_int_eq(gval, dataChecksum);
 

@@ -271,7 +271,7 @@ struct afb_stub_rpc
  */
 static int queue_job(struct afb_stub_rpc *stub, void (*callback)(int signum, void* arg), void *arg)
 {
-	return afb_sched_post_job(stub, 0, 0, callback, arg);
+	return afb_sched_post_job(stub, 0, 0, callback, arg, Afb_Sched_Mode_Normal);
 }
 
 /******************* memory *****************/
@@ -1559,7 +1559,7 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = afb_sched_post_job(NULL, 0, 0, describe_job_cb, indesc);
+		rc = afb_sched_post_job(NULL, 0, 0, describe_job_cb, indesc, Afb_Sched_Mode_Normal);
 		if (rc < 0) {
 			ERROR("can't schedule describe request %d", (int)callid);
 			indesc_reply_description(indesc, NULL);

@@ -730,7 +730,7 @@ static void on_hangup(void *closure)
 
 static int enqueue_processing(struct afb_proto_ws *proto, void (*callback)(int signum, void* arg), void *arg)
 {
-	return afb_sched_post_job(proto, 0, 0, callback, arg);
+	return afb_sched_post_job(proto, 0, 0, callback, arg, Afb_Sched_Mode_Normal);
 }
 
 /*****************************************************/

@@ -27,6 +27,15 @@ struct afb_sched_lock;
 struct ev_mgr;
 
 /**
+ * Scheduling mode for posting a job using 'afb_sched_post_job'
+ */
+enum afb_sched_mode
+{
+	Afb_Sched_Mode_Normal,
+	Afb_Sched_Mode_Start
+};
+
+/**
  * Enter a synchronisation point: activates the job given by 'callback'
  * and 'closure' using 'group' and 'timeout' to control sequencing and
  * execution time.
@@ -128,6 +137,7 @@ extern struct ev_mgr *afb_sched_acquire_event_manager();
  *                 The remaining parameter is the parameter 'arg1'
  *                 given here.
  * @param arg      The second argument for 'callback'
+ * @param mode     The mode
  *
  * @return the job id on success (greater than 0) or
  *         in case of error a negative number in -errno like form
@@ -137,7 +147,8 @@ extern int afb_sched_post_job(
 		long delayms,
 		int timeout,
 		void (*callback)(int, void*),
-		void *arg);
+		void *arg,
+		enum afb_sched_mode mode);
 
 /**
  * Calls synchronously in the current thread the job represented
