@@ -1383,7 +1383,7 @@ static void add(void *closure, struct json_object *object)
 	memcpy (&desc, closure, sizeof desc);
 	request = event = sub = global = session = api = NULL;
 
-	rc = wrap_json_unpack(object, "{s?s s?s s?s s?s s?s s?s s?o s?o s?o s?o s?o s?o s?o}",
+	rc = wrap_json_unpack(object, "{s?s s?s s?s s?s s?s s?s s?o s?o s?o s?o s?o s?o}",
 			"name", &desc.name,
 			"tag", &desc.tag,
 			"apiname", &desc.apiname,
