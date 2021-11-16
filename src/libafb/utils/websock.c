@@ -296,6 +296,19 @@ static int check_control_header(struct websock *ws)
 	return 1;
 }
 
+static void pong(struct websock *ws)
+{
+	int rc;
+	char buffer[8000];
+	unsigned length;
+
+	length = ws->length > sizeof buffer ? sizeof buffer : (unsigned)ws->length;
+	rc = (int)websock_read(ws, buffer, sizeof buffer);
+	if (rc >= 0)
+		websock_pong(ws, buffer, length);
+	websock_drop(ws);
+}
+
 int websock_dispatch(struct websock *ws, int loop)
 {
 	int rc;
@@ -448,10 +461,8 @@ loop:
 		case OPCODE_PING:
 			if (ws->itf->on_ping)
 				ws->itf->on_ping(ws->closure, ws->length);
-			else {
-				websock_drop(ws);
-				websock_pong(ws, NULL, 0);
-			}
+			else
+				pong(ws);
 			ws->state = STATE_INIT;
 			if (!loop)
 				return 0;
