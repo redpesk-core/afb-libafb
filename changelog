@@ -1,3 +1,29 @@
+Version 4.0.4
+-------------
+
+  features
+   - REWORKED SCHEDULER
+   - add new RPC support
+   - rework of the afb-api for RPC
+   - returning HTTP binary blobs from bindings
+   - add support of specialized interface
+   - add pseudo socket protocol 'char:' for being client of serial link
+
+  fixes
+   - json-locator fixes
+   - fix overflow detection of afb-type
+   - fix leak in afb-hreq
+   - fix automatic pong response of WS
+   - avoid concurrent calls to MHD_run
+   - fix compatibility to old json-c
+   - enforce use of default credentials
+   - fix bug in afb-trace
+
+  minors/details
+   - improvements of afb-wsj1
+   - cleaning afb-stub-ws
+   - improve type conversion
+
 Version 4.0.3
 -------------
 
