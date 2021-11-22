@@ -68,6 +68,65 @@ struct group
 static struct group *groups_head = NULL;
 static void *hooktag;
 
+static struct block *getblocktag(void *ptr, struct group **group)
+{
+	int idx;
+	struct group *grp;
+	struct block *blk;
+
+	for (grp = groups_head ; grp ; grp = grp->next) {
+		blk = grp->blocks;
+		for (idx = grp->top ; idx ; idx--, blk++) {
+			if ((uintptr_t)ptr >= blk->begin && (uintptr_t)ptr < blk->end) {
+				*group = grp;
+				return blk;
+			}
+		}
+	}
+	return NULL;
+}
+
+
+static void *searchtag(void *ptr)
+{
+	struct group *group;
+	struct block *block = getblocktag(ptr, &group);
+
+	return block ? block->tag : NULL;
+}
+
+static void cleartags()
+{
+	struct group *group;
+	while ((group = groups_head) != NULL) {
+		groups_head = group->next;
+		free(group);
+	}
+}
+
+
+#if __GLIBC_PREREQ(2,34)
+
+static void hook_on(void *tag)
+{
+}
+
+static void hook_off()
+{
+}
+
+#else
+
+static void deltag(void *ptr)
+{
+	struct group *group;
+	struct block *block = getblocktag(ptr, &group);
+
+	if (block)
+		*block = group->blocks[--group->top];
+}
+
+
 static void addtag(void *ptr, size_t size, void *(*alloc)(size_t))
 {
 	struct block *block;
@@ -92,91 +151,7 @@ static void addtag(void *ptr, size_t size, void *(*alloc)(size_t))
 	}
 }
 
-static struct block *getblocktag(void *ptr, struct group **group)
-{
-	int idx;
-	struct group *grp;
-	struct block *blk;
 
-	for (grp = groups_head ; grp ; grp = grp->next) {
-		blk = grp->blocks;
-		for (idx = grp->top ; idx ; idx--, blk++) {
-			if ((uintptr_t)ptr >= blk->begin && (uintptr_t)ptr < blk->end) {
-				*group = grp;
-				return blk;
-			}
-		}
-	}
-	return NULL;
-}
-
-
-static void deltag(void *ptr)
-{
-	struct group *group;
-	struct block *block = getblocktag(ptr, &group);
-
-	if (block)
-		*block = group->blocks[--group->top];
-}
-
-static void *searchtag(void *ptr)
-{
-	struct group *group;
-	struct block *block = getblocktag(ptr, &group);
-
-	return block ? block->tag : NULL;
-}
-
-static void cleartags()
-{
-	struct group *group;
-	while ((group = groups_head) != NULL) {
-		groups_head = group->next;
-		free(group);
-	}
-}
-
-
-#if 0
-extern void *__libc_malloc(size_t size);
-extern void *__libc_calloc(size_t nmemb, size_t size);
-extern void __libc_free(void *ptr);
-extern void *__libc_realloc(void *ptr, size_t size);
-
-void *malloc(size_t size)
-{
-	void *result = __libc_malloc(size);
-	if (result && hooktag)
-		addtag(result, size, __libc_malloc);
-	return result;
-}
-
-void free(void *ptr)
-{
-	if (ptr && hooktag)
-		deltag(ptr);
-	__libc_free(ptr);
-}
-
-void *calloc(size_t nmemb, size_t size)
-{
-	void *result = __libc_calloc(nmemb, size);
-	if (result && hooktag)
-		addtag(result, nmemb * size, __libc_malloc);
-	return result;
-}
-
-void *realloc(void *ptr, size_t size)
-{
-	if (ptr && hooktag)
-		deltag(ptr);
-	ptr = __libc_realloc(ptr, size);
-	if (ptr && hooktag)
-		addtag(ptr, size, __libc_malloc);
-	return ptr;
-}
-#else
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 static void *(*memo_malloc)(size_t size, const void *caller);
