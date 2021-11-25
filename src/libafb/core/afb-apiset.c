@@ -435,6 +435,19 @@ struct afb_apiset *afb_apiset_subset_get(struct afb_apiset *set)
 }
 
 /**
+ * Returns the 'set' or one of its subset matching 'name'
+ * @param set the head apiset
+ * @param name the name to find
+ * @return the found apiset or NULL
+ */
+struct afb_apiset *afb_apiset_subset_find(struct afb_apiset *set, const char *name)
+{
+	while(set && strcmp(name, set->name))
+		set = set->subset;
+	return set;
+}
+
+/**
  * Set the subset of the set
  * @param set the api set
  * @param subset the subset to set

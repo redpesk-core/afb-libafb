@@ -66,6 +66,7 @@ extern void afb_apiset_onlack_set(
 		void *closure,
 		void (*cleanup)(void*closure));
 
+extern struct afb_apiset *afb_apiset_subset_find(struct afb_apiset *set, const char *name);
 extern int afb_apiset_subset_set(struct afb_apiset *set, struct afb_apiset *subset);
 extern struct afb_apiset *afb_apiset_subset_get(struct afb_apiset *set);
 
