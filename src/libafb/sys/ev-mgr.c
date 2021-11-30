@@ -260,6 +260,9 @@ struct ev_mgr
 	/** internally used timerfd */
 	int timerfd;
 
+	/** last value set to the timer */
+	time_ms_t last_timer;
+
 	/** reference count */
 	uint16_t refcount;
 
@@ -536,6 +539,9 @@ static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
 	struct itimerspec its;
 	struct epoll_event epe;
 
+	if (when == mgr->last_timer)
+		return 0;
+
 	/* ensure existing timerfd */
 	if (mgr->timerfd < 0) {
 		/* create the timerfd */
@@ -560,76 +566,50 @@ static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
 	its.it_interval.tv_nsec = 0;
 	its.it_value.tv_sec = (time_t)(when / 1000);
 	its.it_value.tv_nsec = 1000000L * (long)(when % 1000);
-	return timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
+	rc = timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
+	if (rc < 0)
+		return -errno;
+	mgr->last_timer = when;
+	return 0;
 }
+
 
 /**
  * Compute the next time for blowing an event
  * Then arm the timer.
  */
-static int timer_set(struct ev_mgr *mgr)
+static int timer_set(struct ev_mgr *mgr, time_ms_t upper)
 {
 	struct ev_timer *timer;
-	time_ms_t lower, upper, up;
+	time_ms_t lower, lo, up;
 
 	timers_cleanup(mgr);
 
 	/* get the next slice */
 	lower = 0;
-	upper = TIME_MS_MAX;
 	timer = mgr->timers;
-	while (timer && timer->next_ms <= upper) {
+	while (timer) {
 		if (timer->is_active) {
-			lower = timer->next_ms;
-			up = timer->next_ms + timer->accuracy_ms;
-			if (up < upper)
-				upper = up;
+			lo = timer->next_ms;
+			if (lo <= upper) {
+				up = lo + timer->accuracy_ms;
+				if (up <= lower) {
+					lower = lo;
+					upper = up;
+				}
+				else {
+					if (lower < lo)
+						lower = lo;
+					if (up < upper)
+						upper = up;
+				}
+			}
 		}
 		timer = timer->next;
 	}
 
 	/* activate the timer */
-	return lower ? timer_arm(mgr, (lower + upper) >> 1) : 0;
-}
-
-/**
- * Add to the timers of mgr the timers of
- * the list tlist. It is assumed that both lists are
- * sorted on their next_ms growing values.
- */
-static int timer_add(
-	struct ev_mgr *mgr,
-	struct ev_timer *tlist
-) {
-	struct ev_timer *timer, **prvtim;
-
-	/* merge the two sorted lists */
-	timer = mgr->timers;
-	if (!timer) {
-		mgr->timers = tlist;
-	}
-	else {
-		prvtim = &mgr->timers;
-		while (timer && tlist) {
-			if (timer->next_ms <= tlist->next_ms) {
-				*prvtim = timer;
-				prvtim = &timer->next;
-				timer = timer->next;
-				if (!timer)
-					*prvtim = tlist;
-			}
-			else {
-				*prvtim = tlist;
-				prvtim = &tlist->next;
-				tlist = tlist->next;
-				if (!tlist)
-					*prvtim = timer;
-			}
-		}
-	}
-
-	/* compute the next expected timeout */
-	return timer_set(mgr);
+	return timer_arm(mgr, lower ? ((lower + upper) >> 1) : 0);
 }
 
 /**
@@ -638,18 +618,15 @@ static int timer_add(
 static int timer_dispatch(
 	struct ev_mgr *mgr
 ) {
-	struct ev_timer *timer, *tlist, **prvtim;
+	struct ev_timer *timer, **prvtim;
 	time_ms_t now;
 
 	/* extract expired timers */
 	now = now_ms();
-	tlist = 0;
-	while ((timer = mgr->timers) && timer->next_ms <= now) {
-		/* extract the timer */
-		mgr->timers = timer->next;
-
+	prvtim = &mgr->timers;
+	while ((timer = *prvtim)) {
 		/* process the timer */
-		if (timer->is_active) {
+		if (timer->is_active && timer->next_ms <= now) {
 			timer->handler(timer, timer->closure, (int)timer->decount);
 			/* hack, hack, hack: below, just ignore blind events */
 			do { timer->next_ms += timer->period_ms; } while(timer->next_ms <= now);
@@ -666,20 +643,16 @@ static int timer_dispatch(
 			}
 		}
 		/* either delete or add to tlist */
-		if (timer->is_deleted)
-			free(timer);
+		if (!timer->is_deleted)
+			prvtim = &timer->next;
 		else {
-			/* insert sorted in tlist */
-			prvtim = &tlist;
-			while (*prvtim && (*prvtim)->next_ms < timer->next_ms)
-			prvtim = &(*prvtim)->next;
-			timer->next = *prvtim;
-			*prvtim = timer;
+			*prvtim = timer->next;
+			free(timer);
 		}
 	}
 
 	/* add the changed timers */
-	return tlist ? timer_add(mgr, tlist) : 0;
+	return timer_set(mgr, TIME_MS_MAX);
 }
 
 /**
@@ -731,8 +704,13 @@ int ev_mgr_add_timer(
 		timer->is_deleted = 0;
 		timer->auto_unref = !!autounref;
 		timer->is_active = 1;
-		timer_add(mgr, timer);
-		rc = 0;
+		timer->next = mgr->timers;
+		mgr->timers = timer;
+		rc = timer_set(mgr, TIME_MS_MAX);
+		if (rc < 0) {
+			timer->is_deleted = 1;
+			timer->is_active = 0;
+		}
 	}
 	*ptimer = timer;
 	return rc;
@@ -1094,6 +1072,7 @@ int ev_mgr_create(struct ev_mgr **result)
 #endif
 
 	mgr->timerfd = -1;
+	mgr->last_timer = 0;
 	mgr->state = Idle;
 	mgr->refcount = 1;
 
