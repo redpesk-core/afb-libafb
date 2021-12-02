@@ -67,6 +67,9 @@ struct extension
 	/** uid of the extension */
 	const char *uid;
 
+	/** config of the extension */
+	struct json_object *config;
+
 	/** data of the extension */
 	void *data;
 
@@ -85,18 +88,10 @@ static struct extension *search_extension_uid(const char *uid)
 	return ext;
 }
 
-static struct extension *search_extension_path(const char *path)
-{
-	struct extension *ext = extensions;
-	while(ext != NULL && strcmp(ext->path, path))
-		ext = ext->next;
-	return ext;
-}
-
-static int load_extension(const char *path, int failstops, const char *uid)
+static int load_extension(const char *path, int failstops, const char *uid, struct json_object *config)
 {
 	struct afb_extension_manifest *manifest;
-	struct extension *ext;
+	struct extension *ext, *it;
 	x_dynlib_t handle;
 	size_t pathlen, strsz;
 	int rc;
@@ -159,16 +154,25 @@ static int load_extension(const char *path, int failstops, const char *uid)
 					rc = X_ENOMEM;
 				else {
 					NOTICE("Adding extension %s of %s", name, path);
-					ext->next = extensions;
+					ext->next = 0;
 					ext->handle = handle;
 					ext->manifest = manifest;
+					ext->config = config ? json_object_get(config) : NULL;
 					ext->data = 0;
 					memcpy(ext->path, path, pathlen);
 					if (uid == NULL)
 						ext->uid = manifest->name;
 					else
 						ext->uid = strcpy(&ext->path[pathlen], uid);
-					extensions = ext;
+					/* append at end */
+					it = extensions;
+					if (!it)
+						extensions = ext;
+					else {
+						while (it->next)
+							it = it->next;
+						it->next = ext;
+					}
 					return 1;
 				}
 			}
@@ -186,7 +190,7 @@ static int load_extension(const char *path, int failstops, const char *uid)
 static void load_extension_cb(void *closure, struct json_object *value)
 {
 	int rc, *ret = closure;
-	struct json_object *path, *uid;
+	struct json_object *path, *uid, *config = NULL;
 	const char *pathstr, *uidstr;
 
 	pathstr = NULL;
@@ -202,13 +206,14 @@ static void load_extension_cb(void *closure, struct json_object *value)
 		else
 			uidstr = NULL;
 		pathstr = json_object_get_string(path);
+		json_object_object_get_ex(value, "config", &config);
 	}
 	else {
 		ERROR("Invalid extension specifier %s", json_object_get_string(value));
 		pathstr = NULL;
 	}
 	if (pathstr != NULL) {
-		rc = load_extension(pathstr, 1, uidstr);
+		rc = load_extension(pathstr, 1, uidstr, config);
 	}
 	if (rc < 0 && *ret >= 0)
 		*ret = rc;
@@ -229,7 +234,7 @@ static int try_extension(void *closure, struct path_search_item *item)
 		return 0;
 
 	/* try to get it as a binding */
-	rc = load_extension(item->path, 0, NULL);
+	rc = load_extension(item->path, 0, NULL, NULL);
 	if (rc >= 0)
 		return 0; /* got it */
 
@@ -277,32 +282,38 @@ static void load_extpath_cb(void *closure, struct json_object *value)
 
 #endif
 
-/* load extensions */
-int afb_extend_load(struct json_object *config)
+/* load one extension by path */
+int afb_extend_load_extension(const char *path, const char *uid, struct json_object *config)
 {
-	struct extension *ext, *head;
-	struct json_object *array;
-	int rc;
+	return load_extension(path, 1, uid, config);
+}
 
-	/* load extensions */
-	rc = 1;
-	if (json_object_object_get_ex(config, "extension", &array))
-		wrap_json_optarray_for_all(array, load_extension_cb, &rc);
+/* load extensions at extpath */
+int afb_extend_load_extpath(const char *extpath)
+{
+#if WITH_DIRENT
+	return load_extpath(extpath);
+#else
+	return 1;
+#endif
+}
+
+/* load extensions */
+int afb_extend_load_set_of_extensions(struct json_object *set)
+{
+	int rc = 1;
+	wrap_json_optarray_for_all(set, load_extension_cb, &rc);
+	return rc;
+}
+
+/* load extensions by path */
+int afb_extend_load_set_of_extpaths(struct json_object *set)
+{
+	int rc = 1;
 #if WITH_DIRENT
 	/* search extensions */
-	if (rc >= 0 && json_object_object_get_ex(config, "extpaths", &array))
-		wrap_json_optarray_for_all(array, load_extpath_cb, &rc);
+	wrap_json_optarray_for_all(set, load_extpath_cb, &rc);
 #endif
-
-	/* revert list of extensions */
-	head = 0;
-	while ((ext = extensions)) {
-		extensions = ext->next;
-		ext->next = head;
-		head = ext;
-	}
-	extensions = head;
-
 	return rc;
 }
 
@@ -342,64 +353,17 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 	return rc;
 }
 
-/**
- * Callback for merging config found in @p value with
- * config of the root given by @p closure
- */
-static void merge_config_cb(void *closure, struct json_object *value)
-{
-	struct json_object *root = closure;
-	struct json_object *obj, *config;
-	struct extension *ext;
-
-	/* no merge if no config */
-	if (!json_object_is_type(value, json_type_object)
-		|| !json_object_object_get_ex(value, "config", &config))
-		return;
-
-	/* get the extension */
-	ext = NULL;
-	if (json_object_object_get_ex(value, "uid", &obj)
-	 && json_object_is_type(obj, json_type_string)) {
-		ext = search_extension_uid(json_object_get_string(obj));
-	}
-	if (ext == NULL
-	 && json_object_object_get_ex(value, "path", &obj)
-	 && json_object_is_type(obj, json_type_string)) {
-		ext = search_extension_path(json_object_get_string(obj));
-	}
-	if (ext == NULL)
-		return;
-
-	/* search in root for the uid */
-	if (!json_object_object_get_ex(root, ext->uid, &obj)) {
-		/* none exist, add the config */
-		json_object_object_add(root, ext->uid, json_object_get(config));
-	}
-	else {
-		/* existed, then merge */
-		wrap_json_object_merge(obj, config, wrap_json_merge_option_join_or_keep);
-	}
-}
-
 /* configure the extensions */
-int afb_extend_config(struct json_object *config)
+int afb_extend_configure(struct json_object *config)
 {
 	int rc, s;
 	struct extension *ext;
 	int (*config_v1)(void **data, struct json_object *config, const char *uid);
-	struct json_object *root, *obj, *array;
+	struct json_object *obj;
 
-	/* get the configuration root obejct */
-	if (!json_object_object_get_ex(config, "@extconfig", &root)
-		|| !json_object_is_type(root, json_type_object)) {
-		root = json_object_new_object();
-		json_object_object_add(config, "@extconfig", root);
-	}
-
-	/* merge with config extensions */
-	if (json_object_object_get_ex(config, "extension", &array))
-		wrap_json_optarray_for_all(array, merge_config_cb, root);
+	/* get the configuration root object */
+	if (!json_object_is_type(config, json_type_object))
+		config = NULL;
 
 	/* iterate over extensions */
 	rc = 0;
@@ -407,7 +371,15 @@ int afb_extend_config(struct json_object *config)
 		s = x_dynlib_symbol(&ext->handle, CONFIG_V1, (void**)&config_v1);
 		if (s >= 0) {
 			obj = NULL;
-			json_object_object_get_ex(root, ext->uid, &obj);
+			if (config)
+				json_object_object_get_ex(config, ext->uid, &obj);
+			if (obj == NULL)
+				obj = ext->config;
+			else if (ext->config && json_object_is_type(obj, json_type_object))
+				wrap_json_object_merge(obj, config, wrap_json_merge_option_join_or_keep);
+			if (ext->config)
+				json_object_put(ext->config);
+			ext->config = json_object_get(obj);
 			s = config_v1(&ext->data, obj, ext->uid);
 			if (s < 0)
 				rc = s;
@@ -498,5 +470,34 @@ int afb_extend_exit(struct afb_apiset *declare_set)
 	}
 	return rc;
 }
+
+
+#if DEPRECATED_IF_OLDER_THEN_4_1
+/* load extensions */
+int afb_extend_load(struct json_object *config)
+{
+	struct json_object *set;
+	int rc = 1;
+	if (json_object_object_get_ex(config, "extension", &set))
+		rc = afb_extend_load_set_of_extensions(set);
+	if (rc >= 0 && json_object_object_get_ex(config, "extpaths", &set))
+		rc = afb_extend_load_set_of_extpaths(set);
+	return rc;
+}
+
+/* configure the extensions */
+int afb_extend_config(struct json_object *config)
+{
+	struct json_object *root;
+
+	/* get the configuration root object */
+	if (!json_object_object_get_ex(config, "@extconfig", &root)
+	|| !json_object_is_type(root, json_type_object))
+		root = NULL;
+
+	return afb_extend_configure(root);
+}
+#endif
+
 
 #endif
