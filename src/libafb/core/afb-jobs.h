@@ -69,6 +69,26 @@ extern int afb_jobs_post(
 extern struct afb_job *afb_jobs_dequeue(long *delayms);
 
 /**
+ * Get in 'jobs' at most 'njobs' available to start immediately.
+ * Returns the count of jobs that can be started immediately.
+ * The returned value can be greater than the given count 'njobs',
+ * Allowing to pass a value of zero njobs and get in return the count
+ * of available jobs.
+ *
+ * If not NULL, the value pointed by delayms is filled with the delay
+ * in milliseconds of the first delayed job to be run.
+ *
+ * Once gotten, the returned jobs must be either run or cancelled.
+ *
+ * @param jobs an array for storing jobs found to be run immediately
+ * @param njobs the count of jobs that can be stored in the array jobs
+ * @param delayms the long pointed receives the delay in ms before first delayed job.
+ *
+ * @return the first job that isn't blocked or NULL
+ */
+extern int afb_jobs_dequeue_multiple(struct afb_job **jobs, int njobs, long *delayms);
+
+/**
  * Run the given job now.
  *
  * @param job   a job a retrieved with afb_jobs_dequeue

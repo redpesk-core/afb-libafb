@@ -288,6 +288,54 @@ struct afb_job *afb_jobs_dequeue(long *delayms)
 	return job;
 }
 
+/* dequeue multiple jobs */
+int afb_jobs_dequeue_multiple(struct afb_job **jobs, int njobs, long *delayms)
+{
+	int idx, nava;
+	struct afb_job *job;
+	uint64_t dt;
+	long dtrig, delay, d;
+
+	/* enter critical */
+	x_mutex_lock(&mutex);
+
+	/* search a job */
+	delay = -1;
+	if (!delayed_count)
+		dtrig = LONG_MAX;
+	else {
+		dt = getnow() - delayed_base;
+		dtrig = dt > LONG_MAX ? LONG_MAX : (long)dt;
+	}
+	for (idx = nava = 0, job = pending_jobs ; job ; job = job->next) {
+		if (!job->blocked) {
+			d = job->delayms - dtrig;
+			if (d > 0) {
+				if ((unsigned long)d < (unsigned long)delay)
+					delay = d;
+			}
+			else {
+				nava++;
+				if (idx < njobs) {
+					job->blocked = 1; /* mark job as blocked */
+					job->active = 1; /* mark job as active */
+					pending_count--;
+					if (job->delayms)
+						delayed_count--;
+					jobs[idx++] = job;
+				}
+			}
+		}
+	}
+
+	/* leave critical */
+	x_mutex_unlock(&mutex);
+
+	if (delayms)
+		*delayms = delay;
+	return nava;
+}
+
 /* cancel the given job */
 void afb_jobs_cancel(struct afb_job *job)
 {
