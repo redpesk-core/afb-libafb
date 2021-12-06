@@ -3,6 +3,12 @@ Version 4.1.0
 
   features
    - improved version of afb-extend interface (less requirement on json objects)
+   - add a wakeup time when preparing event loop
+
+  fixes
+   - fix the macros LIBAFB_BEFORE_VERSION and LIBAFB_AFTER_VERSION
+   - fix issue on timer management
+   - fix deprecated hooks of LIBC
 
 Version 4.0.4
 -------------

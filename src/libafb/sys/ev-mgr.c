@@ -615,7 +615,7 @@ static int timer_set(struct ev_mgr *mgr, time_ms_t upper)
 /**
  * dispatch the timer events
  */
-static int timer_dispatch(
+static void timer_dispatch(
 	struct ev_mgr *mgr
 ) {
 	struct ev_timer *timer, **prvtim;
@@ -650,9 +650,6 @@ static int timer_dispatch(
 			free(timer);
 		}
 	}
-
-	/* add the changed timers */
-	return timer_set(mgr, TIME_MS_MAX);
 }
 
 /**
@@ -664,7 +661,11 @@ static int timer_event(
 ) {
 	uint64_t count;
 	int rc = (int)read(mgr->timerfd, &count, sizeof count);
-	return rc < 0 ? rc : count ? timer_dispatch(mgr) : 0;
+	if (rc < 0)
+		return -errno;
+	if (count > 0)
+		timer_dispatch(mgr);
+	return 0;
 }
 
 /* create a new timer object */
@@ -830,7 +831,7 @@ static void do_cleanup(struct ev_mgr *mgr)
 /**
  * Prepare the event loop manager
  */
-static int do_prepare(struct ev_mgr *mgr)
+static int do_prepare(struct ev_mgr *mgr, time_ms_t wakeup_ms)
 {
 	int rc;
 
@@ -840,6 +841,7 @@ static int do_prepare(struct ev_mgr *mgr)
 		mgr->state = Preparing;
 		do_cleanup(mgr);
 		preparers_prepare(mgr);
+		timer_set(mgr, wakeup_ms);
 		rc = efds_prepare(mgr);
 		mgr->state = Ready;
 	}
@@ -954,7 +956,15 @@ void *ev_mgr_try_change_holder(struct ev_mgr *mgr, void *holder, void *next)
  */
 int ev_mgr_prepare(struct ev_mgr *mgr)
 {
-	return do_prepare(mgr);
+	return do_prepare(mgr, TIME_MS_MAX);
+}
+
+/**
+ * prepare the ev_mgr to run with a wakeup
+ */
+int ev_mgr_prepare_with_wakeup(struct ev_mgr *mgr, int wakeup_ms)
+{
+	return do_prepare(mgr, wakeup_ms >= 0 ? now_ms() + (time_ms_t)wakeup_ms : TIME_MS_MAX);
 }
 
 /**
@@ -980,7 +990,7 @@ int ev_mgr_run(struct ev_mgr *mgr, int timeout_ms)
 {
 	int rc;
 
-	rc = do_prepare(mgr);
+	rc = do_prepare(mgr, TIME_MS_MAX);
 	if (rc >= 0) {
 		rc = do_wait(mgr, timeout_ms);
 		if (rc > 0)

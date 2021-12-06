@@ -75,6 +75,16 @@ extern int ev_mgr_get_fd(struct ev_mgr *mgr);
 extern int ev_mgr_prepare(struct ev_mgr *mgr);
 
 /**
+ * prepare the ev_mgr to run with a wakeup
+ *
+ * @param mgr  the event manager
+ * @param wakeup_ms the wakeup time in millisecond
+ *
+ * @return 0 on success or an negative error code
+ */
+extern int ev_mgr_prepare_with_wakeup(struct ev_mgr *mgr, int wakeup_ms);
+
+/**
  * wait an event
  *
  * @param mgr  the event manager

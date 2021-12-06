@@ -130,7 +130,6 @@ void timercb(struct ev_timer *timer, void *closure, int decount)
 	timerdata += decount;
 }
 
-
 START_TEST (timer)
 {
 	int rc;
