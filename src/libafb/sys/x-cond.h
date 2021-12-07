@@ -31,6 +31,7 @@
 #define x_cond_init(pcond)        pthread_cond_init(pcond,NULL)
 #define x_cond_destroy(pcond)     pthread_cond_destroy(pcond)
 #define x_cond_wait(pcond,pmutex) pthread_cond_wait(pcond,pmutex)
+#define x_cond_timedwait(pcond,pmutex,abst) pthread_cond_timedwait(pcond,pmutex,abst)
 #define x_cond_signal(pcond)      pthread_cond_signal(pcond)
 #define x_cond_broadcast(pcond)   pthread_cond_broadcast(pcond)
 #define X_COND_INITIALIZER        PTHREAD_COND_INITIALIZER
