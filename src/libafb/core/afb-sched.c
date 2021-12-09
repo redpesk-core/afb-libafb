@@ -29,76 +29,22 @@
 #include <string.h>
 #include <assert.h>
 
-#include "core/afb-jobs.h"
-#include "core/afb-sched.h"
-#include "sys/ev-mgr.h"
-#include "core/afb-sig-monitor.h"
-#include "sys/verbose.h"
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
 #include "sys/x-thread.h"
 #include "sys/x-errno.h"
 
-#define EVENT_TIMEOUT_TOP  	((uint64_t)-1)
-#define EVENT_TIMEOUT_CHILD	((uint64_t)10000)
+#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
+#include "core/afb-threads.h"
+#include "sys/ev-mgr.h"
+#include "core/afb-sig-monitor.h"
+#include "sys/verbose.h"
 
-#define DEBUGGING 0
-
-#if DEBUGGING
-#include <stdio.h>
-
-enum tread_state {
-	ts_Idle = 0,
-	ts_Running = 1,
-	ts_Event_Handling = 2,
-	ts_Waiting = 3,
-	ts_Leaving = 4,
-	ts_Stopped = 5,
-	ts_Stopping = 6,
-	ts_Blocked = 7,
-	ts_Acquiring = 8
-};
-
-#define STATE_BIT_COUNT 4
-#define ID_BIT_COUNT    20
-
-static const char *state_names[] = {
-	"Idle",
-	"Running",
-	"Event-Handling",
-	"Waiting",
-	"Leaving",
-	"Stopped",
-	"Stopping",
-	"Blocked",
-	"Acquiring"
-};
-
-#endif
-
-/** Description of threads */
-struct thread
-{
-	/** next thread of the list */
-	struct thread *next;
-
-	/** stop requested */
-	volatile unsigned stop: 1;
-
-	/** leave requested */
-	volatile unsigned leave: 1;
-
-#if DEBUGGING
-	/** state */
-	unsigned state: STATE_BIT_COUNT;
-
-	/** state saved */
-	unsigned statesave: STATE_BIT_COUNT;
-
-	/** id */
-	unsigned id: ID_BIT_COUNT;
-#endif
-};
+#define CLASSID_MAIN   1
+#define CLASSID_OTHERS 2
+#define CLASSID_EXTRA  4
+#define ANY_CLASSID    AFB_THREAD_ANY_CLASS
 
 /**
  * Description of synchronous jobs
@@ -134,92 +80,18 @@ struct sync_job
 
 /* synchronisation of threads */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
-static x_cond_t  cond = X_COND_INITIALIZER;
 static x_cond_t  condhold = X_COND_INITIALIZER;
 
 /* counts for threads */
 static int allowed_thread_count = 0;	/**< allowed count of threads */
-static int started_thread_count = 0;	/**< started count of threads */
-static int waiting_thread_count = 0;	/**< count of waiting threads */
 static int hold_request_count = 0;	/**< count of request to hold the event loop */
 static int in_event_loop = 0;		/**< is waiting events */
-
-/* list of threads */
-static struct thread *threads;
 
 /* event loop */
 static struct ev_mgr *evmgr;
 
 /* exit manager */
 static void (*exit_handler)();
-
-/* current thread */
-X_TLS(struct thread,current_thread)
-
-static inline struct thread *get_me()
-{
-	return x_tls_get_current_thread();
-}
-
-static inline void set_me(struct thread *me)
-{
-	x_tls_set_current_thread(me);
-}
-
-/* debugging */
-#if DEBUGGING
-
-//#define PDBG(...)               DEBUG(__VA_ARGS__)
-#define PDBG(...)                 fprintf(stderr, __VA_ARGS__)
-#define DUMP_THREAD_STATES        dump_thread_states()
-#define DUMP_THREAD_ENTER(thr)    dump_thread_enter(thr)
-#define DUMP_THREAD_LEAVE(thr)    dump_thread_leave(thr)
-#define THREAD_STATE_SET(thr,st)  dump_thread_state_set(thr,st)
-#define THREAD_STATE_PUSH(thr,st) (thr)->statesave = (thr)->state, THREAD_STATE_SET(thr,st)
-#define THREAD_STATE_POP(thr)     THREAD_STATE_SET(thr,(thr)->statesave)
-
-static void dump_thread_state_set(struct thread *thr, unsigned st)
-{
-	PDBG("    [SET] %u: %s -> %s\n", (unsigned)thr->id, state_names[thr->state], state_names[st]);
-	thr->state = st & ((1 << STATE_BIT_COUNT) - 1);
-}
-
-static void dump_thread_states()
-{
-	struct thread *thr = threads;
-	PDBG("=== BEGIN STATE started=%d, waiting=%d, in-loop=%d, allowed=%d\n",
-				started_thread_count, waiting_thread_count, in_event_loop, allowed_thread_count);
-	while (thr) {
-		PDBG("    %u: %s\n", (unsigned)thr->id, state_names[thr->state]);
-		thr = thr->next;
-	}
-	PDBG("=== END STATE\n");
-}
-
-static void dump_thread_enter(struct thread *thr)
-{
-	static unsigned idgen = 0;
-
-	thr->id = ++idgen & ((1U << ID_BIT_COUNT) - 1);
-	thr->state = thr->statesave = ts_Idle;
-	PDBG("=== ENTER %u %d/%d state=%s\n", (unsigned)thr->id, started_thread_count, allowed_thread_count, state_names[thr->state]);
-}
-
-
-static void dump_thread_leave(struct thread *thr)
-{
-	PDBG("=== LEAVE %u %d/%d\n", (unsigned)thr->id, started_thread_count, allowed_thread_count);
-}
-
-#else
-#define PDBG(...)
-#define DUMP_THREAD_STATES
-#define DUMP_THREAD_ENTER(thr)
-#define DUMP_THREAD_LEAVE(thr)
-#define THREAD_STATE_SET(thr,st)
-#define THREAD_STATE_PUSH(thr,st)
-#define THREAD_STATE_POP(thr)
-#endif
 
 
 /**
@@ -235,20 +107,26 @@ static void evloop_wakeup()
 /**
  * Release the currently held event loop
  */
-static void evloop_release(void *me)
+static int evloop_release(x_thread_t tid)
 {
-	if (evmgr && !ev_mgr_try_change_holder(evmgr, me, 0)) {
-		if (hold_request_count)
-			x_cond_signal(&condhold);
-	}
+	if (!evmgr || ev_mgr_try_change_holder(evmgr, (void*)tid, 0))
+		return 0;
+	if (hold_request_count)
+		x_cond_signal(&condhold);
+	return 1;
 }
 
 /**
  * get the eventloop for the current thread
  */
-static int evloop_get(void *me)
+static int evloop_get(x_thread_t tid)
 {
-	return (evmgr || ev_mgr_create(&evmgr) >= 0) && ev_mgr_try_change_holder(evmgr, 0, me) == me;
+	return (evmgr || ev_mgr_create(&evmgr) >= 0) && ev_mgr_try_change_holder(evmgr, 0, (void*)tid) == (void*)tid;
+}
+
+static int release_my_evloop()
+{
+	return evloop_release(x_thread_self());
 }
 
 /**
@@ -272,142 +150,60 @@ static void evloop_sig_run(int signum, void *closure)
 	}
 }
 
-/**
- * Main processing loop of internal threads with processing jobs.
- * The loop must be called with the mutex locked
- * and it returns with the mutex locked.
- * @param me the description of the thread to use
- * TODO: how are timeout handled when reentering?
- */
-static void thread_run(int ismain)
+static void run_event_loop(void *closure, x_thread_t tid)
 {
-	struct thread me;
-	struct thread **prv;
-	struct afb_job *job;
-	long delayms;
-
-	DUMP_THREAD_ENTER(&me);
-
-	/* initialize description of itself */
-	me.stop = exit_handler != NULL;
-
-	/* link to the list */
-	me.next = threads;
-	threads = &me;
-	set_me(&me);
-
-	/* initiate thread tempo */
-	afb_sig_monitor_init_timeouts();
-
-	/* loop until stopped */
-	while (!me.stop) {
-
-		/* get a job */
-		job = afb_jobs_dequeue(&delayms);
-		PDBG("JOB=%p delayms=%ld ismain=%d allowed_thread_count=%d in_event_loop=%d hold_request_count=%d\n",
-			job, delayms, ismain, allowed_thread_count, in_event_loop, hold_request_count);
-		if (job) {
-			/* run the job */
-			THREAD_STATE_SET(&me, ts_Running);
-			x_mutex_unlock(&mutex);
-			afb_jobs_run(job);
-			x_mutex_lock(&mutex);
-			THREAD_STATE_SET(&me, ts_Idle);
-
-			/* release the current event loop */
-			evloop_release(&me);
-
-		/* no job, check if stopping is possible */
-		} else if (!ismain && started_thread_count > allowed_thread_count) {
-			THREAD_STATE_SET(&me, ts_Leaving);
-			me.stop = 1;
-
-		/* no job, check if stopping is possible */
-		} else if (ismain && allowed_thread_count == 0 && started_thread_count == 1) {
-			THREAD_STATE_SET(&me, ts_Leaving);
-			me.stop = 1;
-
-		/* no job, no stop, check if event loop waits handling */
-		} else if (!hold_request_count && !in_event_loop && (allowed_thread_count || delayms>0) && evloop_get(&me)) {
-
-			/* setup event loop */
-			in_event_loop = 1;
-			THREAD_STATE_SET(&me, ts_Event_Handling);
-
-			/* run the events */
-			x_mutex_unlock(&mutex);
-			afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
-			x_mutex_lock(&mutex);
-
-			/* release the current event loop */
-			THREAD_STATE_SET(&me, ts_Idle);
-			evloop_release(&me);
-			in_event_loop = 0;
-
-		/* no job, no stop and no event loop */
-		} else {
-			THREAD_STATE_SET(&me, ts_Waiting);
-			waiting_thread_count++;
-			if (waiting_thread_count == started_thread_count)
-				ERROR("Entering job deep sleep! Check your bindings.");
-			x_cond_wait(&cond, &mutex);
-			THREAD_STATE_SET(&me, ts_Idle);
-		}
-	}
-	started_thread_count--;
-	THREAD_STATE_SET(&me, ts_Stopping);
-
-	/* cleanup */
-	evloop_release(&me);
-	set_me(0);
-
-	/* unlink */
-	prv = &threads;
-	while (*prv != &me)
-		prv = &(*prv)->next;
-	*prv = me.next;
-
-	/* terminate */
-	afb_sig_monitor_clean_timeouts();
-
-	/* avoid deep sleep */
-	if (waiting_thread_count && waiting_thread_count >= started_thread_count) {
-		PDBG("    >>>> SIGNAL-DEEP-SLEEP\n");
-		waiting_thread_count--;
-		x_cond_signal(&cond);
-	}
-
-	DUMP_THREAD_LEAVE(&me);
-}
-
-/**
- * Entry point for created threads.
- * @param data not used
- * @return NULL
- */
-static void thread_starter(void *data)
-{
+	afb_sig_monitor_run(0, evloop_sig_run, closure);
 	x_mutex_lock(&mutex);
-	thread_run(0);
+	in_event_loop = 0;
+	evloop_release(tid);
 	x_mutex_unlock(&mutex);
 }
 
-/**
- * Starts a new thread
- * @return 0 in case of success or -1 in case of error
- */
+static void run_job(void *closure, x_thread_t tid)
+{
+	afb_jobs_run((struct afb_job*)closure);
+	x_mutex_lock(&mutex);
+	evloop_release(tid);
+	x_mutex_unlock(&mutex);
+}
+
+static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
+{
+	int rc = 0;
+	struct afb_job *job;
+	long delayms;
+
+	x_mutex_lock(&mutex);
+	job = afb_jobs_dequeue(&delayms);
+	if (job) {
+		desc->run = run_job;
+		desc->job = job;
+		rc = 1;
+	}
+	else {
+		if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
+			rc = -1;
+		else if (!hold_request_count && !in_event_loop && evloop_get(tid)) {
+			/* setup event loop */
+			desc->run = run_event_loop;
+			desc->job = (void*)(intptr_t)delayms;
+			in_event_loop = 1;
+			rc = 1;
+		}
+	}
+	x_mutex_unlock(&mutex);
+	return rc;
+}
+
+static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
+{
+	return get_job((int)(intptr_t)closure, desc, tid);
+}
+
 static int start_one_thread()
 {
-	x_thread_t tid;
-	int rc;
-
-	started_thread_count++;
-	rc = x_thread_create(&tid, thread_starter, NULL, 1);
-	if (rc < 0) {
-		CRITICAL("not able to start thread: %s", strerror(-rc));
-		started_thread_count--;
-	}
-	return rc;
+	int classid = afb_threads_active_count(ANY_CLASSID) < allowed_thread_count ? CLASSID_OTHERS : CLASSID_EXTRA;
+	return afb_threads_start(classid, get_job_cb, (void*)(intptr_t)classid);
 }
 
 /**
@@ -415,26 +211,10 @@ static int start_one_thread()
  */
 static void adapt(enum afb_sched_mode mode)
 {
-	DUMP_THREAD_STATES;
-	if (mode == Afb_Sched_Mode_Normal) {
-		if (in_event_loop) {
-			PDBG("    >>>> WAKEUP\n");
-			evloop_wakeup();
-		}
-		else {
-			PDBG("    >>>> NOTHING\n");
-		}
-	}
-	else {
-		if (waiting_thread_count) {
-			PDBG("    >>>> SIGNAL\n");
-			waiting_thread_count--;
-			x_cond_signal(&cond);
-		}
-		else {
-			PDBG("    >>>> START-THREAD\n");
+	if (!afb_threads_wakeup(ANY_CLASSID, 1)) {
+		evloop_wakeup();
+		if (mode != Afb_Sched_Mode_Normal)
 			start_one_thread();
-		}
 	}
 }
 
@@ -478,24 +258,12 @@ void afb_sched_call_sync(
 		void (*callback)(int, void*),
 		void *arg
 ) {
-	struct thread *me;
 	/* lock */
-	me = get_me();
-	if (me) {
-		x_mutex_lock(&mutex);
-		THREAD_STATE_PUSH(me, ts_Blocked);
-		evloop_release(me);
-		started_thread_count--;
-		adapt(0);
-		x_mutex_unlock(&mutex);
-	}
+	x_mutex_lock(&mutex);
+	if (release_my_evloop())
+		adapt(Afb_Sched_Mode_Normal);
+	x_mutex_unlock(&mutex);
 	afb_sig_monitor_run(0, callback, arg);
-	if (me) {
-		x_mutex_lock(&mutex);
-		started_thread_count++;
-		THREAD_STATE_POP(me);
-		x_mutex_unlock(&mutex);
-	}
 }
 
 /**
@@ -617,101 +385,78 @@ int afb_sched_call_job_sync(
  */
 struct ev_mgr *afb_sched_acquire_event_manager()
 {
-	struct thread *me;
-	void *holder;
+	x_thread_t tid = x_thread_self();
 
 	/* lock */
 	x_mutex_lock(&mutex);
 
-	/* creates the evloop on need */
-	if (!evmgr) {
-		ev_mgr_create(&evmgr);
+	/* try to hold the event loop under lock */
+	if (!evloop_get(tid)) {
 		if (!evmgr) {
 			x_mutex_unlock(&mutex);
 			return 0;
 		}
-	}
-
-	/* get the thread environment if existing */
-	me = get_me();
-
-	/* try to hold the event loop under lock */
-	holder = me ? (void*)me : (void*)&holder;
-	if (holder != ev_mgr_try_change_holder(evmgr, 0, holder)) {
-		if (me) {
-			THREAD_STATE_PUSH(me, ts_Acquiring);
-		}
-
-		/* wait for the event loop */
 		hold_request_count++;
 		do {
 			ev_mgr_wakeup(evmgr);
 			x_cond_wait(&condhold, &mutex);
 		}
-		while (holder != ev_mgr_try_change_holder(evmgr, 0, holder));
+		while (!evloop_get(tid));
 		hold_request_count--;
-
-		if (me) {
-			THREAD_STATE_POP(me);
-		}
-	}
-
-	/* warn if faked */
-	if (!me) {
-		/*
-		 * Releasing it is needed because there is no way to guess
-		 * when it has to be released really. But here is where it is
-		 * hazardous: if the caller modifies the eventloop when it
-		 * is waiting, there is no way to make the change effective.
-		 * A workaround to achieve that goal is for the caller to
-		 * require the event loop a second time after having modified it.
-		 */
-		ERROR("Requiring event manager/loop from outside of binder's callback is hazardous!");
-		if (verbose_wants(Log_Level_Info))
-			afb_sig_monitor_dumpstack();
-		evloop_release(holder);
 	}
 
 	/* unlock */
-	x_mutex_unlock(&mutex);
+	if (allowed_thread_count)
+		x_mutex_unlock(&mutex);
+	else {
+		/*
+		* Releasing it is needed because there is no way to guess
+		* when it has to be released really. But here is where it is
+		* hazardous: if the caller modifies the eventloop when it
+		* is waiting, there is no way to make the change effective.
+		* A workaround to achieve that goal is for the caller to
+		* require the event loop a second time after having modified it.
+		*/
+		evloop_release(tid);
+		x_mutex_unlock(&mutex);
+		ERROR("Requiring event manager/loop from outside of binder's callback is hazardous!");
+		if (verbose_wants(Log_Level_Info))
+			afb_sig_monitor_dumpstack();
+	}
+
 	return evmgr;
 }
 
-/**
- * Exit jobs threads and call handler if not NULL.
- */
-static void exit_threads(int force, void (*handler)())
+/* wait that no thread is running jobs */
+int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
-	struct thread *t;
-
-	/* set the handler */
-	exit_handler = handler;
-
-	/* ask to leave */
-	allowed_thread_count = 0;
-
-	/* stops the threads if forced */
-	if (force) {
-		for (t = threads ; t ; t = t->next) {
-			THREAD_STATE_SET(t, ts_Stopped);
-			t->stop = 1;
-		}
-	}
-
-	/* wake up the threads */
-	evloop_wakeup();
-	if (waiting_thread_count) {
-		PDBG("    >>>> SIGNAL-EXIT\n");
-		waiting_thread_count--;
-		x_cond_signal(&cond);
-	}
+	if (afb_threads_active_count(ANY_CLASSID) <= afb_threads_has_me())
+		start_one_thread();
+	return afb_threads_wait_idle(ANY_CLASSID, timeout * 1000);
 }
 
 /* Exit threads and call handler if not NULL. */
 void afb_sched_exit(int force, void (*handler)())
 {
 	x_mutex_lock(&mutex);
-	exit_threads(force, handler);
+
+        /* set the handler */
+        exit_handler = handler;
+
+	/* disallow start */
+	allowed_thread_count = 0;
+
+	/* release the evloop */
+	release_my_evloop();
+	evloop_wakeup();
+	x_mutex_unlock(&mutex);
+
+	/* stop */
+	if (!force)
+		afb_sched_wait_idle(1,1);
+	afb_threads_stop(ANY_CLASSID, INT_MAX);
+	x_mutex_lock(&mutex);
+	evloop_wakeup();
 	x_mutex_unlock(&mutex);
 }
 
@@ -733,24 +478,23 @@ int afb_sched_start(
 	x_mutex_lock(&mutex);
 
 	/* check whether already running */
-	if (get_me() || allowed_thread_count) {
-		ERROR("thread already started");
+	if (allowed_thread_count) {
+		ERROR("sched already started");
 		rc = X_EINVAL;
 		goto error;
 	}
 
 	/* records the allowed count */
 	allowed_thread_count = allowed_count;
-	started_thread_count = 0;
-	waiting_thread_count = 0;
 	afb_jobs_set_max_count(waiter_count);
 
 	/* start at least one thread: the current one */
-	while (started_thread_count + 1 < start_count) {
+	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
 		rc = start_one_thread();
 		if (rc != 0) {
 			ERROR("Not all threads can be started");
-			exit_threads(1, 0);
+			allowed_thread_count = 0;
+			afb_threads_stop(CLASSID_OTHERS, INT_MAX);
 			goto error;
 		}
 	}
@@ -761,8 +505,9 @@ int afb_sched_start(
 		goto error;
 
 	/* run until end */
-	started_thread_count++;
-	thread_run(1);
+	x_mutex_unlock(&mutex);
+	afb_threads_enter(CLASSID_MAIN, get_job_cb, (void*)(intptr_t)CLASSID_MAIN);
+	x_mutex_lock(&mutex);
 	rc = 0;
 error:
 	allowed_thread_count = 0;
@@ -772,63 +517,4 @@ error:
 		exit_handler = 0;
 	}
 	return rc;
-}
-
-/* wait that no thread is running jobs */
-int afb_sched_wait_idle(int wait_jobs, int timeout)
-{
-	const long one_second  = 1000000000; /* 1000 000 000 ns = 1000 ms = 1s */
-	const long delay_long  =  100000000; /*  100 000 000 ns = 100 ms */
-	const long delay_short =    1000000; /*    1 000 000 ns = 1 ms */
-
-	int jobcnt, idle, rc;
-	struct timespec ts;
-	long cpt = 0, delay;
-
-	for(;;) {
-		/* get the current counters */
-		x_mutex_lock(&mutex);
-		jobcnt = afb_jobs_get_pending_count();
-		idle = waiting_thread_count + in_event_loop >= started_thread_count;
-		if (idle && !started_thread_count && jobcnt && wait_jobs) {
-			/* start a prcessing thread on need */
-			PDBG("    >>>> START-THREAD-WAIT-IDLE\n");
-			start_one_thread();
-		}
-		x_mutex_unlock(&mutex);
-
-		/* compute next delay or exit if idle as expected */
-		if (!idle)
-			delay = delay_short;
-		else {
-			if (!wait_jobs || !jobcnt)
-				return jobcnt;
-			delay = delay_long;
-		}
-
-		/* exit on expired timeout */
-		if (!timeout)
-			return -1;
-
-		/* wait for a delay */
-		/*
-		 * NOTA BENE: using a wait is not beautiful but that function
-		 * used in tests is not used for normal operations.
-		 * Though, if it had to be used in normal operations, a more
-		 * proper way of doing this thing would be to use signaled
-		 * condition.
-		 */
-		cpt += delay;
-		ts.tv_sec = 0;
-		ts.tv_nsec = delay;
-		rc = nanosleep(&ts, &ts);
-		if (rc < 0)
-			cpt -= ts.tv_nsec;
-
-		/* handle timeout decount (coarse grained timeout) */
-		if (cpt >= one_second) {
-			cpt -= one_second;
-			timeout -= (timeout > 0);
-		}
-	}
 }

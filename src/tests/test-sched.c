@@ -76,28 +76,26 @@ int reachError;
 
 void test_job(int sig, void* arg){
 
-    int i, r;
+    int i;
 
     fprintf(stderr, "test_job received sig %d with arg %d\n", sig, p2i(arg));
 
     if(sig == 0){
         pthread_mutex_lock(&gval.mutex);
         gval.runingJobs++;
-        gval.val ++;
+        gval.val++;
 
-        // if this job is not the last one whaite the las job
+        // if this job is not the last one wait the last job
         if(gval.runingJobs < NBJOBS){
-            r = TRUE;
-            while(r){
+            while(!gval.lastJob){
                 pthread_mutex_unlock(&gval.mutex);
                 for(i=0; i<__INT_MAX__; i++);
                 pthread_mutex_lock(&gval.mutex);
-                if(gval.lastJob)r = FALSE;
             }
         }
         // if this job is the last one relese the other jobs
         else{
-            fprintf(stderr, "***** Realease waiting jobs ! *****\n");
+            fprintf(stderr, "***** Release waiting jobs ! *****\n");
             gval.lastJob = TRUE;
         }
     }
@@ -125,29 +123,26 @@ void exit_handler(){
 
 void test_start_job(int sig, void* arg){
 
-    int i, r;
+    int i;
 
     fprintf(stderr, "start_test_job received sig %d with arg %d\n", sig, p2i(arg));
 
     if(sig == 0){
 
-        r = TRUE;
         // wait for jobs to end
-        while(r){
+        pthread_mutex_lock(&gval.mutex);
+        while(gval.runingJobs > 0 || !gval.lastJob) {
+            pthread_mutex_unlock(&gval.mutex);
             for(i=0; i<__INT_MAX__; i++);
             pthread_mutex_lock(&gval.mutex);
-            if(gval.runingJobs <= 0 && gval.lastJob) r = FALSE;
-            pthread_mutex_unlock(&gval.mutex);
         }
-
-        pthread_mutex_lock(&gval.mutex);
         gval.val *= -1;
         gval.lastJob = FALSE;
         pthread_mutex_unlock(&gval.mutex);
     }
 
     afb_sched_exit(1, exit_handler);
-    fprintf(stderr, "living test_start_job\n");
+    fprintf(stderr, "leaving test_start_job\n");
 }
 
 void test_job_sync(int sig, void* arg){
@@ -205,7 +200,7 @@ void test_start_job_sync(int sig, void* arg){
 
     afb_sched_exit(1, NULL);
 
-    fprintf(stderr, "living test_start_job_sync\n");
+    fprintf(stderr, "leaving test_start_job_sync\n");
     fflush(stderr);
 }
 
@@ -285,7 +280,9 @@ END_TEST
 
 void test_job_enter(int sig, void * arg, struct afb_sched_lock * sched_lock){
     int r;
+    fprintf(stderr, "test_job_enter before\n");
     r = afb_sched_leave(sched_lock);
+    fprintf(stderr, "test_job_enter after %d\n", r);
     if(r)reachError++;
 }
 
@@ -294,12 +291,15 @@ void test_start_sched_enter(int sig, void * arg){
     int r;
 
     if (sig == 0){
+	fprintf(stderr, "test_start_sched_enter before\n");
         r = afb_sched_enter(NULL, 1, test_job_enter, arg);
+	fprintf(stderr, "test_start_sched_enter after\n");
         if(r)reachError++;
     }
+    fprintf(stderr, "test_start_sched_enter exiting\n");
     afb_sched_exit(1, NULL);
 
-    fprintf(stderr, "living test_start_sched_enter\n");
+    fprintf(stderr, "leaving test_start_sched_enter\n");
     fflush(stderr);
 }
 
@@ -378,7 +378,7 @@ void test_start_sched_adapt(int sig, void * arg){
     }
 
     afb_sched_exit(1, exit_handler);
-    fprintf(stderr, "living test_start_sched_adapt\n");
+    fprintf(stderr, "leaving test_start_sched_adapt\n");
 }
 
 START_TEST(test_sched_adapt){
