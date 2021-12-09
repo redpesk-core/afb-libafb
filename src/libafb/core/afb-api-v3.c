@@ -46,7 +46,6 @@
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "core/afb-req-v3.h"
-#include "core/afb-sched.h"
 #include "core/afb-calls.h"
 #include "core/afb-error-text.h"
 #include "core/afb-string-mode.h"
@@ -235,7 +234,6 @@ x3_api_get_event_loop_hookable(
 	struct sd_event *r;
 
 #if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
 	r = afb_systemd_get_event_loop();
 #else
 	r = NULL;
@@ -256,7 +254,6 @@ x3_api_get_user_bus_hookable(
 	struct sd_bus *r;
 
 #if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
 	r = afb_systemd_get_user_bus();
 #else
 	r = NULL;
@@ -277,7 +274,6 @@ x3_api_get_system_bus_hookable(
 	struct sd_bus *r;
 
 #if WITH_SYSTEMD
-	afb_sched_acquire_event_manager();
 	r = afb_systemd_get_system_bus();
 #else
 	r = NULL;
