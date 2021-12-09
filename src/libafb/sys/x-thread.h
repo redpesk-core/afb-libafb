@@ -60,9 +60,24 @@ static inline x_thread_t x_thread_self(void)
 	return pthread_self();
 }
 
+static inline int x_thread_equal(x_thread_t t1, x_thread_t t2)
+{
+	return pthread_equal(t1, t2);
+}
+
 static inline int x_thread_kill(x_thread_t tid, int sig)
 {
 	return pthread_kill(tid, sig);
+}
+
+static inline void x_thread_exit(void *retval)
+{
+	pthread_exit(retval);
+}
+
+static inline int x_thread_join(x_thread_t tid, void **retval)
+{
+	return pthread_join(tid, retval);
 }
 
 #if WITH_THREAD_LOCAL
