@@ -74,7 +74,16 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 	*iniv4->dlv4.root = api;
 
 	/* record the description */
-	rc = afb_api_v4_set_binding_fields(api, iniv4->dlv4.desc, iniv4->dlv4.mainctl);
+	afb_api_v4_set_userdata(api, iniv4->dlv4.desc->userdata);
+	afb_api_v4_set_mainctl(api, iniv4->dlv4.mainctl);
+	afb_api_v4_set_verbs(api, iniv4->dlv4.desc->verbs);
+	rc = 0;
+	if (iniv4->dlv4.desc->provide_class)
+		rc =  afb_api_v4_class_provide(api, iniv4->dlv4.desc->provide_class);
+	if (!rc && iniv4->dlv4.desc->require_class)
+		rc =  afb_api_v4_class_require(api, iniv4->dlv4.desc->require_class);
+	if (!rc && iniv4->dlv4.desc->require_api)
+		rc =  afb_api_v4_require_api(api, iniv4->dlv4.desc->require_api, 0);
 	if (rc >= 0 && iniv4->dlv4.mainctl) {
 		/* call the pre init routine safely */
 		memset(&ctlarg, 0, sizeof ctlarg);

@@ -43,6 +43,18 @@ struct afb_event_x2;
 
 struct globset;
 
+/**
+ * Set the global configconfiguration of all apis
+ * This is a json object whose keys are the name of
+ * the apis. The special key '*' is used for all apis.
+ * @param config the config to be recorded
+ */
+extern
+void
+afb_api_common_set_config(
+	struct json_object *config
+);
+
 /******************************************************************************/
 /**
  * The states of APIs
@@ -162,6 +174,8 @@ afb_api_common_incref(
  * @return 1 if the reference count falled to 0 or otherwise,
  *         if the object is stiil referenced returns 0. In other
  *         words returns 1 if the api must be released.
+ *
+ * @see afb_api_common_cleanup
  */
 extern
 int
@@ -176,11 +190,35 @@ afb_api_common_decref(
  * returned 1.
  *
  * @param comapi        the api
+ *
+ * @see afb_api_common_decref
  */
 extern
 void
 afb_api_common_cleanup(
 	struct afb_api_common *comapi
+);
+
+/**
+ * Call the starting function 'startcb' with the
+ * given closure. Manages the state. If the api
+ * is already started, do nothing. If the api
+ * is currently starting, returns an error.
+ * Otherwise run the start callback in a protected
+ * environment.
+ *
+ * @param api the api
+ * @param startcb the start function to call
+ * @param closure the closure of the start function
+ *
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_start(
+	struct afb_api_common *comapi,
+	int (*startcb)(void *closure),
+	void *closure
 );
 
 /**
@@ -214,6 +252,122 @@ afb_api_common_visible_name(
 }
 
 /**
+ * Get the apiset for calling
+ *
+ * @param comapi the api
+ *
+ * @return the apiset for issues calls
+ */
+static inline
+struct afb_apiset *
+afb_api_common_call_set(
+	struct afb_api_common *comapi
+) {
+	return comapi->call_set;
+}
+
+/**
+ * Get the apiset of declaration
+ *
+ * @param comapi the api
+ *
+ * @return the apiset handling declaration of the current api
+ */
+static inline
+struct afb_apiset *
+afb_api_common_declare_set(
+	struct afb_api_common *comapi
+) {
+	return comapi->declare_set;
+}
+
+/**
+ * Get the session of the api
+ * @param comapi the api
+ * @return its session (no add ref is done, the caller
+ * should issue one if it keeps the session but not the api)
+ */
+extern
+struct afb_session *
+afb_api_common_session_get(
+	struct afb_api_common *comapi
+);
+
+#if WITH_API_SESSIONS
+/**
+ * Tell the api to use its own session
+ *
+ * @param comapi the api
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_unshare_session(
+	struct afb_api_common *comapi
+);
+#endif
+
+/**
+ * Get the settings of the api
+ * @param comapi the api
+ * @return its settings
+ */
+extern
+struct json_object *
+afb_api_common_settings(
+	const struct afb_api_common *comapi
+);
+
+/**
+ * Tells the api requires the given names
+ * @param comapi  the api
+ * @param name specification of required apis (a space separated list)
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_require_api(
+	const struct afb_api_common *comapi,
+	const char *name,
+	int initialized
+);
+
+/**
+ * Tells the api requires the given names
+ * @param comapi  the api
+ * @param name specification of required apis (a space separated list)
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_class_provide(
+	const struct afb_api_common *comapi,
+	const char *name
+);
+
+extern
+int
+afb_api_common_class_require(
+	const struct afb_api_common *comapi,
+	const char *name
+);
+
+/**
+ * add an alias in the callset of the api
+ * @param comapi  the api
+ * @param apiname the name to alias (if null the name of the api is used)
+ * @param aliasname the aliased name to declare
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_add_alias(
+	const struct afb_api_common *comapi,
+	const char *apiname,
+	const char *aliasname
+);
+
+/**
  * Is the api sealed?
  *
  * @param comapi the api
@@ -229,59 +383,16 @@ afb_api_common_is_sealed(
 }
 
 /**
- * Get the apiset for calling?
+ * Seal the api. No verb can be added or removed on sealed api.
  *
- * @param comapi the api
- *
- * @return
- */
-static inline
-struct afb_apiset *
-afb_api_common_call_set(
-	struct afb_api_common *comapi
-) {
-	return comapi->call_set;
-}
-
-extern
-int
-afb_api_common_start(
-	struct afb_api_common *comapi,
-	int (*startcb)(void *closure),
-	void *closure
-);
-
-
-#if WITH_API_SESSIONS
-extern
-int
-afb_api_common_unshare_session(
-	struct afb_api_common *comapi
-);
-#endif
-
-extern
-struct afb_session *
-afb_api_common_session_get(
-	struct afb_api_common *comapi
-);
-
-/**
- *
+ * @param comapi the api to seal
  */
 extern
 void
-afb_api_common_set_config(
-	struct json_object *config
-);
-
-#if WITH_AFB_HOOK
-extern
-unsigned
-afb_api_common_update_hook(
+afb_api_common_api_seal(
 	struct afb_api_common *comapi
 );
-#endif
+
 
 extern
 int
@@ -354,47 +465,23 @@ afb_api_common_post_job(
 	void *group
 );
 
+/***************************************************************************
+* SECTION of HOOKABLES
+* the functions belaow are the same than the ones above but may be hooked
+***************************************************************************/
+#if WITH_AFB_HOOK
+/**
+ * When hooks are available, that function update the hooksflags
+ * based on the name of the api and returns the new value
+ * @param comapi the api
+ * @return the computed hook flags (0 if not hooked)
+ */
 extern
-int
-afb_api_common_require_api(
-	const struct afb_api_common *comapi,
-	const char *name,
-	int initialized
-);
-
-extern
-int
-afb_api_common_add_alias(
-	const struct afb_api_common *comapi,
-	const char *apiname,
-	const char *aliasname
-);
-
-extern
-void
-afb_api_common_api_seal(
+unsigned
+afb_api_common_update_hook(
 	struct afb_api_common *comapi
 );
-
-extern
-int
-afb_api_common_class_provide(
-	const struct afb_api_common *comapi,
-	const char *name
-);
-
-extern
-int
-afb_api_common_class_require(
-	const struct afb_api_common *comapi,
-	const char *name
-);
-
-extern
-struct json_object *
-afb_api_common_settings(
-	const struct afb_api_common *comapi
-);
+#endif
 
 extern
 void

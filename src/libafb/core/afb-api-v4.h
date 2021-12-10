@@ -82,6 +82,30 @@ afb_api_v4_create(
 );
 
 /**
+ * Increment the reference count of the api
+ *
+ * @param api the api whose reference count is to increment
+ * @return the api
+ */
+extern
+struct afb_api_v4 *
+afb_api_v4_addref(
+	struct afb_api_v4 *api
+);
+
+/**
+ * Decrement the reference count of the api and release its
+ * resources when the reference count reachs zero.
+ *
+ * @param api the api whose reference count is to decrement
+ */
+extern
+void
+afb_api_v4_unref(
+	struct afb_api_v4 *api
+);
+
+/**
  * Call safely the ctlproc with the given parameters
  *
  * @param apiv4    the api to pass to the ctlproc
@@ -100,6 +124,7 @@ afb_api_v4_safe_ctlproc(
 	afb_ctlarg_t ctlarg
 );
 
+/** OBSOLETE */
 extern
 int
 afb_api_v4_set_binding_fields(
@@ -108,113 +133,81 @@ afb_api_v4_set_binding_fields(
 	afb_api_callback_x4_t mainctl
 );
 
-extern
-struct afb_api_v4 *
-afb_api_v4_addref(
-	struct afb_api_v4 *api
-);
-
-extern
-void
-afb_api_v4_unref(
-	struct afb_api_v4 *api
-);
-
-extern
-struct afb_api_common *
-afb_api_v4_get_api_common(
-	struct afb_api_v4 *api
-);
-
-extern
-void
-afb_api_v4_seal(
-	struct afb_api_v4 *api
-);
-
-extern
-int
-afb_api_v4_add_verb(
-	struct afb_api_v4 *api,
-	const char *verb,
-	const char *info,
-	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
-	void *vcbdata,
-	const struct afb_auth *auth,
-	uint32_t session,
-	int glob
-);
-
-extern
-int
-afb_api_v4_del_verb(
-	struct afb_api_v4 *api,
-	const char *verb,
-	void **vcbdata
-);
-
-extern
-int
-afb_api_v4_event_handler_add(
-	struct afb_api_v4 *api,
-	const char *pattern,
-	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
-	void *closure
-);
-
-extern
-int
-afb_api_v4_event_handler_del(
-	struct afb_api_v4 *api,
-	const char *pattern,
-	void **closure
-);
-
-extern
-void
-afb_api_v4_process_call(
-	struct afb_api_v4 *api,
-	struct afb_req_common *req
-);
-
-extern
-struct json_object *
-afb_api_v4_make_description_openAPIv3(
-	struct afb_api_v4 *api
-);
-
 /************************************************/
 
+/**
+ * Get the log mask
+ * @param api the api
+ * @return the log mask of the api
+ */
 extern
 int
 afb_api_v4_logmask(
 	struct afb_api_v4 *api
 );
 
+/**
+ * Set the log mask
+ * @param apiv4 the api
+ * @param mask the log mask to set
+ */
+extern
+void
+afb_api_v4_logmask_set(
+	struct afb_api_v4 *apiv4,
+	int mask
+);
+
+/**
+ * Get the name of the api
+ * @param apiv4 the api
+ * @return the name of the api
+ */
 extern
 const char *
 afb_api_v4_name(
 	struct afb_api_v4 *apiv4
 );
 
+/**
+ * Get the info of the api
+ * @param apiv4 the api
+ * @return the info of the api
+ */
 extern
 const char *
 afb_api_v4_info(
 	struct afb_api_v4 *apiv4
 );
 
+/**
+ * Get the path of the api
+ * @param apiv4 the api
+ * @return the path of the api
+ */
 extern
 const char *
 afb_api_v4_path(
 	struct afb_api_v4 *apiv4
 );
 
+/**
+ * Get the user data of the api
+ * @param apiv4 the api
+ * @return the user data of the api
+ */
 extern
 void *
 afb_api_v4_get_userdata(
 	struct afb_api_v4 *apiv4
 );
 
+/**
+ * Set the user data of the api
+ * @param apiv4 the api
+ * @param value the user data to set
+ * @return the previous user data of the api
+ */
 extern
 void *
 afb_api_v4_set_userdata(
@@ -222,11 +215,49 @@ afb_api_v4_set_userdata(
 	void *value
 );
 
-/************************************************/
-
+/**
+ * Set the main control routine for the api
+ * @param apiv4 the api
+ * @param mainctl the main control routine to set
+ */
 extern
 void
-afb_api_v4_vverbose_hookable(
+afb_api_v4_set_mainctl(
+	struct afb_api_v4 *apiv4,
+	afb_api_callback_x4_t mainctl
+);
+
+/**
+ * Send to the journal with the log 'level' a message described
+ * by 'fmt' and following parameters.
+ *
+ * 'file', 'line' and 'func' are indicators of position of the code in source files
+ * (see macros __FILE__, __LINE__ and __func__).
+ *
+ * 'level' is defined by syslog standard:
+ *      EMERGENCY         0        System is unusable
+ *      ALERT             1        Action must be taken immediately
+ *      CRITICAL          2        Critical conditions
+ *      ERROR             3        Error conditions
+ *      WARNING           4        Warning conditions
+ *      NOTICE            5        Normal but significant condition
+ *      INFO              6        Informational
+ *      DEBUG             7        Debug-level messages
+ *
+ * @param api v4the api that collects the logging message
+ * @param level the level of the message
+ * @param file the source file that logs the messages or NULL
+ * @param line the line in the source file that logs the message
+ * @param func the name of the function in the source file that logs (or NULL)
+ * @param fmt the format of the message as in printf
+ * @param args the arguments to the format string of the message
+ *
+ * @see syslog
+ * @see printf
+ */
+extern
+void
+afb_api_v4_vverbose(
 	struct afb_api_v4 *apiv4,
 	int level,
 	const char *file,
@@ -253,7 +284,7 @@ afb_api_v4_vverbose_hookable(
  *      INFO              6        Informational
  *      DEBUG             7        Debug-level messages
  *
- * @param api the api that collects the logging message
+ * @param apiv4 the api that collects the logging message
  * @param level the level of the message
  * @param file the source file that logs the messages or NULL
  * @param line the line in the source file that logs the message
@@ -266,7 +297,7 @@ afb_api_v4_vverbose_hookable(
  */
 extern
 void
-afb_api_verbose(
+afb_api_v4_verbose(
 	struct afb_api_v4 *apiv4,
 	int level,
 	const char *file,
@@ -274,6 +305,240 @@ afb_api_verbose(
 	const char *func,
 	const char *fmt,
 	...
+);
+
+/**
+ * set the array of verbs
+ * @param apiv4 the api
+ * @param verbs the set of verbs
+ * @return 0 in case of success or a negative error code
+ */
+extern
+int
+afb_api_v4_set_verbs(
+	struct afb_api_v4 *apiv4,
+	const struct afb_verb_v4 *verbs
+);
+
+/**
+ * add one verb to the api
+ * @param apiv4 the api
+ * @param verb the name of the verb
+ * @param info an ifo text about the verb
+ * @param callback the callback function to call
+ * @param vcbdata the verb callback data
+ * @param auth the authorisation required for calling the verb
+ * @param session the session flags
+ * @param glob if not zero, the verb name is a global pattern
+ * @return 0 in case of success or a negative error code
+ */
+extern
+int
+afb_api_v4_add_verb(
+	struct afb_api_v4 *api,
+	const char *verb,
+	const char *info,
+	void (*callback)(struct afb_req_v4 *req, unsigned nparams, struct afb_data * const params[]),
+	void *vcbdata,
+	const struct afb_auth *auth,
+	uint32_t session,
+	int glob
+);
+
+/**
+ * delete one verb from the api
+ * @param apiv4 the api
+ * @param verb the name of the verb
+ * @param vcbdata a pointer for storing the verb callback data of the remove verb
+ * @return 0 in case of success or a negative error code
+ */
+extern
+int
+afb_api_v4_del_verb(
+	struct afb_api_v4 *api,
+	const char *verb,
+	void **vcbdata
+);
+
+/**
+ * add one event handler for the api
+ * @param apiv4 the api
+ * @param pattern the global pattern of the events to handle
+ * @param callback the callback function that handle the events of pattern
+ * @param closure the closure callback data
+ * @return 0 in case of success or a negative error code
+ */
+extern
+int
+afb_api_v4_event_handler_add(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
+	void *closure
+);
+
+/**
+ * delete one event handler for the api
+ * @param apiv4 the api
+ * @param pattern the global pattern of the handler to remove
+ * @param closure a pointer for storing the closure of the deleted handler
+ * @return 0 in case of success or a negative error code
+ */
+extern
+int
+afb_api_v4_event_handler_del(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void **closure
+);
+
+/**
+ * process the call
+ * @param apiv4 the api
+ * @param req the request to process
+ */
+extern
+void
+afb_api_v4_process_call(
+	struct afb_api_v4 *api,
+	struct afb_req_common *req
+);
+
+/**
+ * Return an openAPIv3 json description of the api
+ * @param apiv4 the api
+ * @return the description
+ */
+extern
+struct json_object *
+afb_api_v4_make_description_openAPIv3(
+	struct afb_api_v4 *api
+);
+
+/**
+ * Return the count of verbs
+ * @param apiv4 the api
+ * @return the count of verb
+ */
+extern
+unsigned
+afb_api_v4_verb_count(
+	struct afb_api_v4 *apiv4
+);
+
+/**
+ * Return the desciptor of the verb of index
+ * @param apiv4 the api
+ * @param index index of the verb to get
+ * @return the description or zero if index is invalid
+ */
+const struct afb_verb_v4 *
+afb_api_v4_verb_at(
+	struct afb_api_v4 *apiv4,
+	unsigned index
+);
+
+/**
+ * Return the desciptor of the verb matching the given name
+ * @param apiv4 the api
+ * @param the name to match
+ * @return the description or zero if no verb matches
+ */
+const struct afb_verb_v4 *
+afb_api_v4_verb_matching(
+	struct afb_api_v4 *apiv4,
+	const char *name
+);
+
+/***************************************************************************
+* SECTION of WRAPPERS to AFB_API_COMMON
+***************************************************************************/
+
+/**
+ * Get a pointer to the internal common api
+ *
+ * @param api the api
+ * @return a pointer to the internal common api
+ *
+ * CAUTION: Never call the function managing the reference count
+ * on the returned pointer!
+ */
+extern
+struct afb_api_common *
+afb_api_v4_get_api_common(
+	struct afb_api_v4 *api
+);
+
+extern
+int
+afb_api_v4_class_provide(
+	struct afb_api_v4 *apiv4,
+	const char *name
+);
+
+extern
+int
+afb_api_v4_require_api(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int initialized
+);
+
+extern
+int
+afb_api_v4_class_require(
+	struct afb_api_v4 *apiv4,
+	const char *name
+);
+
+extern
+int
+afb_api_v4_add_alias(
+	struct afb_api_v4 *apiv4,
+	const char *apiname,
+	const char *aliasname
+);
+
+extern
+void
+afb_api_v4_seal(
+	struct afb_api_v4 *apiv4
+);
+
+/***************************************************************************
+* SECTION of HOOKABLES
+* the functions belaow are the same than the ones above but may be hooked
+***************************************************************************/
+
+#if WITH_AFB_HOOK
+extern
+void
+afb_api_v4_update_hooks(
+	struct afb_api_v4 *apiv4
+);
+#endif
+
+extern
+void
+afb_api_v4_vverbose_hookable(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char *function,
+	const char *fmt,
+	va_list args
+);
+
+void
+afb_api_v4_vverbose_hookable(
+	struct afb_api_v4 *apiv4,
+	int level,
+	const char *file,
+	int line,
+	const char *function,
+	const char *fmt,
+	va_list args
 );
 
 extern

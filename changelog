@@ -11,6 +11,9 @@ Version 4.1.0
    - fix issue on timer management
    - fix deprecated hooks of LIBC
 
+  minor/details
+   - fix declarations in afb-api-v4 and improved API
+
 Version 4.0.4
 -------------
 
