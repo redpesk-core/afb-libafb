@@ -23,7 +23,29 @@
 
 #pragma once
 
+#include "../sys/x-thread.h"
 #include "../sys/ev-mgr.h"
+
+extern
+int afb_ev_mgr_release(x_thread_t tid);
+
+extern
+struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid);
+
+extern
+struct ev_mgr *afb_ev_mgr_get(x_thread_t tid);
+
+extern
+void afb_ev_mgr_wakeup();
+
+extern
+int afb_ev_mgr_release_for_me();
+
+extern
+struct ev_mgr *afb_ev_mgr_try_get_for_me();
+
+extern
+struct ev_mgr *afb_ev_mgr_get_for_me();
 
 extern
 int afb_ev_mgr_get_fd();

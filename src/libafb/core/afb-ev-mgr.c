@@ -23,10 +23,136 @@
 
 
 #include <stdint.h>
+#include <limits.h>
+#include <string.h>
 
 #include "sys/ev-mgr.h"
+#include "core/afb-jobs.h"
 #include "core/afb-sched.h"
 #include "core/afb-ev-mgr.h"
+
+#include "sys/x-mutex.h"
+#include "sys/x-cond.h"
+#include "sys/x-errno.h"
+#include "sys/x-thread.h"
+
+#include "sys/verbose.h"
+
+/* synchronisation of threads */
+static x_mutex_t mutex = X_MUTEX_INITIALIZER;
+
+/* event manager */
+static struct ev_mgr *evmgr = 0;
+
+/* holding the event manager */
+#define INVALID_THREAD_ID 0                       /**< assume 0 is not a valid thread id */
+static x_thread_t holder = INVALID_THREAD_ID;     /**< current holder */
+struct waithold
+{
+	struct waithold *next;
+	x_cond_t  cond;
+};
+static struct waithold *awaiters;
+
+/**
+ * Release the event manager if held currently
+ */
+static void unhold_evmgr()
+{
+	struct waithold *waiter;
+	holder = INVALID_THREAD_ID;
+	waiter = awaiters;
+	if (waiter) {
+		awaiters = waiter->next;
+		x_cond_signal(&waiter->cond);
+	}
+}
+
+/**
+ * Release the event manager if held currently
+ */
+static int try_unhold_evmgr(x_thread_t tid)
+{
+	if (!evmgr || holder != tid) /* x_thread_equal? */
+		return 0;
+	unhold_evmgr();
+	return 1;
+}
+
+/**
+ * try to get the eventloop for the thread of tid
+ */
+static int try_hold_evmgr(x_thread_t tid)
+{
+	if (!evmgr && ev_mgr_create(&evmgr) < 0)
+		return 0;
+	if (holder == INVALID_THREAD_ID) /* x_thread_equal? */
+		holder = tid;
+	return holder == tid; /* x_thread_equal? */
+}
+
+int afb_ev_mgr_release(x_thread_t tid)
+{
+	x_mutex_lock(&mutex);
+	int unheld = try_unhold_evmgr(tid);
+	x_mutex_unlock(&mutex);
+	return unheld;
+}
+
+struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid)
+{
+	x_mutex_lock(&mutex);
+	int gotit = try_hold_evmgr(tid);
+	x_mutex_unlock(&mutex);
+	return gotit ? evmgr : 0;
+}
+
+struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
+{
+	/* lock */
+	x_mutex_lock(&mutex);
+
+	/* try to hold the event loop under lock */
+	while (!try_hold_evmgr(tid) && evmgr) {
+		struct waithold wait = { 0, X_COND_INITIALIZER };
+		struct waithold **piw = &awaiters;
+		while (*piw)
+			piw = &(*piw)->next;
+		*piw = &wait;
+		ev_mgr_wakeup(evmgr);
+		x_cond_wait(&wait.cond, &mutex);
+	}
+
+	/* unlock */
+	x_mutex_unlock(&mutex);
+
+	return evmgr;
+}
+
+/**
+ * wakeup the event loop if needed by sending
+ * an event.
+ */
+void afb_ev_mgr_wakeup()
+{
+	if (evmgr)
+		ev_mgr_wakeup(evmgr);
+}
+
+int afb_ev_mgr_release_for_me()
+{
+	return afb_ev_mgr_release(x_thread_self());
+}
+
+struct ev_mgr *afb_ev_mgr_try_get_for_me()
+{
+	return afb_ev_mgr_try_get(x_thread_self());
+}
+
+struct ev_mgr *afb_ev_mgr_get_for_me()
+{
+	return afb_ev_mgr_get(x_thread_self());
+}
 
 int afb_ev_mgr_get_fd()
 {
