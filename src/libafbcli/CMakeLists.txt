@@ -33,6 +33,7 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/misc/afb-socket.c
 	${DIR}/misc/afb-ws.c
 	${DIR}/core/afb-ev-mgr.c
+	${DIR}/core/afb-jobs.c
 	${DIR}/sys/ev-mgr.c
 	${DIR}/sys/systemd.c
 	${DIR}/sys/verbose.c
@@ -45,6 +46,7 @@ set(LIBAFBCLI_SOURCES
 
 ADD_LIBRARY(libafbcli SHARED ${LIBAFBCLI_SOURCES})
 set_property(TARGET libafbcli PROPERTY OUTPUT_NAME afbcli)
+target_compile_definitions(libafbcli PRIVATE -DWITH_JOB_NOT_MONITORED=1)
 
 SET_TARGET_PROPERTIES(libafbcli PROPERTIES
 	VERSION ${LIBAFBCLI_VERSION}

@@ -42,7 +42,7 @@
 #include "core/afb-perm.h"
 #include "core/afb-req-common.h"
 #include "core/afb-cred.h"
-#include "core/afb-sched.h"
+#include "core/afb-ev-mgr.h"
 #include "sys/ev-mgr.h"
 
 /*********************************************************************/
@@ -223,7 +223,7 @@ struct afb_req_common_query_itf test_queryitf =
 };
 
 void waiteForCB(){
-	struct ev_mgr *evmgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *evmgr = afb_ev_mgr_get_for_me();
 	do {
 		ev_mgr_run(evmgr, 100);
 	}

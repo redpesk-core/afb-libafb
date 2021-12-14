@@ -48,16 +48,6 @@
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 
-/**************** ev mgr ****************************/
-
-struct ev_mgr *afb_sched_acquire_event_manager()
-{
-	static struct ev_mgr *result;
-	if (!result)
-		ev_mgr_create(&result);
-	return result;
-}
-
 /*****************************************************************************************************************************/
 
 static struct sd_event_source *current_sd_event_source_prepare;
@@ -489,7 +479,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 				fcntl(fd, F_SETFL, O_NONBLOCK);
 #if WITH_GNUTLS
 			if (rc == 0 && tls) {
-				rc = tls_upgrade_client(afb_sched_acquire_event_manager(), fd, 0/*host*/);
+				rc = tls_upgrade_client(afb_ev_mgr_get_for_me(), fd, 0/*host*/);
 				if (rc >= 0) {
 					afb_ev_mgr_prepare();
 					fd = rc;
@@ -543,7 +533,7 @@ static int sockopenpref(const char *uri, int server, const char *prefix, const c
 #if WITH_GNUTLS
 	if (fd > 0 && tls) {
 		mfd = fd;
-		fd = tls_upgrade_client(afb_sched_acquire_event_manager(), mfd, 0);
+		fd = tls_upgrade_client(afb_ev_mgr_get_for_me(), mfd, 0);
 		if (fd < 0)
 			close(mfd);
 		else

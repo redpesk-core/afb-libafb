@@ -28,7 +28,6 @@
 
 #include "sys/ev-mgr.h"
 #include "core/afb-jobs.h"
-#include "core/afb-sched.h"
 #include "core/afb-ev-mgr.h"
 
 #include "sys/x-mutex.h"
@@ -156,35 +155,54 @@ struct ev_mgr *afb_ev_mgr_get_for_me()
 
 int afb_ev_mgr_get_fd()
 {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
 	return ev_mgr_get_fd(mgr);
 }
 
 int afb_ev_mgr_prepare()
 {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
-	return ev_mgr_prepare(mgr);
+	long delayms;
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int njobs = afb_jobs_dequeue_multiple(0, 0, &delayms);
+	int result = ev_mgr_prepare_with_wakeup(mgr, njobs ? 0 : delayms > INT_MAX ? INT_MAX : (int)delayms);
+	afb_ev_mgr_release(me);
+	return result;
 }
 
 int afb_ev_mgr_wait(int ms)
 {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
-	return ev_mgr_wait(mgr, ms);
+	x_thread_t me = x_thread_self();
+	int result = ev_mgr_wait(afb_ev_mgr_get(me), ms);
+	afb_ev_mgr_release(me);
+	return result;
+}
+
+static void dispatch_mgr(struct ev_mgr *mgr, unsigned max_count_jobs)
+{
+	struct afb_job *job;
+	ev_mgr_dispatch(mgr);
+	while(max_count_jobs && (job = afb_jobs_dequeue(0))) {
+		afb_jobs_run(job);
+		max_count_jobs--;
+	}
 }
 
 void afb_ev_mgr_dispatch()
 {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
-	ev_mgr_dispatch(mgr);
+	x_thread_t me = x_thread_self();
+	dispatch_mgr(afb_ev_mgr_get(me), 1);
+	afb_ev_mgr_release(me);
 }
 
 int afb_ev_mgr_wait_and_dispatch(int ms)
 {
-	int rc;
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
-	rc = ev_mgr_wait(mgr, ms);
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int rc = ev_mgr_wait(mgr, ms);
 	if (rc >= 0)
-		ev_mgr_dispatch(mgr);
+		dispatch_mgr(mgr, 1);
+	afb_ev_mgr_release(me);
 	return rc;
 }
 
@@ -197,7 +215,7 @@ int afb_ev_mgr_add_fd(
 	int autounref,
 	int autoclose
 ) {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
 	return ev_mgr_add_fd(mgr, efd, fd, events, handler, closure, autounref, autoclose);
 }
 
@@ -206,7 +224,7 @@ int afb_ev_mgr_add_prepare(
 	ev_prepare_cb_t handler,
 	void *closure
 ) {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
 	return ev_mgr_add_prepare(mgr, prep, handler, closure);
 }
 
@@ -222,6 +240,6 @@ int afb_ev_mgr_add_timer(
 	void *closure,
 	int autounref
 ) {
-	struct ev_mgr *mgr = afb_sched_acquire_event_manager();
+	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
 	return ev_mgr_add_timer(mgr, timer, absolute, start_sec, start_ms, count, period_ms, accuracy_ms, handler, closure, autounref);
 }

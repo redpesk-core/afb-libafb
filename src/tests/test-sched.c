@@ -34,6 +34,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+#include "core/afb-ev-mgr.h"
 #include "core/afb-sched.h"
 #include "core/afb-jobs.h"
 #include "core/afb-sig-monitor.h"
@@ -213,15 +214,11 @@ START_TEST(test_async){
     gval.val = 0;
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
-    struct ev_mgr * ev;
 
     fprintf(stderr, "\n***********************test_async***********************\n");
 
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
 
     afb_jobs_set_max_count(NBJOBS);
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
@@ -247,15 +244,11 @@ START_TEST(test_sync){
     gval.val = 0;
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
-    struct ev_mgr * ev;
 
     fprintf(stderr, "\n************************test_sync************************\n");
 
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
 
     afb_jobs_set_max_count(NBJOBS);
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
@@ -310,15 +303,11 @@ START_TEST(test_sched_enter){
     gval.runingJobs = 0;
     gval.killedJobs = 0;
     reachError = FALSE;
-    struct ev_mgr * ev;
 
     fprintf(stderr, "\n************************test_sched_enter************************\n");
 
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
 
     afb_jobs_set_max_count(NBJOBS);
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
@@ -387,14 +376,11 @@ START_TEST(test_sched_adapt){
     gval.lastJob = FALSE;
     gval.runingJobs = 0;
     gval.killedJobs = 0;
-    struct ev_mgr * ev;
     int r;
 
     fprintf(stderr, "\n***********************test_sched_adapt***********************\n");
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
     afb_jobs_set_max_count(NBJOBS+1);
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS+1);
 
@@ -425,10 +411,10 @@ void getevmgr(int num)
     char *prefix = &spaces[off < 0 ? 0 : off];
 
     fprintf(stderr, "%sBEFORE %d\n", prefix, num);
-    ev1 = afb_sched_acquire_event_manager();
+    ev1 = afb_ev_mgr_get_for_me();
     ck_assert(ev1 != NULL);
     fprintf(stderr, "%sMIDDLE %d\n", prefix, num);
-    ev2 = afb_sched_acquire_event_manager();
+    ev2 = afb_ev_mgr_get_for_me();
     ck_assert(ev2 == ev1);
     fprintf(stderr, "%sAFTER %d\n", prefix, num);
     evmgr_gotten++;
@@ -460,14 +446,10 @@ void do_test_evmgr(int signum, void *arg)
 
 START_TEST(test_evmgr)
 {
-    struct ev_mgr * ev;
-
     fprintf(stderr, "\n***********************test_evmgr***********************\n");
 
     // initialisation of the scheduler
     ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-    ev = afb_sched_acquire_event_manager();
-    ck_assert(ev != NULL);
     afb_jobs_set_max_count(NBJOBS+1);
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS+1);
 

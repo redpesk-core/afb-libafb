@@ -37,6 +37,7 @@
 #include "core/afb-jobs.h"
 #include "core/afb-sched.h"
 #include "core/afb-threads.h"
+#include "core/afb-ev-mgr.h"
 #include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
 #include "sys/verbose.h"
@@ -80,54 +81,14 @@ struct sync_job
 
 /* synchronisation of threads */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
-static x_cond_t  condhold = X_COND_INITIALIZER;
-
-/* counts for threads */
-static int allowed_thread_count = 0;	/**< allowed count of threads */
-static int hold_request_count = 0;	/**< count of request to hold the event loop */
-static int in_event_loop = 0;		/**< is waiting events */
-
-/* event loop */
-static struct ev_mgr *evmgr;
 
 /* exit manager */
 static void (*exit_handler)();
 
+/* counts for threads */
+static int allowed_thread_count = 0;	/**< allowed count of threads */
 
-/**
- * wakeup the event loop if needed by sending
- * an event.
- */
-static void evloop_wakeup()
-{
-	if (evmgr)
-		ev_mgr_wakeup(evmgr);
-}
-
-/**
- * Release the currently held event loop
- */
-static int evloop_release(x_thread_t tid)
-{
-	if (!evmgr || ev_mgr_try_change_holder(evmgr, (void*)tid, 0))
-		return 0;
-	if (hold_request_count)
-		x_cond_signal(&condhold);
-	return 1;
-}
-
-/**
- * get the eventloop for the current thread
- */
-static int evloop_get(x_thread_t tid)
-{
-	return (evmgr || ev_mgr_create(&evmgr) >= 0) && ev_mgr_try_change_holder(evmgr, 0, (void*)tid) == (void*)tid;
-}
-
-static int release_my_evloop()
-{
-	return evloop_release(x_thread_self());
-}
+static struct ev_mgr *evmgr;
 
 /**
  * run the event loop
@@ -148,23 +109,19 @@ static void evloop_sig_run(int signum, void *closure)
 				ev_mgr_dispatch(evmgr);
 		}
 	}
+	evmgr = 0;
 }
 
 static void run_event_loop(void *closure, x_thread_t tid)
 {
 	afb_sig_monitor_run(0, evloop_sig_run, closure);
-	x_mutex_lock(&mutex);
-	in_event_loop = 0;
-	evloop_release(tid);
-	x_mutex_unlock(&mutex);
+	afb_ev_mgr_release(tid);
 }
 
 static void run_job(void *closure, x_thread_t tid)
 {
 	afb_jobs_run((struct afb_job*)closure);
-	x_mutex_lock(&mutex);
-	evloop_release(tid);
-	x_mutex_unlock(&mutex);
+	afb_ev_mgr_release(tid);
 }
 
 static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
@@ -172,6 +129,7 @@ static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
 	int rc = 0;
 	struct afb_job *job;
 	long delayms;
+	struct ev_mgr *em;
 
 	x_mutex_lock(&mutex);
 	job = afb_jobs_dequeue(&delayms);
@@ -180,14 +138,15 @@ static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
 		desc->job = job;
 		rc = 1;
 	}
+	else if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
+		rc = -1;
 	else {
-		if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
-			rc = -1;
-		else if (!hold_request_count && !in_event_loop && evloop_get(tid)) {
+		em = afb_ev_mgr_try_get(tid);
+		if (em) {
+			evmgr = em;
 			/* setup event loop */
 			desc->run = run_event_loop;
 			desc->job = (void*)(intptr_t)delayms;
-			in_event_loop = 1;
 			rc = 1;
 		}
 	}
@@ -212,7 +171,7 @@ static int start_one_thread()
 static void adapt(enum afb_sched_mode mode)
 {
 	if (!afb_threads_wakeup(ANY_CLASSID, 1)) {
-		evloop_wakeup();
+		afb_ev_mgr_wakeup();
 		if (mode != Afb_Sched_Mode_Normal)
 			start_one_thread();
 	}
@@ -247,9 +206,7 @@ int afb_sched_post_job(
 ) {
 	int rc;
 
-	x_mutex_lock(&mutex);
 	rc = post_job(group, delayms, timeout, callback, arg, mode);
-	x_mutex_unlock(&mutex);
 	return rc;
 }
 
@@ -259,10 +216,8 @@ void afb_sched_call_sync(
 		void *arg
 ) {
 	/* lock */
-	x_mutex_lock(&mutex);
-	if (release_my_evloop())
+	if (afb_ev_mgr_release_for_me())
 		adapt(Afb_Sched_Mode_Normal);
-	x_mutex_unlock(&mutex);
 	afb_sig_monitor_run(0, callback, arg);
 }
 
@@ -380,53 +335,6 @@ int afb_sched_call_job_sync(
 	return sync.rc;
 }
 
-/**
- * Ensure that the current running thread can control the event loop.
- */
-struct ev_mgr *afb_sched_acquire_event_manager()
-{
-	x_thread_t tid = x_thread_self();
-
-	/* lock */
-	x_mutex_lock(&mutex);
-
-	/* try to hold the event loop under lock */
-	if (!evloop_get(tid)) {
-		if (!evmgr) {
-			x_mutex_unlock(&mutex);
-			return 0;
-		}
-		hold_request_count++;
-		do {
-			ev_mgr_wakeup(evmgr);
-			x_cond_wait(&condhold, &mutex);
-		}
-		while (!evloop_get(tid));
-		hold_request_count--;
-	}
-
-	/* unlock */
-	if (allowed_thread_count)
-		x_mutex_unlock(&mutex);
-	else {
-		/*
-		* Releasing it is needed because there is no way to guess
-		* when it has to be released really. But here is where it is
-		* hazardous: if the caller modifies the eventloop when it
-		* is waiting, there is no way to make the change effective.
-		* A workaround to achieve that goal is for the caller to
-		* require the event loop a second time after having modified it.
-		*/
-		evloop_release(tid);
-		x_mutex_unlock(&mutex);
-		ERROR("Requiring event manager/loop from outside of binder's callback is hazardous!");
-		if (verbose_wants(Log_Level_Info))
-			afb_sig_monitor_dumpstack();
-	}
-
-	return evmgr;
-}
-
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
@@ -445,19 +353,18 @@ void afb_sched_exit(int force, void (*handler)())
 
 	/* disallow start */
 	allowed_thread_count = 0;
+	x_mutex_unlock(&mutex);
 
 	/* release the evloop */
-	release_my_evloop();
-	evloop_wakeup();
-	x_mutex_unlock(&mutex);
+
+	afb_ev_mgr_release_for_me();
+	afb_ev_mgr_wakeup();
 
 	/* stop */
 	if (!force)
 		afb_sched_wait_idle(1,1);
 	afb_threads_stop(ANY_CLASSID, INT_MAX);
-	x_mutex_lock(&mutex);
-	evloop_wakeup();
-	x_mutex_unlock(&mutex);
+	afb_ev_mgr_wakeup();
 }
 
 /* Enter the jobs processing loop */

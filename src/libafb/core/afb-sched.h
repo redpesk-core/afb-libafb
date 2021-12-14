@@ -113,13 +113,6 @@ extern int afb_sched_start(
 extern void afb_sched_exit(int force, void (*handler)());
 
 /**
- * Ensure that the current running thread can control the event loop.
- *
- * @return the event loop manager
- */
-extern struct ev_mgr *afb_sched_acquire_event_manager();
-
-/**
  * Schedule a new asynchronous job represented by 'callback' and 'arg'
  * for the 'group' and the 'timeout'.
  *

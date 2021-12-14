@@ -614,7 +614,6 @@ void test_check_perm(int sig, void * arg){
 START_TEST(check_perm)
 {
 	struct afb_req_common req;
-	struct ev_mgr * ev;
 
 	fprintf(stderr, "\n### Check Perm\n");
 
@@ -626,9 +625,6 @@ START_TEST(check_perm)
 
 	// initialisation of the scheduler
 	ck_assert_int_eq(afb_sig_monitor_init(1), 0);
-
-	ev = afb_sched_acquire_event_manager();
-	ck_assert(ev != NULL);
 
 	gval = 0;
 	ck_assert_int_eq(afb_sched_start(10, 1, 10, test_check_perm, &req),0);
