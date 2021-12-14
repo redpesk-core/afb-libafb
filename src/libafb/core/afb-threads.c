@@ -71,7 +71,7 @@ struct thread
 
 };
 
-/* synchronisation of threads */
+/* synchronisation of threads (TODO: try to use lock-free technics) */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 static x_cond_t *asleep_waiter_cond = 0;
 

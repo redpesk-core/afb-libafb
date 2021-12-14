@@ -2,6 +2,7 @@ Version 4.1.0
 -------------
 
   features
+   - add a module to handle pool of threads
    - improved version of afb-extend interface (less requirement on json objects)
    - add function for dequeuing multiple jobs
    - add a wakeup time when preparing event loop

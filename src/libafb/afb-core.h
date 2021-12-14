@@ -51,6 +51,7 @@
 #include "core/afb-session.h"
 #include "core/afb-sig-monitor.h"
 #include "core/afb-string-mode.h"
+#include "core/afb-threads.h"
 #include "core/afb-token.h"
 #include "core/afb-type.h"
 #include "core/afb-type-internal.h"
