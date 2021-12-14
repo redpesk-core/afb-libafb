@@ -152,7 +152,7 @@ static void thread_run(struct thread *me)
 	afb_threads_job_desc_t jobdesc;
 	x_thread_t tid = me->tid;
 
-PRINT("++++++++++++ START %p\n",me);
+PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 	/* initiate thread tempo */
 	afb_sig_monitor_init_timeouts();
 
@@ -174,10 +174,10 @@ PRINT("++++++++++++ START %p\n",me);
 					/* no job, wait */
 					me->asleep = 1;
 					asleep_count++;
-PRINT("++++++++++++ TRwB%p\n",me);
+PRINT("++++++++++++ TRwB%p classid=%d\n",me,me->classid);
 					wakeup_asleep_waiter(0);
 					x_cond_wait(&me->cond, &mutex);
-PRINT("++++++++++++ TRwA%p\n",me);
+PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
 				}
 			}
 		}
@@ -185,7 +185,7 @@ PRINT("++++++++++++ TRwA%p\n",me);
 	/* terminate */
 	afb_sig_monitor_clean_timeouts();
 
-PRINT("++++++++++++ STOP %p\n",me);
+PRINT("++++++++++++ STOP %p classid=%d\n",me,me->classid);
 }
 
 static void thread_starter(void *thr)
