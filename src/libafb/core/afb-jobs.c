@@ -378,7 +378,9 @@ int afb_jobs_abort(int jobid)
 /* Run the given job */
 void afb_jobs_run(struct afb_job *job)
 {
-#if WITH_SIG_MONITOR_TIMERS
+#if WITH_JOB_NOT_MONITORED
+	job->callback(0, job->arg);
+#elif WITH_SIG_MONITOR_TIMERS
 	afb_sig_monitor_run(job->timeout, job->callback, job->arg);
 #else
 	afb_sig_monitor_run(0, job->callback, job->arg);
