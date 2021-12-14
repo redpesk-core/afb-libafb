@@ -132,12 +132,18 @@ static void sched_jobs_cb(int sig, void * arg)
 	if (afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 1)
 		afb_sched_post_job(NULL, 100, 0, sched_jobs_cb, NULL, Afb_Sched_Mode_Normal);
 	else
-		afb_sched_exit(0, NULL);
+		afb_sched_exit(0, NULL, NULL, 0);
+}
+
+static int sched_jobs_start(int sig, void * arg)
+{
+	sched_jobs_cb(sig, arg);
+	return 0;
 }
 
 static void sched_jobs()
 {
-	ck_assert_int_eq(0, afb_sched_start(1, 1, 100, sched_jobs_cb, NULL));
+	ck_assert_int_eq(0, afb_sched_start(1, 1, 100, sched_jobs_start, NULL));
 }
 
 /*********************************************************************/
@@ -594,7 +600,7 @@ START_TEST (subscribe)
 }
 END_TEST
 
-void test_check_perm(int sig, void * arg){
+int test_check_perm(int sig, void * arg){
 
 	struct afb_req_common * req = (struct afb_req_common *)arg;
 	int r = 0;
@@ -608,7 +614,8 @@ void test_check_perm(int sig, void * arg){
 
 	gval++;
 
-	afb_sched_exit(1, NULL);
+	afb_sched_exit(0, NULL, NULL, 0);
+	return 0;
 }
 
 START_TEST(check_perm)

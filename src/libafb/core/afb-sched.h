@@ -86,19 +86,19 @@ extern int afb_sched_call_job_sync(
 /**
  * Enter the jobs processing loop.
  *
- * @param allowed_count Maximum count of thread for jobs including this one
- * @param start_count   Count of thread to start now, must be lower.
- * @param waiter_count  Maximum count of jobs that can be waiting.
- * @param start         The start routine to activate (can't be NULL)
- * @param arg           Arguments to pass to the start routine
+ * @param allowed_count  Maximum count of thread for jobs including this one
+ * @param start_count    Count of thread to start now, must be lower.
+ * @param max_jobs_count Maximum count of jobs that can be waiting.
+ * @param start          The start routine to activate (can't be NULL)
+ * @param arg            Arguments to pass to the start routine
  *
- * @return 0 in case of success or -1 in case of error.
+ * @return in case of success or -1 in case of error.
  */
 extern int afb_sched_start(
 		int allowed_count,
 		int start_count,
-		int waiter_count,
-		void (*start)(int signum, void* arg),
+		int max_jobs_count,
+		int (*start)(int signum, void* arg),
 		void *arg);
 
 /**
@@ -109,8 +109,9 @@ extern int afb_sched_start(
  * @param handler  A function called when threads have stopped
  *                 and before the main thread (the one that called
  *                 'afb_sched_start') returns.
+ * @param closure  The closure for the handler
  */
-extern void afb_sched_exit(int force, void (*handler)());
+extern void afb_sched_exit(int force, void (*handler)(void *closure), void *closure, int exitcode);
 
 /**
  * Schedule a new asynchronous job represented by 'callback' and 'arg'

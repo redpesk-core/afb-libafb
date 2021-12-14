@@ -117,12 +117,12 @@ void test_job(int sig, void* arg){
     fprintf(stderr, "test_job with arg %d terminates !\n", p2i(arg));
 }
 
-void exit_handler(){
+void exit_handler(void *data){
     fprintf(stderr, "Exit scheduler\n");
     sched_runing = FALSE;
 }
 
-void test_start_job(int sig, void* arg){
+int test_start_job(int sig, void* arg){
 
     int i;
 
@@ -142,8 +142,9 @@ void test_start_job(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(1, exit_handler);
+    afb_sched_exit(1, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_job\n");
+    return 0;
 }
 
 void test_job_sync(int sig, void* arg){
@@ -175,7 +176,7 @@ void test_job_sync(int sig, void* arg){
 
 }
 
-void test_start_job_sync(int sig, void* arg){
+int test_start_job_sync(int sig, void* arg){
 
     int i, r;
 
@@ -199,10 +200,11 @@ void test_start_job_sync(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(1, NULL);
+    afb_sched_exit(1, NULL, NULL, 0);
 
     fprintf(stderr, "leaving test_start_job_sync\n");
     fflush(stderr);
+    return 0;
 }
 
 /*********************************************************************/
@@ -279,7 +281,7 @@ void test_job_enter(int sig, void * arg, struct afb_sched_lock * sched_lock){
     if(r)reachError++;
 }
 
-void test_start_sched_enter(int sig, void * arg){
+int test_start_sched_enter(int sig, void * arg){
 
     int r;
 
@@ -290,10 +292,11 @@ void test_start_sched_enter(int sig, void * arg){
         if(r)reachError++;
     }
     fprintf(stderr, "test_start_sched_enter exiting\n");
-    afb_sched_exit(1, NULL);
+    afb_sched_exit(1, NULL, NULL, 0);
 
     fprintf(stderr, "leaving test_start_sched_enter\n");
     fflush(stderr);
+    return 0;
 }
 
 START_TEST(test_sched_enter){
@@ -324,7 +327,7 @@ START_TEST(test_sched_enter){
 }
 END_TEST
 
-void test_start_sched_adapt(int sig, void * arg){
+int test_start_sched_adapt(int sig, void * arg){
     int r,i;
 
     fprintf(stderr, "test_start_sched_adapt received sig %d with arg %d\n", sig, p2i(arg));
@@ -366,8 +369,9 @@ void test_start_sched_adapt(int sig, void * arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(1, exit_handler);
+    afb_sched_exit(1, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_sched_adapt\n");
+    return 0;
 }
 
 START_TEST(test_sched_adapt){
@@ -426,7 +430,7 @@ void jobgetevmgr(int signum, void *arg)
     getevmgr(num);
 }
 
-void do_test_evmgr(int signum, void *arg)
+int do_test_evmgr(int signum, void *arg)
 {
     int i, s;
 
@@ -440,8 +444,9 @@ void do_test_evmgr(int signum, void *arg)
         fprintf(stderr, "-- MAIN launch of %d -> %d\n", 1+i, s);
         ck_assert_int_ge(s, 0);
     }
-    afb_sched_exit(0, 0);
+    afb_sched_exit(0, 0, NULL, 0);
     fprintf(stderr, "-- MAIN EXIT --\n");
+    return 0;
 }
 
 START_TEST(test_evmgr)

@@ -83,7 +83,9 @@ struct sync_job
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 
 /* exit manager */
-static void (*exit_handler)();
+static void (*exit_handler)(void*) = 0;
+static void *exit_closure;
+static int exit_code;
 
 /* counts for threads */
 static int allowed_thread_count = 0;	/**< allowed count of threads */
@@ -344,12 +346,14 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 }
 
 /* Exit threads and call handler if not NULL. */
-void afb_sched_exit(int force, void (*handler)())
+void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitcode)
 {
 	x_mutex_lock(&mutex);
 
         /* set the handler */
         exit_handler = handler;
+        exit_closure = closure;
+        exit_code = exitcode;
 
 	/* disallow start */
 	allowed_thread_count = 0;
@@ -367,14 +371,28 @@ void afb_sched_exit(int force, void (*handler)())
 	afb_ev_mgr_wakeup();
 }
 
+struct start_job_description
+{
+	int (*start)(int signum, void* arg);
+	void *arg;
+	int rc;
+};
+
+static void do_start_job(int signum, void* arg)
+{
+	struct start_job_description *sjd = arg;
+	sjd->rc = sjd->start(signum, sjd->arg);
+}
+
 /* Enter the jobs processing loop */
 int afb_sched_start(
 	int allowed_count,
 	int start_count,
 	int waiter_count,
-	void (*start)(int signum, void* arg),
+	int (*start)(int signum, void* arg),
 	void *arg)
 {
+	struct start_job_description sjd;
 	int rc;
 
 	assert(allowed_count >= 1);
@@ -407,7 +425,10 @@ int afb_sched_start(
 	}
 
 	/* queue the start job */
-	rc = afb_jobs_post(NULL, 0, 0, start, arg);
+	sjd.start = start;
+	sjd.arg = arg;
+	sjd.rc = -1;
+	rc = afb_jobs_post(NULL, 0, 0, do_start_job, &sjd);
 	if (rc < 0)
 		goto error;
 
@@ -415,12 +436,13 @@ int afb_sched_start(
 	x_mutex_unlock(&mutex);
 	afb_threads_enter(CLASSID_MAIN, get_job_cb, (void*)(intptr_t)CLASSID_MAIN);
 	x_mutex_lock(&mutex);
-	rc = 0;
+	rc = sjd.rc;
 error:
 	allowed_thread_count = 0;
 	x_mutex_unlock(&mutex);
 	if (exit_handler) {
-		exit_handler();
+		rc = exit_code;
+		exit_handler(exit_closure);
 		exit_handler = 0;
 	}
 	return rc;

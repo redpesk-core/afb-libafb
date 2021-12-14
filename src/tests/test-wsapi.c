@@ -318,11 +318,11 @@ void wsapi_test_hangup(struct afb_wsapi * wsapi[]){
 
 /******************************** Tests ********************************/
 
-void start_afb_scheduler(int signum, void* arg){
+int start_afb_scheduler(int signum, void* arg){
 
     if (signum){
         fprintf(stderr, "start_afb_scheduler receved sig %d", signum);
-        return;
+        return -1;
     }
 
     int rc, i=0;
@@ -404,8 +404,8 @@ void start_afb_scheduler(int signum, void* arg){
     }
     ck_assert_int_eq(cb_checksum, 2);
 
-    afb_sched_exit(1, NULL);
-
+    afb_sched_exit(1, NULL, NULL, 0);
+    return 0;
 }
 
 
