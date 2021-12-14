@@ -82,6 +82,12 @@ static struct thread *threads = 0;
 static int active_count = 0;
 static int asleep_count = 0;
 
+#ifndef AFB_THREADS_RESERVE_COUNT
+#define AFB_THREADS_RESERVE_COUNT 16
+#endif
+static int reserve_count = AFB_THREADS_RESERVE_COUNT;
+static struct thread *reserve = 0;
+
 static inline int match_any_class(int classid)
 {
 	return !~classid;
@@ -188,11 +194,20 @@ PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
 PRINT("++++++++++++ STOP %p classid=%d\n",me,me->classid);
 }
 
-static void thread_starter(void *thr)
+static void thread_starter(void *arg)
 {
+	struct thread *thr = arg;
 	x_mutex_lock(&mutex);
-	thread_run(thr);
-	unlink_thread(thr);
+	for (;;) {
+		thread_run(thr);
+		unlink_thread(thr);
+		if (reserve_count <= 0)
+			break;
+		thr->next = reserve;
+		reserve = thr;
+		reserve_count--;
+		x_cond_wait(&thr->cond, &mutex);
+	}
 	x_mutex_unlock(&mutex);
 	free(thr);
 	x_thread_exit(0);
@@ -279,7 +294,25 @@ int afb_threads_asleep_count(int classid)
 
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
 {
-	return start(classid, jobget, closure, start_thread);
+	struct thread *thr;
+	x_mutex_lock(&mutex);
+	thr = reserve;
+	if (!thr) {
+		x_mutex_unlock(&mutex);
+		return start(classid, jobget, closure, start_thread);
+	}
+	reserve = thr->next;
+	reserve_count++;
+	thr->next = 0;
+	thr->active = 1;
+	thr->asleep = 0;
+	thr->classid = classid;
+	thr->getjob = jobget;
+	thr->getjobcls = closure;
+	link_thread(thr);
+	x_cond_signal(&thr->cond);
+	x_mutex_unlock(&mutex);
+	return 0;
 }
 
 int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closure)
@@ -326,7 +359,7 @@ int afb_threads_has_thread(x_thread_t tid)
 	struct thread *thr;
 	x_mutex_lock(&mutex);
 	thr = get_thread(tid);
-	resu = thr ? thr->classid : 0;;
+	resu = thr ? thr->classid : 0;
 	x_mutex_unlock(&mutex);
 	return resu;
 }
@@ -395,4 +428,16 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 	}
 	x_mutex_unlock(&mutex);
 	return resu;
+}
+
+void afb_threads_set_reserve_count(int count)
+{
+	int curco;
+	struct thread *ithr;
+	x_mutex_lock(&mutex);
+	curco = reserve_count;
+	for (ithr = reserve ; ithr ; ithr = ithr->next)
+		curco++;
+	reserve_count += count - curco;
+	x_mutex_unlock(&mutex);
 }
