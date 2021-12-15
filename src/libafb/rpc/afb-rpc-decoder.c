@@ -150,19 +150,39 @@ int afb_rpc_decoder_peek_uint8(afb_rpc_decoder_t *decoder, uint8_t *value)
 
 int afb_rpc_decoder_read_uint16(afb_rpc_decoder_t *decoder, uint16_t *value)
 {
-	int rc = afb_rpc_decoder_read_copy(decoder, value, sizeof *value);
-#if BYTE_ORDER != LITTLE_ENDIAN
+	return afb_rpc_decoder_read_copy(decoder, value, sizeof *value);
+}
+
+int afb_rpc_decoder_read_uint16le(afb_rpc_decoder_t *decoder, uint16_t *value)
+{
+	int rc = afb_rpc_decoder_read_uint16(decoder, value);
 	*value = le16toh(*value);
-#endif
+	return rc;
+}
+
+int afb_rpc_decoder_read_uint16be(afb_rpc_decoder_t *decoder, uint16_t *value)
+{
+	int rc = afb_rpc_decoder_read_uint16(decoder, value);
+	*value = be16toh(*value);
 	return rc;
 }
 
 int afb_rpc_decoder_read_uint32(afb_rpc_decoder_t *decoder, uint32_t *value)
 {
-	int rc = afb_rpc_decoder_read_copy(decoder, value, sizeof *value);
-#if BYTE_ORDER != LITTLE_ENDIAN
+	return afb_rpc_decoder_read_copy(decoder, value, sizeof *value);
+}
+
+int afb_rpc_decoder_read_uint32le(afb_rpc_decoder_t *decoder, uint32_t *value)
+{
+	int rc = afb_rpc_decoder_read_uint32(decoder, value);
 	*value = le32toh(*value);
-#endif
+	return rc;
+}
+
+int afb_rpc_decoder_read_uint32be(afb_rpc_decoder_t *decoder, uint32_t *value)
+{
+	int rc = afb_rpc_decoder_read_uint32(decoder, value);
+	*value = be32toh(*value);
 	return rc;
 }
 

@@ -51,7 +51,7 @@ int afb_rpc_v0_code_version_offer(afb_rpc_coder_t *coder, uint8_t count, const u
 {
 	int rc = afb_rpc_coder_write_uint8(coder, CHAR_FOR_VERSION_OFFER);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint32(coder, AFBRPC_PROTO_IDENTIFIER);
+		rc = afb_rpc_coder_write_uint32le(coder, AFBRPC_PROTO_IDENTIFIER);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_uint8(coder, count);
 	if (rc >= 0)
@@ -83,7 +83,7 @@ int afb_rpc_v0_code_version_set(afb_rpc_coder_t *coder, uint8_t version)
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_uint8(coder, version);
 	if (rc >= 0 && version >= AFBRPC_PROTO_VERSION_2)
-		rc = afb_rpc_coder_write_uint16(coder, 4);
+		rc = afb_rpc_coder_write_uint16le(coder, 4);
 	return rc;
 }
 
@@ -119,7 +119,7 @@ static int read_on_version_offer(afb_rpc_decoder_t *decoder, afb_rpc_v0_msg_t *m
 	int rc;
 	uint32_t id;
 
-	rc = afb_rpc_decoder_read_uint32(decoder, &id);
+	rc = afb_rpc_decoder_read_uint32le(decoder, &id);
 	if (rc >= 0 && id != AFBRPC_PROTO_IDENTIFIER)
 		rc = X_EPROTO;
 	if (rc >= 0)
@@ -137,7 +137,7 @@ static int read_on_version_set(afb_rpc_decoder_t *decoder, afb_rpc_v0_msg_t *msg
 	uint16_t chlen;
 	int rc = afb_rpc_decoder_read_uint8(decoder, &msg->version_set.version);
 	if (rc >= 0 && msg->version_set.version >= AFBRPC_PROTO_VERSION_2) {
-		rc = afb_rpc_decoder_read_uint16(decoder, &chlen);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &chlen);
 		if (rc >= 0 && chlen != 4)
 			rc = X_EPROTO;
 	}

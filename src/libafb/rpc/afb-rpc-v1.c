@@ -55,7 +55,7 @@ static int write_string_length(afb_rpc_coder_t *coder, const char *value, size_t
 	uint32_t len = (uint32_t)++length;
 	int rc = len && (size_t)len == length ? 0 : X_EINVAL;
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint32(coder, len);
+		rc = afb_rpc_coder_write_uint32le(coder, len);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write(coder, value, len);
 	return rc;
@@ -68,14 +68,14 @@ static int write_string(afb_rpc_coder_t *coder, const char *value)
 
 static int write_nullstring(afb_rpc_coder_t *coder, const char *value)
 {
-	return value ? write_string(coder, value) : afb_rpc_coder_write_uint32(coder, 0);
+	return value ? write_string(coder, value) : afb_rpc_coder_write_uint32le(coder, 0);
 }
 
 static int write_binary(afb_rpc_coder_t *coder, const void *value, size_t length)
 {
 	int rc = length <= UINT32_MAX ? 0 : X_EINVAL;
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint32(coder, (uint32_t)length);
+		rc = afb_rpc_coder_write_uint32le(coder, (uint32_t)length);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write(coder, value, (uint32_t)length);
 	return rc;
@@ -85,7 +85,7 @@ static int write_uint8_uint16(afb_rpc_coder_t *coder, uint8_t x1, uint16_t x2)
 {
 	int rc = afb_rpc_coder_write_uint8(coder, x1);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, x2);
+		rc = afb_rpc_coder_write_uint16le(coder, x2);
 	return rc;
 }
 
@@ -93,7 +93,7 @@ static int write_uint8_uint16_uint16(afb_rpc_coder_t *coder, uint8_t x1, uint16_
 {
 	int rc = write_uint8_uint16(coder, x1, x2);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, x3);
+		rc = afb_rpc_coder_write_uint16le(coder, x3);
 	return rc;
 }
 
@@ -111,7 +111,7 @@ static int readbin(afb_rpc_decoder_t *decoder, const void **value, uint32_t *len
 	uint32_t len;
 	int rc;
 
-	rc = afb_rpc_decoder_read_uint32(decoder, &len);
+	rc = afb_rpc_decoder_read_uint32le(decoder, &len);
 	if (rc < 0)
 		return rc;
 
@@ -167,9 +167,9 @@ int afb_rpc_v1_code_call(
 {
 	int rc = write_uint8_uint16_str(coder, CHAR_FOR_CALL, callid, verb);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, sessionid);
+		rc = afb_rpc_coder_write_uint16le(coder, sessionid);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, tokenid);
+		rc = afb_rpc_coder_write_uint16le(coder, tokenid);
 	if (rc >= 0)
 		rc = write_binary(coder, data, data_size);
 	if (rc >= 0)
@@ -236,7 +236,7 @@ int afb_rpc_v1_code_describe(afb_rpc_coder_t *coder, uint16_t descid)
 {
 	int rc = afb_rpc_coder_write_uint8(coder, CHAR_FOR_DESCRIBE);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, descid);
+		rc = afb_rpc_coder_write_uint16le(coder, descid);
 	return rc;
 }
 
@@ -363,13 +363,13 @@ int afb_rpc_v1_code(afb_rpc_coder_t *coder, const struct afb_rpc_v1_msg *msg)
 /* on call, propagate it to the ws service */
 static int read_on_call(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->call.callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->call.callid);
 	if (rc >= 0)
 		rc = read_string(decoder, &msg->call.verb, NULL);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->call.sessionid);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->call.sessionid);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->call.tokenid);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->call.tokenid);
 	if (rc >= 0)
 		rc = read_binary(decoder, (const void**)&msg->call.data, &msg->call.data_len);
 	if (rc >= 0)
@@ -381,7 +381,7 @@ static int read_on_call(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 
 static int read_on_reply(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->reply.callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->reply.callid);
 	if (rc >= 0)
 		rc = read_nullstring(decoder, &msg->reply.error, NULL);
 	if (rc >= 0)
@@ -396,7 +396,7 @@ static int read_on_reply(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 /* adds an event */
 static int read_on_event_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_create.eventid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_create.eventid);
 	if (rc >= 0)
 		rc = read_string(decoder, &msg->event_create.eventname, NULL);
 	if (rc >= 0)
@@ -407,7 +407,7 @@ static int read_on_event_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_ms
 /* removes an event */
 static int read_on_event_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_remove.eventid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_remove.eventid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_event_remove;
 	return rc;
@@ -416,9 +416,9 @@ static int read_on_event_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_ms
 /* subscribes an event */
 static int read_on_event_subscribe(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_subscribe.callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_subscribe.callid);
 	if (rc >= 0)
-	 	rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_subscribe.eventid);
+	 	rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_subscribe.eventid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_event_subscribe;
 	return rc;
@@ -427,9 +427,9 @@ static int read_on_event_subscribe(afb_rpc_decoder_t *decoder, struct afb_rpc_v1
 /* unsubscribes an event */
 static int read_on_event_unsubscribe(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_unsubscribe.callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_unsubscribe.callid);
 	if (rc >= 0)
-	 	rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_unsubscribe.eventid);
+	 	rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_unsubscribe.eventid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_event_unsubscribe;
 	return rc;
@@ -438,7 +438,7 @@ static int read_on_event_unsubscribe(afb_rpc_decoder_t *decoder, struct afb_rpc_
 /* pushs an event */
 static int read_on_event_push(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_push.eventid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_push.eventid);
 	if (rc >= 0)
 	 	rc = read_nullstring(decoder, &msg->event_push.data, NULL);
 	if (rc >= 0)
@@ -463,7 +463,7 @@ static int read_on_event_broadcast(afb_rpc_decoder_t *decoder, struct afb_rpc_v1
 
 static int read_on_event_unexpected(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->event_unexpected.eventid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->event_unexpected.eventid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_event_unexpected;
 	return rc;
@@ -472,7 +472,7 @@ static int read_on_event_unexpected(afb_rpc_decoder_t *decoder, struct afb_rpc_v
 /* adds an session */
 static int read_on_session_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->session_create.sessionid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->session_create.sessionid);
 	if (rc >= 0)
 		rc = read_string(decoder, &msg->session_create.sessionname, NULL);
 	if (rc >= 0)
@@ -483,7 +483,7 @@ static int read_on_session_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_
 /* removes an session */
 static int read_on_session_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->session_remove.sessionid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->session_remove.sessionid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_session_remove;
 	return rc;
@@ -492,7 +492,7 @@ static int read_on_session_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_
 /* adds an token */
 static int read_on_token_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->token_create.tokenid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->token_create.tokenid);
 	if (rc >= 0)
 		rc = read_string(decoder, &msg->token_create.tokenname, NULL);
 	if (rc >= 0)
@@ -503,7 +503,7 @@ static int read_on_token_create(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_ms
 /* removes an token */
 static int read_on_token_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->token_remove.tokenid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->token_remove.tokenid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_token_remove;
 	return rc;
@@ -511,7 +511,7 @@ static int read_on_token_remove(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_ms
 
 static int read_on_describe(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->describe.descid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->describe.descid);
 	if (rc >= 0)
 		msg->type = afb_rpc_v1_msg_type_describe;
 	return rc;
@@ -519,7 +519,7 @@ static int read_on_describe(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *m
 
 static int read_on_description(afb_rpc_decoder_t *decoder, struct afb_rpc_v1_msg *msg)
 {
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->description.descid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->description.descid);
 	if (rc >= 0)
 		rc = read_nullstring(decoder, &msg->description.data, NULL);
 	if (rc >= 0)

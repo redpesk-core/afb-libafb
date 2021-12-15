@@ -76,10 +76,10 @@ START_TEST(test_output_int)
 	rc = afb_rpc_coder_write_uint8(&rpc_coder, 1);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_rpc_coder_write_uint16(&rpc_coder, 2);
+	rc = afb_rpc_coder_write_uint16le(&rpc_coder, 2);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_rpc_coder_write_uint32(&rpc_coder, 3);
+	rc = afb_rpc_coder_write_uint32le(&rpc_coder, 3);
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_rpc_coder_write_align(&rpc_coder, 4);
@@ -89,12 +89,12 @@ START_TEST(test_output_int)
 
 	rc = afb_rpc_coder_write_align(&rpc_coder, 4);
 	ck_assert_int_eq(rc, 0);
-	rc = afb_rpc_coder_write_uint16(&rpc_coder, 12);
+	rc = afb_rpc_coder_write_uint16le(&rpc_coder, 12);
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_rpc_coder_write_align(&rpc_coder, 4);
 	ck_assert_int_eq(rc, 0);
-	rc = afb_rpc_coder_write_uint32(&rpc_coder, 13);
+	rc = afb_rpc_coder_write_uint32le(&rpc_coder, 13);
 	ck_assert_int_eq(rc, 0);
 
 	rc = afb_rpc_coder_output_sizes(&rpc_coder, &sz);

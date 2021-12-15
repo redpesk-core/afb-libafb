@@ -108,5 +108,9 @@ extern int afb_rpc_decoder_peek_uint8(afb_rpc_decoder_t *decoder, uint8_t *value
 extern int afb_rpc_decoder_read_uint8(afb_rpc_decoder_t *decoder, uint8_t *value);
 
 extern int afb_rpc_decoder_read_uint16(afb_rpc_decoder_t *decoder, uint16_t *value);
+extern int afb_rpc_decoder_read_uint16le(afb_rpc_decoder_t *decoder, uint16_t *value);
+extern int afb_rpc_decoder_read_uint16be(afb_rpc_decoder_t *decoder, uint16_t *value);
 
 extern int afb_rpc_decoder_read_uint32(afb_rpc_decoder_t *decoder, uint32_t *value);
+extern int afb_rpc_decoder_read_uint32le(afb_rpc_decoder_t *decoder, uint32_t *value);
+extern int afb_rpc_decoder_read_uint32be(afb_rpc_decoder_t *decoder, uint32_t *value);

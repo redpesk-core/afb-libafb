@@ -119,7 +119,7 @@ static int code_shortcut_message_header(afb_rpc_coder_t *coder, uint16_t oper, u
 		if (rc >= 0)
 			rc = afb_rpc_coder_write_uint8(coder, AFB_RPC_V2_ID_PCKT_FLAG_MSG_BEGIN|AFB_RPC_V2_ID_PCKT_FLAG_MSG_END);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, (uint16_t)(SZ_SHORTCUT_HEADER + size));
+			rc = afb_rpc_coder_write_uint16le(coder, (uint16_t)(SZ_SHORTCUT_HEADER + size));
 	}
 	return rc;
 }
@@ -140,26 +140,26 @@ static int opt_param_resource_write(afb_rpc_coder_t *coder, const afb_rpc_v2_val
 {
 	int rc = 0;
 	if (value->data) {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_RES_PLAIN);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_RES_PLAIN);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_RES_PLAIN(value->length));
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_RES_PLAIN(value->length));
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, kind);
+			rc = afb_rpc_coder_write_uint16le(coder, kind);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, 0/*align*/);
+			rc = afb_rpc_coder_write_uint16le(coder, 0/*align*/);
 		if (rc >= 0)
 			rc = afb_rpc_coder_write(coder, value->data, value->length);
 		if (rc >= 0)
 			rc = afb_rpc_coder_write_align(coder, ALIGNMENT);
 	}
 	else if (value->id) {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_RES_ID);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_RES_ID);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_RES_ID);
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_RES_ID);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, kind);
+			rc = afb_rpc_coder_write_uint16le(coder, kind);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, value->id);
+			rc = afb_rpc_coder_write_uint16le(coder, value->id);
 	}
 	return rc;
 }
@@ -168,11 +168,11 @@ static int opt_param_timeout_write(afb_rpc_coder_t *coder, uint32_t timeout)
 {
 	int rc = 0;
 	if (timeout) {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_TIMEOUT);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_TIMEOUT);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_TIMEOUT);
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_TIMEOUT);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint32(coder, timeout);
+			rc = afb_rpc_coder_write_uint32le(coder, timeout);
 	}
 	return rc;
 }
@@ -181,31 +181,31 @@ static int param_value_write(afb_rpc_coder_t *coder, const afb_rpc_v2_value_t *v
 {
 	int rc = 0;
 	if (value->data && value->id) {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_VALUE_TYPED);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_VALUE_TYPED);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_VALUE_TYPED(value->length));
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_VALUE_TYPED(value->length));
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, value->id); /* type-id */
+			rc = afb_rpc_coder_write_uint16le(coder, value->id); /* type-id */
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, 0/*align*/);
+			rc = afb_rpc_coder_write_uint16le(coder, 0/*align*/);
 		if (rc >= 0)
 			rc = afb_rpc_coder_write(coder, value->data, value->length);
 		if (rc >= 0)
 			rc = afb_rpc_coder_write_align(coder, ALIGNMENT);
 	}
 	else if (value->id) {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_VALUE_DATA);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_VALUE_DATA);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_VALUE_DATA);
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_VALUE_DATA);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, value->id);
+			rc = afb_rpc_coder_write_uint16le(coder, value->id);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, 0/*align*/);
+			rc = afb_rpc_coder_write_uint16le(coder, 0/*align*/);
 	}
 	else {
-		rc = afb_rpc_coder_write_uint16(coder, AFB_RPC_V2_ID_PARAM_VALUE);
+		rc = afb_rpc_coder_write_uint16le(coder, AFB_RPC_V2_ID_PARAM_VALUE);
 		if (rc >= 0)
-			rc = afb_rpc_coder_write_uint16(coder, SZ_PARAM_VALUE(value->length));
+			rc = afb_rpc_coder_write_uint16le(coder, SZ_PARAM_VALUE(value->length));
 		if (rc >= 0)
 			rc = afb_rpc_coder_write(coder, value->data, value->length);
 		if (rc >= 0)
@@ -225,9 +225,9 @@ static int array_values_write(afb_rpc_coder_t *coder, const afb_rpc_v2_value_arr
 
 int afb_rpc_v2_code_call_request_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg_call_request_t *msg, const afb_rpc_v2_value_array_t *values)
 {
-	int rc = afb_rpc_coder_write_uint16(coder, msg->callid);
+	int rc = afb_rpc_coder_write_uint16le(coder, msg->callid);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, values ? values->count : 0);
+		rc = afb_rpc_coder_write_uint16le(coder, values ? values->count : 0);
 	if (rc >= 0)
 		rc = opt_param_resource_write(coder, &msg->verb, AFB_RPC_V2_ID_KIND_VERB);
 	if (rc >= 0)
@@ -246,11 +246,11 @@ int afb_rpc_v2_code_call_request_body(afb_rpc_coder_t *coder, const afb_rpc_v2_m
 
 int afb_rpc_v2_code_call_reply_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg_call_reply_t *msg, const afb_rpc_v2_value_array_t *values)
 {
-	int rc = afb_rpc_coder_write_uint16(coder, msg->callid);
+	int rc = afb_rpc_coder_write_uint16le(coder, msg->callid);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, values ? values->count : 0);
+		rc = afb_rpc_coder_write_uint16le(coder, values ? values->count : 0);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint32(coder, (uint32_t)(int32_t)msg->status);
+		rc = afb_rpc_coder_write_uint32le(coder, (uint32_t)(int32_t)msg->status);
 	if (rc >= 0 && values)
 		rc = array_values_write(coder, values);
 	return rc;
@@ -258,9 +258,9 @@ int afb_rpc_v2_code_call_reply_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg
 
 int afb_rpc_v2_code_event_push_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg_event_push_t *msg, const afb_rpc_v2_value_array_t *values)
 {
-	int rc = afb_rpc_coder_write_uint16(coder, msg->eventid);
+	int rc = afb_rpc_coder_write_uint16le(coder, msg->eventid);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, values ? values->count : 0);
+		rc = afb_rpc_coder_write_uint16le(coder, values ? values->count : 0);
 	if (rc >= 0 && values)
 		rc = array_values_write(coder, values);
 	return rc;
@@ -268,9 +268,9 @@ int afb_rpc_v2_code_event_push_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg
 
 int afb_rpc_v2_code_event_broadcast_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg_event_broadcast_t *msg, const afb_rpc_v2_value_array_t *values)
 {
-	int rc = afb_rpc_coder_write_uint16(coder, values ? values->count : 0);
+	int rc = afb_rpc_coder_write_uint16le(coder, values ? values->count : 0);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->length);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->length);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write(coder, msg->uuid, sizeof *msg->uuid);
 	if (rc >= 0)
@@ -286,9 +286,9 @@ int afb_rpc_v2_code_event_broadcast_body(afb_rpc_coder_t *coder, const afb_rpc_v
 
 int afb_rpc_v2_code_resource_create_body(afb_rpc_coder_t *coder, const afb_rpc_v2_msg_resource_create_t * msg)
 {
-	int rc = afb_rpc_coder_write_uint16(coder, msg->kind);
+	int rc = afb_rpc_coder_write_uint16le(coder, msg->kind);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->id);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->id);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write(coder, msg->data, msg->length);
 	if (rc >= 0)
@@ -336,9 +336,9 @@ static int code_event_subscription(afb_rpc_coder_t *coder, const struct afb_rpc_
 {
 	int rc = code_shortcut_message_header(coder, oper, SZ_EVENT_SUB_UNSUB);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->callid);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->callid);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->eventid);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->eventid);
 	return rc;
 }
 
@@ -357,7 +357,7 @@ int afb_rpc_v2_code_event_unexpected(afb_rpc_coder_t *coder, const afb_rpc_v2_ms
 {
 	int rc = code_shortcut_message_header(coder, AFB_RPC_V2_ID_OP_EVENT_UNEXPECTED, SZ_EVENT_UNEXPECTED);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->eventid);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->eventid);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_align(coder, ALIGNMENT);
 	return rc;
@@ -391,9 +391,9 @@ int afb_rpc_v2_code_resource_destroy(afb_rpc_coder_t *coder, const afb_rpc_v2_ms
 {
 	int rc = code_shortcut_message_header(coder, AFB_RPC_V2_ID_OP_RESOURCE_DESTROY, SZ_RES_DESTROY);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->kind);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->kind);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16(coder, msg->id);
+		rc = afb_rpc_coder_write_uint16le(coder, msg->id);
 	return rc;
 }
 
@@ -455,18 +455,18 @@ static int decode_param(afb_rpc_decoder_t *decoder, struct param *param)
 	int rc;
 
 	memset(param, 0, sizeof *param);
-	rc = afb_rpc_decoder_read_uint16(decoder, &param->type);
+	rc = afb_rpc_decoder_read_uint16le(decoder, &param->type);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &length);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &length);
 	if (rc >= 0) {
 		switch (param->type) {
 		case AFB_RPC_V2_ID_PARAM_RES_ID:
-			rc = afb_rpc_decoder_read_uint16(decoder, &param->kind);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &param->kind);
 			if (rc >= 0)
-				rc = afb_rpc_decoder_read_uint16(decoder, &param->id);
+				rc = afb_rpc_decoder_read_uint16le(decoder, &param->id);
 			break;
 		case AFB_RPC_V2_ID_PARAM_RES_PLAIN:
-			rc = afb_rpc_decoder_read_uint16(decoder, &param->kind);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &param->kind);
 			if (rc >= 0)
 				rc = afb_rpc_decoder_skip(decoder, sizeof(uint16_t));
 			if (rc >= 0) {
@@ -479,7 +479,7 @@ static int decode_param(afb_rpc_decoder_t *decoder, struct param *param)
 			rc = afb_rpc_decoder_read_pointer(decoder, &param->data, param->length);
 			break;
 		case AFB_RPC_V2_ID_PARAM_VALUE_TYPED:
-			rc = afb_rpc_decoder_read_uint16(decoder, &param->id);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &param->id);
 			if (rc >= 0)
 				rc = afb_rpc_decoder_skip(decoder, sizeof(uint16_t));
 			if (rc >= 0) {
@@ -488,10 +488,10 @@ static int decode_param(afb_rpc_decoder_t *decoder, struct param *param)
 			}
 			break;
 		case AFB_RPC_V2_ID_PARAM_VALUE_DATA:
-			rc = afb_rpc_decoder_read_uint16(decoder, &param->id);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &param->id);
 			break;
 		case AFB_RPC_V2_ID_PARAM_TIMEOUT:
-			rc = afb_rpc_decoder_read_uint32(decoder, &param->timeout);
+			rc = afb_rpc_decoder_read_uint32le(decoder, &param->timeout);
 			break;
 		default:
 			rc = afb_rpc_decoder_skip(decoder, length - SZ_PARAM_BASE);
@@ -600,9 +600,9 @@ static int decode_call_request(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_call_r
 	afb_rpc_v2_value_t *val;
 	afb_rpc_v2_value_array_t *values;
 
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->callid);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &nval);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &nval);
 	if (rc >= 0) {
 		values = valdec->array;
 		if (values != NULL) {
@@ -660,11 +660,11 @@ static int decode_call_reply(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_call_rep
 {
 	uint16_t nval;
 
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->callid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->callid);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &nval);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &nval);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint32(decoder, (uint32_t*)&msg->status);
+		rc = afb_rpc_decoder_read_uint32le(decoder, (uint32_t*)&msg->status);
 	if (rc >= 0)
 		rc = decode_values(decoder, nval, valdec);
 	return rc;
@@ -674,9 +674,9 @@ static int decode_event_push(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_event_pu
 {
 	uint16_t nval;
 
-	int rc = afb_rpc_decoder_read_uint16(decoder, &msg->eventid);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->eventid);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &nval);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &nval);
 	if (rc >= 0)
 		rc = decode_values(decoder, nval, valdec);
 	return rc;
@@ -688,9 +688,9 @@ static int decode_event_subscription(afb_rpc_decoder_t *decoder, struct afb_rpc_
 	if (afb_rpc_decoder_remaining_size(decoder) != SZ_EVENT_SUB_UNSUB)
 		rc = X_EPROTO;
 	else {
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->callid);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->callid);
 		if (rc >= 0)
-			rc = afb_rpc_decoder_read_uint16(decoder, &msg->eventid);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &msg->eventid);
 	}
 	return rc;
 }
@@ -702,7 +702,7 @@ static int decode_event_unexpected(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_ev
 	if (afb_rpc_decoder_remaining_size(decoder) != SZ_EVENT_UNEXPECTED)
 		rc = X_EPROTO;
 	else {
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->eventid);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->eventid);
 		if (rc >= 0)
 			rc = afb_rpc_decoder_read_align(decoder, ALIGNMENT);
 	}
@@ -713,9 +713,9 @@ static int decode_event_broadcast(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_eve
 {
 	uint16_t nval;
 
-	int rc = afb_rpc_decoder_read_uint16(decoder, &nval);
+	int rc = afb_rpc_decoder_read_uint16le(decoder, &nval);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->length);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->length);
 	if (rc >= 0)
 		rc = afb_rpc_decoder_read_pointer(decoder, (const void**)&msg->uuid, sizeof *msg->uuid);
 	if (rc >= 0)
@@ -736,9 +736,9 @@ static int decode_resource_create(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_res
 	if (afb_rpc_decoder_remaining_size(decoder) < SZ_RES_CREATE_BASE)
 		rc = X_EPROTO;
 	else {
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->kind);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->kind);
 		if (rc >= 0)
-			rc = afb_rpc_decoder_read_uint16(decoder, &msg->id);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &msg->id);
 		if (rc >= 0) {
 			msg->length = (uint32_t)afb_rpc_decoder_remaining_size(decoder);
 			if (msg->length) {
@@ -757,9 +757,9 @@ static int decode_resource_destroy(afb_rpc_decoder_t *decoder, struct afb_rpc_v2
 	if (afb_rpc_decoder_remaining_size(decoder) != SZ_RES_DESTROY)
 		rc = X_EPROTO;
 	else {
-		rc = afb_rpc_decoder_read_uint16(decoder, &msg->kind);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &msg->kind);
 		if (rc >= 0)
-			rc = afb_rpc_decoder_read_uint16(decoder, &msg->id);
+			rc = afb_rpc_decoder_read_uint16le(decoder, &msg->id);
 	}
 	return rc;
 }
@@ -840,7 +840,7 @@ int afb_rpc_v2_decode_packet(afb_rpc_decoder_t *decoder, afb_rpc_v2_pckt_t *pckt
 	if (rc >= 0)
 		rc = afb_rpc_decoder_read_uint8(decoder, &pckt->flags);
 	if (rc >= 0)
-		rc = afb_rpc_decoder_read_uint16(decoder, &pckt->length);
+		rc = afb_rpc_decoder_read_uint16le(decoder, &pckt->length);
 	if (rc >= 0)
 		rc = afb_rpc_decoder_read_pointer(decoder, &pckt->payload, pckt->length - 4);
 	if (rc >= 0)

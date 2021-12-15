@@ -208,8 +208,12 @@ extern int afb_rpc_coder_write_zeroes(afb_rpc_coder_t *coder, uint32_t count);
 extern int afb_rpc_coder_write_align(afb_rpc_coder_t *coder, uint32_t base);
 
 extern int afb_rpc_coder_write_uint32(afb_rpc_coder_t *coder, uint32_t value);
+extern int afb_rpc_coder_write_uint32le(afb_rpc_coder_t *coder, uint32_t value);
+extern int afb_rpc_coder_write_uint32be(afb_rpc_coder_t *coder, uint32_t value);
 
 extern int afb_rpc_coder_write_uint16(afb_rpc_coder_t *coder, uint16_t value);
+extern int afb_rpc_coder_write_uint16le(afb_rpc_coder_t *coder, uint16_t value);
+extern int afb_rpc_coder_write_uint16be(afb_rpc_coder_t *coder, uint16_t value);
 
 extern int afb_rpc_coder_write_uint8(afb_rpc_coder_t *coder, uint8_t value);
 

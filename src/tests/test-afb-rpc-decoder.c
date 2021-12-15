@@ -66,11 +66,11 @@ START_TEST(test_input_int)
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(u8, 1);
 
-	rc = afb_rpc_decoder_read_uint16(&rpc_decoder, &u16);
+	rc = afb_rpc_decoder_read_uint16le(&rpc_decoder, &u16);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(u16, 2);
 
-	rc = afb_rpc_decoder_read_uint32(&rpc_decoder, &u32);
+	rc = afb_rpc_decoder_read_uint32le(&rpc_decoder, &u32);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(u32, 3);
 
@@ -90,14 +90,14 @@ START_TEST(test_input_int)
 	rc = afb_rpc_decoder_read_align(&rpc_decoder, 4);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_rpc_decoder_read_uint16(&rpc_decoder, &u16);
+	rc = afb_rpc_decoder_read_uint16le(&rpc_decoder, &u16);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(u16, 12);
 
 	rc = afb_rpc_decoder_read_align(&rpc_decoder, 4);
 	ck_assert_int_eq(rc, 0);
 
-	rc = afb_rpc_decoder_read_uint32(&rpc_decoder, &u32);
+	rc = afb_rpc_decoder_read_uint32le(&rpc_decoder, &u32);
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(u32, 13);
 

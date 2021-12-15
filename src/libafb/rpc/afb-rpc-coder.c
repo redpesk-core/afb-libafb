@@ -268,19 +268,33 @@ int afb_rpc_coder_write_align(afb_rpc_coder_t *coder, uint32_t base)
 	return base & (base - 1) ? X_EINVAL : write_align(coder, base);
 }
 
+int afb_rpc_coder_write_uint32le(afb_rpc_coder_t *coder, uint32_t value)
+{
+	return afb_rpc_coder_write_uint32(coder, htole32(value));
+}
+
+int afb_rpc_coder_write_uint32be(afb_rpc_coder_t *coder, uint32_t value)
+{
+	return afb_rpc_coder_write_uint32(coder, htobe32(value));
+}
+
 int afb_rpc_coder_write_uint32(afb_rpc_coder_t *coder, uint32_t value)
 {
-#if BYTE_ORDER != LITTLE_ENDIAN
-	value = htole32(value);
-#endif
 	return afb_rpc_coder_write(coder, &value, (int)sizeof value);
+}
+
+int afb_rpc_coder_write_uint16le(afb_rpc_coder_t *coder, uint16_t value)
+{
+	return afb_rpc_coder_write_uint16(coder, htole16(value));
+}
+
+int afb_rpc_coder_write_uint16be(afb_rpc_coder_t *coder, uint16_t value)
+{
+	return afb_rpc_coder_write_uint16(coder, htobe16(value));
 }
 
 int afb_rpc_coder_write_uint16(afb_rpc_coder_t *coder, uint16_t value)
 {
-#if BYTE_ORDER != LITTLE_ENDIAN
-	value = htole16(value);
-#endif
 	return afb_rpc_coder_write(coder, &value, (int)sizeof value);
 }
 
