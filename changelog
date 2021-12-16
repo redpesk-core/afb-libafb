@@ -9,6 +9,7 @@ Version 4.1.0
    - add a wakeup time when preparing event loop
 
   fixes
+   - fix correct apiset (callset) for required features
    - fix the macros LIBAFB_BEFORE_VERSION and LIBAFB_AFTER_VERSION
    - fix issue on timer management
    - fix deprecated hooks of LIBC
