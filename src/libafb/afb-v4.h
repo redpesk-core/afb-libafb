@@ -147,7 +147,7 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_req_reply                   afb_req_v4_reply_hookable
 #define afb_req_subcall                 afb_req_v4_subcall_hookable
 #define afb_req_subcall_sync            afb_req_v4_subcall_sync_hookable
-#define afb_req_wants_log_level(r,l)    AFB_SYSLOG_MASK_WANT(afb_req_logmask(r),l)
+#define afb_req_wants_log_level(r,l)    (afb_req_logmask(r) & (1 << (l)))
 
 #define afb_req_context_get(req)               afb_req_context(req, 0, 0, 0, 0)
 #define afb_req_context_set(req,context,freer) afb_req_context(req, 1, 0, freer, context)
