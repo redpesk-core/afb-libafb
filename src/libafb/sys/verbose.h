@@ -78,6 +78,8 @@ enum
 
 extern int logmask;
 
+extern void set_logmask(int lvl);
+
 extern void verbose(int loglevel, const char *file, int line, const char *function, const char *fmt, ...) __attribute__((format(printf, 5, 6)));
 extern void vverbose(int loglevel, const char *file, int line, const char *function, const char *fmt, va_list args);
 
