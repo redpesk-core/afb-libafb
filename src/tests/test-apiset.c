@@ -606,7 +606,7 @@ START_TEST (check_classes)
 		if (clapi[i].requires && clapi[i].requires[0])
 			ck_assert_int_eq(0, afb_apiset_require_class(a, clapi[i].name, clapi[i].requires));
 		if (clapi[i].apireq && clapi[i].apireq[0])
-			ck_assert_int_eq(0, afb_apiset_require(a, clapi[i].name, clapi[i].apireq));
+			ck_assert_int_eq(0, afb_apiset_require(a, clapi[i].name, a, clapi[i].apireq));
 	}
 
 	/* start all */

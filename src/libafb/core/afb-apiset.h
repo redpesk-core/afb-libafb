@@ -97,7 +97,7 @@ extern void afb_apiset_enum(
 			void (*callback)(void *closure, struct afb_apiset *set, const char *name, const char *aliasto),
 			void *closure);
 
-extern int afb_apiset_require(struct afb_apiset *set, const char *name, const char *required);
-extern int afb_apiset_require_class(struct afb_apiset *set, const char *apiname, const char *classname);
-extern int afb_apiset_provide_class(struct afb_apiset *set, const char *apiname, const char *classname);
+extern int afb_apiset_require(struct afb_apiset *declset, const char *apiname, struct afb_apiset *callset, const char *required);
+extern int afb_apiset_require_class(struct afb_apiset *declset, const char *apiname, const char *classname);
+extern int afb_apiset_provide_class(struct afb_apiset *declset, const char *apiname, const char *classname);
 extern int afb_apiset_class_start(const char *classname);

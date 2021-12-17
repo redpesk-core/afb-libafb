@@ -305,7 +305,7 @@ afb_api_common_require_api(
 
 		/* check the required api */
 		if (comapi->state == Api_State_Pre_Init) {
-			rc2 = afb_apiset_require(comapi->call_set, comapi->name, iter);
+			rc2 = afb_apiset_require(comapi->declare_set, comapi->name, comapi->call_set, iter);
 			if (rc2 < 0) {
 				ERROR("[API %s] requiring api %s in pre-init failed", comapi->name, iter);
 			}
@@ -402,7 +402,7 @@ afb_api_common_class_require(
 			save = *++end;
 		*end = 0;
 
-		rc2 = afb_apiset_require_class(comapi->call_set, comapi->name, iter);
+		rc2 = afb_apiset_require_class(comapi->declare_set, comapi->name, iter);
 		if (rc2 < 0)
 			rc = rc2;
 

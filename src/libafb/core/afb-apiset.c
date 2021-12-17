@@ -102,7 +102,7 @@ struct api_class
  */
 struct api_depend
 {
-	struct afb_apiset *set;
+	struct afb_apiset *callset;
 	char name[];
 };
 
@@ -782,7 +782,7 @@ static int start_array_depends(struct api_array *array)
 
 	i = 0;
 	while (i < array->count) {
-		api = searchrec(array->depends[i]->set, array->depends[i]->name);
+		api = searchrec(array->depends[i]->callset, array->depends[i]->name);
 		if (!api) {
 			rc = X_ENOENT;
 			i++;
@@ -1090,13 +1090,13 @@ void afb_apiset_enum(
  * Returns 0 if the declaration successed or -1 in case of failure
  * (ENOMEM: allocation failure, ENOENT: api name not found)
  */
-int afb_apiset_require(struct afb_apiset *set, const char *name, const char *required)
+int afb_apiset_require(struct afb_apiset *declset, const char *apiname, struct afb_apiset *callset, const char *required)
 {
 	struct api_desc *a;
 	struct api_depend *d;
 	int rc;
 
-	a = searchrec(set, name);
+	a = searchrec(declset, apiname);
 	if (!a)
 		rc = X_ENOENT;
 	else {
@@ -1104,7 +1104,7 @@ int afb_apiset_require(struct afb_apiset *set, const char *name, const char *req
 		if (!d)
 			rc = X_ENOMEM;
 		else {
-			d->set = set;
+			d->callset = callset;
 			strcpy(d->name, required);
 			rc = api_array_add(&a->require.apis, d);
 		}
@@ -1117,9 +1117,9 @@ int afb_apiset_require(struct afb_apiset *set, const char *name, const char *req
  * Returns 0 if the declaration successed or -1 in case of failure
  * (ENOMEM: allocation failure, ENOENT: api name not found)
  */
-int afb_apiset_require_class(struct afb_apiset *set, const char *apiname, const char *classname)
+int afb_apiset_require_class(struct afb_apiset *declset, const char *apiname, const char *classname)
 {
-	struct api_desc *a = searchrec(set, apiname);
+	struct api_desc *a = searchrec(declset, apiname);
 	struct api_class *c = class_search(classname, 1);
 	return a && c ? api_array_add(&a->require.classes, c) : X_ENOENT;
 }
@@ -1129,9 +1129,9 @@ int afb_apiset_require_class(struct afb_apiset *set, const char *apiname, const 
  * Returns 0 if the declaration successed or -1 in case of failure
  * (ENOMEM: allocation failure, ENOENT: api name not found)
  */
-int afb_apiset_provide_class(struct afb_apiset *set, const char *apiname, const char *classname)
+int afb_apiset_provide_class(struct afb_apiset *declset, const char *apiname, const char *classname)
 {
-	struct api_desc *a = searchrec(set, apiname);
+	struct api_desc *a = searchrec(declset, apiname);
 	struct api_class *c = class_search(classname, 1);
 	return a && c ? api_array_add(&c->providers, a) : X_ENOENT;
 }
