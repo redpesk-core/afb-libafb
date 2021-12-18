@@ -310,10 +310,10 @@ afb_api_v4_verb_at(
 	struct afb_api_v4 *apiv4,
 	unsigned index
 ) {
-	if (apiv4->dyn_verb_count < index)
+	if (apiv4->dyn_verb_count > index)
 		return apiv4->verbs.dynamics[index];
 	index -= apiv4->dyn_verb_count;
-	if (apiv4->sta_verb_count < index)
+	if (apiv4->sta_verb_count > index)
 		return &apiv4->verbs.statics[index];
 	return 0;
 }
