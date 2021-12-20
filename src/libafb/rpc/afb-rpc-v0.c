@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015-2021 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
+ * Author: johann Gautier <johann.gautier@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
  * Commercial License Usage
