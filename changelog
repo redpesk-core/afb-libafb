@@ -2,17 +2,22 @@ Version 4.1.0
 -------------
 
   features
+   - depends of afb-binding >= 4.1.0
    - full rewrite of the scheduler
    - add a module to handle pool of threads
    - improved version of afb-extend interface (less requirement on json objects)
    - add function for dequeuing multiple jobs
    - add a wakeup time when preparing event loop
+   - add functions to get verbs of api v4
+   - implement get/set of userdata for requests v4
+   - allows hooking of interface queries
 
   fixes
    - fix correct apiset (callset) for required features
    - fix the macros LIBAFB_BEFORE_VERSION and LIBAFB_AFTER_VERSION
    - fix issue on timer management
    - fix deprecated hooks of LIBC
+   - fix definitions in afb-v4.h
 
   minor/details
    - fix declarations in afb-api-v4 and improved API
