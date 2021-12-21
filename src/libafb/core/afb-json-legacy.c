@@ -366,7 +366,7 @@ do_reply_any_json(
 			info = (const char*)afb_data_ro_pointer(dinf);
 		}
 	}
-	else if (AFB_IS_BINDER_ERROR(status) && nreplies <= 1) {
+	else if (AFB_IS_BINDER_ERRNO(status) && nreplies <= 1) {
 		/* not a legacy reply but a standard libafb error */
 		dobj = NULL;
 		object = type == &afb_type_predefined_json ? "null" : NULL;
@@ -596,7 +596,7 @@ afb_json_legacy_req_reply_hookable(
 	struct afb_data *reply[4];
 
 	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Copy);
-	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 4, reply);
+	afb_req_common_reply_hookable(comreq, afb_error_code(error), 4, reply);
 }
 
 void
@@ -614,7 +614,7 @@ afb_json_legacy_req_vreply_hookable(
 		info = NULL;
 
 	afb_json_legacy_make_reply_json_c_mode(reply, obj, error, info, Afb_String_Copy, Afb_String_Free);
-	afb_req_common_reply_hookable(comreq, LEGACY_STATUS(error), 4, reply);
+	afb_req_common_reply_hookable(comreq, afb_error_code(error), 4, reply);
 }
 
 /**************************************************************************/
