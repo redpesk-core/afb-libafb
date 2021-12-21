@@ -85,6 +85,7 @@ static struct flag req_flags[] = { /* must be sorted by names */
 		{ "subscribe",		afb_hook_flag_req_subscribe },
 		{ "unref",		afb_hook_flag_req_unref },
 		{ "unsubscribe",	afb_hook_flag_req_unsubscribe },
+		{ "userdata",		afb_hook_flag_req_userdata },
 		{ "vverbose",		afb_hook_flag_req_vverbose },
 };
 

@@ -335,3 +335,35 @@ int afb_req_v4_interface_by_name(
 	void **result
 );
 
+/** Get the user data associated to the request */
+extern
+void *
+afb_req_v4_get_userdata(
+	struct afb_req_v4 *reqv4
+);
+
+/** set (associate) the user data to the request */
+extern
+void
+afb_req_v4_set_userdata(
+	struct afb_req_v4 *reqv4,
+	void *userdata,
+	void (*freecb)(void*)
+);
+
+/** Get the user data associated to the request (hookable) */
+extern
+void *
+afb_req_v4_get_userdata_hookable(
+	struct afb_req_v4 *reqv4
+);
+
+/** set (associate) the user data to the request (hookable) */
+extern
+void
+afb_req_v4_set_userdata_hookable(
+	struct afb_req_v4 *reqv4,
+	void *userdata,
+	void (*freecb)(void*)
+);
+

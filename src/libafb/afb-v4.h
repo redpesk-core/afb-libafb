@@ -151,6 +151,8 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_req_context_get             afb_req_v4_cookie_get_hookable
 #define afb_req_context_set             afb_req_v4_cookie_set_hookable
 #define afb_req_context_drop            afb_req_v4_cookie_drop_hookable
+#define afb_req_get_userdata            afb_req_v4_get_userdata_hookable
+#define afb_req_set_userdata            afb_req_v4_set_userdata_hookable
 
 /*-- API ------------------------------------------*/
 

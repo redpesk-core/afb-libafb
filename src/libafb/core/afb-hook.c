@@ -385,6 +385,16 @@ static void hook_req_context_drop_cb(void *closure, const struct afb_hookid *hoo
 	_hook_req_(req, "context_drop -> %d", result);
 }
 
+static void hook_req_get_userdata_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata)
+{
+	_hook_req_(req, "get_userdata -> %p", userdata);
+}
+
+static void hook_req_set_userdata_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata, void (*freecb)(void*))
+{
+	_hook_req_(req, "set_userdata(%p, %p)", userdata, freecb);
+}
+
 static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_begin = hook_req_begin_cb,
 	.hook_req_end = hook_req_end_cb,
@@ -412,6 +422,8 @@ static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_context_get = hook_req_context_get_cb,
 	.hook_req_context_getinit = hook_req_context_getinit_cb,
 	.hook_req_context_drop = hook_req_context_drop_cb,
+	.hook_req_get_userdata = hook_req_get_userdata_cb,
+	.hook_req_set_userdata = hook_req_set_userdata_cb,
 };
 
 /******************************************************************************
@@ -585,6 +597,16 @@ int afb_hook_req_context_drop(const struct afb_req_common *req, int result)
 	return result;
 }
 
+void *afb_hook_req_get_userdata(const struct afb_req_common *req, void *userdata)
+{
+	_HOOK_XREQ_2_(userdata, get_userdata, req, userdata);
+	return userdata;
+}
+
+void afb_hook_req_set_userdata(const struct afb_req_common *req, void *userdata, void (*freecb)(void*))
+{
+	_HOOK_XREQ_2_(userdata, set_userdata, req, userdata, freecb);
+}
 
 
 /******************************************************************************

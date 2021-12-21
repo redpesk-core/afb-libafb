@@ -222,6 +222,14 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.req_interface_by_name = afb_req_v4_interface_by_name,
 
 #endif
+/*-- BEGIN OF VERSION 4r1  REVISION  4 --------------------*/
+#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 4
+
+	.req_get_userdata = afb_req_v4_get_userdata_hookable,
+	.req_set_userdata = afb_req_v4_set_userdata_hookable,
+
+
+#endif
 /*-- END -----------------------------------*/
 };
 

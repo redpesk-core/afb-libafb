@@ -89,6 +89,7 @@ struct afb_hookid
 #define afb_hook_flag_req_context_get		0x00800000
 #define afb_hook_flag_req_context_getinit	0x01000000
 #define afb_hook_flag_req_context_drop		0x02000000
+#define afb_hook_flag_req_userdata		0x04000000
 
 /* common flags */
 #define afb_hook_flags_req_life		(afb_hook_flag_req_begin|afb_hook_flag_req_end)
@@ -111,7 +112,8 @@ struct afb_hookid
 #define afb_hook_flags_req_common	(afb_hook_flags_req_life|afb_hook_flags_req_args|afb_hook_flag_req_reply\
 					|afb_hook_flags_req_session|afb_hook_flags_req_event|afb_hook_flags_req_subcalls\
 					|afb_hook_flag_req_vverbose|afb_hook_flags_req_security)
-#define afb_hook_flags_req_extra	(afb_hook_flags_req_common|afb_hook_flags_req_ref|afb_hook_flags_req_context)
+#define afb_hook_flags_req_extra	(afb_hook_flags_req_common|afb_hook_flags_req_ref|afb_hook_flags_req_context\
+					|afb_hook_flag_req_userdata)
 #define afb_hook_flags_req_all		(afb_hook_flags_req_extra)
 
 struct afb_hook_req_itf {
@@ -141,6 +143,8 @@ struct afb_hook_req_itf {
 	void (*hook_req_context_get)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int result);
 	void (*hook_req_context_getinit)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *value, int (*initcb)(void*, void**, void(**)(void*), void**), void *initclo, int result);
 	void (*hook_req_context_drop)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result);
+	void (*hook_req_get_userdata)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata);
+	void (*hook_req_set_userdata)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata, void (*freecb)(void*));
 };
 
 extern void afb_hook_init_req(struct afb_req_common *req);
@@ -176,6 +180,8 @@ extern int afb_hook_req_context_set(const struct afb_req_common *req, void *valu
 extern int afb_hook_req_context_get(const struct afb_req_common *req, void *value, int result);
 extern int afb_hook_req_context_getinit(const struct afb_req_common *req, void *value, int (*initcb)(void*, void**, void(**)(void*), void**), void *closure, int result);
 extern int afb_hook_req_context_drop(const struct afb_req_common *req, int result);
+extern void *afb_hook_req_get_userdata(const struct afb_req_common *req, void *userdata);
+extern void afb_hook_req_set_userdata(const struct afb_req_common *req, void *userdata, void (*freecb)(void*));
 
 /*********************************************************
 * section hooking apis

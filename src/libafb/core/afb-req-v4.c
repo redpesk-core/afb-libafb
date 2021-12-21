@@ -66,6 +66,15 @@ struct afb_req_v4
 	/** the verb */
 	const struct afb_verb_v4 *verb;
 
+	/** userdata */
+	struct {
+		/** the user data */
+		void *data;
+
+		/** function for freeing the usre data */
+		void (*freecb)(void*);
+	} user;
+
 	/** hook flag */
 	unsigned hookflags;
 
@@ -98,6 +107,8 @@ void afb_req_v4_unref(struct afb_req_v4 *reqv4)
 
 	if (!__atomic_sub_fetch(&reqv4->refcount, 1, __ATOMIC_RELAXED)) {
 		comreq = reqv4->comreq;
+		if (reqv4->user.freecb)
+			reqv4->user.freecb(reqv4->user.data);
 		free(reqv4);
 		afb_req_common_unref(comreq);
 	}
@@ -425,6 +436,56 @@ int afb_req_v4_interface_by_name(
 	return afb_req_common_interface_by_name(reqv4->comreq, name, result);
 }
 
+/** Get the user data associated to the request */
+void *
+afb_req_v4_get_userdata(
+	struct afb_req_v4 *reqv4
+) {
+	return reqv4->user.data;
+}
+
+/** set (associate) the user data to the request */
+void
+afb_req_v4_set_userdata(
+	struct afb_req_v4 *reqv4,
+	void *userdata,
+	void (*freecb)(void*)
+) {
+	void *oldu = reqv4->user.data;
+	void (*oldf)(void*) = reqv4->user.freecb;
+	reqv4->user.data = userdata;
+	reqv4->user.freecb = freecb;
+	if (oldf && oldu != userdata)
+		oldf(oldu);
+}
+
+/** Get the user data associated to the request */
+void *
+afb_req_v4_get_userdata_hookable(
+	struct afb_req_v4 *reqv4
+) {
+	void *result = afb_req_v4_get_userdata(reqv4);
+#if WITH_AFB_HOOK
+	if (reqv4->hookflags & afb_hook_flag_req_userdata)
+		result = afb_hook_req_get_userdata(reqv4->comreq, result);
+#endif
+	return result;
+}
+
+/** set (associate) the user data to the request */
+void
+afb_req_v4_set_userdata_hookable(
+	struct afb_req_v4 *reqv4,
+	void *userdata,
+	void (*freecb)(void*)
+) {
+	afb_req_v4_set_userdata(reqv4, userdata, freecb);
+#if WITH_AFB_HOOK
+	if (reqv4->hookflags & afb_hook_flag_req_userdata)
+		afb_hook_req_set_userdata(reqv4->comreq, userdata, freecb);
+#endif
+}
+
 /******************************************************************************/
 
 static void call_checked_v4(void *closure, int status)
@@ -460,6 +521,8 @@ void afb_req_v4_process(
 		reqv4->hookflags = comreq->hookflags;
 #endif
 		reqv4->refcount = 1;
+		reqv4->user.data = 0;
+		reqv4->user.freecb = 0;
 		afb_req_common_check_and_set_session_async(comreq, verb->auth, verb->session, call_checked_v4, reqv4);
 	}
 }
