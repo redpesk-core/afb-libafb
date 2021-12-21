@@ -50,7 +50,6 @@
 
 #include "sys/verbose.h"
 #include "misc/afb-systemd.h"
-#include "core/afb-sched.h"
 #include "sys/x-errno.h"
 
 #if !defined(AFB_API_DBUS_PATH_PREFIX)
