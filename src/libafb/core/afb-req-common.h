@@ -512,4 +512,20 @@ afb_req_common_get_client_info_hookable(
 	struct afb_req_common *req
 );
 
+extern
+int
+afb_req_common_interface_by_id_hookable(
+	struct afb_req_common *req,
+	int id,
+	void **result
+);
+
+extern
+int
+afb_req_common_interface_by_name_hookable(
+	struct afb_req_common *req,
+	const char *name,
+	void **result
+);
+
 /******************************************************************************/

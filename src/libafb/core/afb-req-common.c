@@ -414,6 +414,34 @@ afb_req_common_interface_by_name(
 	return get_interface(req, 0, name, result);
 }
 
+int
+afb_req_common_interface_by_id_hookable(
+	struct afb_req_common *req,
+	int id,
+	void **result
+) {
+	int rc = afb_req_common_interface_by_id(req, id, result);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_interface)
+		rc = afb_hook_req_interface_by_id(req, id, *result, rc);
+#endif
+	return rc;
+}
+
+int
+afb_req_common_interface_by_name_hookable(
+	struct afb_req_common *req,
+	const char *name,
+	void **result
+) {
+	int rc = afb_req_common_interface_by_name(req, name, result);
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_interface)
+		rc = afb_hook_req_interface_by_name(req, name, *result, rc);
+#endif
+	return rc;
+}
+
 #if WITH_REQ_PROCESS_ASYNC
 /**
  * job callback for asynchronous and secured processing of the x2.

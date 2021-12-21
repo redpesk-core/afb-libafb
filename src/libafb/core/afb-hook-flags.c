@@ -68,6 +68,7 @@ static struct flag req_flags[] = { /* must be sorted by names */
 		{ "get_client_info",	afb_hook_flag_req_get_client_info },
 		{ "get_uid",		afb_hook_flag_req_get_uid },
 		{ "has_permission",	afb_hook_flag_req_has_permission },
+		{ "interface",		afb_hook_flag_req_interface },
 		{ "json",		afb_hook_flag_req_json },
 		{ "life",		afb_hook_flags_req_life },
 		{ "ref",		afb_hook_flags_req_ref },

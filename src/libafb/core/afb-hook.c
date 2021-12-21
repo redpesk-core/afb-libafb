@@ -395,6 +395,16 @@ static void hook_req_set_userdata_cb(void *closure, const struct afb_hookid *hoo
 	_hook_req_(req, "set_userdata(%p, %p)", userdata, freecb);
 }
 
+static void hook_req_interface_by_name_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *name, void *value, int result)
+{
+	_hook_req_(req, "interface_by_name(%s) -> %d, %p", name, result, value);
+}
+
+static void hook_req_interface_by_id_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int id, void *value, int result)
+{
+	_hook_req_(req, "interface_by_id(%d) -> %d, %p", id, result, value);
+}
+
 static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_begin = hook_req_begin_cb,
 	.hook_req_end = hook_req_end_cb,
@@ -424,6 +434,8 @@ static struct afb_hook_req_itf hook_req_default_itf = {
 	.hook_req_context_drop = hook_req_context_drop_cb,
 	.hook_req_get_userdata = hook_req_get_userdata_cb,
 	.hook_req_set_userdata = hook_req_set_userdata_cb,
+	.hook_req_interface_by_name = hook_req_interface_by_name_cb,
+	.hook_req_interface_by_id = hook_req_interface_by_id_cb,
 };
 
 /******************************************************************************
@@ -608,6 +620,17 @@ void afb_hook_req_set_userdata(const struct afb_req_common *req, void *userdata,
 	_HOOK_XREQ_2_(userdata, set_userdata, req, userdata, freecb);
 }
 
+int afb_hook_req_interface_by_name(const struct afb_req_common *req, const char *name, void *value, int result)
+{
+	_HOOK_XREQ_2_(interface, interface_by_name, req, name, value, result);
+	return result;
+}
+
+int afb_hook_req_interface_by_id(const struct afb_req_common *req, int id, void *value, int result)
+{
+	_HOOK_XREQ_2_(interface, interface_by_id, req, id, value, result);
+	return result;
+}
 
 /******************************************************************************
  * section: hooking reqs

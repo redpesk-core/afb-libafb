@@ -90,6 +90,7 @@ struct afb_hookid
 #define afb_hook_flag_req_context_getinit	0x01000000
 #define afb_hook_flag_req_context_drop		0x02000000
 #define afb_hook_flag_req_userdata		0x04000000
+#define afb_hook_flag_req_interface		0x08000000
 
 /* common flags */
 #define afb_hook_flags_req_life		(afb_hook_flag_req_begin|afb_hook_flag_req_end)
@@ -111,7 +112,7 @@ struct afb_hookid
 /* predefined groups */
 #define afb_hook_flags_req_common	(afb_hook_flags_req_life|afb_hook_flags_req_args|afb_hook_flag_req_reply\
 					|afb_hook_flags_req_session|afb_hook_flags_req_event|afb_hook_flags_req_subcalls\
-					|afb_hook_flag_req_vverbose|afb_hook_flags_req_security)
+					|afb_hook_flag_req_vverbose|afb_hook_flags_req_security|afb_hook_flag_req_interface)
 #define afb_hook_flags_req_extra	(afb_hook_flags_req_common|afb_hook_flags_req_ref|afb_hook_flags_req_context\
 					|afb_hook_flag_req_userdata)
 #define afb_hook_flags_req_all		(afb_hook_flags_req_extra)
@@ -145,6 +146,8 @@ struct afb_hook_req_itf {
 	void (*hook_req_context_drop)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result);
 	void (*hook_req_get_userdata)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata);
 	void (*hook_req_set_userdata)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata, void (*freecb)(void*));
+	void (*hook_req_interface_by_name)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *name, void *value, int result);
+	void (*hook_req_interface_by_id)(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int id, void *value, int result);
 };
 
 extern void afb_hook_init_req(struct afb_req_common *req);
@@ -182,6 +185,8 @@ extern int afb_hook_req_context_getinit(const struct afb_req_common *req, void *
 extern int afb_hook_req_context_drop(const struct afb_req_common *req, int result);
 extern void *afb_hook_req_get_userdata(const struct afb_req_common *req, void *userdata);
 extern void afb_hook_req_set_userdata(const struct afb_req_common *req, void *userdata, void (*freecb)(void*));
+extern int afb_hook_req_interface_by_name(const struct afb_req_common *req, const char *name, void *value, int result);
+extern int afb_hook_req_interface_by_id(const struct afb_req_common *req, int id, void *value, int result);
 
 /*********************************************************
 * section hooking apis

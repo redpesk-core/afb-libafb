@@ -436,6 +436,24 @@ int afb_req_v4_interface_by_name(
 	return afb_req_common_interface_by_name(reqv4->comreq, name, result);
 }
 
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_id_hookable(
+	struct afb_req_v4 *reqv4,
+	int id,
+	void **result
+) {
+	return afb_req_common_interface_by_id_hookable(reqv4->comreq, id, result);
+}
+
+/** get a specialized interface for the request req */
+int afb_req_v4_interface_by_name_hookable(
+	struct afb_req_v4 *reqv4,
+	const char *name,
+	void **result
+) {
+	return afb_req_common_interface_by_name_hookable(reqv4->comreq, name, result);
+}
+
 /** Get the user data associated to the request */
 void *
 afb_req_v4_get_userdata(
