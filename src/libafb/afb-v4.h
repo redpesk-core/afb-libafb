@@ -148,10 +148,9 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_req_subcall                 afb_req_v4_subcall_hookable
 #define afb_req_subcall_sync            afb_req_v4_subcall_sync_hookable
 #define afb_req_wants_log_level(r,l)    (afb_req_logmask(r) & (1 << (l)))
-
-#define afb_req_context_get(req)               afb_req_context(req, 0, 0, 0, 0)
-#define afb_req_context_set(req,context,freer) afb_req_context(req, 1, 0, freer, context)
-#define afb_req_context_clear(req)             afb_req_context(req, 1, 0, 0, 0)
+#define afb_req_context_get             afb_req_v4_cookie_get_hookable
+#define afb_req_context_set             afb_req_v4_cookie_set_hookable
+#define afb_req_context_drop            afb_req_v4_cookie_drop_hookable
 
 /*-- API ------------------------------------------*/
 
