@@ -27,7 +27,7 @@
 
 #include <afb/afb-errno.h>
 
-//static const char text_aborted[]            = "aborted";
+static const char text_bad_api_state[]      = "bad-api-state";
 static const char text_bad_state[]          = "bad-state";
 static const char text_disconnected[]       = "disconnected";
 static const char text_forbidden[]          = "forbidden";
@@ -35,22 +35,32 @@ static const char text_insufficient_scope[] = "insufficient-scope";
 static const char text_internal_error[]     = "internal-error";
 static const char text_invalid_request[]    = "invalid-request";
 static const char text_invalid_token[]      = "invalid-token";
-static const char text_no_item[]            = "not-item";
+static const char text_no_item[]            = "no-item";
 static const char text_not_available[]      = "not-available";
-static const char text_not_replied[]        = "not-replied";
+static const char text_no_reply[]           = "no-reply";
+static const char text_out_of_memory[]      = "out-of-memory";
 static const char text_unauthorized[]       = "unauthorized";
 static const char text_unknown_api[]        = "unknown-api";
-//static const char text_unknown_session[]    = "unknown-session";
 static const char text_unknown_verb[]       = "unknown-verb";
+static const char text_user_error[]         = "user-error";
+
+#define ALSO_SOME_LEGACY 1
+#if ALSO_SOME_LEGACY
+static const char text_not_item[]           = "not-item";
+static const char text_not_replied[]        = "not-replied";
+#endif
 
 const char *afb_error_text(int code)
 {
 	if (!AFB_IS_ERRNO(code))
 		return 0;
+
+	if (AFB_IS_USER_ERRNO(code))
+		return text_user_error;
+
 	switch(code) {
-	case AFB_ERRNO_INTERNAL_ERROR:
 	case AFB_ERRNO_OUT_OF_MEMORY:
-		return text_internal_error;
+		return text_out_of_memory;
 	case AFB_ERRNO_UNKNOWN_API:
 		return text_unknown_api;
 	case AFB_ERRNO_UNKNOWN_VERB:
@@ -66,9 +76,9 @@ const char *afb_error_text(int code)
 	case AFB_ERRNO_INSUFFICIENT_SCOPE:
 		return text_insufficient_scope;
 	case AFB_ERRNO_BAD_API_STATE:
-		return text_internal_error;
+		return text_bad_api_state;
 	case AFB_ERRNO_NO_REPLY:
-		return text_not_replied;
+		return text_no_reply;
 	case AFB_ERRNO_INVALID_REQUEST:
 		return text_invalid_request;
 	case AFB_ERRNO_NO_ITEM:
@@ -77,14 +87,20 @@ const char *afb_error_text(int code)
 		return text_bad_state;
 	case AFB_ERRNO_DISCONNECTED:
 		return text_disconnected;
+	default:
+		return text_internal_error;
 	}
-	return text_internal_error;
 }
 
 int afb_error_code(const char *error)
 {
 	if (!error)
 		return 0;
+
+	if (!strcmp(error, text_internal_error))
+		return AFB_ERRNO_INTERNAL_ERROR;
+	if (!strcmp(error, text_out_of_memory))
+		return AFB_ERRNO_OUT_OF_MEMORY;
 	if (!strcmp(error, text_unknown_api))
 		return AFB_ERRNO_UNKNOWN_API;
 	if (!strcmp(error, text_unknown_verb))
@@ -99,9 +115,9 @@ int afb_error_code(const char *error)
 		return AFB_ERRNO_FORBIDDEN;
 	if (!strcmp(error, text_insufficient_scope))
 		return AFB_ERRNO_INSUFFICIENT_SCOPE;
-	if (!strcmp(error, text_internal_error))
+	if (!strcmp(error, text_bad_api_state))
 		return AFB_ERRNO_BAD_API_STATE;
-	if (!strcmp(error, text_not_replied))
+	if (!strcmp(error, text_no_reply))
 		return AFB_ERRNO_NO_REPLY;
 	if (!strcmp(error, text_invalid_request))
 		return AFB_ERRNO_INVALID_REQUEST;
@@ -111,5 +127,11 @@ int afb_error_code(const char *error)
 		return AFB_ERRNO_BAD_STATE;
 	if (!strcmp(error, text_disconnected))
 		return AFB_ERRNO_DISCONNECTED;
-	return AFB_ERRNO_INTERNAL_ERROR;
+#if ALSO_SOME_LEGACY
+	if (!strcmp(error, text_not_replied))
+		return AFB_ERRNO_NO_REPLY;
+	if (!strcmp(error, text_not_item))
+		return AFB_ERRNO_NO_ITEM;
+#endif
+	return AFB_ERRNO_GENERIC_FAILURE;
 }
