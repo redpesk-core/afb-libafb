@@ -484,6 +484,44 @@ static void hook_req_get_client_info(void *closure, const struct afb_hookid *hoo
 					"result", result);
 }
 
+static void hook_req_get_userdata(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata)
+{
+	char pu[50];
+	snprintf(pu, sizeof pu, "%p", userdata);
+	hook_req(closure, hookid, req, "get_userdata", "{ss}",
+					"userdata", pu);
+}
+
+static void hook_req_set_userdata(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, void *userdata, void (*freecb)(void*))
+{
+	char pu[50], pf[50];
+	snprintf(pu, sizeof pu, "%p", userdata);
+	snprintf(pf, sizeof pf, "%p", freecb);
+	hook_req(closure, hookid, req, "set_userdata", "{ss ss}",
+					"userdata", pu,
+					"freecb", pf);
+}
+
+static void hook_req_interface_by_name(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *name, void *value, int result)
+{
+	char pv[50];
+	snprintf(pv, sizeof pv, "%p", value);
+	hook_req(closure, hookid, req, "interface_by_name", "{ss ss sd}",
+					"name", name,
+					"interface", pv,
+					"result", result);
+}
+
+static void hook_req_interface_by_id(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int id, void *value, int result)
+{
+	char pv[50];
+	snprintf(pv, sizeof pv, "%p", value);
+	hook_req(closure, hookid, req, "interface_by_id", "{sd ss sd}",
+					"id", id,
+					"interface", pv,
+					"result", result);
+}
+
 static struct afb_hook_req_itf hook_req_itf = {
 	.hook_req_begin = hook_req_begin,
 	.hook_req_end = hook_req_end,
@@ -511,6 +549,10 @@ static struct afb_hook_req_itf hook_req_itf = {
 	.hook_req_context_get = hook_req_context_get,
 	.hook_req_context_getinit = hook_req_context_getinit,
 	.hook_req_context_drop = hook_req_context_drop,
+	.hook_req_get_userdata = hook_req_get_userdata,
+	.hook_req_set_userdata = hook_req_set_userdata,
+	.hook_req_interface_by_name = hook_req_interface_by_name,
+	.hook_req_interface_by_id = hook_req_interface_by_id,
 };
 
 /*******************************************************************************/
