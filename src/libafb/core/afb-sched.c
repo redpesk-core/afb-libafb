@@ -83,9 +83,13 @@ struct sync_job
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 
 /* exit manager */
-static void (*exit_handler)(void*) = 0;
-static void *exit_closure;
-static int exit_code;
+struct exiting
+{
+	void (*handler)(void*);
+	void *closure;
+	int code;
+};
+static struct exiting *pexiting = 0;
 
 /* counts for threads */
 static int allowed_thread_count = 0;	/**< allowed count of threads */
@@ -350,17 +354,19 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 {
 	x_mutex_lock(&mutex);
 
-        /* set the handler */
-        exit_handler = handler;
-        exit_closure = closure;
-        exit_code = exitcode;
+	if (pexiting) {
+	        /* record handler and exit code */
+		pexiting->handler = handler;
+		pexiting->closure = closure;
+		pexiting->code = exitcode;
+		pexiting = 0;
+	}
 
 	/* disallow start */
 	allowed_thread_count = 0;
 	x_mutex_unlock(&mutex);
 
 	/* release the evloop */
-
 	afb_ev_mgr_release_for_me();
 	afb_ev_mgr_wakeup();
 
@@ -371,52 +377,39 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 	afb_ev_mgr_wakeup();
 }
 
-struct start_job_description
-{
-	int (*start)(int signum, void* arg);
-	void *arg;
-	int rc;
-};
-
-static void do_start_job(int signum, void* arg)
-{
-	struct start_job_description *sjd = arg;
-	sjd->rc = sjd->start(signum, sjd->arg);
-}
-
 /* Enter the jobs processing loop */
 int afb_sched_start(
 	int allowed_count,
 	int start_count,
-	int waiter_count,
-	int (*start)(int signum, void* arg),
+	int max_jobs_count,
+	void (*start)(int signum, void* arg),
 	void *arg)
 {
-	struct start_job_description sjd;
-	int rc;
+	struct exiting exiting = { 0, 0, 0 };
 
 	assert(allowed_count >= 1);
 	assert(start_count >= 0);
-	assert(waiter_count > 0);
+	assert(max_jobs_count > 0);
 	assert(start_count <= allowed_count);
 
 	x_mutex_lock(&mutex);
+	pexiting = &exiting;
 
 	/* check whether already running */
 	if (allowed_thread_count) {
 		ERROR("sched already started");
-		rc = X_EINVAL;
+		exiting.code = X_EINVAL;
 		goto error;
 	}
 
 	/* records the allowed count */
 	allowed_thread_count = allowed_count;
-	afb_jobs_set_max_count(waiter_count);
+	afb_jobs_set_max_count(max_jobs_count);
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
-		rc = start_one_thread();
-		if (rc != 0) {
+		exiting.code = start_one_thread();
+		if (exiting.code != 0) {
 			ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
 			afb_threads_stop(CLASSID_OTHERS, INT_MAX);
@@ -425,25 +418,21 @@ int afb_sched_start(
 	}
 
 	/* queue the start job */
-	sjd.start = start;
-	sjd.arg = arg;
-	sjd.rc = -1;
-	rc = afb_jobs_post(NULL, 0, 0, do_start_job, &sjd);
-	if (rc < 0)
+	exiting.code = afb_jobs_post(NULL, 0, 0, start, arg);
+	if (exiting.code < 0)
 		goto error;
 
 	/* run until end */
 	x_mutex_unlock(&mutex);
 	afb_threads_enter(CLASSID_MAIN, get_job_cb, (void*)(intptr_t)CLASSID_MAIN);
 	x_mutex_lock(&mutex);
-	rc = sjd.rc;
 error:
+	pexiting = 0;
 	allowed_thread_count = 0;
 	x_mutex_unlock(&mutex);
-	if (exit_handler) {
-		rc = exit_code;
-		exit_handler(exit_closure);
-		exit_handler = 0;
+	if (exiting.handler) {
+		exiting.handler(exiting.closure);
+		exiting.handler = 0;
 	}
-	return rc;
+	return exiting.code;
 }

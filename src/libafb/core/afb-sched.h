@@ -86,6 +86,9 @@ extern int afb_sched_call_job_sync(
 /**
  * Enter the jobs processing loop.
  *
+ * When entered, the job processing loop does not return until
+ * the function @see afb_sched_exit is called.
+ *
  * @param allowed_count  Maximum count of thread for jobs including this one
  * @param start_count    Count of thread to start now, must be lower.
  * @param max_jobs_count Maximum count of jobs that can be waiting.
@@ -98,7 +101,7 @@ extern int afb_sched_start(
 		int allowed_count,
 		int start_count,
 		int max_jobs_count,
-		int (*start)(int signum, void* arg),
+		void (*start)(int signum, void* arg),
 		void *arg);
 
 /**
@@ -110,6 +113,7 @@ extern int afb_sched_start(
  *                 and before the main thread (the one that called
  *                 'afb_sched_start') returns.
  * @param closure  The closure for the handler
+ * @param exitcode Code to be returned by exited @see afb_sched_start
  */
 extern void afb_sched_exit(int force, void (*handler)(void *closure), void *closure, int exitcode);
 
