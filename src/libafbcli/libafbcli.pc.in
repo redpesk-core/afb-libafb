@@ -30,4 +30,5 @@ URL: @PROJECT_URL@
 Requires: json-c libsystemd
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
 Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafbcli
+Libs.private: @PCLIBSPRIV@
 

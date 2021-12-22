@@ -44,15 +44,22 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/tls/tls.c
 )
 
-ADD_LIBRARY(libafbcli SHARED ${LIBAFBCLI_SOURCES})
-set_property(TARGET libafbcli PROPERTY OUTPUT_NAME afbcli)
+add_library(libafbcli OBJECT ${LIBAFBCLI_SOURCES})
 target_compile_definitions(libafbcli PRIVATE -DWITH_JOB_NOT_MONITORED=1)
+target_include_directories(libafbcli PRIVATE ${DIR})
 
-SET_TARGET_PROPERTIES(libafbcli PROPERTIES
+add_library(libafbclista STATIC $<TARGET_OBJECTS:libafbcli>)
+set_target_properties(libafbclista PROPERTIES
+	OUTPUT_NAME afbcli
+	VERSION ${LIBAFB_VERSION}
+)
+
+add_library(libafbcliso SHARED $<TARGET_OBJECTS:libafbcli>)
+set_target_properties(libafbcliso PROPERTIES
+	OUTPUT_NAME afbcli
 	VERSION ${LIBAFBCLI_VERSION}
 	SOVERSION ${LIBAFBCLI_SOVERSION})
-
-TARGET_LINK_LIBRARIES(libafbcli
+target_link_libraries(libafbcliso
 	${libsystemd_LDFLAGS}
 	${json-c_LDFLAGS}
 	${gnutls_LDFLAGS}
@@ -62,9 +69,11 @@ TARGET_LINK_LIBRARIES(libafbcli
 	-Wl,--gc-sections
 )
 
-target_include_directories(libafbcli PUBLIC ${DIR})
+set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${gnutls_LDFLAGS} -lpthread)
+list(JOIN PCLIBSPRIV " " PCLIBSPRIV)
 
-INSTALL(TARGETS libafbcli LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+INSTALL(TARGETS libafbclista ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+INSTALL(TARGETS libafbcliso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 INSTALL(FILES
 		afb-ws-client.h
 		${DIR}/wsj1/afb-wsj1.h

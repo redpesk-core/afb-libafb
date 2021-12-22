@@ -11,6 +11,7 @@ Version 4.1.0
    - add functions to get verbs of api v4
    - implement get/set of userdata for requests v4
    - allows hooking of interface queries
+   - deliver a static library for libafbcli
 
   fixes
    - fix correct apiset (callset) for required features
