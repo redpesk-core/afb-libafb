@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015-2020 IoT.bzh Company
+ Copyright (C) 2015-2022 IoT.bzh Company
 
  Author: Johann Gautier <johann.gautier@iot.bzh>
 
