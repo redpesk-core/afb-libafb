@@ -70,7 +70,7 @@ void timeout_test_job(int sig, void * arg){
 		for(;;);
 		gval++;
 	}
-	else if ( sig == SIGVTALRM || sig == SIGABRT ) {
+	else if ( sig == SIGALRM || sig == SIGABRT ) {
 		gval *= -1;
 		gsig = sig;
 	}
@@ -171,7 +171,7 @@ START_TEST(job_aborting)
 	afb_jobs_run(job);
 	// if gval = -2 it means that the job has been run once and have been killed
 	ck_assert_int_eq(gval, -2);
-	ck_assert_int_eq(gsig, SIGVTALRM);
+	ck_assert_int_eq(gsig, SIGALRM);
 }
 END_TEST
 

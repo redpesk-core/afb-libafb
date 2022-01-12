@@ -101,7 +101,7 @@ void test_job(int sig, void* arg){
         }
     }
     // if the job receve a stoping signal, inform the test rotine throw gval
-    else if(sig == SIGVTALRM ||
+    else if(sig == SIGALRM ||
             sig == SIGTERM ||
             sig == SIGKILL)
     {
@@ -162,7 +162,7 @@ void test_job_sync(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
     // if the job receve a stoping signal, inform the test rotine throw gval
-    else if(sig == SIGVTALRM ||
+    else if(sig == SIGALRM ||
             sig == SIGTERM ||
             sig == SIGKILL)
     {

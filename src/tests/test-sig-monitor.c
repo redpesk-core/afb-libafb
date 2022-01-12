@@ -102,7 +102,7 @@ void test_job(int sig, void * arg){
 		}
 		gval++;
 	}
-	else if (sig == SIGVTALRM){
+	else if (sig == SIGALRM){
 		gval = -1;
 	}
 	else{

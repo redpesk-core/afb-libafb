@@ -253,7 +253,7 @@ static inline void monitor_raise(int signum)
 {
 	sigjmp_buf *eh = x_tls_get_error_handler();
 	if (eh != NULL)
-		siglongjmp(*eh, signum);
+		siglongjmp(*eh, signum == SIG_FOR_TIMER ? SIGALRM : signum);
 }
 #endif
 /******************************************************************************/
