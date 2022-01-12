@@ -139,20 +139,18 @@ X_TLS(void,timerid)
 
 #define get_timerid()  ((timer_t)x_tls_get_timerid())
 #define set_timerid(x) (x_tls_set_timerid((void*)(x)))
-#define is_timer_set() (!!x_tls_get_timerid())
 
 /*
  * Creates a timer for the current thread
  *
  * Returns 0 in case of success
  */
-static inline int timeout_create()
+static inline int timeout_get(timer_t *tid)
 {
 	int rc;
 	struct sigevent sevp;
-	timer_t timerid;
 
-	if (is_timer_set())
+	if ((*tid = get_timerid()))
 		rc = 0;
 	else {
 		sevp.sigev_notify = SIGEV_THREAD_ID;
@@ -163,15 +161,21 @@ static inline int timeout_create()
 #else
 		sevp._sigev_un._tid = (pid_t)syscall(SYS_gettid);
 #endif
-		rc = timer_create(CLOCK_FOR_TIMER, &sevp, &timerid);
-		if (!rc && !timerid) {
-			rc = timer_create(CLOCK_FOR_TIMER, &sevp, &timerid);
+		rc = timer_create(CLOCK_FOR_TIMER, &sevp, tid);
+		if (!rc && !*tid) {
+			rc = timer_create(CLOCK_FOR_TIMER, &sevp, tid);
 			timer_delete(0);
 		}
 		if (!rc)
-			set_timerid(timerid);
+			set_timerid(*tid);
 	}
 	return rc;
+}
+
+static inline int timeout_create()
+{
+	timer_t timerid;
+	return timeout_get(&timerid);
 }
 
 /*
@@ -181,14 +185,15 @@ static inline int timeout_arm(int timeout)
 {
 	int rc;
 	struct itimerspec its;
+	timer_t timerid;
 
-	rc = timeout_create();
+	rc = timeout_get(&timerid);
 	if (rc == 0) {
 		its.it_interval.tv_sec = 0;
 		its.it_interval.tv_nsec = 0;
 		its.it_value.tv_sec = timeout;
 		its.it_value.tv_nsec = 0;
-		rc = timer_settime(get_timerid(), 0, &its, NULL);
+		rc = timer_settime(timerid, 0, &its, NULL);
 	}
 
 	return rc;
@@ -199,7 +204,7 @@ static inline int timeout_arm(int timeout)
  */
 static inline void timeout_disarm()
 {
-	if (is_timer_set())
+	if (get_timerid())
 		timeout_arm(0);
 }
 
@@ -208,7 +213,7 @@ static inline void timeout_disarm()
  */
 static inline void timeout_delete()
 {
-	if (is_timer_set()) {
+	if (get_timerid()) {
 		timer_delete(get_timerid());
 		set_timerid(0);
 	}
