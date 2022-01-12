@@ -192,12 +192,14 @@ int afb_jobs_post(
 	} else {
 		/* add the job */
 		rc = job_add(group, delayms, timeout, callback, arg, &job);
+		if (rc >= 0)
+			rc = (int)job->id;
 	}
 
 	/* leave critical */
 	x_mutex_unlock(&mutex);
 
-	return rc < 0 ? rc : (int)job->id;
+	return rc;
 }
 
 /**

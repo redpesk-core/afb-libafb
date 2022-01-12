@@ -127,8 +127,11 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 			sz = read(fd, buffer, esz);
 #endif
 			if (sz >= 0) {
-				if (esz > (size_t)sz)
-					buffer = realloc(buffer, (size_t)sz);
+				if (esz > (size_t)sz) {
+					void *newbuffer = realloc(buffer, (size_t)sz);
+					if (newbuffer != NULL)
+						buffer = newbuffer;
+				}
 				afb_stub_rpc_receive(stub, buffer, (size_t)sz);
 			}
 			else {

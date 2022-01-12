@@ -599,7 +599,7 @@ static int decode_call_request(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_call_r
 	uint16_t nval;
 	struct param param;
 	afb_rpc_v2_value_t *val;
-	afb_rpc_v2_value_array_t *values;
+	afb_rpc_v2_value_array_t *values = NULL;
 
 	int rc = afb_rpc_decoder_read_uint16le(decoder, &msg->callid);
 	if (rc >= 0)
@@ -651,7 +651,7 @@ static int decode_call_request(afb_rpc_decoder_t *decoder, afb_rpc_v2_msg_call_r
 				break;
 			}
 	}
-	if (rc >= 0 && values && values->count != nval)
+	if (rc >= 0 && values != NULL && values->count != nval)
 		rc = X_EPROTO;
 
 	return rc;
