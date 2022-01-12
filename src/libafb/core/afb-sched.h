@@ -31,8 +31,8 @@ struct ev_mgr;
  */
 enum afb_sched_mode
 {
-	Afb_Sched_Mode_Normal,
-	Afb_Sched_Mode_Start
+	Afb_Sched_Mode_Normal,	/**< don't start a new thread */
+	Afb_Sched_Mode_Start	/**< enforce a thread start if needed */
 };
 
 /**
@@ -40,7 +40,7 @@ enum afb_sched_mode
  * and 'closure' using 'group' and 'timeout' to control sequencing and
  * execution time.
  * @param group the group for sequencing jobs
- * @param timeout the time in seconds allocated to the job
+ * @param timeout the time in seconds allocated to wait the job the job
  * @param callback the callback that will handle the job.
  *                 it receives 3 parameters: 'signum' that will be 0
  *                 on normal flow or the catched signal number in case
@@ -159,16 +159,30 @@ extern int afb_sched_post_job(
  * the current thread from the thread of threads handling
  * asynchronous jobs.
  *
+ * @param timeout  The timeout of achievment in second (0 no timeout)
  * @param callback The function to execute for achieving the job.
  *                 Its first parameter is either 0 on normal flow
  *                 or the signal number that broke the normal flow.
  *                 The remaining parameter is the parameter 'arg'
  *                 given here.
  * @param arg      The second argument for 'callback'
+ * @param mode     Scheduling policy
  */
-extern void afb_sched_call_sync(
+extern void afb_sched_call(
+		int timeout,
 		void (*callback)(int, void*),
-		void *arg);
+		void *arg,
+		enum afb_sched_mode mode
+);
+
+/* obsolete */
+static inline void afb_sched_call_sync(
+		void (*callback)(int, void*),
+		void *arg
+) {
+	afb_sched_call(0, callback, arg, Afb_Sched_Mode_Normal);
+}
+
 
 /**
  * Wait that every running thread are in waiting state.

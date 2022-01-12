@@ -52,6 +52,12 @@
  */
 struct sync_job
 {
+	/** next item */
+	struct sync_job *next;
+
+	/** identifier */
+	uintptr_t id;
+
 	/** synchronize condition */
 	x_cond_t condsync;
 
@@ -81,6 +87,11 @@ struct sync_job
 
 /* synchronisation of threads */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
+
+/* synchronisation of sync jobs */
+static x_mutex_t sync_jobs_mutex = X_MUTEX_INITIALIZER;
+static uintptr_t sync_jobs_cptr = 0;
+static struct sync_job *sync_jobs_head = 0;
 
 /* exit manager */
 struct exiting
@@ -216,15 +227,37 @@ int afb_sched_post_job(
 	return rc;
 }
 
-/* call a monitored routine synchronousely */
-void afb_sched_call_sync(
+/* call a monitored routine synchronousely, taking care of releasing event loop */
+void afb_sched_call(
+		int timeout,
 		void (*callback)(int, void*),
-		void *arg
+		void *arg,
+		enum afb_sched_mode mode
 ) {
-	/* lock */
 	if (afb_ev_mgr_release_for_me())
-		adapt(Afb_Sched_Mode_Normal);
-	afb_sig_monitor_run(0, callback, arg);
+		adapt(mode);
+	afb_sig_monitor_run(timeout, callback, arg);
+}
+
+/**
+ * @brief get the sync_job of id, optionnaly unlink it, and return it
+ *
+ * @param id id to get
+ * @param unlink if not zero, unlink the item
+ * @return struct sync_job* the job or NULL if not found
+ */
+static struct sync_job *get_sync_job(uintptr_t id, int unlink)
+{
+	struct sync_job *sync, **prv = &sync_jobs_head;
+	while ((sync = *prv) != NULL) {
+		if (sync->id == id) {
+			if (unlink)
+				*prv = sync->next;
+			break;
+		}
+		prv = &sync->next;
+	}
+	return sync;
 }
 
 /**
@@ -236,17 +269,27 @@ static void do_sync_cb(int signum, void *closure)
 	int rc;
 	struct sync_job *sync = closure;
 
-	if (signum != 0)
-		rc = X_EINTR;
-	else {
+	if (signum == 0) {
 		x_cond_init(&sync->condsync);
-		x_mutex_lock(&mutex);
-		rc = post_job(sync->group, 0, sync->timeout, sync->handler, sync, Afb_Sched_Mode_Start);
+		x_mutex_lock(&sync_jobs_mutex);
+		sync->id = ++sync_jobs_cptr;
+		if (sync->id == 0)
+			sync->id = ++sync_jobs_cptr;
+		sync->next = sync_jobs_head;
+		sync_jobs_head = sync;
+		rc = post_job(sync->group, 0, sync->timeout, sync->handler, (void*)sync->id, Afb_Sched_Mode_Start);
 		if (rc >= 0) {
-			x_cond_wait(&sync->condsync, &mutex);
+			x_cond_wait(&sync->condsync, &sync_jobs_mutex);
 			rc = 0;
 		}
-		x_mutex_unlock(&mutex);
+		get_sync_job(sync->id, 1);
+		x_mutex_unlock(&sync_jobs_mutex);
+	}
+	else {
+		x_mutex_lock(&sync_jobs_mutex);
+		get_sync_job(sync->id, 1);
+		x_mutex_unlock(&sync_jobs_mutex);
+		rc = signum == SIGALRM ? X_ETIMEDOUT : X_EINTR;
 	}
 	sync->rc = rc;
 }
@@ -257,8 +300,21 @@ static void do_sync_cb(int signum, void *closure)
  */
 static void enter_cb(int signum, void *closure)
 {
-	struct sync_job *sync = closure;
-	sync->enter(signum, sync->arg, (struct afb_sched_lock*)&sync->condsync);
+	struct sync_job *sync;
+	void (*enter)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock);
+	void *arg;
+	uintptr_t id = (uintptr_t)closure;
+	x_mutex_lock(&sync_jobs_mutex);
+	sync = get_sync_job(id, 0);
+	if (sync == NULL)
+		enter = NULL;
+	else {
+		enter = sync->enter;
+		arg = sync->arg;
+	}
+	x_mutex_unlock(&sync_jobs_mutex);
+	if (enter)
+		enter(signum, arg, (struct afb_sched_lock*)id);
 }
 
 /**
@@ -290,7 +346,7 @@ int afb_sched_enter(
 	sync.arg = closure;
 	sync.handler = enter_cb;
 
-	afb_sched_call_sync(do_sync_cb, &sync);
+	afb_sched_call(timeout, do_sync_cb, &sync, Afb_Sched_Mode_Normal);
 	return sync.rc;
 }
 
@@ -302,24 +358,33 @@ int afb_sched_enter(
 int afb_sched_leave(struct afb_sched_lock *afb_sched_lock)
 {
 	int rc;
-	x_cond_t *cond = (x_cond_t*)afb_sched_lock;
-	x_mutex_lock(&mutex);
-	rc = x_cond_signal(cond);
-	x_mutex_unlock(&mutex);
+	struct sync_job *sync;
+
+	x_mutex_lock(&sync_jobs_mutex);
+	sync = get_sync_job((uintptr_t)afb_sched_lock, 1);
+	if (sync == NULL)
+		rc = X_EINVAL;
+	else {
+		rc = x_cond_signal(&sync->condsync);
+		if (rc < 0)
+			rc = -errno;
+	}
+	x_mutex_unlock(&sync_jobs_mutex);
+
 	return rc;
+
 }
 
-/**
- * Internal helper function for 'afb_sched_call_job_sync'.
- * @see afb_sched_call_job_sync
- */
-static void call_cb(int signum, void *closure)
+struct call_job_sync {
+	void (*callback)(int, void*);
+	void *arg;
+};
+
+static void call_job_sync_cb(int signum, void *closure, struct afb_sched_lock *lock)
 {
-	struct sync_job *sync = closure;
-	sync->callback(signum, sync->arg);
-	x_mutex_lock(&mutex);
-	x_cond_signal(&sync->condsync);
-	x_mutex_unlock(&mutex);
+	struct call_job_sync *cjs = closure;
+	cjs->callback(signum, cjs->arg);
+	afb_sched_leave(lock);
 }
 
 /* call a job synchronousely */
@@ -329,16 +394,14 @@ int afb_sched_call_job_sync(
 		void (*callback)(int, void*),
 		void *arg)
 {
-	struct sync_job sync;
-
-	sync.group = group;
-	sync.timeout = timeout;
-	sync.callback = callback;
-	sync.arg = arg;
-	sync.handler = call_cb;
-
-	afb_sched_call_sync(do_sync_cb, &sync);
-	return sync.rc;
+	if (group == NULL) {
+		afb_sched_call(timeout, callback, arg, Afb_Sched_Mode_Start);
+		return 0;
+	}
+	else {
+		struct call_job_sync cjs = { callback, arg };
+		return afb_sched_enter(group, timeout, call_job_sync_cb, &cjs);
+	}
 }
 
 /* wait that no thread is running jobs */
