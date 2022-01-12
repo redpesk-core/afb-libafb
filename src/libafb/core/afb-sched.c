@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
@@ -279,18 +280,30 @@ static void do_sync_cb(int signum, void *closure)
 		sync_jobs_head = sync;
 		rc = post_job(sync->group, 0, sync->timeout, sync->handler, (void*)sync->id, Afb_Sched_Mode_Start);
 		if (rc >= 0) {
-			x_cond_wait(&sync->condsync, &sync_jobs_mutex);
-			rc = 0;
+			if (sync->timeout) {
+				struct timespec ts;
+				clock_gettime(CLOCK_REALTIME, &ts);
+				ts.tv_sec += sync->timeout;
+				rc = x_cond_timedwait(&sync->condsync, &sync_jobs_mutex, &ts);
+				if (rc < 0)
+					rc = X_ETIMEDOUT;
+			}
+			else {
+				x_cond_wait(&sync->condsync, &sync_jobs_mutex);
+				rc = 0;
+			}
 		}
 		get_sync_job(sync->id, 1);
 		x_mutex_unlock(&sync_jobs_mutex);
 	}
 	else {
-		x_mutex_unlock(&sync_jobs_mutex);
-		x_mutex_lock(&sync_jobs_mutex);
-		get_sync_job(sync->id, 1);
-		x_mutex_unlock(&sync_jobs_mutex);
 		rc = signum == SIGALRM ? X_ETIMEDOUT : X_EINTR;
+		x_mutex_unlock(&sync_jobs_mutex);
+		if (sync->id != 0) {
+			x_mutex_lock(&sync_jobs_mutex);
+			get_sync_job(sync->id, 1);
+			x_mutex_unlock(&sync_jobs_mutex);
+		}
 	}
 	sync->rc = rc;
 }
@@ -341,13 +354,14 @@ int afb_sched_enter(
 ) {
 	struct sync_job sync;
 
+	sync.id = 0;
 	sync.group = group;
 	sync.timeout = timeout;
 	sync.enter = callback;
 	sync.arg = closure;
 	sync.handler = enter_cb;
 
-	afb_sched_call(timeout, do_sync_cb, &sync, Afb_Sched_Mode_Normal);
+	afb_sched_call(0, do_sync_cb, &sync, Afb_Sched_Mode_Normal);
 	return sync.rc;
 }
 
