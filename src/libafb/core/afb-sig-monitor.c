@@ -275,6 +275,7 @@ static int sigterm[] = { SIGINT, SIGABRT, SIGTERM, 0 };
 
 static int exiting = 0;
 static int enabled = 0;
+static int dumpstack_enabled = 1;
 
 /* install the handlers */
 static int set_signals_handler(void (*handler)(int), int *signals)
@@ -376,7 +377,7 @@ static void on_signal_terminate (int signum)
 {
 	if (!is_in_safe_dumpstack()) {
 		ERROR("Terminating signal %d received: %s", signum, strsignal(signum));
-		if (signum == SIGABRT)
+		if (dumpstack_enabled && signum == SIGABRT)
 			safe_dumpstack(3, signum);
 	}
 	safe_exit(1);
@@ -387,8 +388,8 @@ static void on_signal_error(int signum)
 {
 	if (!is_in_safe_dumpstack()) {
 		ERROR("ALERT! signal %d received: %s", signum, strsignal(signum));
-
-		safe_dumpstack(3, signum);
+		if (dumpstack_enabled)
+			safe_dumpstack(3, signum);
 	}
 	monitor_raise(signum);
 
@@ -450,4 +451,11 @@ void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *ar
 void afb_sig_monitor_dumpstack()
 {
 	return dumpstack(1, 0);
+}
+
+void afb_sig_monitor_dumpstack_enable(int enable)
+{
+#if WITH_SIG_MONITOR_SIGNALS
+	dumpstack_enabled = enable;
+#endif
 }

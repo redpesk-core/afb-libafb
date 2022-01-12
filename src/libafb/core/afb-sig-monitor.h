@@ -62,3 +62,7 @@ extern void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), v
  */
 extern void afb_sig_monitor_dumpstack();
 
+/**
+ * enable or disable stack dumps
+ */
+extern void afb_sig_monitor_dumpstack_enable(int enable);
