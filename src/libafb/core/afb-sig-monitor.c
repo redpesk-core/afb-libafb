@@ -132,6 +132,7 @@ static inline void timeout_delete() {}
 #include <signal.h>
 
 #define SIG_FOR_TIMER   SIGVTALRM
+#define CLOCK_FOR_TIMER CLOCK_REALTIME
 
 /* local per thread timers */
 X_TLS(void,timerid)
@@ -162,9 +163,9 @@ static inline int timeout_create()
 #else
 		sevp._sigev_un._tid = (pid_t)syscall(SYS_gettid);
 #endif
-		rc = timer_create(CLOCK_THREAD_CPUTIME_ID, &sevp, &timerid);
+		rc = timer_create(CLOCK_FOR_TIMER, &sevp, &timerid);
 		if (!rc && !timerid) {
-			rc = timer_create(CLOCK_THREAD_CPUTIME_ID, &sevp, &timerid);
+			rc = timer_create(CLOCK_FOR_TIMER, &sevp, &timerid);
 			timer_delete(0);
 		}
 		if (!rc)
@@ -234,10 +235,8 @@ static void monitor(int timeout, void (*function)(int sig, void*), void *arg)
 	signum = sigsetjmp(jmpbuf, 1);
 	if (signum == 0) {
 		x_tls_set_error_handler(&jmpbuf);
-		if (timeout) {
-			timeout_create();
+		if (timeout)
 			timeout_arm(timeout);
-		}
 		function(0, arg);
 	} else {
 		signum2 = sigsetjmp(jmpbuf, 1);
