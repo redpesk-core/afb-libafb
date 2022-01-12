@@ -286,6 +286,7 @@ static void do_sync_cb(int signum, void *closure)
 		x_mutex_unlock(&sync_jobs_mutex);
 	}
 	else {
+		x_mutex_unlock(&sync_jobs_mutex);
 		x_mutex_lock(&sync_jobs_mutex);
 		get_sync_job(sync->id, 1);
 		x_mutex_unlock(&sync_jobs_mutex);
