@@ -12,6 +12,7 @@ Version 4.1.0
    - implement get/set of userdata for requests v4
    - allows hooking of interface queries
    - deliver a static library for libafbcli
+   - allow to disable stack dump
 
   fixes
    - fix correct apiset (callset) for required features
@@ -19,9 +20,13 @@ Version 4.1.0
    - fix issue on timer management
    - fix deprecated hooks of LIBC
    - fix definitions in afb-v4.h
+   - fix expiration of afb_sched_enter and change its logic
+   - fix timer used for expiration to be REALTIME_CLOCK
 
   minor/details
    - fix declarations in afb-api-v4 and improved API
+   - report SIGALARM instead of SIGVTALARM that is specific
+   - enhance timer management
 
 Version 4.0.4
 -------------
