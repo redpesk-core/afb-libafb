@@ -351,8 +351,8 @@ process_sync(
 	ERROR("Calls/Subcalls sync are not supported");
 	if (status)
 		*status = X_ENOTSUP;
-	if (ps->nreplies)
-		*ps->nreplies = 0;
+	if (nreplies)
+		*nreplies = 0;
 	return X_ENOTSUP;
 }
 #endif

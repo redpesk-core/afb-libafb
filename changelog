@@ -22,6 +22,7 @@ Version 4.1.0
    - fix definitions in afb-v4.h
    - fix expiration of afb_sched_enter and change its logic
    - fix timer used for expiration to be REALTIME_CLOCK
+   - fix compiling with WITH_AFB_CALL_SYNC=OFF
 
   minor/details
    - fix declarations in afb-api-v4 and improved API
