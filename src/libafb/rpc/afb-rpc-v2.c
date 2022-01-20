@@ -98,9 +98,9 @@ uint16_t afb_rpc_v2_size_to_indicator(uint32_t size)
 
 uint32_t afb_rpc_v2_indicator_to_size(uint16_t indicator)
 {
-	uint32_t r = (uint32_t)(indicator & 0xfff0);
-	r = ((r + 0x00000010) << (indicator & 0x000f)) - 1;
-	return r;
+	uint32_t r = (uint32_t)(indicator & 0xfff0) + 0x00000010;
+	r <<= 1 + (indicator & 0x000f);
+	return r - 1;
 }
 
 /*************************************************************************************

@@ -204,7 +204,7 @@ extern int afb_rpc_coder_write_copy(afb_rpc_coder_t *coder, const void *data, ui
 
 extern int afb_rpc_coder_write_zeroes(afb_rpc_coder_t *coder, uint32_t count);
 
-/* align to base (base MUST be a power of 2 */
+/* align to base (base MUST be a power of 2) */
 extern int afb_rpc_coder_write_align(afb_rpc_coder_t *coder, uint32_t base);
 
 extern int afb_rpc_coder_write_uint32(afb_rpc_coder_t *coder, uint32_t value);
