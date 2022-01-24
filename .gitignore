@@ -3,3 +3,4 @@ build/
 doxygen-output/
 .vscode/*.json
 *.swp
+analyze.output
