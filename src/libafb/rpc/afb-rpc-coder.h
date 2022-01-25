@@ -99,7 +99,7 @@ struct afb_rpc_coder_iovec
 		/** buffer */
 		char inl[AFB_RPC_OUTPUT_INLINE_SIZE];
 	} data;
-	/** size. For sizes lesser than sizeof(void*), data is inline */
+	/** size. For sizes lesser than AFB_RPC_OUTPUT_INLINE_SIZE, data is inline */
 	uint32_t size;
 };
 

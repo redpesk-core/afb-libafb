@@ -214,7 +214,7 @@ int afb_rpc_coder_write_copy(afb_rpc_coder_t *coder, const void *data, uint32_t 
 	int rc;
 	void *copy;
 
-	if (size <= AFB_RPC_OUTPUT_BUFFER_COUNT_MAX)
+	if (size <= AFB_RPC_OUTPUT_INLINE_SIZE)
 		rc = afb_rpc_coder_write(coder, data, size);
 	else {
 		copy = malloc(size);
