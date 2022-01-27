@@ -26,9 +26,10 @@ Name: libafb
 Description: afb-libafb core library
 Version: @PROJECT_VERSION@
 URL: @PROJECT_URL@
+afbext_version_script=@CMAKE_INSTALL_FULL_INCLUDEDIR@/libafb/extend/libafb-extend.map
+afbext_ldflags=-Wl,--version-script=@CMAKE_INSTALL_FULL_INCLUDEDIR@/libafb/extend/libafb-extend.map
 
 Requires: @PCREQUIRES@
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
 Libs: -L@CMAKE_INSTALL_FULL_LIBDIR@ -lafb
 Libs.private: @PCLIBSPRIV@
-

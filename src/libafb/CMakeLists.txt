@@ -40,7 +40,7 @@ installheader(${CMAKE_CURRENT_BINARY_DIR}/libafb-config.h)
 installheader(libafb.h afb-extension.h afb-v4.h)
 
 foreach(entry core utils sys http apis misc wsapi wsj1 extend tls rpc)
-	file(GLOB hdr ${entry}/*.h)
+	file(GLOB hdr ${entry}/*.h ${entry}/*.map)
 	installfiles(${DESTHDR}/${entry} ${hdr})
 	installheader(afb-${entry}.h)
 	file(GLOB src ${entry}/*.c)

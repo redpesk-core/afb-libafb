@@ -13,6 +13,7 @@ Version 4.1.0
    - allows hooking of interface queries
    - deliver a static library for libafbcli
    - allow to disable stack dump
+   - provide a linker version script for extensions
 
   fixes
    - fix correct apiset (callset) for required features
