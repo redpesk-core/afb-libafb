@@ -23,6 +23,9 @@ Version 4.1.0
    - fix expiration of afb_sched_enter and change its logic
    - fix timer used for expiration to be REALTIME_CLOCK
    - fix compiling with WITH_AFB_CALL_SYNC=OFF
+   - fix timer reference (critical)
+   - fix encoding of data copy
+   - fix size indicator of AFBRPCv2
 
   minor/details
    - fix declarations in afb-api-v4 and improved API
