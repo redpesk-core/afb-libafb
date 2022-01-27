@@ -701,10 +701,10 @@ int ev_mgr_add_timer(
 			+ (time_ms_t)start_sec * 1000
 			+ (time_ms_t)start_ms
 			- (time_ms_t)(accuracy_ms >> 1);
-		timer->next = 0;
 		timer->is_deleted = 0;
 		timer->auto_unref = !!autounref;
 		timer->is_active = 1;
+		timer->refcount = 1;
 		timer->next = mgr->timers;
 		mgr->timers = timer;
 		rc = timer_set(mgr, TIME_MS_MAX);
