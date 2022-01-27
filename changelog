@@ -31,6 +31,7 @@ Version 4.1.0
    - fix declarations in afb-api-v4 and improved API
    - report SIGALARM instead of SIGVTALARM that is specific
    - enhance timer management
+   - improve network latency by using TCP_NODELAY
 
 Version 4.0.4
 -------------

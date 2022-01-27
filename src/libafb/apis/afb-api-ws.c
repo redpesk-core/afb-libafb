@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
@@ -147,6 +149,8 @@ static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 	if (fdc < 0) {
 		ERROR("can't accept connection to %s: %m", apiws->uri);
 	} else {
+		int opt = 1;
+		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &opt, (socklen_t)sizeof opt);
 		server = afb_stub_ws_create_server(fdc, &apiws->uri[apiws->offapi], apiws->apiset);
 		if (server)
 			afb_stub_ws_set_on_hangup(server, server_on_hangup);

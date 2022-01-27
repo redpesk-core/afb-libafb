@@ -33,6 +33,8 @@
 #include <fcntl.h>
 #include <sys/un.h>
 #include <time.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include <systemd/sd-event.h>
 
@@ -474,6 +476,8 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 			(((int)port[0]) << 8)|(int)port[1]);
 		fd = socket(iai->ai_family, iai->ai_socktype, iai->ai_protocol);
 		if (fd >= 0) {
+			rc = 1;
+			setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 			rc = connect(fd, iai->ai_addr, iai->ai_addrlen);
 			if (rc == 0)
 				fcntl(fd, F_SETFL, O_NONBLOCK);
@@ -636,6 +640,8 @@ static void server_listen_callback(struct ev_fd *efd, int fd, uint32_t revents, 
 		lenaddr = (socklen_t)sizeof addr;
 		fdc = accept(fd, &addr, &lenaddr);
 		if (fdc >= 0) {
+			int opt = 1;
+			setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, (socklen_t)sizeof opt);
 			lcb->onclient(lcb->closure, fdc);
 		}
 	}

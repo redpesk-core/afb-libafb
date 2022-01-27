@@ -30,6 +30,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
@@ -308,6 +310,8 @@ static void server_accept(struct server *server, int fd)
 	if (fdc < 0) {
 		ERROR("can't accept connection to %s: %m", server->uri);
 	} else {
+		rc = 1;
+		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 		stub = afb_stub_rpc_create(&server->uri[server->offapi], server->apiset);
 		if (!stub) {
 			ERROR("can't serve accepted connection to %s", server->uri);

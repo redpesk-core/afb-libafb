@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include "misc/afb-socket.h"
 
@@ -223,6 +225,8 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 				}
 				rc = bind(fd, iai->ai_addr, iai->ai_addrlen);
 			} else {
+				rc = 1;
+				setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 				rc = connect(fd, iai->ai_addr, iai->ai_addrlen);
 			}
 			if (rc == 0) {

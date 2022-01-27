@@ -29,6 +29,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <poll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include "utils/websock.h"
 #include "misc/afb-ws.h"
@@ -168,6 +171,8 @@ struct afb_ws *afb_ws_create(int fd, const struct afb_ws_itf *itf, void *closure
 		goto error;
 
 	/* init */
+	rc = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 	result->fd = fd;
 	result->state = waiting;
 	result->itf = itf;
