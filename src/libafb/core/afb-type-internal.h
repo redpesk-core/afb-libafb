@@ -97,8 +97,8 @@ struct afb_type
 	/** flags */
 	uint8_t flags;
 
-	/** typeid (compatible with rpcv2) */
-	uint16_t typeid;
+	/** typenum (compatible with rpcv2) */
+	uint16_t typenum;
 };
 
 #define TYPE_OP_COUNT_MAX  UINT8_MAX

@@ -667,38 +667,38 @@ static int datas_to_values(unsigned ndata, struct afb_data * const datas[], afb_
 	unsigned i;
 	void *cptr;
 	size_t size;
-	uint16_t typeid;
+	uint16_t typenum;
 	struct afb_data *data;
 
 	for (i = 0 ; i < ndata ; i++) {
 		data = datas[i];
-		typeid = afb_typeid(afb_data_type(data));
+		typenum = afb_typeid(afb_data_type(data));
 		afb_data_get_constant(data, &cptr, &size);
-		switch (typeid) {
+		switch (typenum) {
 		case Afb_Typeid_Predefined_Opaque:
-			typeid = AFB_RPC_V2_ID_TYPE_OPAQUE;
+			typenum = AFB_RPC_V2_ID_TYPE_OPAQUE;
 			break;
 		case Afb_Typeid_Predefined_Bytearray:
-			typeid = AFB_RPC_V2_ID_TYPE_BYTEARRAY;
+			typenum = AFB_RPC_V2_ID_TYPE_BYTEARRAY;
 			break;
 		case Afb_Typeid_Predefined_Stringz:
-			typeid = AFB_RPC_V2_ID_TYPE_STRINGZ;
+			typenum = AFB_RPC_V2_ID_TYPE_STRINGZ;
 			break;
 		case Afb_Typeid_Predefined_Json_C:
 			cptr = (void*)json_object_to_json_string_length((json_object*)cptr, 0, &size);
 			size++;
 			/*@fallthrough@*/
 		case Afb_Typeid_Predefined_Json:
-			typeid = AFB_RPC_V2_ID_TYPE_JSON;
+			typenum = AFB_RPC_V2_ID_TYPE_JSON;
 			break;
 		case Afb_Typeid_Predefined_Bool:
-			typeid = AFB_RPC_V2_ID_TYPE_BOOL;
+			typenum = AFB_RPC_V2_ID_TYPE_BOOL;
 			break;
 		case Afb_Typeid_Predefined_I8:
-			typeid = AFB_RPC_V2_ID_TYPE_I8; /* TODO not a predefined type */
+			typenum = AFB_RPC_V2_ID_TYPE_I8; /* TODO not a predefined type */
 			break;
 		case Afb_Typeid_Predefined_U8:
-			typeid = AFB_RPC_V2_ID_TYPE_U8; /* TODO not a predefined type */
+			typenum = AFB_RPC_V2_ID_TYPE_U8; /* TODO not a predefined type */
 			break;
 		case Afb_Typeid_Predefined_I16:
 		case Afb_Typeid_Predefined_U16:
@@ -709,11 +709,11 @@ static int datas_to_values(unsigned ndata, struct afb_data * const datas[], afb_
 		case Afb_Typeid_Predefined_Float:
 		case Afb_Typeid_Predefined_Double:
 		default:
-			typeid = 0; /* TODO */
+			typenum = 0; /* TODO */
 		}
 		if (size > UINT16_MAX - 8)
 			return X_EOVERFLOW;
-		values[i].id = typeid;
+		values[i].id = typenum;
 		values[i].data = cptr ? cptr : &values[i].data;
 		values[i].length = (uint16_t)size;
 	}
@@ -1758,13 +1758,13 @@ static int decode_v1(struct afb_stub_rpc *stub)
 * PART - PROCESS INCOMING MESSAGES V2
 **************************************************************************/
 
-static int typed_value_to_data(struct afb_stub_rpc *stub, uint16_t typeid, uint32_t length, const void *value, struct afb_data **data)
+static int typed_value_to_data(struct afb_stub_rpc *stub, uint16_t typenum, uint32_t length, const void *value, struct afb_data **data)
 {
 	int rc;
 	struct afb_type *type1 = 0, *type2 = 0;
 	uint8_t size;
 
-	switch (typeid) {
+	switch (typenum) {
 	case AFB_RPC_V2_ID_TYPE_OPAQUE:
 		type1 = &afb_type_predefined_opaque;
 		break;

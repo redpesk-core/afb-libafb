@@ -25,6 +25,7 @@
 #pragma once
 
 #include "afb-api-common.h"
+#include "afb-string-mode.h"
 
 struct afb_apiset;
 struct afb_api_v3;
@@ -37,7 +38,6 @@ struct afb_req_common;
 struct json_object;
 
 struct afb_api_common;
-enum afb_string_mode;
 
 /**
  * Creates an instance of given name and add it to the declare_set.

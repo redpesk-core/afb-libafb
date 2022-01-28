@@ -31,9 +31,9 @@ struct afb_type;
 #  define AFB_PREFIX_PREDEF_TYPE "#"
 #endif
 
-static inline int afb_type_is_predefined(const char *typename)
+static inline int afb_type_is_predefined(const char *name)
 {
-	return typename[0] == AFB_PREFIX_PREDEF_TYPE[0];
+	return name[0] == AFB_PREFIX_PREDEF_TYPE[0];
 }
 
 /*****************************************************************************/

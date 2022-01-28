@@ -144,7 +144,7 @@
 		.operations = (struct opdesc*)opcvt_##stype,\
 		.family = FAMILY, \
 		.flags = FLAG_IS_PREDEFINED | FLAGS, \
-		.typeid = ID, \
+		.typenum = ID, \
 		.op_count = (uint16_t)(sizeof opcvt_##stype / sizeof opcvt_##stype[0]) \
 	}
 

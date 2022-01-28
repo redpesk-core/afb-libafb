@@ -115,7 +115,7 @@ int afb_type_register(struct afb_type **result, const char *name, int streamable
 			else
 				type->flags = 0;
 			type->op_count = 0;
-			type->typeid = last_typeid++;
+			type->typenum = last_typeid++;
 			type->next = known_types;
 			known_types = type;
 			rc = 0;
@@ -463,9 +463,9 @@ int afb_type_add_updater(
 	return X_EINVAL;
 }
 
-/* Get the typeid */
+/* Get the typenum */
 uint16_t afb_typeid(
 	const struct afb_type *type
 ) {
-	return type->typeid;
+	return type->typenum;
 }

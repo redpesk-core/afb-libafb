@@ -194,7 +194,7 @@ PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
 PRINT("++++++++++++ STOP %p classid=%d\n",me,me->classid);
 }
 
-static void thread_starter(void *arg)
+static void *thread_starter(void *arg)
 {
 	struct thread *thr = arg;
 	x_mutex_lock(&mutex);
@@ -210,7 +210,7 @@ static void thread_starter(void *arg)
 	}
 	x_mutex_unlock(&mutex);
 	free(thr);
-	x_thread_exit(0);
+	return 0;
 }
 
 static int start_thread(struct thread *thr)
