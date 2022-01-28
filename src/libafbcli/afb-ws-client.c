@@ -494,14 +494,17 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 			if (rc == 0) {
 				rc = negociate(eloop, fd, proto_json1, path, xhost);
 				if (rc == 0) {
-					result = afb_wsj1_create(fd, itf, closure);
-					if (result != NULL) {
+					result = afb_wsj1_create(fd, 1, itf, closure);
+					if (result == NULL)
+						fd = -1;
+					else {
 						afb_ev_mgr_prepare();
 						break;
 					}
 				}
 			}
-			close(fd);
+			if (fd >= 0)
+				close(fd);
 		}
 		iai = iai->ai_next;
 	}
@@ -580,7 +583,7 @@ struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const cha
 
 	fd = sockopen(eloop, uri, 0);
 	if (fd) {
-		pws = afb_proto_ws_create_client(fd, itf, closure);
+		pws = afb_proto_ws_create_client(fd, 1, itf, closure);
 		if (pws) {
 			afb_ev_mgr_prepare();
 			return pws;
@@ -603,7 +606,7 @@ struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char
 
 	fd = sockopen(eloop, uri, 0);
 	if (fd >= 0) {
-		rc = afb_wsapi_create(&wsapi, fd, itf, closure);
+		rc = afb_wsapi_create(&wsapi, fd, 1, itf, closure);
 		if (rc >= 0) {
 			afb_ev_mgr_prepare();
 			rc = afb_wsapi_initiate(wsapi);

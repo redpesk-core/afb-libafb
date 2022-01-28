@@ -160,7 +160,7 @@ static void evfdcb(struct ev_fd *efd, int fd, uint32_t revents, void *ws)
  *
  * Returns the handle for the afb_ws created or NULL on error.
  */
-struct afb_ws *afb_ws_create(int fd, const struct afb_ws_itf *itf, void *closure)
+struct afb_ws *afb_ws_create(int fd, int autoclose, const struct afb_ws_itf *itf, void *closure)
 {
 	int rc;
 	struct afb_ws *result;
@@ -180,7 +180,7 @@ struct afb_ws *afb_ws_create(int fd, const struct afb_ws_itf *itf, void *closure
 	result->buffer.buffer = NULL;
 	result->buffer.size = 0;
 
-	rc = afb_ev_mgr_add_fd(&result->efd, fd, EPOLLIN, evfdcb, result, 0, 1);
+	rc = afb_ev_mgr_add_fd(&result->efd, fd, EPOLLIN, evfdcb, result, 0, autoclose);
 	if (rc < 0)
 		goto error2;
 
@@ -194,10 +194,12 @@ struct afb_ws *afb_ws_create(int fd, const struct afb_ws_itf *itf, void *closure
 
 error3:
 	ev_fd_unref(result->efd);
+	autoclose = 0;
 error2:
 	free(result);
 error:
-	close(fd);
+	if (autoclose)
+		close(fd);
 	return NULL;
 }
 

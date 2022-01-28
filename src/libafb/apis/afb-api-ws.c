@@ -90,10 +90,9 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 	if (rc >= 0) {
 		/* create the client stub */
 		fd = rc;
-		stubws = afb_stub_ws_create_client(fd, api, call_set);
+		stubws = afb_stub_ws_create_client(fd, 1, api, call_set);
 		if (!stubws) {
 			ERROR("can't setup client ws service to %s", uri);
-			close(fd);
 			rc = X_ENOMEM;
 		} else {
 			if (afb_stub_ws_client_add(stubws, declare_set) >= 0) {
@@ -151,7 +150,7 @@ static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 	} else {
 		int opt = 1;
 		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &opt, (socklen_t)sizeof opt);
-		server = afb_stub_ws_create_server(fdc, &apiws->uri[apiws->offapi], apiws->apiset);
+		server = afb_stub_ws_create_server(fdc, 1, &apiws->uri[apiws->offapi], apiws->apiset);
 		if (server)
 			afb_stub_ws_set_on_hangup(server, server_on_hangup);
 		else

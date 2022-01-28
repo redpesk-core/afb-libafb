@@ -294,7 +294,7 @@ void wsapi_test_init(int fd[], struct afb_wsapi * wsapi[]){
 
     for (i=0; i<NB_WSAPI; i++) {
 
-        rc = afb_wsapi_create(&wsapi[i], fd[i], &itf, i2p(i+1));
+        rc = afb_wsapi_create(&wsapi[i], fd[i], 0, &itf, i2p(i+1));
         ck_assert_int_eq(rc, 0);
 
         rc = afb_wsapi_initiate(wsapi[i]);

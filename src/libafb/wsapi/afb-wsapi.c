@@ -1156,7 +1156,7 @@ static const struct afb_ws_itf ws_itf =
 
 /*****************************************************/
 
-int afb_wsapi_create(struct afb_wsapi **wsapi, int fd, const struct afb_wsapi_itf *itf, void *closure)
+int afb_wsapi_create(struct afb_wsapi **wsapi, int fd, int autoclose, const struct afb_wsapi_itf *itf, void *closure)
 {
 	struct afb_wsapi *wsa;
 
@@ -1170,7 +1170,7 @@ int afb_wsapi_create(struct afb_wsapi **wsapi, int fd, const struct afb_wsapi_it
 
 		fcntl(fd, F_SETFD, FD_CLOEXEC);
 		fcntl(fd, F_SETFL, O_NONBLOCK);
-		wsa->ws = afb_ws_create(fd, &ws_itf, wsa);
+		wsa->ws = afb_ws_create(fd, autoclose, &ws_itf, wsa);
 		if (wsa->ws != NULL) {
 			*wsapi = wsa;
 			return 0;

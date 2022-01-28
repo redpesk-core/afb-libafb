@@ -95,7 +95,7 @@ struct afb_wsj1
 	x_mutex_t mutex;
 };
 
-struct afb_wsj1 *afb_wsj1_create(int fd, struct afb_wsj1_itf *itf, void *closure)
+struct afb_wsj1 *afb_wsj1_create(int fd, int autoclose, struct afb_wsj1_itf *itf, void *closure)
 {
 	struct afb_wsj1 *result;
 
@@ -115,18 +115,17 @@ struct afb_wsj1 *afb_wsj1_create(int fd, struct afb_wsj1_itf *itf, void *closure
 	if (result->tokener == NULL)
 		goto error2;
 
-	result->ws = afb_ws_create(fd, &wsj1_itf, result);
-	if (result->ws == NULL)
-		goto error3;
+	result->ws = afb_ws_create(fd, autoclose, &wsj1_itf, result);
+	if (result->ws != NULL)
+		return result;
 
-	return result;
-
-error3:
+	autoclose = 0;
 	json_tokener_free(result->tokener);
 error2:
 	free(result);
 error:
-	close(fd);
+	if (autoclose)
+		close(fd);
 	return NULL;
 }
 

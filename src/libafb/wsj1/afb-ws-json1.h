@@ -32,6 +32,7 @@ extern
 struct afb_ws_json1 *
 afb_ws_json1_create(
 	int fd,
+	int autoclose,
 	struct afb_apiset *apiset,
 	struct afb_session *session,
 	struct afb_token *token,

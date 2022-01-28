@@ -235,6 +235,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 		fd = rc;
 		stub = afb_stub_rpc_create(api, call_set);
 		if (!stub) {
+			close(fd);
 			ERROR("can't create client rpc service to %s", uri);
 			rc = X_ENOMEM;
 		} else {
@@ -246,7 +247,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 				}
 			}
 			else {
-				struct afb_ws *ws = afb_ws_create(fd, &wsitf, stub);
+				struct afb_ws *ws = afb_ws_create(fd, 1, &wsitf, stub);
 				if (ws == NULL)
 					rc = X_ENOMEM;
 				else {
@@ -268,7 +269,6 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 			}
 			afb_stub_rpc_unref(stub);
 		}
-		close(fd);
 	}
 error:
 	return strong ? rc : 0;
@@ -336,7 +336,7 @@ static void server_accept(struct server *server, int fd)
 				}
 			}
 			else {
-				struct afb_ws *ws = afb_ws_create(fdc, &wsitf, stub);
+				struct afb_ws *ws = afb_ws_create(fdc, 1, &wsitf, stub);
 				if (ws == NULL)
 					rc = X_ENOMEM;
 				else {
@@ -349,7 +349,6 @@ static void server_accept(struct server *server, int fd)
 			if (rc < 0) {
 				ERROR("can't serve connection to %s", server->uri);
 				afb_stub_rpc_unref(stub);
-				close(fdc);
 			}
 		}
 	}

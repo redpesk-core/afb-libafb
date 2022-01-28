@@ -68,8 +68,8 @@ struct afb_proto_ws_server_itf
 	void (*on_event_unexpected)(void *closure, uint16_t eventid);
 };
 
-extern struct afb_proto_ws *afb_proto_ws_create_client(int fd, const struct afb_proto_ws_client_itf *itf, void *closure);
-extern struct afb_proto_ws *afb_proto_ws_create_server(int fd, const struct afb_proto_ws_server_itf *itf, void *closure);
+extern struct afb_proto_ws *afb_proto_ws_create_client(int fd, int autoclose, const struct afb_proto_ws_client_itf *itf, void *closure);
+extern struct afb_proto_ws *afb_proto_ws_create_server(int fd, int autoclose, const struct afb_proto_ws_server_itf *itf, void *closure);
 
 extern void afb_proto_ws_unref(struct afb_proto_ws *protows);
 extern void afb_proto_ws_addref(struct afb_proto_ws *protows);

@@ -130,7 +130,7 @@ struct afb_stub_ws
 	char apiname[];
 };
 
-static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, uint8_t server);
+static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, int autoclose, uint8_t server);
 
 /******************* ws request part for server *****************/
 
@@ -213,7 +213,7 @@ static struct afb_proto_ws *client_get_proto(struct afb_stub_ws *stubws)
 	if (proto == NULL && stubws->robust.reopen) {
 		fd = stubws->robust.reopen(stubws->robust.closure);
 		if (fd >= 0)
-			proto = create_proto(stubws, fd, 1);
+			proto = create_proto(stubws, fd, 1, 1);
 	}
 	return proto;
 }
@@ -744,13 +744,13 @@ static int enqueue_processing(struct afb_proto_ws *proto, void (*callback)(int s
  *
  * @return the created protocol or NULL on error
  */
-static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, uint8_t is_client)
+static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, int autoclose, uint8_t is_client)
 {
 	struct afb_proto_ws *proto;
 
 	stubws->proto = proto = is_client
-		  ? afb_proto_ws_create_client(fd, &client_itf, stubws)
-		  : afb_proto_ws_create_server(fd, &server_itf, stubws);
+		  ? afb_proto_ws_create_client(fd, autoclose, &client_itf, stubws)
+		  : afb_proto_ws_create_server(fd, autoclose, &server_itf, stubws);
 	if (proto) {
 		afb_proto_ws_on_hangup(proto, on_hangup);
 		afb_proto_ws_set_queuing(proto, enqueue_processing);
@@ -769,7 +769,7 @@ static struct afb_proto_ws *create_proto(struct afb_stub_ws *stubws, int fd, uin
  *
  * @return a handle on the created stub object
  */
-static struct afb_stub_ws *create_stub_ws(int fd, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
+static struct afb_stub_ws *create_stub_ws(int fd, int autoclose, const char *apiname, struct afb_apiset *apiset, uint8_t is_client)
 {
 	struct afb_stub_ws *stubws;
 
@@ -777,7 +777,7 @@ static struct afb_stub_ws *create_stub_ws(int fd, const char *apiname, struct af
 	stubws = calloc(1, sizeof *stubws + 1 + strlen(apiname));
 	if (stubws) {
 		/* create the underlying protocol object */
-		if (create_proto(stubws, fd, is_client)) {
+		if (create_proto(stubws, fd, autoclose, is_client)) {
 			/* terminate initialization */
 			stubws->refcount = 1;
 			stubws->is_client = is_client;
@@ -787,22 +787,24 @@ static struct afb_stub_ws *create_stub_ws(int fd, const char *apiname, struct af
 		}
 		free(stubws);
 	}
+	else if (autoclose)
+		close(fd);
 	return NULL;
 }
 
 /* creates a client stub */
-struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname, struct afb_apiset *apiset)
+struct afb_stub_ws *afb_stub_ws_create_client(int fd, int autoclose, const char *apiname, struct afb_apiset *apiset)
 {
-	return create_stub_ws(fd, apiname, apiset, 1);
+	return create_stub_ws(fd, autoclose, apiname, apiset, 1);
 }
 
 /* creates a server stub */
-struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset)
+struct afb_stub_ws *afb_stub_ws_create_server(int fd, int autoclose, const char *apiname, struct afb_apiset *apiset)
 {
 	struct afb_stub_ws *stubws;
 
 	/* create the stub */
-	stubws = create_stub_ws(fd, apiname, apiset, 0);
+	stubws = create_stub_ws(fd, autoclose, apiname, apiset, 0);
 	if (stubws) {
 #if WITH_CRED
 		/*

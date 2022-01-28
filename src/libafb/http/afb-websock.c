@@ -104,6 +104,7 @@ static int headerhas(const char *header, const char *needle)
 typedef
 	void *(*wscreator_t)(
 		int fd,
+		int autoclose,
 		struct afb_apiset *apiset,
 		struct afb_session *session,
 		struct afb_token *token,
@@ -162,7 +163,7 @@ static void upgrade_to_websocket(
 	struct memo_websocket *memo = cls;
 	void *ws;
 
-	ws = memo->proto->create(dup(sock), memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
+	ws = memo->proto->create(sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
 	if (ws == NULL) {
 		/* TODO */
 		close_websocket(urh);
@@ -243,8 +244,20 @@ static int check_websocket_upgrade(struct MHD_Connection *con, const struct prot
 	return 1;
 }
 
+static void *afb_ws_json1_create_adaptor(
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure
+) {
+	return afb_ws_json1_create(fd, autoclose, apiset, session, token, cleanup, cleanup_closure);
+}
+
 static const struct protodef protodefs[] = {
-	{ "x-afb-ws-json1",	(void*)afb_ws_json1_create },
+	{ "x-afb-ws-json1",	afb_ws_json1_create_adaptor },
 	{ NULL, NULL }
 };
 

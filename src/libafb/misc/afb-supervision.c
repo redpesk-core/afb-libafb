@@ -218,7 +218,7 @@ static void try_connect_supervisor()
 #endif
 
 	/* make the supervisor link */
-	supervisor = afb_stub_ws_create_server(fd, supervision_apiname, supervision_apiset);
+	supervisor = afb_stub_ws_create_server(fd, 1, supervision_apiname, supervision_apiset);
 	if (!supervisor) {
 		ERROR("Creation of supervisor failed: %m");
 		goto end;

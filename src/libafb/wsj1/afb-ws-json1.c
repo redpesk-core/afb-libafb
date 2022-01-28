@@ -120,6 +120,7 @@ static const struct afb_evt_itf evt_itf = {
 struct afb_ws_json1 *
 afb_ws_json1_create(
 	int fd,
+	int autoclose,
 	struct afb_apiset *apiset,
 	struct afb_session *session,
 	struct afb_token *token,
@@ -140,7 +141,8 @@ afb_ws_json1_create(
 	if (result->session == NULL)
 		goto error2;
 
-	result->wsj1 = afb_wsj1_create(fd, &wsj1_itf, result);
+	result->wsj1 = afb_wsj1_create(fd, autoclose, &wsj1_itf, result);
+	autoclose = 0;
 	if (result->wsj1 == NULL)
 		goto error3;
 
@@ -162,7 +164,8 @@ error3:
 error2:
 	free(result);
 error:
-	close(fd);
+	if (autoclose)
+		close(fd);
 	return NULL;
 }
 

@@ -27,12 +27,14 @@ Version 4.1.0
    - fix timer reference (critical)
    - fix encoding of data copy
    - fix size indicator of AFBRPCv2
+   - fix double close on initialisation error
 
   minor/details
    - fix declarations in afb-api-v4 and improved API
    - report SIGALARM instead of SIGVTALARM that is specific
    - enhance timer management
    - improve network latency by using TCP_NODELAY
+   - remove use of dup for websockets on libmicrohttpd
 
 Version 4.0.4
 -------------

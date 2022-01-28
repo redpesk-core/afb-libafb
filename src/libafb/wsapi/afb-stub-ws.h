@@ -28,9 +28,9 @@ struct afb_stub_ws;
 struct afb_apiset;
 struct afb_api_item;
 
-extern struct afb_stub_ws *afb_stub_ws_create_client(int fd, const char *apiname, struct afb_apiset *apiset);
+extern struct afb_stub_ws *afb_stub_ws_create_client(int fd, int autoclose, const char *apiname, struct afb_apiset *apiset);
 
-extern struct afb_stub_ws *afb_stub_ws_create_server(int fd, const char *apiname, struct afb_apiset *apiset);
+extern struct afb_stub_ws *afb_stub_ws_create_server(int fd, int autoclose, const char *apiname, struct afb_apiset *apiset);
 
 /**
  * Decrement the count of reference to the stub and drop its used resources
