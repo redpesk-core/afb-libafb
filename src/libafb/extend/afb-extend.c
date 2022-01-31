@@ -44,6 +44,7 @@
 
 #define MANIFEST	"AfbExtensionManifest"
 #define OPTIONS_V1	"AfbExtensionOptionsV1"
+#define GETOPTIONS_V1	"AfbExtensionGetOptionsV1"
 #define CONFIG_V1	"AfbExtensionConfigV1"
 #define DECLARE_V1	"AfbExtensionDeclareV1"
 #define SERVE_V1	"AfbExtensionServeV1"
@@ -325,6 +326,7 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 	const struct argp_option *options;
 	const struct argp_option **oar;
 	const char **enam;
+	const struct argp_option *(*getopt)();
 
 	/* allocates enough for the result */
 	for (n = 0, ext = extensions ; ext ; ext = ext->next, n++);
@@ -341,8 +343,14 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 		/* initialize the results */
 		n = 0;
 		for (ext = extensions ; ext ; ext = ext->next) {
-			s = x_dynlib_symbol(&ext->handle, OPTIONS_V1, (void**)&options);
-			if (s >= 0) {
+			s = x_dynlib_symbol(&ext->handle, GETOPTIONS_V1, (void**)&getopt);
+			options = s < 0 ? NULL : getopt();
+			if (options == NULL) {
+				s = x_dynlib_symbol(&ext->handle, OPTIONS_V1, (void**)&options);
+				if (s < 0)
+					options = NULL;
+			}
+			if (options != NULL) {
 				oar[n] = options;
 				enam[n] = ext->uid;
 				n++;

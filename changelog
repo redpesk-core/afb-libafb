@@ -14,6 +14,7 @@ Version 4.1.0
    - deliver a static library for libafbcli
    - allow to disable stack dump
    - provide a linker version script for extensions
+   - new function for extensions, AfbExtensionGetOptionsV1
 
   fixes
    - fix correct apiset (callset) for required features

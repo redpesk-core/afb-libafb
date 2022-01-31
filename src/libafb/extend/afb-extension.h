@@ -103,7 +103,7 @@ struct afb_hsrv;
  * AfbExtensionOptionsV1
  * ---------------------
  *
- * When defined, this symbol must be an array of argp_option
+ * When defined, this symbol must be an array of argp_options
  * (see links below). This is used to enable definition of
  * command line options that the binder can parse.
  *
@@ -111,6 +111,20 @@ struct afb_hsrv;
  * http://www.gnu.org/software/libc/manual/html_node/Argp-Option-Vectors.html
  */
 extern const struct argp_option AfbExtensionOptionsV1[];
+
+/**
+ * AfbExtensionGetOptionsV1
+ * ------------------------
+ *
+ * When defined, this function must return an array of argp_options.
+ * See above 'AfbExtensionOptionsV1'.
+ * 
+ * When the static version (the array) 'AfbExtensionOptionsV1' and the dynamic
+ * version (the function) 'AfbExtensionGetOptionsV1' are both defined,
+ * only the dynamic version will be called first and the static version (the
+ * array) will be used only if the function returned NULL.
+ */
+extern const struct argp_option *AfbExtensionGetOptionsV1();
 
 /**
  * AfbExtensionConfigV1
