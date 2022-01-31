@@ -131,6 +131,9 @@ set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
 set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
 set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
 
+# for tools use
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)
+
 ###########################################################################
 
 include(FindThreads)
