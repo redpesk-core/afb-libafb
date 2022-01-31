@@ -241,7 +241,7 @@ void afb_sched_call(
 }
 
 /**
- * @brief get the sync_job of id, optionnaly unlink it, and return it
+ * @brief get the sync_job of id, optionaly unlink it, and return it
  *
  * @param id id to get
  * @param unlink if not zero, unlink the item
@@ -299,6 +299,7 @@ static void enter_cb(int signum, void *closure)
  * @param closure the argument to the callback
  * @return 0 on success or -1 in case of error
  */
+#include <stdio.h>
 int afb_sched_enter(
 		const void *group,
 		int timeout,
@@ -334,7 +335,9 @@ int afb_sched_enter(
 			ts.tv_sec += sync.timeout;
 			rc = x_cond_timedwait(&sync.condsync, &sync_jobs_mutex, &ts);
 			if (rc < 0)
-				rc = X_ETIMEDOUT;
+				rc = -errno;
+			else if (rc > 0)
+				rc = -rc;
 		}
 		else {
 			x_cond_wait(&sync.condsync, &sync_jobs_mutex);
