@@ -480,7 +480,7 @@ int afb_extend_exit(struct afb_apiset *declare_set)
 }
 
 
-#if DEPRECATED_IF_OLDER_THEN_4_1
+#if WITH_DEPRECATED_OLDER_THAN_4_1
 /* load extensions */
 int afb_extend_load(struct json_object *config)
 {

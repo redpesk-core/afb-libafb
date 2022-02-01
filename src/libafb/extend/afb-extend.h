@@ -151,9 +151,9 @@ extern int afb_extend_serve(struct afb_apiset *call_set);
 extern int afb_extend_exit(struct afb_apiset *declare_set);
 
 /* DEPRECATED */
-#undef DEPRECATED_IF_OLDER_THEN_4_1
-#define DEPRECATED_IF_OLDER_THEN_4_1   1
-#if DEPRECATED_IF_OLDER_THEN_4_1
+#undef WITH_DEPRECATED_OLDER_THAN_4_1
+#define WITH_DEPRECATED_OLDER_THAN_4_1   1
+#if WITH_DEPRECATED_OLDER_THAN_4_1
 /**
  * Load the extensions listed in the given config.
  * The following fields of config are used:
