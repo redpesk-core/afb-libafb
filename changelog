@@ -29,6 +29,7 @@ Version 4.1.0
    - fix encoding of data copy
    - fix size indicator of AFBRPCv2
    - fix double close on initialisation error
+   - fix configuration of extensions
 
   minor/details
    - fix declarations in afb-api-v4 and improved API

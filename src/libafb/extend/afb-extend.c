@@ -383,11 +383,13 @@ int afb_extend_configure(struct json_object *config)
 				json_object_object_get_ex(config, ext->uid, &obj);
 			if (obj == NULL)
 				obj = ext->config;
-			else if (ext->config && json_object_is_type(obj, json_type_object))
-				wrap_json_object_merge(obj, config, wrap_json_merge_option_join_or_keep);
-			if (ext->config)
-				json_object_put(ext->config);
-			ext->config = json_object_get(obj);
+			else {
+				if (ext->config) {
+					wrap_json_object_merge(obj, ext->config, wrap_json_merge_option_join_or_keep);
+					json_object_put(ext->config);
+				}
+				ext->config = json_object_get(obj);
+			}
 			s = config_v1(&ext->data, obj, ext->uid);
 			if (s < 0)
 				rc = s;
