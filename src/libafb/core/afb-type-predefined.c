@@ -345,7 +345,7 @@ CONVERT(opaque,json)
 	int rc;
 	char buffer[OPAQUE_BUFSIZE + 2];
 
-	rc = opaque_to_string(in, &buffer[1], sizeof buffer);
+	rc = opaque_to_string(in, &buffer[1], (sizeof buffer) - 1);
 	if (rc >= 0) {
 		buffer[0] = buffer[++rc] = '"';
 		buffer[++rc] = 0;
