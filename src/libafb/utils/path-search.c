@@ -416,7 +416,7 @@ static int searchrec(struct path_search *paths, struct search *search)
 		/* searching before parents */
 		length = (unsigned short)paths->length;
 		search->item.pathlen = (short)length;
-		memcpy(search->path, paths->path, 1 + length);
+		memcpy(search->path, paths->path, 1 + (size_t)length);
 		search->prv = 0;
 		stop = search_in_dir(search);
 		if (!stop && paths->parent) {
@@ -429,7 +429,7 @@ static int searchrec(struct path_search *paths, struct search *search)
 		if (!stop) {
 			length = (unsigned short)-paths->length;
 			search->item.pathlen = (short)length;
-			memcpy(search->path, paths->path, 1 + length);
+			memcpy(search->path, paths->path, 1 + (size_t)length);
 			search->prv = 0;
 			stop = search_in_dir(search);
 		}

@@ -126,8 +126,8 @@ static void flatof(flat_t *flat, void *base)
  */
 static inline size_t size(uint16_t capacity)
 {
-	return sizeof(uint16_t) * (capacity + 1)
-		+ sizeof(void*) * capacity;
+	return sizeof(uint16_t) * ((size_t)capacity + 1)
+		+ sizeof(void*) * (size_t)capacity;
 }
 
 /**
