@@ -25,11 +25,13 @@
 
 #if WITH_CRED
 
+#include <stdlib.h>
 #include <stdint.h>
 
 #include "core/afb-perm.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
+#include "core/afb-jobs.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "sys/verbose.h"
@@ -57,6 +59,13 @@ static inline const char *session_of_req(struct afb_req_common *req)
 #include "core/afb-ev-mgr.h"
 #include "sys/ev-mgr.h"
 
+struct memo_check
+{
+	int status;
+	void *closure;
+	void (*checkcb)(void *closure, int status);
+};
+
 static cynagora_t *cynagora;
 static struct ev_fd *evfd;
 static pthread_mutex_t mutex;
@@ -71,19 +80,46 @@ static void mkmutex()
 	pthread_mutexattr_destroy(&a);
 }
 
-static void evfdcb(struct ev_fd *evfd, int fd, uint32_t events, void *closure)
+static void lock()
 {
 	pthread_mutex_lock(&mutex);
-	cynagora_async_process(cynagora);
+}
+
+static void unlock()
+{
 	pthread_mutex_unlock(&mutex);
+}
+
+static void async_job_cb(int status, void *closure)
+{
+	struct memo_check *memo = closure;
+	memo->checkcb(memo->closure, memo->status);
+	free(memo);
+}
+
+static void async_check_cb(void *closure, int status)
+{
+	int rc;
+	struct memo_check *memo = closure;
+	memo->status = status;
+	rc = afb_jobs_post(NULL, 0, 0, async_job_cb, memo);
+	if (rc < 0)
+		ERROR("cynagora encountered error when queing job");
+}
+
+static void evfdcb(struct ev_fd *evfd, int fd, uint32_t events, void *closure)
+{
+	lock();
+	cynagora_async_process(cynagora);
+	unlock();
 }
 
 static int cynagora_async_ctl_cb(
 	void *closure,
 	int op,
 	int fd,
-	uint32_t events)
-{
+	uint32_t events
+) {
 	int rc = 0;
 
 	if ((op == EPOLL_CTL_DEL || op == EPOLL_CTL_ADD) && evfd) {
@@ -105,7 +141,7 @@ static int cynagora_acquire()
 
 	/* cynagora isn't reentrant */
 	pthread_once(&once, mkmutex);
-	pthread_mutex_lock(&mutex);
+	lock(&mutex);
 
 	if (cynagora)
 		rc = 0;
@@ -115,24 +151,18 @@ static int cynagora_acquire()
 		if (rc < 0) {
 			cynagora = NULL;
 			ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
-			pthread_mutex_unlock(&mutex);
+			unlock(&mutex);
 		} else {
 			rc = cynagora_async_setup(cynagora, cynagora_async_ctl_cb, NULL);
 			if (rc < 0) {
 				ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
 				cynagora_destroy(cynagora);
 				cynagora = NULL;
-				pthread_mutex_unlock(&mutex);
+				unlock(&mutex);
 			}
 		}
 	}
 	return rc;
-}
-
-static void cynagora_release()
-{
-	/* cynagora isn't reentrant */
-	pthread_mutex_unlock(&mutex);
 }
 
 void afb_perm_check_req_async(
@@ -144,6 +174,7 @@ void afb_perm_check_req_async(
 {
 	int rc;
 	cynagora_key_t key;
+	struct memo_check *memo;
 
 	if (!req->credentials) {
 		/* case of permission for self */
@@ -156,15 +187,25 @@ void afb_perm_check_req_async(
 	else {
 		rc = cynagora_acquire();
 		if (rc >= 0) {
-			key.client = req->credentials->label;
-			key.user = req->credentials->user;
-			key.session = session_of_req(req);
-			key.permission = permission;
-			rc = cynagora_async_check(cynagora, &key, 0, 0, callback, closure);
-			cynagora_release();
-			if (rc >= 0)
-				return;
-			ERROR("Can't query cynagora: %s", strerror(-rc));
+			memo = malloc(sizeof *memo);
+			if (memo == NULL) {
+				rc = -ENOMEM;
+				ERROR("Can't query cynagora: %s", strerror(-rc));
+			}
+			else {
+				memo->status = -EFAULT;
+				memo->closure = closure;
+				memo->checkcb = callback;
+				key.client = req->credentials->label;
+				key.user = req->credentials->user;
+				key.session = session_of_req(req);
+				key.permission = permission;
+				rc = cynagora_async_check(cynagora, &key, 0, 0, async_check_cb, memo);
+				unlock();
+				if (rc >= 0)
+					return;
+				ERROR("Can't query cynagora: %s", strerror(-rc));
+			}
 		}
 	}
 	callback(closure, rc);
