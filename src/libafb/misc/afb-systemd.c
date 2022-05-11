@@ -103,7 +103,7 @@ struct sd_bus *afb_systemd_get_system_bus()
 
 int afb_systemd_fds_init()
 {
-	return systemd_fds_init();
+	return 0;
 }
 
 int afb_systemd_fds_for(const char *name)

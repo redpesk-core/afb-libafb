@@ -34,7 +34,6 @@ extern struct sd_event *systemd_get_event_loop();
 extern struct sd_bus *systemd_get_user_bus();
 extern struct sd_bus *systemd_get_system_bus();
 
-extern int systemd_fds_init();
-extern int systemd_fds_for(const char *name);
-
 #endif
+
+extern int systemd_fds_for(const char *name);

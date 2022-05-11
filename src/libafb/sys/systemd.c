@@ -82,41 +82,31 @@ struct sd_bus *systemd_get_system_bus()
 	return result;
 }
 
-static int fds_names(char ***result)
-{
-	static char *null;
-	static char **names;
+#endif
 
-	int rc;
+#include <stdlib.h>
 
-	if (names)
-		rc = 0;
-	else {
-		rc = sd_listen_fds_with_names(1, &names);
-		if (rc <= 0)
-			names = &null;
-	}
-	*result = names;
-	return rc;
-}
-
-int systemd_fds_init()
-{
-	char **names;
-	return fds_names(&names);
-}
+#if !defined(SD_LISTEN_FDS_START)
+# define SD_LISTEN_FDS_START 3
+#endif
 
 int systemd_fds_for(const char *name)
 {
-	int idx;
-	char **names;
-
-	fds_names(&names);
-	for (idx = 0 ; names[idx] != NULL ; idx++)
-		if (!strcmp(name, names[idx]))
-			return idx + SD_LISTEN_FDS_START;
-
+	int idx, fd;
+	const char *fdnames = getenv("LISTEN_FDNAMES");
+	if (fdnames != NULL) {
+		for (fd = SD_LISTEN_FDS_START ; *fdnames != '\0' ; fd++) {
+			idx = 0;
+			while (fdnames[idx] != ':' && name[idx] != '\0' && fdnames[idx] == name[idx])
+				idx++;
+			if (name[idx] == '\0' && (fdnames[idx] == ':' || fdnames[idx] == '\0'))
+				return fd;
+			while (fdnames[idx] != ':' && fdnames[idx] != '\0')
+				idx++;
+			while (fdnames[idx] == ':')
+				idx++;
+			fdnames = &fdnames[idx];
+		}
+	}
 	return X_ENOENT;
 }
-
-#endif
