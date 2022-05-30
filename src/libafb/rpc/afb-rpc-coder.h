@@ -130,6 +130,9 @@ struct afb_rpc_coder
 	/* output tiny size */
 	uint8_t inline_remain;
 
+	/* write position */
+	uint32_t pos;
+
 	/* size of the output buffer */
 	uint32_t size;
 
@@ -219,6 +222,9 @@ extern int afb_rpc_coder_write_uint16be(afb_rpc_coder_t *coder, uint16_t value);
 extern int afb_rpc_coder_write_uint8(afb_rpc_coder_t *coder, uint8_t value);
 
 extern int afb_rpc_coder_write_subcoder(afb_rpc_coder_t *coder, afb_rpc_coder_t *subcoder, uint32_t offset, uint32_t size);
+
+extern uint32_t afb_rpc_coder_get_position(afb_rpc_coder_t *coder);
+extern int afb_rpc_coder_set_position(afb_rpc_coder_t *coder, uint32_t pos);
 
 #if !RPC_NO_IOVEC
 

@@ -37,12 +37,11 @@ void afb_rpc_coder_init(afb_rpc_coder_t *coder)
 	coder->dispose_count = 0;
 	coder->buffer_count = 0;
 	coder->inline_remain = 0;
+	coder->pos = 0;
 	coder->size = 0;
 }
 
-/**
- * Get the output sizes
- */
+/* Get the output sizes */
 int afb_rpc_coder_output_sizes(afb_rpc_coder_t *coder, uint32_t *size)
 {
 	if (size)
@@ -98,24 +97,20 @@ static inline void *extrbuff(void *closure, void *data, uint32_t length)
 	return ((char*)closure) + length;
 }
 
-/**
- * Get part of output as a buffer
- */
+/* Get part of output as a buffer */
 uint32_t afb_rpc_coder_output_get_subbuffer(afb_rpc_coder_t *coder, void *buffer, uint32_t size, uint32_t offset)
 {
 	void *end = extract(coder, offset, size, extrbuff, buffer);
 	return (uint32_t)((char*)end - (char*)buffer);
 }
 
-/**
- * Get the output as a buffer
- */
+/* Get the output as a buffer */
 uint32_t afb_rpc_coder_output_get_buffer(afb_rpc_coder_t *coder, void *buffer, uint32_t size)
 {
 	return afb_rpc_coder_output_get_subbuffer(coder, buffer, size, 0);
 }
 
-/** dispose of the memory of the coder */
+/* dispose of the memory of the coder */
 void afb_rpc_coder_output_dispose(afb_rpc_coder_t *coder)
 {
 	afb_rpc_coder_dispose_t *disp;
@@ -129,10 +124,11 @@ void afb_rpc_coder_output_dispose(afb_rpc_coder_t *coder)
 	}
 	coder->buffer_count = 0;
 	coder->inline_remain = 0;
+	coder->pos = 0;
 	coder->size = 0;
 }
 
-/*  */
+/* set on dispose action */
 int afb_rpc_coder_on_dispose2_output(afb_rpc_coder_t *coder, void (*dispose)(void*,void*), void *closure, void *arg)
 {
 	afb_rpc_coder_dispose_t *disp;
@@ -147,6 +143,7 @@ int afb_rpc_coder_on_dispose2_output(afb_rpc_coder_t *coder, void (*dispose)(voi
 	return 0;
 }
 
+/* set on dispose action */
 int afb_rpc_coder_on_dispose_output(afb_rpc_coder_t *coder, void (*dispose)(void*), void *closure)
 {
 	afb_rpc_coder_dispose_t *disp;
@@ -161,14 +158,12 @@ int afb_rpc_coder_on_dispose_output(afb_rpc_coder_t *coder, void (*dispose)(void
 	return 0;
 }
 
-int afb_rpc_coder_write(afb_rpc_coder_t *coder, const void *data, uint32_t size)
+static int write_at_end(afb_rpc_coder_t *coder, const void *data, uint32_t size)
 {
 	afb_rpc_coder_iovec_t *buf;
 	uint32_t rem;
 
-	if (size == 0)
-		/* do nothing */;
-	else if (size <= AFB_RPC_OUTPUT_INLINE_SIZE) {
+	if (size <= AFB_RPC_OUTPUT_INLINE_SIZE) {
 		rem = (uint32_t)coder->inline_remain;
 		if (size <= rem) {
 			/* append in last inline buffer */
@@ -206,7 +201,61 @@ int afb_rpc_coder_write(afb_rpc_coder_t *coder, const void *data, uint32_t size)
 		coder->inline_remain = 0;
 	}
 	coder->size += size;
+	coder->pos = coder->size;
 	return 0;
+}
+
+static int write_in_middle(afb_rpc_coder_t *coder, const void *data, uint32_t size)
+{
+	char *ptr;
+	uint32_t sz, pos;
+	afb_rpc_coder_iovec_t *buf = coder->buffers;
+
+	/* position on first buffer */
+	for (pos = coder->pos ; pos >= buf->size ; pos -= (buf++)->size);
+
+	/* move forward */
+	coder->pos += size;
+
+	/* write now */
+	sz = buf->size;
+	ptr = sz > AFB_RPC_OUTPUT_INLINE_SIZE ? (char*)buf->data.pointer : buf->data.inl;
+	sz -= pos;
+	ptr += pos;
+	if (sz >= size)
+		memcpy(ptr, data, size);
+	else {
+		for (;;) {
+			memcpy(ptr, data, sz);
+			size -= sz;
+			if (size == 0)
+				break;
+			data += sz;
+			buf++;
+			sz = buf->size;
+			ptr = sz > AFB_RPC_OUTPUT_INLINE_SIZE ? (char*)buf->data.pointer : buf->data.inl;
+			sz = sz > size ? size : sz;
+		}
+	}
+	return 0;
+}
+
+int afb_rpc_coder_write(afb_rpc_coder_t *coder, const void *data, uint32_t size)
+{
+	int rc = 0;
+	if (size > 0) {
+		uint32_t exsz = coder->size - coder->pos;
+		if (exsz == 0)
+			rc = write_at_end(coder, data, size);
+		else if (exsz >= size)
+			rc = write_in_middle(coder, data, size);
+		else {
+			rc = write_in_middle(coder, data, exsz);
+			if (rc >= 0)
+				rc = write_at_end(coder, data + exsz, size - exsz);
+		}
+	}
+	return rc;
 }
 
 int afb_rpc_coder_write_copy(afb_rpc_coder_t *coder, const void *data, uint32_t size)
@@ -254,6 +303,21 @@ int afb_rpc_coder_write_zeroes(afb_rpc_coder_t *coder, uint32_t count)
 		}
 	}
 	return rc;
+}
+
+uint32_t afb_rpc_coder_get_position(afb_rpc_coder_t *coder)
+{
+	return coder->pos;
+}
+
+int afb_rpc_coder_set_position(afb_rpc_coder_t *coder, uint32_t pos)
+{
+	if (pos > coder->size) {
+		coder->pos = coder->size;
+		return afb_rpc_coder_write_zeroes(coder, coder->size - pos);
+	}
+	coder->pos = pos;
+	return 0;
 }
 
 /* align to index for the base (base MUST be a power of 2 */
