@@ -256,16 +256,20 @@ int afb_rpc_coder_write_zeroes(afb_rpc_coder_t *coder, uint32_t count)
 	return rc;
 }
 
-/* align to base (base MUST be a power of 2 */
-static int write_align(afb_rpc_coder_t *coder, uint32_t base)
+/* align to index for the base (base MUST be a power of 2 */
+int afb_rpc_coder_write_align_at(afb_rpc_coder_t *coder, uint32_t base, uint32_t index)
 {
-	return afb_rpc_coder_write_zeroes(coder, (uint32_t)((-coder->size) & (base - 1)));
+	uint32_t count, mask = base - 1;
+	if ((base & mask) != 0)
+		return X_EINVAL;
+	count = (uint32_t)((index-coder->size) & mask);
+	return count == 0 ? 0 : afb_rpc_coder_write_zeroes(coder, count);
 }
 
 /* align to base (base MUST be a power of 2 */
 int afb_rpc_coder_write_align(afb_rpc_coder_t *coder, uint32_t base)
 {
-	return base & (base - 1) ? X_EINVAL : write_align(coder, base);
+	return afb_rpc_coder_write_align_at(coder, base, 0);
 }
 
 int afb_rpc_coder_write_uint32le(afb_rpc_coder_t *coder, uint32_t value)
