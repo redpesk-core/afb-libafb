@@ -33,9 +33,10 @@ struct afb_rpc_decoder;
 #define AFBRPC_PROTO_VERSION_UNSET	0
 #define AFBRPC_PROTO_VERSION_1		1
 #define AFBRPC_PROTO_VERSION_2		2
+#define AFBRPC_PROTO_VERSION_3		3
 
 #define AFBRPC_PROTO_VERSION_MIN	AFBRPC_PROTO_VERSION_1
-#define AFBRPC_PROTO_VERSION_MAX	AFBRPC_PROTO_VERSION_2
+#define AFBRPC_PROTO_VERSION_MAX	AFBRPC_PROTO_VERSION_3
 
 enum afb_rpc_v0_msg_type {
 	afb_rpc_v0_msg_type_NONE,
@@ -63,10 +64,14 @@ typedef struct afb_rpc_v0_msg afb_rpc_v0_msg_t;
 extern int afb_rpc_v0_code_version_offer(struct afb_rpc_coder *coder, uint8_t count, const uint8_t *versions);
 extern int afb_rpc_v0_code_version_offer_v1(struct afb_rpc_coder *coder);
 extern int afb_rpc_v0_code_version_offer_v2(struct afb_rpc_coder *coder);
+extern int afb_rpc_v0_code_version_offer_v3(struct afb_rpc_coder *coder);
 extern int afb_rpc_v0_code_version_offer_v1_or_v2(struct afb_rpc_coder *rpc);
+extern int afb_rpc_v0_code_version_offer_v1_or_v3(struct afb_rpc_coder *rpc);
+extern int afb_rpc_v0_code_version_offer_v1_v2_or_v3(struct afb_rpc_coder *rpc);
 extern int afb_rpc_v0_code_version_set(struct afb_rpc_coder *coder, uint8_t version);
 extern int afb_rpc_v0_code_version_set_v1(struct afb_rpc_coder *coder);
 extern int afb_rpc_v0_code_version_set_v2(struct afb_rpc_coder *coder);
+extern int afb_rpc_v0_code_version_set_v3(struct afb_rpc_coder *coder);
 
 extern int afb_rpc_v0_code(struct afb_rpc_coder *coder, afb_rpc_v0_msg_t *msg);
 
