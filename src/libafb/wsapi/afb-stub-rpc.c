@@ -2821,7 +2821,6 @@ static int decode_v0(struct afb_stub_rpc *stub)
 /**************************************************************************
 * PART - DISPATCH INCOMING MESSAGES
 **************************************************************************/
-
 static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 {
 	int rc = 0;
@@ -3016,11 +3015,34 @@ static void release_all_events_cb(void*closure, uint16_t id, void *ptr)
 	afb_evt_unref(eventid);
 }
 
+static void release_all_outcalls(struct afb_stub_rpc *stub)
+{
+	struct outcall *ocall, *iter = __atomic_exchange_n(&stub->outcalls, NULL, __ATOMIC_RELAXED);
+	while (iter != NULL) {
+		ocall = iter;
+		iter = iter->next;
+		ocall->next = NULL;
+
+		switch(ocall->type) {
+		case outcall_type_call:
+			afb_req_common_reply_hookable(ocall->item.comreq, AFB_ERRNO_DISCONNECTED, 0, NULL);
+			afb_req_common_unref(ocall->item.comreq);
+			break;
+		case outcall_type_describe:
+			describe_reply(ocall, NULL);
+			break;
+		}
+		outcall_free(stub, ocall);
+	}
+}
+
 /* disconnect */
 static void disconnect(struct afb_stub_rpc *stub)
 {
 	struct u16id2ptr *i2p;
 	struct u16id2bool *i2b;
+
+	release_all_outcalls(stub);
 
 	i2p = __atomic_exchange_n(&stub->event_proxies, NULL, __ATOMIC_RELAXED);
 	if (i2p) {
