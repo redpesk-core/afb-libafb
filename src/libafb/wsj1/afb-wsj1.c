@@ -33,6 +33,7 @@
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
+#include <afb/afb-errno.h>
 
 #include "misc/afb-ws.h"
 #include "wsj1/afb-wsj1.h"
@@ -151,10 +152,15 @@ static void wsj1_on_hangup(struct afb_wsj1 *wsj1)
 	char *text;
 	int len;
 
+#undef STR
+#undef STR2
+#define STR2(x) #x
+#define STR(x) STR2(x)
 	static const char error_object_str[] = "{"
 		"\"jtype\":\"afb-reply\","
 		"\"request\":{"
 			"\"status\":\"disconnected\","
+			"\"code\":"STR(AFB_ERRNO_DISCONNECTED)","
 			"\"info\":\"server hung up\"}}";
 
 	ncall = __atomic_exchange_n(&wsj1->calls, NULL, __ATOMIC_RELAXED);
