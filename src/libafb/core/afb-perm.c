@@ -31,7 +31,7 @@
 #include "core/afb-perm.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
-#include "core/afb-jobs.h"
+#include "core/afb-sched.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "sys/verbose.h"
@@ -102,7 +102,7 @@ static void async_check_cb(void *closure, int status)
 	int rc;
 	struct memo_check *memo = closure;
 	memo->status = status;
-	rc = afb_jobs_post(NULL, 0, 0, async_job_cb, memo);
+	rc = afb_sched_post_job(NULL, 0, 0, async_job_cb, memo, Afb_Sched_Mode_Normal);
 	if (rc < 0)
 		ERROR("cynagora encountered error when queing job");
 }

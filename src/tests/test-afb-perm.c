@@ -40,6 +40,7 @@
 
 #include "afb/afb-auth.h"
 #include "core/afb-perm.h"
+#include "core/afb-jobs.h"
 #include "core/afb-req-common.h"
 #include "core/afb-cred.h"
 #include "core/afb-ev-mgr.h"
@@ -225,7 +226,12 @@ struct afb_req_common_query_itf test_queryitf =
 void waiteForCB(){
 	struct ev_mgr *evmgr = afb_ev_mgr_get_for_me();
 	do {
-		ev_mgr_run(evmgr, 100);
+		long delayms;
+		struct afb_job *job = afb_jobs_dequeue(&delayms);
+		if (job != NULL)
+			afb_jobs_run(job);
+		else
+			ev_mgr_run(evmgr, delayms < 100 ? 100 : (int)delayms);
 	}
 	while(done == 0);
 }
