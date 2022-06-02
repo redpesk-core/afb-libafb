@@ -317,7 +317,7 @@ static int inblock_get(struct afb_stub_rpc *stub, void *data, size_t size, struc
 		result->data = data;
 		result->size = size;
 	}
-	return (*inblock = result) ? 0 : X_ENOMEM;
+	return (*inblock = result) != NULL ? 0 : X_ENOMEM;
 }
 
 static struct inblock *inblock_addref(struct inblock *inblock)
@@ -3074,6 +3074,8 @@ static void disconnect(struct afb_stub_rpc *stub)
 /* sub one reference and free resources if falling to zero */
 void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 {
+	struct inblock *iblk;
+
 	if (stub && !__atomic_sub_fetch(&stub->refcount, 1, __ATOMIC_RELAXED)) {
 
 		/* cleanup */
@@ -3083,6 +3085,10 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 			afb_apiset_unref(stub->declare_set);
 		}
 		afb_apiset_unref(stub->call_set);
+		while ((iblk = stub->receive.pool) != NULL) {
+			stub->receive.pool = iblk->data;
+			free(iblk);
+		}
 		free(stub);
 	}
 }
