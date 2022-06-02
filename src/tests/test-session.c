@@ -259,6 +259,7 @@ START_TEST (check_LOA)
 	}
 
 	/* set the loa/key */
+	j = (INT_MAX >> 1) ^ (INT_MAX >> 4);
 	while (j) {
 		for (i = 0 ; k[i] ; i++)
 			ck_assert_int_eq(j, afb_session_get_loa(s, k[i]));
