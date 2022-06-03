@@ -80,6 +80,9 @@
 #cmakedefine01 WITH_CASE_FOLDING
 #cmakedefine01 WITH_EXTENSION
 #cmakedefine01 WITH_GNUTLS
+#cmakedefine01 WITH_RPC_V1
+#cmakedefine01 WITH_RPC_V2
+#cmakedefine01 WITH_RPC_V3
 
 #if WITH_LIBMICROHTTPD
 /* Always add INFER_EXTENSION (more details in afb-hreq.c) */
