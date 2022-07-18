@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-jsonc.h>
 
 #include "afb-extension.h"
 #include "afb-extend.h"
@@ -35,7 +36,6 @@
 #include "sys/verbose.h"
 #include "sys/x-dynlib.h"
 #include "sys/x-errno.h"
-#include "utils/wrap-json.h"
 #include "core/afb-v4-itf.h"
 
 #if WITH_DIRENT
@@ -303,7 +303,7 @@ int afb_extend_load_extpath(const char *extpath)
 int afb_extend_load_set_of_extensions(struct json_object *set)
 {
 	int rc = 1;
-	wrap_json_optarray_for_all(set, load_extension_cb, &rc);
+	rp_jsonc_optarray_for_all(set, load_extension_cb, &rc);
 	return rc;
 }
 
@@ -313,7 +313,7 @@ int afb_extend_load_set_of_extpaths(struct json_object *set)
 	int rc = 1;
 #if WITH_DIRENT
 	/* search extensions */
-	wrap_json_optarray_for_all(set, load_extpath_cb, &rc);
+	rp_jsonc_optarray_for_all(set, load_extpath_cb, &rc);
 #endif
 	return rc;
 }
@@ -385,7 +385,7 @@ int afb_extend_configure(struct json_object *config)
 				obj = ext->config;
 			else {
 				if (ext->config) {
-					wrap_json_object_merge(obj, ext->config, wrap_json_merge_option_join_or_keep);
+					rp_jsonc_object_merge(obj, ext->config, rp_jsonc_merge_option_join_or_keep);
 					json_object_put(ext->config);
 				}
 				ext->config = json_object_get(obj);

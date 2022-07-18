@@ -29,6 +29,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <rp-utils/rp-jsonc.h>
+
 #define ISSPACE(x) (isspace((int)(unsigned char)(x)))
 
 #include "core/afb-apiname.h"
@@ -50,7 +52,6 @@
 #include "sys/verbose.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
-#include "utils/wrap-json.h"
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"
 
@@ -96,13 +97,13 @@ static struct json_object *make_settings(struct afb_api_common *comapi)
 
 	/* clone the globals */
 	if (json_object_object_get_ex(configuration, "*", &obj))
-		result = wrap_json_clone(obj);
+		result = rp_jsonc_clone(obj);
 	else
 		result = json_object_new_object();
 
 	/* add locals */
 	if (json_object_object_get_ex(configuration, comapi->name, &obj))
-		wrap_json_object_add(result, obj);
+		rp_jsonc_object_add(result, obj);
 
 	/* add library path */
 	if (comapi->path)

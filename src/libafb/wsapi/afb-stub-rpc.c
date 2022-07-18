@@ -1900,7 +1900,7 @@ static int receive_event_broadcast(
 		const char *event_name,
 		unsigned ndata,
 		struct afb_data *data[],
-		const uuid_binary_t uuid,
+		const rp_uuid_binary_t uuid,
 		uint8_t hop
 ) {
 	return afb_evt_rebroadcast_name_hookable(event_name, ndata, data, uuid, hop);

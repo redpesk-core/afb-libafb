@@ -33,6 +33,7 @@
 #include <sys/un.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-jsonc.h>
 
 #define AFB_BINDING_VERSION 3
 #define AFB_BINDING_NO_ROOT
@@ -52,7 +53,6 @@
 #endif
 #include "core/afb-error-text.h"
 #include "sys/verbose.h"
-#include "utils/wrap-json.h"
 #include "core/afb-sched.h"
 #include "sys/x-socket.h"
 #include "sys/x-mutex.h"
@@ -335,15 +335,15 @@ static void process_cb(void *closure, struct json_object *args)
 	switch(i) {
 	case Exit:
 		i = 0;
-		if (wrap_json_unpack(args, "i", &i))
-			wrap_json_unpack(args, "{si}", "code", &i);
+		if (rp_jsonc_unpack(args, "i", &i))
+			rp_jsonc_unpack(args, "{si}", "code", &i);
 		ERROR("exiting from supervision with code %d -> %d", i, i & 127);
 		exit(i & 127);
 		break;
 	case Sclose:
 		uuid = NULL;
-		if (wrap_json_unpack(args, "s", &uuid))
-			wrap_json_unpack(args, "{ss}", "uuid", &uuid);
+		if (rp_jsonc_unpack(args, "s", &uuid))
+			rp_jsonc_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
 			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
 		else {
@@ -372,7 +372,7 @@ static void process_cb(void *closure, struct json_object *args)
 			trace = afb_trace_create(supervisor_apiname, NULL /* not bound to any session */);
 
 		add = drop = NULL;
-		wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
+		rp_jsonc_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 		if (add) {
 			rc = afb_trace_add(comreq, add, trace);
 			if (rc)
@@ -390,7 +390,7 @@ static void process_cb(void *closure, struct json_object *args)
 		break;
 	case Do:
 		sub = NULL;
-		if (wrap_json_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
+		if (rp_jsonc_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
 			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
 		else {
 			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);

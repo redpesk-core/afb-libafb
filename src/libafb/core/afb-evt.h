@@ -25,7 +25,7 @@
 
 #include <stdint.h>
 
-#include "../utils/uuid.h"
+#include <rp-utils/rp-uuid.h>
 
 struct afb_event_x2;
 struct afb_event;
@@ -57,7 +57,7 @@ struct afb_evt_pushed
 
 struct afb_evt_broadcasted
 {
-	uuid_binary_t uuid;
+	rp_uuid_binary_t uuid;
 	uint8_t hop;
 	struct afb_evt_data data;
 };
@@ -93,7 +93,7 @@ extern int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data *
 extern int afb_evt_broadcast(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[]);
 
 extern int afb_evt_broadcast_name_hookable(const char *event, unsigned nparams, struct afb_data * const params[]);
-extern int afb_evt_rebroadcast_name_hookable(const char *event, unsigned nparams, struct afb_data * const params[], const  uuid_binary_t uuid, uint8_t hop);
+extern int afb_evt_rebroadcast_name_hookable(const char *event, unsigned nparams, struct afb_data * const params[], const  rp_uuid_binary_t uuid, uint8_t hop);
 
 extern struct afb_evt *afb_evt_addref_hookable(struct afb_evt *evt);
 extern void afb_evt_unref_hookable(struct afb_evt *evt);

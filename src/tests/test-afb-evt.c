@@ -34,11 +34,12 @@
 #include <check.h>
 #include <signal.h>
 
+#include <rp-utils/rp-jsonc.h>
+
 #include "core/afb-hook.h"
 #include "core/afb-evt.h"
 #include "core/afb-sched.h"
 #include "sys/x-errno.h"
-#include "utils/wrap-json.h"
 #include <afb/afb-event-x2.h>
 
 #define NAME "toto"

@@ -32,15 +32,18 @@ set(incdirs
 	${CMAKE_SOURCE_DIR}/include
 	${json-c_INCLUDE_DIRS}
 	${afb-binding_INCLUDE_DIRS}
+	${librp-utils_INCLUDE_DIRS}
 )
 set(ldflags
 	${CMAKE_THREAD_LIBS_INIT}
 	${json-c_LDFLAGS}
 	${afb-binding_LDFLAGS}
+	${librp-utils_LDFLAGS}
 )
 
 set(deps
 	json-c
+	librp-utils
 )
 
 set(privs

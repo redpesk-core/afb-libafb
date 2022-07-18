@@ -30,11 +30,12 @@
 #include <limits.h>
 #include <string.h>
 
+#include <rp-utils/rp-uuid.h>
+
 #include "core/afb-session.h"
 #include "core/afb-hook.h"
 #include "sys/verbose.h"
 #include "utils/pearson.h"
-#include "utils/uuid.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
@@ -91,7 +92,7 @@ struct afb_session
 	uint8_t autoclose: 1;   /**< close the session when unreferenced */
 	uint8_t notinset: 1;	/**< session removed from the set of sessions */
 	uint8_t hash;		/**< hash value of the uuid */
-	uuid_stringz_t uuid;	/**< identification of client session */
+	rp_uuid_stringz_t uuid;	/**< identification of client session */
 };
 
 /**
@@ -186,12 +187,12 @@ static int sessionset_add(struct afb_session *session, uint8_t hashidx)
 }
 
 /* make a new uuid not used in the set of sessions */
-static uint8_t sessionset_make_uuid (uuid_stringz_t uuid)
+static uint8_t sessionset_make_uuid (rp_uuid_stringz_t uuid)
 {
 	uint8_t hashidx;
 
 	do {
-		uuid_new_stringz(uuid);
+		rp_uuid_new_stringz(uuid);
 		hashidx = pearson4(uuid);
 	} while(sessionset_search(uuid, hashidx));
 	return hashidx;
@@ -445,7 +446,7 @@ int afb_session_what_remains(struct afb_session *session)
 /* This function will return exiting session or newly created session */
 int afb_session_get (struct afb_session **psession, const char *uuid, int timeout, int *created)
 {
-	uuid_stringz_t _uuid_;
+	rp_uuid_stringz_t _uuid_;
 	uint8_t hashidx;
 	struct afb_session *session;
 	time_t now;

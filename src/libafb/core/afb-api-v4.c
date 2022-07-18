@@ -28,6 +28,7 @@
 #include <stdint.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-jsonc.h>
 
 #include "core/afb-v4-itf.h"
 
@@ -59,7 +60,6 @@
 #include "utils/globmatch.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
-#include "utils/wrap-json.h"
 #include "utils/namecmp.h"
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"

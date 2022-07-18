@@ -36,6 +36,7 @@
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
+#include <rp-utils/rp-jsonc.h>
 
 #include <afb/afb-arg.h>
 
@@ -52,7 +53,6 @@
 #include "core/afb-evt.h"
 #include "misc/afb-trace.h"
 
-#include "utils/wrap-json.h"
 #include "sys/verbose.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
@@ -210,12 +210,12 @@ static void emit(void *closure, const struct afb_hookid *hookid, const char *typ
 
 	data1 = data2 = data = NULL;
 	va_start(ap1, ap2);
-	wrap_json_vpack(&data1, fmt1, ap1);
+	rp_jsonc_vpack(&data1, fmt1, ap1);
 	va_end(ap1);
 	if (fmt2)
-		wrap_json_vpack(&data2, fmt2, ap2);
+		rp_jsonc_vpack(&data2, fmt2, ap2);
 
-	wrap_json_pack(&data, "{so ss ss si so so*}",
+	rp_jsonc_pack(&data, "{so ss ss si so so*}",
 					"time", timestamp(hookid),
 					"tag", hook->tag->tag,
 					"type", type,
@@ -245,7 +245,7 @@ static void hook_req(void *closure, const struct afb_hookid *hookid, const struc
 #if WITH_CRED
 	cred = req->credentials;
 	if (cred)
-		wrap_json_pack(&jcred, "{si ss si si ss* ss*}",
+		rp_jsonc_pack(&jcred, "{si ss si si ss* ss*}",
 						"uid", (int)cred->uid,
 						"user", cred->user,
 						"gid", (int)cred->gid,
@@ -392,7 +392,7 @@ static void hook_req_vverbose(void *closure, const struct afb_hookid *hookid, co
 	va_end(ap);
 
 	if (file)
-		wrap_json_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", func);
+		rp_jsonc_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", func);
 
 	hook_req(closure, hookid, req, "vverbose", "{si ss* ss? so*}",
 					"level", level,
@@ -612,7 +612,7 @@ static void hook_api_vverbose(void *closure, const struct afb_hookid *hookid, co
 	va_end(ap);
 
 	if (file)
-		wrap_json_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", function);
+		rp_jsonc_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", function);
 
 	hook_api(closure, hookid, comapi, "vverbose", "{si ss* ss? so*}",
 					"level", level,
@@ -1013,7 +1013,7 @@ static void hook_global_vverbose(void *closure, const struct afb_hookid *hookid,
 	va_end(ap);
 
 	if (file)
-		wrap_json_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", function);
+		rp_jsonc_pack(&pos, "{ss si ss*}", "file", file, "line", line, "function", function);
 
 	hook_global(closure, hookid, "vverbose", "{si ss* ss? so*}",
 					"level", level,
@@ -1375,7 +1375,7 @@ static void add_flags(void *closure, struct json_object *object, enum trace_type
 	const char *name, *queried;
 	struct desc *desc = closure;
 
-	if (wrap_json_unpack(object, "s", &name))
+	if (rp_jsonc_unpack(object, "s", &name))
 		ctxt_error(&desc->context->errors, "unexpected %s value %s",
 					abstracting[type].name,
 					json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
@@ -1425,7 +1425,7 @@ static void add(void *closure, struct json_object *object)
 	memcpy (&desc, closure, sizeof desc);
 	request = event = sub = global = session = api = NULL;
 
-	rc = wrap_json_unpack(object, "{s?s s?s s?s s?s s?s s?s s?o s?o s?o s?o s?o s?o}",
+	rc = rp_jsonc_unpack(object, "{s?s s?s s?s s?s s?s s?s s?o s?o s?o s?o s?o s?o}",
 			"name", &desc.name,
 			"tag", &desc.tag,
 			"apiname", &desc.apiname,
@@ -1452,28 +1452,28 @@ static void add(void *closure, struct json_object *object)
 
 		/* get what is expected */
 		if (request)
-			wrap_json_optarray_for_all(request, add_req_flags, &desc);
+			rp_jsonc_optarray_for_all(request, add_req_flags, &desc);
 
 		if (api)
-			wrap_json_optarray_for_all(api, add_api_flags, &desc);
+			rp_jsonc_optarray_for_all(api, add_api_flags, &desc);
 
 		if (event)
-			wrap_json_optarray_for_all(event, add_evt_flags, &desc);
+			rp_jsonc_optarray_for_all(event, add_evt_flags, &desc);
 
 		if (session)
-			wrap_json_optarray_for_all(session, add_session_flags, &desc);
+			rp_jsonc_optarray_for_all(session, add_session_flags, &desc);
 
 		if (global)
-			wrap_json_optarray_for_all(global, add_global_flags, &desc);
+			rp_jsonc_optarray_for_all(global, add_global_flags, &desc);
 
 		/* apply */
 		if (sub)
-			wrap_json_optarray_for_all(sub, add, &desc);
+			rp_jsonc_optarray_for_all(sub, add, &desc);
 		else
 			addhooks(&desc);
 	}
 	else {
-		wrap_json_optarray_for_all(object, add_req_flags, &desc);
+		rp_jsonc_optarray_for_all(object, add_req_flags, &desc);
 		addhooks(&desc);
 	}
 }
@@ -1486,7 +1486,7 @@ static void drop_tag(void *closure, struct json_object *object)
 	struct tag *tag;
 	const char *name;
 
-	rc = wrap_json_unpack(object, "s", &name);
+	rc = rp_jsonc_unpack(object, "s", &name);
 	if (rc)
 		ctxt_error(&context->errors, "unexpected tag value %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 	else {
@@ -1506,7 +1506,7 @@ static void drop_event(void *closure, struct json_object *object)
 	struct event *event;
 	const char *name;
 
-	rc = wrap_json_unpack(object, "s", &name);
+	rc = rp_jsonc_unpack(object, "s", &name);
 	if (rc)
 		ctxt_error(&context->errors, "unexpected event value %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 	else {
@@ -1526,7 +1526,7 @@ static void drop_session(void *closure, struct json_object *object)
 	struct afb_session *session;
 	const char *uuid;
 
-	rc = wrap_json_unpack(object, "s", &uuid);
+	rc = rp_jsonc_unpack(object, "s", &uuid);
 	if (rc)
 		ctxt_error(&context->errors, "unexpected session value %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 	else {
@@ -1593,7 +1593,7 @@ int afb_trace_add(struct afb_req_common *req, struct json_object *args, struct a
 	desc.context = &context;
 
 	x_mutex_lock(&trace->mutex);
-	wrap_json_optarray_for_all(args, add, &desc);
+	rp_jsonc_optarray_for_all(args, add, &desc);
 	x_mutex_unlock(&trace->mutex);
 
 	if (!context.errors)
@@ -1616,7 +1616,7 @@ int afb_trace_drop(struct afb_req_common *req, struct json_object *args, struct 
 	context.req = req;
 
 	/* special: boolean value */
-	if (!wrap_json_unpack(args, "b", &rc)) {
+	if (!rp_jsonc_unpack(args, "b", &rc)) {
 		if (rc) {
 			x_mutex_lock(&trace->mutex);
 			trace_unhook(trace, NULL, NULL, NULL);
@@ -1627,7 +1627,7 @@ int afb_trace_drop(struct afb_req_common *req, struct json_object *args, struct 
 	}
 
 	tags = events = uuids = NULL;
-	rc = wrap_json_unpack(args, "{s?o s?o s?o}",
+	rc = rp_jsonc_unpack(args, "{s?o s?o s?o}",
 			"event", &events,
 			"tag", &tags,
 			"uuid", &uuids);
@@ -1640,13 +1640,13 @@ int afb_trace_drop(struct afb_req_common *req, struct json_object *args, struct 
 	x_mutex_lock(&trace->mutex);
 
 	if (tags)
-		wrap_json_optarray_for_all(tags, drop_tag, &context);
+		rp_jsonc_optarray_for_all(tags, drop_tag, &context);
 
 	if (events)
-		wrap_json_optarray_for_all(events, drop_event, &context);
+		rp_jsonc_optarray_for_all(events, drop_event, &context);
 
 	if (uuids)
-		wrap_json_optarray_for_all(uuids, drop_session, &context);
+		rp_jsonc_optarray_for_all(uuids, drop_session, &context);
 
 	trace_cleanup(trace);
 

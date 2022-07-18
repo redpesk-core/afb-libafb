@@ -27,8 +27,9 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include <rp-utils/rp-uuid.h>
+
 #include "afb-string-mode.h"
-#include "../utils/uuid.h"
 
 struct json_object;
 struct afb_data;
@@ -308,7 +309,7 @@ int
 afb_json_legacy_event_rebroadcast_name(
 	const char *event,
 	struct json_object *obj,
-	const uuid_binary_t uuid,
+	const rp_uuid_binary_t uuid,
 	uint8_t hop
 );
 

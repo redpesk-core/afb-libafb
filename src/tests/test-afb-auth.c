@@ -35,10 +35,10 @@
 
 #include <afb/afb-auth.h>
 #include <afb/afb-session.h>
+#include <rp-utils/rp-jsonc.h>
 
 #include "core/afb-auth.h"
 #include "sys/verbose.h"
-#include "utils/wrap-json.h"
 
 START_TEST (test)
 {
@@ -395,7 +395,7 @@ START_TEST (test)
             fprintf(stderr, "    '%s'", json_object_to_json_string(result));
             if(i<7) fprintf(stderr, ",");
             fprintf(stderr, "\n");
-            ck_assert_int_eq(wrap_json_equal(expected_result, result), 1);
+            ck_assert_int_eq(rp_jsonc_equal(expected_result, result), 1);
         }
         fprintf(stderr, "},\n");
     }

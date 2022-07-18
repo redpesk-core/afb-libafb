@@ -29,6 +29,7 @@
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
+#include <rp-utils/rp-jsonc.h>
 
 #include "containerof.h"
 
@@ -57,7 +58,6 @@
 #include "utils/globmatch.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
-#include "utils/wrap-json.h"
 #include "utils/namecmp.h"
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"

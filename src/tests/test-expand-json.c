@@ -36,9 +36,9 @@
 
 /*********************************************************************/
 
-#include "utils/expand-vars.h"
-#include "utils/expand-json.h"
-#include "utils/wrap-json.h"
+#include <rp-utils/rp-expand-vars.h>
+#include <rp-utils/rp-jsonc-expand.h>
+#include <rp-utils/rp-jsonc.h>
 
 /*********************************************************************/
 
@@ -46,21 +46,21 @@ char input[] = "{ \"key\": [ { \"$ref\": \"$valref\" }, 5, true, 0 ], \"item\": 
 char *vars[] = { "valref=toto", "valitem=HELLO", "toto=item", NULL };
 char output[] = "{ \"key\": [ \"toto\", 5, true, 0 ], \"item\": \"xHELLOx\" }";
 
-void printpath(expand_json_path_t path, struct json_object* object)
+void printpath(rp_jsonc_expand_path_t path, struct json_object* object)
 {
-	int i, n = expand_json_path_length(path);
+	int i, n = rp_jsonc_expand_path_length(path);
 
 	printf("ROOT");
 	for (i = 0 ; i < n ; i++) {
-		if (expand_json_path_is_array(path, i))
-			printf("[%d]", (int)expand_json_path_index(path, i));
+		if (rp_jsonc_expand_path_is_array(path, i))
+			printf("[%d]", (int)rp_jsonc_expand_path_index(path, i));
 		else
-			printf(".%s", expand_json_path_key(path, i));
+			printf(".%s", rp_jsonc_expand_path_key(path, i));
 	}
 	printf(" = %s\n", json_object_get_string(object));
 }
 
-struct json_object *expobj(void *closure, struct json_object* object, expand_json_path_t path)
+struct json_object *expobj(void *closure, struct json_object* object, rp_jsonc_expand_path_t path)
 {
 	struct json_object *ref;
 
@@ -71,13 +71,13 @@ struct json_object *expobj(void *closure, struct json_object* object, expand_jso
 	return object;
 }
 
-struct json_object *expstr(void *closure, struct json_object* object, expand_json_path_t path)
+struct json_object *expstr(void *closure, struct json_object* object, rp_jsonc_expand_path_t path)
 {
 	char *trf;
 
 	ck_assert_ptr_eq(closure, input);
 	printpath(path, object);
-	trf = expand_vars_only(json_object_get_string(object), 0, vars);
+	trf = rp_expand_vars_only(json_object_get_string(object), 0, vars);
 	if (trf) {
 		object = json_object_new_string(trf);
 		free(trf);
@@ -91,9 +91,9 @@ START_TEST (check_expand)
 	struct json_object *out = json_tokener_parse(output);
 	struct json_object *res;
 
-	res = expand_json(in, input, expobj, expstr);
+	res = rp_jsonc_expand(in, input, expobj, expstr);
 	printf("got %s\n", json_object_get_string(res));
-	ck_assert_int_eq(0, wrap_json_cmp(res, out));
+	ck_assert_int_eq(0, rp_jsonc_cmp(res, out));
 
 	if (res != in)
 		json_object_put(res);

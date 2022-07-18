@@ -38,8 +38,9 @@
 
 /*********************************************************************/
 
-#include "utils/json-locator.h"
-#include "utils/wrap-json.h"
+#include <rp-utils/rp-jsonc-locator.h>
+#include <rp-utils/rp-jsonc-path.h>
+#include <rp-utils/rp-jsonc.h>
 
 /*********************************************************************/
 
@@ -84,16 +85,16 @@ void explore(struct json_object *root, struct json_object *jso)
 	const char *filename;
 	char *locat;
 
-	locat = json_locator_search_path(root, jso);
-	filename = json_locator_locate(jso, &linenum);
+	locat = rp_jsonc_path(root, jso);
+	filename = rp_jsonc_locator_locate(jso, &linenum);
 	fprintf (stderr, "%p %s:%d {%s} -> %s\n", jso, filename?:"<null>", linenum, locat ?: "<null>", json_object_get_string(jso));
 	free(locat);
 	switch (json_object_get_type(jso)) {
 	case json_type_object:
-		wrap_json_object_for_all(jso, (void*)explore, root);
+		rp_jsonc_object_for_all(jso, (void*)explore, root);
 		break;
 	case json_type_array:
-		wrap_json_array_for_all(jso, (void*)explore, root);
+		rp_jsonc_array_for_all(jso, (void*)explore, root);
 		break;
 	default:
 		break;
@@ -110,7 +111,7 @@ START_TEST (check_read)
 
 	rc = getpath(buffer, TEST_SOURCE_DIR"test-json-locator.json");
 	ck_assert_int_eq(0, rc);
-	rc = json_locator_from_file(&obj, buffer);
+	rc = rp_jsonc_locator_from_file(&obj, buffer);
 	ck_assert_int_eq(0, rc);
 	explore(obj, obj);
 	json_object_put(obj);

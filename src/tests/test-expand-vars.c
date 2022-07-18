@@ -36,7 +36,7 @@
 
 /*********************************************************************/
 
-#include "utils/expand-vars.h"
+#include <rp-utils/rp-expand-vars.h>
 
 /*********************************************************************/
 
@@ -53,7 +53,7 @@ START_TEST (check_expand)
 	unsetenv("rien");
 
 	// check expansion
-	r = expand_vars_env_only("$TEST", 0);
+	r = rp_expand_vars_env_only("$TEST", 0);
 	ck_assert_ptr_nonnull(r);
 	printf("%s\n",r);
 	ck_assert_str_eq(r, "debut:a:hum:rien::rien:tres:rien::rien:a:hum:rien::rien:tres:rien::rien:fin");
@@ -62,15 +62,15 @@ START_TEST (check_expand)
 	// check robust to infinite expansion
 	putenv("V=xxx");
 	putenv("Z=$Z:$V:$Z");
-	r = expand_vars_env_only("$Z", 0);
+	r = rp_expand_vars_env_only("$Z", 0);
 	ck_assert_ptr_null(r);
-	r = expand_vars_env_only("$Z", 1);
+	r = rp_expand_vars_env_only("$Z", 1);
 	ck_assert_ptr_nonnull(r);
 	ck_assert_str_eq(r, "$Z");
 	free(r);
 
 	// check robust to null
-	r = expand_vars_env_only(0, 0);
+	r = rp_expand_vars_env_only(0, 0);
 	ck_assert_ptr_null(r);
 	free(r);
 }
@@ -83,7 +83,7 @@ char **after;
 
 void mc(const char *in, const char *out)
 {
-	char *r = expand_vars(in, 1, before, after);
+	char *r = rp_expand_vars(in, 1, before, after);
 	printf("mc got %s\n", r);
 	ck_assert_ptr_nonnull(r);
 	ck_assert_str_eq(r, out);

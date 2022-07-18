@@ -450,7 +450,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 		afb_proto_ws_client_event_unexpected(stubws->proto, event_id);
 }
 
-static void client_on_event_broadcast_cb(void *closure, const char *event_name, struct json_object *data, const uuid_binary_t uuid, uint8_t hop)
+static void client_on_event_broadcast_cb(void *closure, const char *event_name, struct json_object *data, const rp_uuid_binary_t uuid, uint8_t hop)
 {
 	afb_json_legacy_event_rebroadcast_name(event_name, data, uuid, hop);
 }

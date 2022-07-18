@@ -623,7 +623,7 @@ int
 afb_json_legacy_event_rebroadcast_name(
 	const char *event,
 	struct json_object *obj,
-	const uuid_binary_t uuid,
+	const rp_uuid_binary_t uuid,
 	uint8_t hop
 ) {
 	int rc;

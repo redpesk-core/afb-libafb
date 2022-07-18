@@ -33,7 +33,8 @@
 
 #include <afb/afb-req-subcall-flags.h>
 
-#include "utils/wrap-json.h"
+#include <rp-utils/rp-jsonc.h>
+
 #include "apis/afb-api-so.h"
 #include "core/afb-calls.h"
 #include "core/afb-api-common.h"

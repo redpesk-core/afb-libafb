@@ -29,6 +29,7 @@
 #include <assert.h>
 
 #include <afb/afb-event-x2-itf.h>
+#include <rp-utils/rp-uuid.h>
 
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
@@ -36,7 +37,6 @@
 #include "core/afb-data-array.h"
 #include "sys/verbose.h"
 #include "core/afb-sched.h"
-#include "utils/uuid.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
 #include "sys/x-errno.h"
@@ -157,7 +157,7 @@ static struct {
 	x_mutex_t mutex;
 	uint8_t base;
 	uint8_t count;
-	uuid_binary_t uuids[EVENT_BROADCAST_MEMORY_COUNT];
+	rp_uuid_binary_t uuids[EVENT_BROADCAST_MEMORY_COUNT];
 } uniqueness = {
 	.mutex = X_MUTEX_INITIALIZER,
 	.base = 0,
@@ -175,7 +175,7 @@ make_evt_broadcasted(
 	const char *event,
 	unsigned nparams,
 	struct afb_data * const params[],
-	const uuid_binary_t uuid,
+	const rp_uuid_binary_t uuid,
 	uint8_t hop
 ) {
 	size_t sz;
@@ -282,9 +282,9 @@ static void broadcast_job(int signum, void *closure)
 /*
  * Broadcasts the string 'event' with its 'object'
  */
-static int broadcast_name(const char *event, unsigned nparams, struct afb_data * const params[], const uuid_binary_t uuid, uint8_t hop)
+static int broadcast_name(const char *event, unsigned nparams, struct afb_data * const params[], const rp_uuid_binary_t uuid, uint8_t hop)
 {
-	uuid_binary_t local_uuid;
+	rp_uuid_binary_t local_uuid;
 	struct afb_evt_broadcasted *jb;
 	int rc;
 #if EVENT_BROADCAST_MEMORY_COUNT
@@ -293,7 +293,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 
 	/* check if lately sent */
 	if (!uuid) {
-		uuid_new_binary(local_uuid);
+		rp_uuid_new_binary(local_uuid);
 		uuid = local_uuid;
 		hop = EVENT_BROADCAST_HOP_MAX;
 #if EVENT_BROADCAST_MEMORY_COUNT
@@ -303,7 +303,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 		iter = (int)uniqueness.base;
 		count = (int)uniqueness.count;
 		while (count) {
-			if (0 == memcmp(uuid, uniqueness.uuids[iter], sizeof(uuid_binary_t))) {
+			if (0 == memcmp(uuid, uniqueness.uuids[iter], sizeof(rp_uuid_binary_t))) {
 				x_mutex_unlock(&uniqueness.mutex);
 				return 0;
 			}
@@ -317,7 +317,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 		iter += (int)(uniqueness.count++);
 	else if (++uniqueness.base == EVENT_BROADCAST_MEMORY_COUNT)
 		uniqueness.base = 0;
-	memcpy(uniqueness.uuids[iter], uuid, sizeof(uuid_binary_t));
+	memcpy(uniqueness.uuids[iter], uuid, sizeof(rp_uuid_binary_t));
 	x_mutex_unlock(&uniqueness.mutex);
 #else
 	}
@@ -351,12 +351,12 @@ int afb_evt_broadcast(struct afb_evt *evt, unsigned nparams, struct afb_data * c
 	return broadcast_name(evt->fullname, nparams, params, NULL, 0);
 }
 
-int afb_evt_rebroadcast_name(const char *event, unsigned nparams, struct afb_data * const params[], const uuid_binary_t uuid, uint8_t hop)
+int afb_evt_rebroadcast_name(const char *event, unsigned nparams, struct afb_data * const params[], const rp_uuid_binary_t uuid, uint8_t hop)
 {
 	return broadcast_name(event, nparams, params, uuid, hop);
 }
 
-int afb_evt_rebroadcast_name_hookable(const char *event, unsigned nparams, struct afb_data * const params[], const uuid_binary_t uuid, uint8_t hop)
+int afb_evt_rebroadcast_name_hookable(const char *event, unsigned nparams, struct afb_data * const params[], const rp_uuid_binary_t uuid, uint8_t hop)
 #if !WITH_AFB_HOOK
 	__attribute__((alias("afb_evt_rebroadcast_name")));
 #else

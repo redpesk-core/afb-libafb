@@ -32,6 +32,8 @@
 
 #include <check.h>
 
+#include <rp-utils/rp-jsonc.h>
+
 #if !defined(ck_assert_ptr_null)
 # define ck_assert_ptr_null(X)      ck_assert_ptr_eq(X, NULL)
 # define ck_assert_ptr_nonnull(X)   ck_assert_ptr_ne(X, NULL)
@@ -54,7 +56,6 @@
 #include "core/afb-hook.h"
 #include "sys/x-errno.h"
 #include "sys/verbose.h"
-#include "utils/wrap-json.h"
 
 #if WITH_REQ_PROCESS_ASYNC
 #define RUNJOB afb_sched_wait_idle(1,1);
@@ -248,22 +249,22 @@ START_TEST (test_functional)
 	settings = afb_api_common_settings_hookable(comapi);
 	fprintf(stderr, "comapi->setting = %s\n", json_object_to_json_string(comapi->settings));
 	ck_assert_ptr_eq(settings, comapi->settings);
-	ck_assert_int_eq(0, wrap_json_check(comapi->settings, "{s:s}", "binding-path", path));
-	settings = wrap_json_clone(comapi->settings);
+	ck_assert_int_eq(0, rp_jsonc_check(comapi->settings, "{s:s}", "binding-path", path));
+	settings = rp_jsonc_clone(comapi->settings);
 	afb_api_common_set_config(settings);
 
 	comapi->settings = NULL;
 	fprintf(stderr, "set up a json config and load it ...\n");
 	// set up the json config
-	ck_assert_int_eq(0, wrap_json_pack(&config, "{ss ss}", "binding-path", path, "binding-info", info));
-	ck_assert_int_eq(0,	wrap_json_pack(&settings, "{so}", name, config));
+	ck_assert_int_eq(0, rp_jsonc_pack(&config, "{ss ss}", "binding-path", path, "binding-info", info));
+	ck_assert_int_eq(0,	rp_jsonc_pack(&settings, "{so}", name, config));
 	// load it
 	afb_api_common_set_config(settings);
 	// set up the api settings based on the the priviously set config
 	settings = afb_api_common_settings_hookable(comapi);
 	fprintf(stderr, "comapi->setting = %s\n", json_object_to_json_string(comapi->settings));
 	ck_assert_ptr_eq(settings, comapi->settings);
-	ck_assert_int_eq(1, wrap_json_equal(comapi->settings, config));
+	ck_assert_int_eq(1, rp_jsonc_equal(comapi->settings, config));
 
 	/******** job ********/
 	fprintf(stderr, "\n******** job ********\n");

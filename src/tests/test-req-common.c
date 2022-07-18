@@ -31,6 +31,7 @@
 #include <time.h>
 
 #include <check.h>
+#include <rp-utils/rp-jsonc.h>
 
 #if !defined(ck_assert_ptr_null)
 # define ck_assert_ptr_null(X)      ck_assert_ptr_eq(X, NULL)
@@ -55,7 +56,6 @@
 #include "core/afb-cred.h"
 #include "core/afb-evt.h"
 #include "sys/verbose.h"
-#include "utils/wrap-json.h"
 
 #include <json-c/json.h>
 
@@ -453,7 +453,7 @@ START_TEST(process_on_behalf)
 	res = afb_req_common_get_client_info_hookable(req);
 	fprintf(stderr, "afb_req_common_get_client_info_hookable returned %s\n", json_object_to_json_string(res));
 	ck_assert_int_eq(
-		wrap_json_equal(
+		rp_jsonc_equal(
 			res,
 			json_tokener_parse(
 				"{ \"uid\": 1, \"gid\": 1, \"pid\": 1, \"user\": \"1\", \"label\": \"User::App::LABEL\", \"id\": \"LABEL\" }"

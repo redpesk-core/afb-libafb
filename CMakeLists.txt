@@ -145,6 +145,7 @@ find_package(Threads)
 
 PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
 PKG_CHECK_MODULES(json-c REQUIRED json-c)
+PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils)
 
 if(WITH_LIBMICROHTTPD)
 	PKG_CHECK_MODULES(libmicrohttpd REQUIRED libmicrohttpd>=0.9.60)

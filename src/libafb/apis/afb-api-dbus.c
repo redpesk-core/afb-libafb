@@ -963,7 +963,7 @@ static void server_event_broadcast_cb(void *closure1, const char *json, const vo
 	const struct afb_evt_broadcasted *event = closure2;
 	int rc = sd_bus_emit_signal(api->sdbus, api->path, api->name, "broadcast",
 			"ssayy", event->data.name, json,
-			event->uuid, UUID_BINARY_LENGTH, event->hop);
+			event->uuid, RP_UUID_BINARY_LENGTH, event->hop);
 	if (rc < 0)
 		ERROR("error while broadcasting event %s", event->data.name);
 }

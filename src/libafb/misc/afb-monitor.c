@@ -27,6 +27,7 @@
 #include <stdarg.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-jsonc.h>
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
@@ -43,7 +44,6 @@
 #include "core/afb-type-predefined.h"
 #include "sys/verbose.h"
 #include "sys/x-errno.h"
-#include "utils/wrap-json.h"
 
 static const char _apis_[] = "apis";
 static const char _disconnected_[] = "disconnected";
@@ -149,7 +149,7 @@ static void set_sub_unsub(
 		}
 		if (++i >= n)
 			return;
-		obj = json_object_array_get_idx(list, (wrap_json_index_t)i);
+		obj = json_object_array_get_idx(list, (rp_jsonc_index_t)i);
 	}
 }
 
@@ -167,9 +167,9 @@ static int decode_verbosity(struct json_object *v)
 	const char *s;
 	int level = -1;
 
-	if (!wrap_json_unpack(v, "i", &level)) {
+	if (!rp_jsonc_unpack(v, "i", &level)) {
 		level = level < _VERBOSITY_(Log_Level_Error) ? _VERBOSITY_(Log_Level_Error) : level > _VERBOSITY_(Log_Level_Debug) ? _VERBOSITY_(Log_Level_Debug) : level;
-	} else if (!wrap_json_unpack(v, "s", &s)) {
+	} else if (!rp_jsonc_unpack(v, "s", &s)) {
 		level = _VERBOSITY_(verbose_level_of_name(s));
 	}
 	return level;
@@ -302,7 +302,7 @@ static struct json_object *get_verbosity(struct json_object *spec)
 	} else if (json_object_is_type(spec, json_type_array)) {
 		n = (int)json_object_array_length(spec);
 		for (i = 0 ; i < n ; i++)
-			get_verbosity_of(resu, json_object_get_string(json_object_array_get_idx(spec, (wrap_json_index_t)i)));
+			get_verbosity_of(resu, json_object_get_string(json_object_array_get_idx(spec, (rp_jsonc_index_t)i)));
 	} else if (json_object_is_type(spec, json_type_string)) {
 		get_verbosity_of(resu, json_object_get_string(spec));
 	} else if (json_object_get_boolean(spec)) {
@@ -381,7 +381,7 @@ static struct namelist *get_apis_namelist(struct json_object *spec)
 		for (i = 0 ; i < n ; i++)
 			add_one_name_to_namelist(&head,
 						 json_object_get_string(
-							 json_object_array_get_idx(spec, (wrap_json_index_t)i)),
+							 json_object_array_get_idx(spec, (rp_jsonc_index_t)i)),
 						 NULL);
 	} else if (json_object_is_type(spec, json_type_string)) {
 		add_one_name_to_namelist(&head, json_object_get_string(spec), NULL);
@@ -480,7 +480,7 @@ static void f_get_cb(void *closure, struct json_object *args)
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
 
-	wrap_json_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
+	rp_jsonc_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
 	if (!verbosity && !apis)
 		afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
 	else {
@@ -510,7 +510,7 @@ static void f_set_cb(void *closure, struct json_object *args)
 	struct afb_req_common *req = closure;
 	struct json_object *verbosity = NULL,  *subscribe = NULL,  *unsubscribe = NULL;
 
-	wrap_json_unpack(args, "{s?o s?o s?o}",
+	rp_jsonc_unpack(args, "{s?o s?o s?o}",
 				_verbosity_, &verbosity,
 				_subscribe_, &subscribe,
 				_unsubscribe_, &unsubscribe);
@@ -584,7 +584,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 	struct afb_trace *trace;
 
 	afb_session_cookie_getinit(req->session, _monitor_, (void**)&trace, context_create, req);
-	wrap_json_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
+	rp_jsonc_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
 	if (add) {
 		rc = afb_trace_add(req, add, trace);
 		if (rc)
@@ -618,7 +618,7 @@ static void f_session(struct afb_req_common *req)
 	struct json_object *r = NULL;
 
 	/* make the result */
-	wrap_json_pack(&r, "{s:s,s:i,s:i}",
+	rp_jsonc_pack(&r, "{s:s,s:i,s:i}",
 			"uuid", afb_session_uuid(req->session),
 			"timeout", afb_session_timeout(req->session),
 			"remain", afb_session_what_remains(req->session));

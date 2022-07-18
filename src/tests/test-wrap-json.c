@@ -27,7 +27,8 @@
 #include <limits.h>
 #include <stdio.h>
 
-#include "utils/wrap-json.h"
+#include <rp-utils/rp-jsonc.h>
+
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
@@ -37,13 +38,13 @@ void tclone(struct json_object *object)
 {
 	struct json_object *o;
 
-	o = wrap_json_clone(object);
-	if (!wrap_json_equal(object, o))
+	o = rp_jsonc_clone(object);
+	if (!rp_jsonc_equal(object, o))
 		printf("ERROR in clone or equal: %s VERSUS %s\n", j2t(object), j2t(o));
 	json_object_put(o);
 
-	o = wrap_json_clone_deep(object);
-	if (!wrap_json_equal(object, o))
+	o = rp_jsonc_clone_deep(object);
+	if (!rp_jsonc_equal(object, o))
 		printf("ERROR in clone_deep or equal: %s VERSUS %s\n", j2t(object), j2t(o));
 	json_object_put(o);
 }
@@ -62,11 +63,11 @@ void arrcb(void *closure, struct json_object *obj)
 
 void tforall(struct json_object *object)
 {
-	wrap_json_for_all(object, objcb, "wrap_json_for_all");
-	wrap_json_optobject_for_all(object, objcb, "wrap_json_optobject_for_all");
-	wrap_json_object_for_all(object, objcb, "wrap_json_object_for_all");
-	wrap_json_optarray_for_all(object, arrcb, "wrap_json_optarray_for_all");
-	wrap_json_array_for_all(object, arrcb, "wrap_json_array_for_all");
+	rp_jsonc_for_all(object, objcb, "rp_jsonc_for_all");
+	rp_jsonc_optobject_for_all(object, objcb, "rp_jsonc_optobject_for_all");
+	rp_jsonc_object_for_all(object, objcb, "rp_jsonc_object_for_all");
+	rp_jsonc_optarray_for_all(object, arrcb, "rp_jsonc_optarray_for_all");
+	rp_jsonc_array_for_all(object, arrcb, "rp_jsonc_array_for_all");
 }
 
 struct mix
@@ -92,18 +93,18 @@ void tmix(struct json_object *object)
 	struct json_object *z;
 	struct mix mix = { .n = 0 };
 
-	wrap_json_object_for_all(object, mixcb, &mix);
+	rp_jsonc_object_for_all(object, mixcb, &mix);
 	if (mix.n) {
-		z = wrap_json_object_add(wrap_json_clone(mix.pair[0]), mix.pair[1]);
-		if (!wrap_json_contains(z, mix.pair[0]))
+		z = rp_jsonc_object_add(rp_jsonc_clone(mix.pair[0]), mix.pair[1]);
+		if (!rp_jsonc_contains(z, mix.pair[0]))
 			printf("  ERROR mix/1\n");
-		if (!wrap_json_contains(z, mix.pair[1]))
+		if (!rp_jsonc_contains(z, mix.pair[1]))
 			printf("  ERROR mix/2\n");
-		if (!wrap_json_contains(z, object))
+		if (!rp_jsonc_contains(z, object))
 			printf("  ERROR mix/3\n");
-		if (!wrap_json_contains(object, z))
+		if (!rp_jsonc_contains(object, z))
 			printf("  ERROR mix/4\n");
-		if (!wrap_json_equal(object, z))
+		if (!rp_jsonc_equal(object, z))
 			printf("  ERROR mix/5\n");
 		json_object_put(z);
 		json_object_put(mix.pair[0]);
@@ -118,12 +119,12 @@ void p(const char *desc, ...)
 	struct json_object *result;
 
 	va_start(args, desc);
-	rc = wrap_json_vpack(&result, desc, args);
+	rc = rp_jsonc_vpack(&result, desc, args);
 	va_end(args);
 	if (!rc)
 		printf("  SUCCESS %s\n\n", j2t(result));
 	else
-		printf("  ERROR[char %d err %d] %s\n\n", wrap_json_get_error_position(rc), wrap_json_get_error_code(rc), wrap_json_get_error_string(rc));
+		printf("  ERROR[char %d err %d] %s\n\n", rp_jsonc_get_error_position(rc), rp_jsonc_get_error_code(rc), rp_jsonc_get_error_string(rc));
 	tclone(result);
 	json_object_put(result);
 }
@@ -190,10 +191,10 @@ void tchk(struct json_object *object, const char *desc, const char **keys, int l
 {
 	int rm, rc;
 
-	rm = wrap_json_match(object, desc, keys[0], keys[1], keys[2], keys[3], keys[4]);
-	rc = wrap_json_check(object, desc, keys[0], keys[1], keys[2], keys[3], keys[4]);
+	rm = rp_jsonc_match(object, desc, keys[0], keys[1], keys[2], keys[3], keys[4]);
+	rc = rp_jsonc_check(object, desc, keys[0], keys[1], keys[2], keys[3], keys[4]);
 	if (rc != qrc)
-		printf("  ERROR DIFFERS[char %d err %d] %s\n", wrap_json_get_error_position(rc), wrap_json_get_error_code(rc), wrap_json_get_error_string(rc));
+		printf("  ERROR DIFFERS[char %d err %d] %s\n", rp_jsonc_get_error_position(rc), rp_jsonc_get_error_code(rc), rp_jsonc_get_error_string(rc));
 	if (rm != !rc)
 		printf("  ERROR OF MATCH\n");
 }
@@ -215,10 +216,10 @@ void u(const char *value, const char *desc, ...)
 	memset(xz, 0, sizeof xz);
 	object = json_tokener_parse(value);
 	va_start(args, desc);
-	rc = wrap_json_vunpack(object, desc, args);
+	rc = rp_jsonc_vunpack(object, desc, args);
 	va_end(args);
 	if (rc)
-		printf("  ERROR[char %d err %d] %s", wrap_json_get_error_position(rc), wrap_json_get_error_code(rc), wrap_json_get_error_string(rc));
+		printf("  ERROR[char %d err %d] %s", rp_jsonc_get_error_position(rc), rp_jsonc_get_error_code(rc), rp_jsonc_get_error_string(rc));
 	else {
 		value = NULL;
 		printf("  SUCCESS");
@@ -278,8 +279,8 @@ void c(const char *sx, const char *sy, int e, int c)
 	jx = json_tokener_parse(sx);
 	jy = json_tokener_parse(sy);
 
-	re = wrap_json_cmp(jx, jy);
-	rc = wrap_json_contains(jx, jy);
+	re = rp_jsonc_cmp(jx, jy);
+	rc = rp_jsonc_contains(jx, jy);
 
 	printf("compare(%s)(%s)\n", sx, sy);
 	printf("   -> %d / %d\n", re, rc);
