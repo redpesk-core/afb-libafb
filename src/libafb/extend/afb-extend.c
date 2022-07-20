@@ -28,12 +28,12 @@
 #include <string.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 #include <rp-utils/rp-jsonc.h>
 
 #include "afb-extension.h"
 #include "afb-extend.h"
 
-#include "sys/verbose.h"
 #include "sys/x-dynlib.h"
 #include "sys/x-errno.h"
 #include "core/afb-v4-itf.h"
@@ -100,14 +100,14 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 	const char *name;
 
 	/* try to load */
-	DEBUG("Trying extension %s", path);
+	RP_DEBUG("Trying extension %s", path);
 	rc = x_dynlib_open(path, &handle, 1, 0);
 	if (rc < 0) {
 		if (failstops) {
-			ERROR("Unloadable extension %s: %s", path, x_dynlib_error(&handle));
+			RP_ERROR("Unloadable extension %s: %s", path, x_dynlib_error(&handle));
 			return rc;
 		}
-		DEBUG("can't load extension %s", path);
+		RP_DEBUG("can't load extension %s", path);
 		return 0;
 	}
 
@@ -115,35 +115,35 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 	rc = x_dynlib_symbol(&handle, MANIFEST, (void**)&manifest);
 	if (rc < 0) {
 		if (failstops) {
-			ERROR("Not an extension %s: %s", path, x_dynlib_error(&handle));
+			RP_ERROR("Not an extension %s: %s", path, x_dynlib_error(&handle));
 		}
 		else {
-			DEBUG("Not an extension %s", path);
+			RP_DEBUG("Not an extension %s", path);
 			rc = 0;
 		}
 	} else if (!manifest || manifest->magic != AFB_EXTENSION_MAGIC
 			|| !manifest->name) {
-		ERROR("Manifest error of extension %s", path);
+		RP_ERROR("Manifest error of extension %s", path);
 		rc = X_EINVAL;
 	} else if (manifest->version != 1) {
-		ERROR("Unsupported version %d of extension %s: %s", manifest->version, manifest->name, path);
+		RP_ERROR("Unsupported version %d of extension %s: %s", manifest->version, manifest->name, path);
 		rc = X_ENOTSUP;
 	} else {
 		name = uid == NULL ? manifest->name : uid;
 		if (search_extension_uid(name) != NULL) {
-			ERROR("Duplicated extension name %s", name);
+			RP_ERROR("Duplicated extension name %s", name);
 			rc = X_EEXIST;
 		} else {
 			afb_v4_connect_dynlib(&handle, &infov4, 0);
 			if (infov4.root || infov4.desc || infov4.mainctl) {
-				ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
-				ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
+				RP_ERROR("CAUTION!!! Binding in extension must be compiled without global symbols!");
+				RP_ERROR("  ...  Please recompile extension %s (%s)", manifest->name, path);
 				if (infov4.root)
-					ERROR(" ... with AFB_BINDING_NO_ROOT defined (or option -D)");
+					RP_ERROR(" ... with AFB_BINDING_NO_ROOT defined (or option -D)");
 				if (infov4.desc)
-					ERROR(" ... without defining a main structure (afbBindingRoot or afbBindingV4)");
+					RP_ERROR(" ... without defining a main structure (afbBindingRoot or afbBindingV4)");
 				if (infov4.mainctl)
-					ERROR(" ... without defining an entry function (afbBindingEntry or afbBindingV4Entry)");
+					RP_ERROR(" ... without defining an entry function (afbBindingEntry or afbBindingV4Entry)");
 				rc = X_ENOTSUP;
 			}
 			else {
@@ -154,7 +154,7 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 				if (!ext)
 					rc = X_ENOMEM;
 				else {
-					NOTICE("Adding extension %s of %s", name, path);
+					RP_NOTICE("Adding extension %s of %s", name, path);
 					ext->next = 0;
 					ext->handle = handle;
 					ext->manifest = manifest;
@@ -182,7 +182,7 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 	x_dynlib_close(&handle);
 	if (!failstops && rc < 0) {
 		if (rc < 0)
-			NOTICE("Ignoring extension %s", path);
+			RP_NOTICE("Ignoring extension %s", path);
 		rc = 0;
 	}
 	return rc;
@@ -210,7 +210,7 @@ static void load_extension_cb(void *closure, struct json_object *value)
 		json_object_object_get_ex(value, "config", &config);
 	}
 	else {
-		ERROR("Invalid extension specifier %s", json_object_get_string(value));
+		RP_ERROR("Invalid extension specifier %s", json_object_get_string(value));
 		pathstr = NULL;
 	}
 	if (pathstr != NULL) {
@@ -251,7 +251,7 @@ static int filterdirs(void *closure, struct path_search_item *item)
 {
 	int result = item->name[0] != '.';
 	if (result)
-		INFO("Scanning dir=[%s] for extensions", item->path);
+		RP_INFO("Scanning dir=[%s] for extensions", item->path);
 	return result;
 }
 

@@ -46,6 +46,7 @@ typedef int mhd_result_t;
 #else
 typedef enum MHD_Result mhd_result_t;
 #endif
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-sched.h"
 #include "core/afb-ev-mgr.h"
@@ -58,8 +59,6 @@ typedef enum MHD_Result mhd_result_t;
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
 #include "sys/x-socket.h"
-
-#include "sys/verbose.h"
 
 #define JSON_CONTENT  "application/json"
 #define FORM_CONTENT  MHD_HTTP_POST_ENCODING_MULTIPART_FORMDATA
@@ -145,7 +144,7 @@ static mhd_result_t access_handler(
 		method = get_method(methodstr);
 		method &= afb_method_get | afb_method_post;
 		if (method == afb_method_none) {
-			WARNING("Unsupported HTTP operation %s", methodstr);
+			RP_WARNING("Unsupported HTTP operation %s", methodstr);
 			reply_error(connection, MHD_HTTP_BAD_REQUEST);
 			return MHD_YES;
 		}
@@ -153,7 +152,7 @@ static mhd_result_t access_handler(
 		/* create the request */
 		hreq = afb_hreq_create();
 		if (hreq == NULL) {
-			ERROR("Can't allocate 'hreq'");
+			RP_ERROR("Can't allocate 'hreq'");
 			reply_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR);
 			return MHD_YES;
 		}
@@ -178,19 +177,19 @@ static mhd_result_t access_handler(
 			} else if (strcasestr(type, FORM_CONTENT) != NULL) {
 				hreq->postform = MHD_create_post_processor (connection, 65500, postproc, hreq);
 				if (hreq->postform == NULL) {
-					ERROR("Can't create POST processor");
+					RP_ERROR("Can't create POST processor");
 					afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 				}
 				return MHD_YES;
 			} else if (strcasestr(type, JSON_CONTENT) != NULL) {
 				hreq->tokener = json_tokener_new();
 				if (hreq->tokener == NULL) {
-					ERROR("Can't create tokener for POST");
+					RP_ERROR("Can't create tokener for POST");
 					afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 				}
 				return MHD_YES;
                         } else {
-				WARNING("Unsupported media type %s", type);
+				RP_WARNING("Unsupported media type %s", type);
 				afb_hreq_reply_error(hreq, MHD_HTTP_UNSUPPORTED_MEDIA_TYPE);
 				return MHD_YES;
 			}
@@ -201,7 +200,7 @@ static mhd_result_t access_handler(
 	if (*upload_data_size) {
 		if (hreq->postform != NULL) {
 			if (!MHD_post_process (hreq->postform, upload_data, *upload_data_size)) {
-				ERROR("error in POST processor");
+				RP_ERROR("error in POST processor");
 				afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 				return MHD_YES;
 			}
@@ -213,7 +212,7 @@ static mhd_result_t access_handler(
 				jerr = json_tokener_get_error(hreq->tokener);
 			}
 			if (jerr != json_tokener_success) {
-				ERROR("error in POST json: %s", json_tokener_error_desc(jerr));
+				RP_ERROR("error in POST json: %s", json_tokener_error_desc(jerr));
 				afb_hreq_reply_error(hreq, MHD_HTTP_BAD_REQUEST);
 				return MHD_YES;
 			}
@@ -227,7 +226,7 @@ static mhd_result_t access_handler(
 		rc = MHD_destroy_post_processor(hreq->postform);
 		hreq->postform = NULL;
 		if (rc == MHD_NO) {
-			ERROR("error detected in POST processing");
+			RP_ERROR("error detected in POST processing");
 			afb_hreq_reply_error(hreq, MHD_HTTP_BAD_REQUEST);
 			return MHD_YES;
 		}
@@ -272,7 +271,7 @@ static mhd_result_t access_handler(
 	}
 
 	/* no handler */
-	NOTICE("Unhandled request to %s", hreq->url);
+	RP_NOTICE("Unhandled request to %s", hreq->url);
 	afb_hreq_reply_error(hreq, MHD_HTTP_NOT_FOUND);
 	return MHD_YES;
 }
@@ -431,7 +430,7 @@ int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, con
 
 	root = locale_root_create_at(dirfd, alias);
 	if (root == NULL) {
-		ERROR("can't connect to directory %s: %m", alias);
+		RP_ERROR("can't connect to directory %s: %m", alias);
 		rc = 0;
 	} else {
 		rc = afb_hsrv_add_alias_root(hsrv, prefix, root, priority, relax);
@@ -455,14 +454,14 @@ int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const cha
 		if (rc > 0 && rc < (int)(sizeof buffer))
 			target = buffer;
 		else {
-			ERROR("can't make path %s/%s", basepath, alias);
+			RP_ERROR("can't make path %s/%s", basepath, alias);
 			target = NULL;
 		}
 	}
 	if (target != NULL) {
 		root = locale_root_create_path(target);
 		if (root == NULL) {
-			ERROR("can't connect to directory %s: %m", target);
+			RP_ERROR("can't connect to directory %s: %m", target);
 		} else {
 			rc = afb_hsrv_add_alias_root(hsrv, prefix, root, priority, relax);
 			locale_root_unref(root);
@@ -545,7 +544,7 @@ int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix, const 
 			}
 		}
 	}
-	ERROR("can't create alias of %s to dirname %s", prefix, dirname);
+	RP_ERROR("can't create alias of %s to dirname %s", prefix, dirname);
 	return rc;
 }
 
@@ -579,7 +578,7 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 	key_or_end = MHD_OPTION_END;
 	if (cert || key) {
 		if (!cert || !key) {
-			ERROR("hsrv start, invalid invalid tls arguments");
+			RP_ERROR("hsrv start, invalid invalid tls arguments");
 			return 0;
 		}
 		flags |= MHD_USE_TLS;
@@ -601,7 +600,7 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 			MHD_OPTION_END);	/* options-end */
 
 	if (httpd == NULL) {
-		ERROR("hsrv start, can't setup MHD");
+		RP_ERROR("hsrv start, can't setup MHD");
 		return 0;
 	}
 
@@ -609,14 +608,14 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 	info = MHD_get_daemon_info(httpd, MHD_DAEMON_INFO_EPOLL_FD);
 	if (info == NULL) {
 		MHD_stop_daemon(httpd);
-		ERROR("hsrv start, no pollfd");
+		RP_ERROR("hsrv start, no pollfd");
 		return 0;
 	}
 
 	/* record it to the main loop */
 	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EPOLLIN, listen_callback, hsrv, 0, 0) < 0) {
 		MHD_stop_daemon(httpd);
-		ERROR("connection to events for httpd failed");
+		RP_ERROR("connection to events for httpd failed");
 		return 0;
 	}
 
@@ -667,18 +666,18 @@ static void hsrv_itf_callback(struct ev_fd *efd, int fd, uint32_t revents, void 
 	socklen_t lenaddr;
 
 	if ((revents & EPOLLHUP) != 0) {
-		ERROR("disconnection for server %s: %m", itf->uri);
+		RP_ERROR("disconnection for server %s: %m", itf->uri);
 		hsrv_itf_connect(itf);
 		ev_fd_unref(efd);
 	} else if ((revents & EPOLLIN) != 0) {
 		lenaddr = (socklen_t)sizeof addr;
 		fdc = accept(fd, &addr, &lenaddr);
 		if (fdc < 0)
-			ERROR("can't accept connection to %s: %m", itf->uri);
+			RP_ERROR("can't accept connection to %s: %m", itf->uri);
 		else {
 			sts = MHD_add_connection(itf->hsrv->httpd, fdc, &addr, lenaddr);
 			if (sts != MHD_YES) {
-				ERROR("can't add incoming connection to %s: %m", itf->uri);
+				RP_ERROR("can't add incoming connection to %s: %m", itf->uri);
 				close(fdc);
 			}
 		}
@@ -694,12 +693,12 @@ static int hsrv_itf_connect(struct hsrv_itf *itf)
 
 	fd = afb_socket_open_scheme(itf->uri, 1, "tcp:");
 	if (fd < 0) {
-		ERROR("can't create socket %s", itf->uri);
+		RP_ERROR("can't create socket %s", itf->uri);
 		return -errno;
 	}
 	rc = afb_ev_mgr_add_fd(&itf->efd, fd, EPOLLIN, hsrv_itf_callback, itf, 0, 1);
 	if (rc < 0) {
-		ERROR("can't connect socket %s", itf->uri);
+		RP_ERROR("can't connect socket %s", itf->uri);
 		return rc;
 	}
 	memset(&addr, 0, sizeof addr);
@@ -711,12 +710,12 @@ static int hsrv_itf_connect(struct hsrv_itf *itf)
 	} else {
 		rgni = getnameinfo(&addr, lenaddr, hbuf, sizeof hbuf, sbuf, sizeof sbuf, NI_NUMERICSERV);
 		if (rgni != 0) {
-			ERROR("getnameinfo returned %d: %s", rgni, gai_strerror(rgni));
+			RP_ERROR("getnameinfo returned %d: %s", rgni, gai_strerror(rgni));
 			hbuf[0] = sbuf[0] = '?';
 			hbuf[1] = sbuf[1] = 0;
 		}
 	}
-	NOTICE("Listening interface %s:%s", hbuf, sbuf);
+	RP_NOTICE("Listening interface %s:%s", hbuf, sbuf);
 	return 0;
 }
 

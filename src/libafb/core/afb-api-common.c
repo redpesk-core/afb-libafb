@@ -30,6 +30,7 @@
 #include <ctype.h>
 
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #define ISSPACE(x) (isspace((int)(unsigned char)(x)))
 
@@ -49,7 +50,6 @@
 #include "core/afb-string-mode.h"
 
 #include "core/afb-sched.h"
-#include "sys/verbose.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
 #include "sys/x-realpath.h"
@@ -205,9 +205,9 @@ afb_api_common_vverbose(
 	char *p;
 
 	if (!fmt || vasprintf(&p, fmt, args) < 0)
-		vverbose(level, file, line, function, fmt, args);
+		rp_vverbose(level, file, line, function, fmt, args);
 	else {
-		verbose(level, file, line, function, (verbose_is_colorized() == 0 ? "[API %s] %s" : COLOR_API "[API %s]" COLOR_DEFAULT " %s"), comapi->name, p);
+		rp_verbose(level, file, line, function, (rp_verbose_is_colorized() == 0 ? "[API %s] %s" : RP_VERBOSE_COLOR_API "[API %s]" RP_VERBOSE_COLOR_DEFAULT " %s"), comapi->name, p);
 		free(p);
 	}
 }
@@ -220,7 +220,7 @@ afb_api_common_new_event(
 ) {
 	/* check daemon state */
 	if (comapi->state == Api_State_Pre_Init) {
-		ERROR("[API %s] Bad call to 'afb_daemon_event_make(%s)', must not be in PreInit", comapi->name, name);
+		RP_ERROR("[API %s] Bad call to 'afb_daemon_event_make(%s)', must not be in PreInit", comapi->name, name);
 		*evt = NULL;
 		return X_EINVAL;
 	}
@@ -239,7 +239,7 @@ afb_api_common_event_broadcast(
 
 	/* check daemon state */
 	if (comapi->state == Api_State_Pre_Init) {
-		ERROR("[API %s] Bad call to 'afb_daemon_event_broadcast(%s)', must not be in PreInit",
+		RP_ERROR("[API %s] Bad call to 'afb_daemon_event_broadcast(%s)', must not be in PreInit",
 			comapi->name, name);
 		return X_EINVAL;
 	}
@@ -281,10 +281,10 @@ afb_api_common_require_api(
 	/* emit a warning about unexpected require in preinit */
 	if (comapi->state == Api_State_Pre_Init && initialized) {
 		if (initialized) {
-			ERROR("[API %s] requiring initialized apis in pre-init is forbiden", comapi->name);
+			RP_ERROR("[API %s] requiring initialized apis in pre-init is forbiden", comapi->name);
 			return X_EINVAL;
 		}
-		WARNING("[API %s] requiring apis pre-init may lead to unexpected result", comapi->name);
+		RP_WARNING("[API %s] requiring apis pre-init may lead to unexpected result", comapi->name);
 	}
 
 	/* scan the names in a local copy */
@@ -308,12 +308,12 @@ afb_api_common_require_api(
 		if (comapi->state == Api_State_Pre_Init) {
 			rc2 = afb_apiset_require(comapi->declare_set, comapi->name, comapi->call_set, iter);
 			if (rc2 < 0) {
-				ERROR("[API %s] requiring api %s in pre-init failed", comapi->name, iter);
+				RP_ERROR("[API %s] requiring api %s in pre-init failed", comapi->name, iter);
 			}
 		} else {
 			rc2 = afb_apiset_get_api(comapi->call_set, iter, 1, initialized, NULL);
 			if (rc2 < 0) {
-				ERROR("[API %s] requiring api %s%s failed", comapi->name,
+				RP_ERROR("[API %s] requiring api %s%s failed", comapi->name,
 					 iter, initialized ? " initialized" : "");
 			}
 		}
@@ -332,12 +332,12 @@ afb_api_common_add_alias(
 	const char *aliasname
 ) {
 	if (!afb_apiname_is_valid(aliasname)) {
-		ERROR("[API %s] Can't add alias to %s: bad API name", comapi->name, aliasname);
+		RP_ERROR("[API %s] Can't add alias to %s: bad API name", comapi->name, aliasname);
 		return X_EINVAL;
 	}
 	if (!apiname)
 		apiname = comapi->name;
-	NOTICE("[API %s] aliasing [API %s] to [API %s]", comapi->name, apiname, aliasname);
+	RP_NOTICE("[API %s] aliasing [API %s] to [API %s]", comapi->name, apiname, aliasname);
 	return afb_apiset_add_alias(comapi->declare_set, apiname, aliasname);
 }
 
@@ -713,12 +713,12 @@ afb_api_common_event_handler_add(
 		return 0;
 
 	if (rc == X_EEXIST) {
-		ERROR("[API %s] event handler %s already exists", comapi->name, pattern);
+		RP_ERROR("[API %s] event handler %s already exists", comapi->name, pattern);
 		return rc;
 	}
 
 oom_error:
-	ERROR("[API %s] can't allocate event handler %s", comapi->name, pattern);
+	RP_ERROR("[API %s] can't allocate event handler %s", comapi->name, pattern);
 	return X_ENOMEM;
 }
 
@@ -732,7 +732,7 @@ afb_api_common_event_handler_del(
 	&& !globset_del(comapi->event_handlers, pattern, closure))
 		return 0;
 
-	ERROR("[API %s] event handler %s not found", comapi->name, pattern);
+	RP_ERROR("[API %s] event handler %s not found", comapi->name, pattern);
 	return X_ENOENT;
 }
 
@@ -891,7 +891,7 @@ afb_api_common_start(
 
 	case Api_State_Init:
 		/* starting in progress: it is an error */
-		ERROR("Service of API %s required started while starting", comapi->name);
+		RP_ERROR("Service of API %s required started while starting", comapi->name);
 		return X_EBUSY;
 
 	default:
@@ -916,7 +916,7 @@ afb_api_common_start(
 
 	if (start.rc < 0) {
 		/* initialisation error */
-		ERROR("Initialisation of service API %s failed (%d): %s", comapi->name, start.rc, strerror(-start.rc));
+		RP_ERROR("Initialisation of service API %s failed (%d): %s", comapi->name, start.rc, strerror(-start.rc));
 		comapi->state = Api_State_Error;
 	}
 	else {

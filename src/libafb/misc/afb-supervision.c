@@ -34,6 +34,7 @@
 
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #define AFB_BINDING_VERSION 3
 #define AFB_BINDING_NO_ROOT
@@ -52,7 +53,6 @@
 #include "misc/afb-debug.h"
 #endif
 #include "core/afb-error-text.h"
-#include "sys/verbose.h"
 #include "core/afb-sched.h"
 #include "sys/x-socket.h"
 #include "sys/x-mutex.h"
@@ -132,7 +132,7 @@ static void disconnect_supervisor()
 {
 	struct afb_stub_ws *s;
 
-	INFO("Disconnecting supervision");
+	RP_INFO("Disconnecting supervision");
 	s = __atomic_exchange_n(&supervisor, NULL, __ATOMIC_RELAXED);
 	if (s)
 		afb_stub_ws_unref(s);
@@ -147,7 +147,7 @@ static void disconnect_supervisor()
 static void on_supervisor_hangup(struct afb_stub_ws *s)
 {
 	if (s && s == supervisor) {
-		NOTICE("disconnecting from supervisor");
+		RP_NOTICE("disconnecting from supervisor");
 		disconnect_supervisor();
 	}
 }
@@ -168,44 +168,44 @@ static void try_connect_supervisor()
 
 	/* check existing path */
 	if (supervisor_socket_path[0] != '@' && access(supervisor_socket_path, F_OK)) {
-		INFO("Can't acces socket path %s: %m", supervisor_socket_path);
+		RP_INFO("Can't acces socket path %s: %m", supervisor_socket_path);
 		goto end;
 	}
 
 	/* socket connection */
 	fd = open_supervisor_socket(supervisor_socket_path);
 	if (fd < 0) {
-		INFO("Can't connect supervision socket to %s: %m", supervisor_socket_path);
+		RP_INFO("Can't connect supervision socket to %s: %m", supervisor_socket_path);
 		goto end;
 	}
 
 	/* negotiation */
-	NOTICE("connecting to supervisor %s", supervisor_socket_path);
+	RP_NOTICE("connecting to supervisor %s", supervisor_socket_path);
 	do { srd = read(fd, &initiator, sizeof initiator); } while(srd < 0 && errno == EINTR);
 	if (srd < 0) {
-		ERROR("Can't read supervisor %s: %m", supervisor_socket_path);
+		RP_ERROR("Can't read supervisor %s: %m", supervisor_socket_path);
 		goto end2;
 	}
 	if ((size_t)srd != sizeof initiator) {
-		ERROR("When reading supervisor %s: %m", supervisor_socket_path);
+		RP_ERROR("When reading supervisor %s: %m", supervisor_socket_path);
 		goto end2;
 	}
 	if (strnlen(initiator.interface, sizeof initiator.interface) == sizeof initiator.interface) {
-		ERROR("Bad interface of supervisor %s", supervisor_socket_path);
+		RP_ERROR("Bad interface of supervisor %s", supervisor_socket_path);
 		goto end2;
 	}
 	if (strcmp(initiator.interface, AFB_SUPERVISOR_INTERFACE_1)) {
-		ERROR("Unknown interface %s for supervisor %s", initiator.interface, supervisor_socket_path);
+		RP_ERROR("Unknown interface %s for supervisor %s", initiator.interface, supervisor_socket_path);
 		goto end2;
 	}
 	if (strnlen(initiator.extra, sizeof initiator.extra) == sizeof initiator.extra) {
-		ERROR("Bad extra of supervisor %s", supervisor_socket_path);
+		RP_ERROR("Bad extra of supervisor %s", supervisor_socket_path);
 		goto end2;
 	}
 
 	/* interprets extras */
 	if (!strcmp(initiator.extra, "CLOSE")) {
-		NOTICE("Supervisor asks to CLOSE");
+		RP_NOTICE("Supervisor asks to CLOSE");
 		goto end2;
 	}
 #if WITH_AFB_DEBUG
@@ -220,7 +220,7 @@ static void try_connect_supervisor()
 	/* make the supervisor link */
 	supervisor = afb_stub_ws_create_server(fd, 1, supervision_apiname, supervision_apiset);
 	if (!supervisor) {
-		ERROR("Creation of supervisor failed: %m");
+		RP_ERROR("Creation of supervisor failed: %m");
 		goto end;
 	}
 	afb_stub_ws_set_on_hangup(supervisor, on_supervisor_hangup);
@@ -236,13 +236,13 @@ end:
 
 static void try_connect_supervisor_job(int signum, void *args)
 {
-	INFO("Try to connect supervisor after SIGHUP");
+	RP_INFO("Try to connect supervisor after SIGHUP");
 	try_connect_supervisor();
 }
 
 static void on_sighup(int signum)
 {
-	INFO("Supervision received a SIGHUP");
+	RP_INFO("Supervision received a SIGHUP");
 	afb_sched_post_job(NULL, 0, 0, try_connect_supervisor_job, NULL, Afb_Sched_Mode_Normal);
 }
 
@@ -261,7 +261,7 @@ int afb_supervision_init(struct afb_apiset *apiset, struct json_object *config)
 	/* create the apiset */
 	supervision_apiset = afb_apiset_create(supervision_apiname, 0);
 	if (!supervision_apiset) {
-		ERROR("Can't create supervision's apiset");
+		RP_ERROR("Can't create supervision's apiset");
 		return -1;
 	}
 
@@ -269,7 +269,7 @@ int afb_supervision_init(struct afb_apiset *apiset, struct json_object *config)
 	rc = afb_apiset_add(supervision_apiset, supervision_apiname,
 			(struct afb_api_item){ .itf = &supervision_api_itf, .closure = NULL});
 	if (rc < 0) {
-		ERROR("Can't create supervision's apiset: %m");
+		RP_ERROR("Can't create supervision's apiset: %m");
 		afb_apiset_unref(supervision_apiset);
 		supervision_apiset = NULL;
 		return rc;
@@ -284,7 +284,7 @@ int afb_supervision_init(struct afb_apiset *apiset, struct json_object *config)
 	sa.sa_handler = on_sighup;
 	rc = sigaction(SIGHUP, &sa, NULL);
 	if (rc < 0)
-		ERROR("Can't connect supervision to SIGHUP: %m");
+		RP_ERROR("Can't connect supervision to SIGHUP: %m");
 
 	/* connect to supervision */
 	try_connect_supervisor();
@@ -337,7 +337,7 @@ static void process_cb(void *closure, struct json_object *args)
 		i = 0;
 		if (rp_jsonc_unpack(args, "i", &i))
 			rp_jsonc_unpack(args, "{si}", "code", &i);
-		ERROR("exiting from supervision with code %d -> %d", i, i & 127);
+		RP_ERROR("exiting from supervision with code %d -> %d", i, i & 127);
 		exit(i & 127);
 		break;
 	case Sclose:

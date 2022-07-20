@@ -33,7 +33,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "sys/verbose.h"
+#include <rp-utils/rp-verbose.h>
+
 #include "apis/afb-api-ws.h"
 #include "apis/afb-api-so.h"
 #include "core/afb-apiset.h"
@@ -72,7 +73,7 @@ static int add(const char *path, struct afb_apiset *declare_set, struct afb_apis
 	/* create a sub-apiset */
 	ownset = afb_apiset_create_subset_last(declare_set, path, 3600);
 	if (!ownset) {
-		ERROR("Can't create apiset autoset-ws %s", path);
+		RP_ERROR("Can't create apiset autoset-ws %s", path);
 		return X_ENOMEM;
 	}
 
@@ -138,7 +139,7 @@ static int create_any(const char *path, struct afb_apiset *declare_set, struct a
 			rc = afb_api_ws_add_client(sockname, declare_set, call_set, 0);
 			break;
 		default:
-			NOTICE("Unexpected autoset entry: %s", path);
+			RP_NOTICE("Unexpected autoset entry: %s", path);
 			rc = -errno;
 			break;
 		}

@@ -25,6 +25,8 @@
 #include <string.h>
 #include <time.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
 #include "sys/x-thread.h"
@@ -32,7 +34,6 @@
 
 #include "core/afb-sig-monitor.h"
 #include "core/afb-threads.h"
-#include "sys/verbose.h"
 
 #define DEBUGGING 0
 #if DEBUGGING
@@ -225,7 +226,7 @@ static int start_thread(struct thread *thr)
 	x_mutex_unlock(&mutex);
 	if (rc < 0) {
 		free(thr);
-		CRITICAL("not able to start thread: %s", strerror(-rc));
+		RP_CRITICAL("not able to start thread: %s", strerror(-rc));
 	}
 	return rc;
 }

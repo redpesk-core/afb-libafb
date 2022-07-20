@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
@@ -64,7 +65,6 @@ json_object_to_json_string_length(
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
-#include "sys/verbose.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
 #include "sys/x-errno.h"
@@ -1493,7 +1493,7 @@ static void incall_reply_cb(struct afb_req_common *comreq, int status, unsigned 
 	struct afb_stub_rpc *stub = req->stub;
 	int rc = send_call_reply(stub, status, nreplies, replies, req->callid);
 	if (rc < 0)
-		ERROR("error while sending reply");
+		RP_ERROR("error while sending reply");
 	emit(stub);
 }
 
@@ -1507,7 +1507,7 @@ static int incall_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *ev
 	if (rc >= 0)
 		rc = send_event_subscribe(stub, req->callid, afb_evt_id(evt));
 	if (rc < 0)
-		ERROR("error while subscribing event");
+		RP_ERROR("error while subscribing event");
 	emit(stub);
 	return rc;
 }
@@ -1518,7 +1518,7 @@ static int incall_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *
 	struct afb_stub_rpc *stub = req->stub;
 	int rc = send_event_unsubscribe(stub, req->callid, afb_evt_id(evt));
 	if (rc < 0)
-		ERROR("error while unsubscribing event");
+		RP_ERROR("error while unsubscribing event");
 	emit(stub);
 	return rc;
 }
@@ -1663,12 +1663,12 @@ static int add_session(struct afb_stub_rpc *stub, uint16_t sessionid, const char
 
 	rc = afb_session_get(&session, sessionstr, AFB_SESSION_TIMEOUT_DEFAULT, &created);
 	if (rc < 0)
-		ERROR("can't create session %s", sessionstr);
+		RP_ERROR("can't create session %s", sessionstr);
 	else {
 		afb_session_set_autoclose(session, 1);
 		rc = u16id2ptr_add(&stub->session_proxies, sessionid, session);
 		if (rc < 0) {
-			ERROR("can't record session %s", sessionstr);
+			RP_ERROR("can't record session %s", sessionstr);
 			afb_session_unref(session);
 			session = NULL;
 		}
@@ -1747,7 +1747,7 @@ static int receive_call_reply(
 
 	if (!outcall) {
 		/* unexpected reply */
-		ERROR("no call of id %d for the reply", (int)callid);
+		RP_ERROR("no call of id %d for the reply", (int)callid);
 		rc = X_EPROTO;
 	}
 	else {
@@ -1789,11 +1789,11 @@ static int receive_token_create(struct afb_stub_rpc *stub, uint16_t tokenid, con
 
 	rc = afb_token_get(&token, tokenstr);
 	if (rc < 0)
-		ERROR("can't create token %s, out of memory", tokenstr);
+		RP_ERROR("can't create token %s, out of memory", tokenstr);
 	else {
 		rc = u16id2ptr_add(&stub->token_proxies, tokenid, token);
 		if (rc < 0) {
-			ERROR("can't record token %s", tokenstr);
+			RP_ERROR("can't record token %s", tokenstr);
 			afb_token_unref(token);
 		}
 	}
@@ -1819,11 +1819,11 @@ static int receive_event_create(struct afb_stub_rpc *stub, uint16_t eventid, con
 	/* check conflicts */
 	rc = afb_evt_create(&event, event_name);
 	if (rc < 0)
-		ERROR("can't create event %s, out of memory", event_name);
+		RP_ERROR("can't create event %s, out of memory", event_name);
 	else {
 		rc = u16id2ptr_add(&stub->event_proxies, eventid, event);
 		if (rc < 0) {
-			ERROR("can't record event %s", event_name);
+			RP_ERROR("can't record event %s", event_name);
 			afb_evt_unref(event);
 		}
 	}
@@ -1855,15 +1855,15 @@ static int receive_event_subscription(struct afb_stub_rpc *stub, uint16_t callid
 
 	outcall = outcall_at(stub, callid);
 	if (outcall == NULL || outcall->type != outcall_type_call) {
-		ERROR("can't %s, no call of id %d", _unsubscribe_+sub, (int)callid);
+		RP_ERROR("can't %s, no call of id %d", _unsubscribe_+sub, (int)callid);
 		rc = X_EPROTO;
 	}
 	else {
 		rc = u16id2ptr_get(stub->event_proxies, eventid, (void**)&event);
 		if (rc < 0 || !event)
-			ERROR("can't %s, no event of id %d", _unsubscribe_+sub, (int)callid);
+			RP_ERROR("can't %s, no event of id %d", _unsubscribe_+sub, (int)callid);
 		else if (afb_req_common_subscribe_hookable(outcall->item.comreq, event) < 0)
-			ERROR("can't  %s: %m", _unsubscribe_+sub);
+			RP_ERROR("can't  %s: %m", _unsubscribe_+sub);
 	}
 	return rc;
 }
@@ -1889,7 +1889,7 @@ static int receive_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsig
 	if (rc >= 0 && evt)
 		rc = afb_evt_push_hookable(evt, ndata, data);
 	else
-		ERROR("unreadable push event");
+		RP_ERROR("unreadable push event");
 	if (rc <= 0)
 		send_event_unexpected(stub, eventid);
 	return rc;
@@ -1923,12 +1923,12 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 	int rc;
 	struct outcall *outcall = outcall_at(stub, callid);
 	if (outcall == NULL) {
-		ERROR("no describe of id %d", (int)callid);
+		RP_ERROR("no describe of id %d", (int)callid);
 		rc = X_EPROTO;
 	}
 	else {
 		if (outcall->type != outcall_type_describe) {
-			ERROR("describe mismatch for id %d", (int)callid);
+			RP_ERROR("describe mismatch for id %d", (int)callid);
 		rc = X_EPROTO;
 		}
 		else {
@@ -1974,14 +1974,14 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	struct indesc *indesc = indesc_get(stub, callid);
 
 	if (indesc == NULL) {
-		ERROR("can't reply describe request %d", (int)callid);
+		RP_ERROR("can't reply describe request %d", (int)callid);
 		reply_description(stub, NULL, callid);
 		rc = X_ENOMEM;
 	}
 	else {
 		rc = afb_sched_post_job(NULL, 0, 0, describe_job_cb, indesc, Afb_Sched_Mode_Normal);
 		if (rc < 0) {
-			ERROR("can't schedule describe request %d", (int)callid);
+			RP_ERROR("can't schedule describe request %d", (int)callid);
 			indesc_reply_description(indesc, NULL);
 		}
 	}

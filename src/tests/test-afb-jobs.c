@@ -33,9 +33,10 @@
 #include <check.h>
 #include <signal.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-jobs.h"
 #include "core/afb-sig-monitor.h"
-#include "sys/verbose.h"
 
 /*********************************************************************/
 

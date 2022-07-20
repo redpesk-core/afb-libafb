@@ -27,7 +27,6 @@
 #include "sys/process-name.h"
 #include "sys/subpath.h"
 #include "sys/systemd.h"
-#include "sys/verbose.h"
 #include "sys/x-buf.h"
 #include "sys/x-cond.h"
 #include "sys/x-dynlib.h"

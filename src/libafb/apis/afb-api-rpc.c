@@ -33,6 +33,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "apis/afb-api-rpc.h"
@@ -43,7 +45,6 @@
 #include "core/afb-ev-mgr.h"
 #include "wsapi/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
-#include "sys/verbose.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 #include "sys/x-uio.h"
@@ -87,7 +88,7 @@ static const char *prefix_ws_remove(const char *uri)
 static void client_on_hangup(struct afb_stub_rpc *client)
 {
 	const char *apiname = afb_stub_rpc_apiname(client);
-	WARNING("Disconnected of API %s", apiname);
+	RP_WARNING("Disconnected of API %s", apiname);
 	afb_monitor_api_disconnected(apiname);
 }
 
@@ -97,7 +98,7 @@ static int reopen_client(void *closure)
 	const char *apiname = afb_socket_api(uri);
 	int fd = afb_socket_open(uri, 0);
 	if (fd >= 0)
-		INFO("Reconnected to API %s", apiname);
+		RP_INFO("Reconnected to API %s", apiname);
 	return fd;
 }
 #endif
@@ -223,7 +224,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	turi = prefix_ws_remove(uri);
 	api = afb_socket_api(turi);
 	if (api == NULL || !afb_apiname_is_valid(api)) {
-		ERROR("invalid (too long) rpc client uri %s", uri);
+		RP_ERROR("invalid (too long) rpc client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
@@ -236,7 +237,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 		stub = afb_stub_rpc_create(api, call_set);
 		if (!stub) {
 			close(fd);
-			ERROR("can't create client rpc service to %s", uri);
+			RP_ERROR("can't create client rpc service to %s", uri);
 			rc = X_ENOMEM;
 		} else {
 			if (uri == turi) {
@@ -258,14 +259,14 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 				}
 			}
 			if (rc < 0)
-				ERROR("can't setup client rpc service to %s", uri);
+				RP_ERROR("can't setup client rpc service to %s", uri);
 			else {
 				rc = afb_stub_rpc_client_add(stub, declare_set);
 				if (rc >= 0) {
 					afb_stub_rpc_offer(stub);
 					return 0;
 				}
-				ERROR("can't add the client to the apiset for service %s", uri);
+				RP_ERROR("can't add the client to the apiset for service %s", uri);
 			}
 			afb_stub_rpc_unref(stub);
 		}
@@ -292,7 +293,7 @@ int afb_api_rpc_add_client_weak(const char *uri, struct afb_apiset *declare_set,
 static void server_on_hangup(struct afb_stub_rpc *server)
 {
 	const char *apiname = afb_stub_rpc_apiname(server);
-	INFO("Disconnection of client of API %s", apiname);
+	RP_INFO("Disconnection of client of API %s", apiname);
 	afb_stub_rpc_unref(server);
 }
 #endif
@@ -308,13 +309,13 @@ static void server_accept(struct server *server, int fd)
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
 	if (fdc < 0) {
-		ERROR("can't accept connection to %s: %m", server->uri);
+		RP_ERROR("can't accept connection to %s: %m", server->uri);
 	} else {
 		rc = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 		stub = afb_stub_rpc_create(&server->uri[server->offapi], server->apiset);
 		if (!stub) {
-			ERROR("can't serve accepted connection to %s", server->uri);
+			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
 		}
 		else {
@@ -347,7 +348,7 @@ static void server_accept(struct server *server, int fd)
 				}
 			}
 			if (rc < 0) {
-				ERROR("can't serve connection to %s", server->uri);
+				RP_ERROR("can't serve connection to %s", server->uri);
 				afb_stub_rpc_unref(stub);
 			}
 		}
@@ -382,14 +383,14 @@ static int server_connect(struct server *server)
 	/* request the service object name */
 	rc = afb_socket_open(prefix_ws_remove(server->uri), 1);
 	if (rc < 0)
-		ERROR("can't create socket %s", server->uri);
+		RP_ERROR("can't create socket %s", server->uri);
 	else {
 		/* listen for service */
 		fd = rc;
 		rc = afb_ev_mgr_add_fd(&server->efd, fd, EPOLLIN, server_listen_callback, server, 0, 1);
 		if (rc < 0) {
 			close(fd);
-			ERROR("can't connect socket %s", server->uri);
+			RP_ERROR("can't connect socket %s", server->uri);
 		}
 	}
 	return rc;
@@ -406,7 +407,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	/* check the size */
 	luri = strlen(uri);
 	if (luri > 4000) {
-		ERROR("can't create socket %s", uri);
+		RP_ERROR("can't create socket %s", uri);
 		rc = X_E2BIG;
 		goto error;
 	}
@@ -414,7 +415,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	/* check the api name */
 	api = afb_socket_api(prefix_ws_remove(uri));
 	if (api == NULL || !afb_apiname_is_valid(api)) {
-		ERROR("invalid api name in rpc uri %s", uri);
+		RP_ERROR("invalid api name in rpc uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
@@ -422,7 +423,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	/* check api name */
 	rc = afb_apiset_get_api(call_set, api, 1, 0, NULL);
 	if (rc < 0) {
-		ERROR("Can't provide rpc-server for URI %s API %s", uri, api);
+		RP_ERROR("Can't provide rpc-server for URI %s API %s", uri, api);
 		goto error;
 	}
 
@@ -431,7 +432,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	extra = luri == (size_t)(api - uri) + lapi ? 0 : lapi + 1;
 	server = malloc(sizeof * server + 1 + luri + extra);
 	if (!server) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}

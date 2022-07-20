@@ -32,6 +32,7 @@
 
 #include <check.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #if !defined(ck_assert_ptr_null)
 # define ck_assert_ptr_null(X)      ck_assert_ptr_eq(X, NULL)
@@ -55,9 +56,6 @@
 #include "core/afb-jobs.h"
 #include "core/afb-cred.h"
 #include "core/afb-evt.h"
-#include "sys/verbose.h"
-
-#include <json-c/json.h>
 
 #include "core/afb-sched.h"
 #include "core/afb-sig-monitor.h"

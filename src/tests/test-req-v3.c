@@ -35,9 +35,10 @@
 # define ck_assert_ptr_nonnull(X)   ck_assert_ptr_ne(X, NULL)
 #endif
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"
-#include "sys/verbose.h"
 
 /*********************************************************************/
 

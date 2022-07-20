@@ -30,12 +30,13 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "sys/x-dynlib.h"
 #include "sys/x-errno.h"
 #include "apis/afb-api-so.h"
 #include "apis/afb-api-so-v3.h"
 #include "apis/afb-api-so-v4.h"
-#include "sys/verbose.h"
 #include "core/afb-sig-monitor.h"
 #include "utils/path-search.h"
 
@@ -54,7 +55,7 @@ static void safe_dlopen_cb(int sig, void *closure)
 	if (!sig)
 		sd->status = x_dynlib_open(sd->path, sd->dynlib, sd->global, sd->lazy);
 	else {
-		ERROR("dlopen of %s raised signal %s", sd->path, strsignal(sig));
+		RP_ERROR("dlopen of %s raised signal %s", sd->path, strsignal(sig));
 		sd->status = X_EINTR;
 	}
 }
@@ -78,8 +79,8 @@ static int load_binding(const char *path, struct afb_apiset *declare_set, struct
 	// This is a loadable library let's check if it's a binding
 	rc = safe_dlopen(path, &dynlib, 0, 0);
 	if (rc) {
-		_VERBOSE_(
-			force ? Log_Level_Error : Log_Level_Notice,
+		_RP_VERBOSE_(
+			force ? rp_Log_Level_Error : rp_Log_Level_Notice,
 			"binding [%s] not loadable: %s",
 				path,
 				rc == X_EINTR ? "signal raised" : x_dynlib_error(&dynlib)
@@ -110,7 +111,7 @@ static int load_binding(const char *path, struct afb_apiset *declare_set, struct
 		return 0; /* yes version 3 */
 
 	/* not a valid binding */
-	_VERBOSE_(force ? Log_Level_Error : Log_Level_Info, "binding [%s] %s",
+	_RP_VERBOSE_(force ? rp_Log_Level_Error : rp_Log_Level_Info, "binding [%s] %s",
 					path, "isn't a supported AFB binding");
 
 error2:
@@ -214,7 +215,7 @@ See https://sourceware.org/bugzilla/show_bug.cgi?id=22101
 	result = 1;
 #endif
 	if (result)
-		INFO("Scanning dir=[%s] for bindings", item->path);
+		RP_INFO("Scanning dir=[%s] for bindings", item->path);
 	return result;
 }
 

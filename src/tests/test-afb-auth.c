@@ -32,13 +32,12 @@
 
 #include <json-c/json.h>
 
-
 #include <afb/afb-auth.h>
 #include <afb/afb-session.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-auth.h"
-#include "sys/verbose.h"
 
 START_TEST (test)
 {

@@ -26,6 +26,8 @@
 #include <limits.h>
 #include <string.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "sys/ev-mgr.h"
 #include "core/afb-jobs.h"
 #include "core/afb-ev-mgr.h"
@@ -34,8 +36,6 @@
 #include "sys/x-cond.h"
 #include "sys/x-errno.h"
 #include "sys/x-thread.h"
-
-#include "sys/verbose.h"
 
 /* synchronisation of threads */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;

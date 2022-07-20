@@ -29,6 +29,7 @@
 #include <stdarg.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include <afb/afb-binding-v3.h>
 #include <afb/afb-req-x2.h>
@@ -50,8 +51,6 @@
 #include "core/afb-req-v3.h"
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
-
-#include "sys/verbose.h"
 
 #include "containerof.h"
 #include <stdarg.h>

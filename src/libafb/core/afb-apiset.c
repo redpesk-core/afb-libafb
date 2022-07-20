@@ -27,13 +27,14 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-session.h"
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "core/afb-sched.h"
 
 #include "sys/x-errno.h"
-#include "sys/verbose.h"
 #include "utils/namecmp.h"
 
 #define INCR		8	/* CAUTION: must be a power of 2 */
@@ -495,7 +496,7 @@ int afb_apiset_add(struct afb_apiset *set, const char *name, struct afb_api_item
 
 	/* check whether it exists already */
 	if (search(set, name)) {
-		ERROR("api of name %s already exists", name);
+		RP_ERROR("api of name %s already exists", name);
 		return X_EEXIST;
 	}
 
@@ -524,12 +525,12 @@ int afb_apiset_add(struct afb_apiset *set, const char *name, struct afb_api_item
 	all_apis = desc;
 
 	if (afb_apiname_is_public(name))
-		INFO("API %s added", name);
+		RP_INFO("API %s added", name);
 
 	return 0;
 
 oom:
-	ERROR("out of memory");
+	RP_ERROR("out of memory");
 	return X_ENOMEM;
 }
 
@@ -550,21 +551,21 @@ int afb_apiset_add_alias(struct afb_apiset *set, const char *name, const char *a
 
 	/* check alias doesn't already exist */
 	if (search(set, alias)) {
-		ERROR("api of name %s already exists", alias);
+		RP_ERROR("api of name %s already exists", alias);
 		return X_EEXIST;
 	}
 
 	/* check aliased api exists */
 	api = search(set, name);
 	if (api == NULL) {
-		ERROR("api of name %s doesn't exists", name);
+		RP_ERROR("api of name %s doesn't exists", name);
 		return X_ENOENT;
 	}
 
 	/* allocates and init the struct */
 	ali = malloc(sizeof *ali + strlen(alias) + 1);
 	if (ali == NULL) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		return X_ENOMEM;
 	}
 	ali->api = api;
@@ -816,24 +817,24 @@ static int start_api(struct api_desc *api)
 	if (api->status != NOT_STARTED)
 		return api->status;
 
-	NOTICE("API %s starting...", api->name);
+	RP_NOTICE("API %s starting...", api->name);
 	api->status = X_EBUSY;
 	rc = start_array_classes(&api->require.classes);
 	if (rc < 0)
-		ERROR("Cannot start classes needed by api %s", api->name);
+		RP_ERROR("Cannot start classes needed by api %s", api->name);
 	else {
 		rc = start_array_depends(&api->require.apis);
 		if (rc < 0)
-			ERROR("Cannot start apis needed by api %s", api->name);
+			RP_ERROR("Cannot start apis needed by api %s", api->name);
 		else if (api->api.itf->service_start) {
 			rc = api->api.itf->service_start(api->api.closure);
 			if (rc < 0)
-				ERROR("The api %s failed to start", api->name);
+				RP_ERROR("The api %s failed to start", api->name);
 		}
 	}
 	api->status = rc;
 	if (rc == 0)
-		INFO("API %s started", api->name);
+		RP_INFO("API %s started", api->name);
 	return rc;
 }
 
@@ -849,7 +850,7 @@ int afb_apiset_start_service(struct afb_apiset *set, const char *name)
 
 	a = searchrec(set, name);
 	if (!a) {
-		ERROR("can't find service %s", name);
+		RP_ERROR("can't find service %s", name);
 		return X_ENOENT;
 	}
 
@@ -954,7 +955,7 @@ int afb_apiset_get_logmask(struct afb_apiset *set, const char *name)
 		return X_ENOENT;
 
 	if (!i->api.itf->get_logmask)
-		return logmask;
+		return rp_logmask;
 
 	return i->api.itf->get_logmask(i->api.closure);
 }

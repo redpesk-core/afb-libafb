@@ -36,10 +36,10 @@
 
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "sys/ev-mgr.h"
 
-#include "sys/verbose.h"
 #include "sys/x-errno.h"
 
 static int initialized;
@@ -57,7 +57,7 @@ static int initialize()
 
 	/* check version */
 	if (gnutls_check_version("3.4.6") == NULL) {
-		ERROR("GnuTLS 3.4.6 or later is required");
+		RP_ERROR("GnuTLS 3.4.6 or later is required");
 		return initialized = X_ENOTSUP;
 	}
 

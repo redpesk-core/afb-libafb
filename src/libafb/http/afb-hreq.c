@@ -36,6 +36,7 @@
 
 #include <microhttpd.h>
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #if HAVE_LIBMAGIC
 #include <magic.h>
@@ -57,7 +58,6 @@
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
-#include "sys/verbose.h"
 #include "sys/x-errno.h"
 #include "utils/namecmp.h"
 
@@ -208,7 +208,7 @@ static void set_response_cookie(struct afb_hreq *hreq, struct MHD_Response *resp
 		else
 			res = MHD_add_response_header(response, MHD_HTTP_HEADER_SET_COOKIE, cookie);
 		if (res == MHD_NO)
-			ERROR("unable to set cookie");
+			RP_ERROR("unable to set cookie");
 	}
 }
 
@@ -226,7 +226,7 @@ static void afb_hreq_reply_v(struct afb_hreq *hreq, unsigned status, struct MHD_
 
 	/* Check replying status */
 	if (hreq->replied != 0) {
-		ERROR("Already replied HTTP request");
+		RP_ERROR("Already replied HTTP request");
 		MHD_destroy_response(response);
 		return;
 	}
@@ -308,15 +308,15 @@ static magic_t lazy_libmagic()
 		done = 1;
 		/* MAGIC_MIME tells magic to return a mime of the file,
 			 but you can specify different things */
-		INFO("Loading mimetype default magic database");
+		RP_INFO("Loading mimetype default magic database");
 		result = magic_open(MAGIC_MIME_TYPE);
 		if (result == NULL) {
-			ERROR("unable to initialize magic library");
+			RP_ERROR("unable to initialize magic library");
 		}
 		/* Warning: should not use NULL for DB
 				[libmagic bug wont pass efence check] */
 		else if (magic_load(result, MAGIC_DB) != 0) {
-			ERROR("cannot load magic database: %s", magic_error(result));
+			RP_ERROR("cannot load magic database: %s", magic_error(result));
 			magic_close(result);
 			result = NULL;
 		}
@@ -569,7 +569,7 @@ static int try_reply_file(struct afb_hreq *hreq, const char *filename, int relax
 	if (inm && 0 == strcmp(inm, etag)) {
 		/* etag ok, return NOT MODIFIED */
 		close(fd);
-		DEBUG("Not Modified: [%s]", filename);
+		RP_DEBUG("Not Modified: [%s]", filename);
 		response = MHD_create_response_from_buffer(0, empty_string, MHD_RESPMEM_PERSISTENT);
 		status = MHD_HTTP_NOT_MODIFIED;
 	} else {
@@ -744,7 +744,7 @@ void afb_hreq_redirect_to(struct afb_hreq *hreq, const char *url, int add_query_
 
 	wqp = add_query_part ? url_with_query(hreq, url) : NULL;
 	to = wqp ? : url;
-	DEBUG("%s redirect from [%s] to [%s]", permanent ? "permanent" : "temporary", hreq->url, url);
+	RP_DEBUG("%s redirect from [%s] to [%s]", permanent ? "permanent" : "temporary", hreq->url, url);
 	afb_hreq_reply_static(hreq, redir, 0, NULL,
 			MHD_HTTP_HEADER_LOCATION, to, NULL);
 	free(wqp);
@@ -1041,7 +1041,7 @@ void afb_hreq_call(struct afb_hreq *hreq, struct afb_apiset *apiset, const char 
 	hreq->comreq.apiname = strndup(api, lenapi);
 	hreq->comreq.verbname = strndup(verb, lenverb);
 	if (hreq->comreq.apiname == NULL || hreq->comreq.verbname == NULL) {
-		ERROR("Out of memory");
+		RP_ERROR("Out of memory");
 		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);
 	} else if (afb_hreq_init_context(hreq) < 0) {
 		afb_hreq_reply_error(hreq, MHD_HTTP_INTERNAL_SERVER_ERROR);

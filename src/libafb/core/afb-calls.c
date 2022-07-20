@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <rp-utils/rp-verbose.h>
 #include <afb/afb-req-subcall-flags.h>
 
 #include "core/afb-data.h"
@@ -41,7 +42,6 @@
 #include "core/afb-error-text.h"
 
 #include "core/afb-sched.h"
-#include "sys/verbose.h"
 #include "sys/x-errno.h"
 #include "containerof.h"
 
@@ -196,7 +196,7 @@ process(
 	if (!req) {
 		/* error! out of memory */
 		afb_data_array_unref(nparams, params);
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		callback(closure1, closure2, closure3, X_ENOMEM, 0, NULL);
 		return;
 	}
@@ -348,7 +348,7 @@ process_sync(
 	struct afb_req_common *caller,
 	int flags
 ) {
-	ERROR("Calls/Subcalls sync are not supported");
+	RP_ERROR("Calls/Subcalls sync are not supported");
 	if (status)
 		*status = X_ENOTSUP;
 	if (nreplies)

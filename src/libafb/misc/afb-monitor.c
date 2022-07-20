@@ -28,6 +28,7 @@
 
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
@@ -42,8 +43,28 @@
 #include "core/afb-json-legacy.h"
 #include "core/afb-data.h"
 #include "core/afb-type-predefined.h"
-#include "sys/verbose.h"
 #include "sys/x-errno.h"
+
+
+#define Verbosity_Level_Error	0
+#define Verbosity_Level_Warning	1
+#define Verbosity_Level_Notice	2
+#define Verbosity_Level_Info	3
+#define Verbosity_Level_Debug	4
+#define _DEVERBOSITY_(vlvl)      ((vlvl) + rp_Log_Level_Error)
+#define _VERBOSITY_(llvl)        ((llvl) - rp_Log_Level_Error)
+#define verbosity_to_mask(verbo) ((1 << (_DEVERBOSITY_(verbo) + 1)) - 1)
+#define verbosity_from_mask(mask) ((mask) <= _RP_LOGMASK_(rp_Log_Level_Error) ? Verbosity_Level_Error \
+                                   : (mask) <= _RP_LOGMASK_(rp_Log_Level_Warning) ? Verbosity_Level_Warning \
+                                   : (mask) <= _RP_LOGMASK_(rp_Log_Level_Notice) ? Verbosity_Level_Notice \
+                                   : (mask) <= _RP_LOGMASK_(rp_Log_Level_Info) ? Verbosity_Level_Info \
+                                   : Verbosity_Level_Debug)
+#define verbosity_set(verbo) rp_set_logmask(verbosity_to_mask(verbo))
+#define verbosity_get()      verbosity_from_mask(rp_logmask)
+
+
+
+
 
 static const char _apis_[] = "apis";
 static const char _disconnected_[] = "disconnected";
@@ -168,9 +189,9 @@ static int decode_verbosity(struct json_object *v)
 	int level = -1;
 
 	if (!rp_jsonc_unpack(v, "i", &level)) {
-		level = level < _VERBOSITY_(Log_Level_Error) ? _VERBOSITY_(Log_Level_Error) : level > _VERBOSITY_(Log_Level_Debug) ? _VERBOSITY_(Log_Level_Debug) : level;
+		level = level < _VERBOSITY_(rp_Log_Level_Error) ? _VERBOSITY_(rp_Log_Level_Error) : level > _VERBOSITY_(rp_Log_Level_Debug) ? _VERBOSITY_(rp_Log_Level_Debug) : level;
 	} else if (!rp_jsonc_unpack(v, "s", &s)) {
-		level = _VERBOSITY_(verbose_level_of_name(s));
+		level = _VERBOSITY_(rp_verbose_level_of_name(s));
 	}
 	return level;
 }
@@ -238,11 +259,11 @@ static void set_verbosity(struct json_object *spec)
 static struct json_object *encode_verbosity(int level)
 {
 	switch(_DEVERBOSITY_(level)) {
-	case Log_Level_Error:	return json_object_new_string(_error_);
-	case Log_Level_Warning:	return json_object_new_string(_warning_);
-	case Log_Level_Notice:	return json_object_new_string(_notice_);
-	case Log_Level_Info:	return json_object_new_string(_info_);
-	case Log_Level_Debug:	return json_object_new_string(_debug_);
+	case rp_Log_Level_Error:	return json_object_new_string(_error_);
+	case rp_Log_Level_Warning:	return json_object_new_string(_warning_);
+	case rp_Log_Level_Notice:	return json_object_new_string(_notice_);
+	case rp_Log_Level_Info:	return json_object_new_string(_info_);
+	case rp_Log_Level_Debug:	return json_object_new_string(_debug_);
 	default: return json_object_new_int(level);
 	}
 }
@@ -341,7 +362,7 @@ static void add_one_name_to_namelist(struct namelist **head, const char *name, s
 	size_t length = strlen(name) + 1;
 	struct namelist *item = malloc(length + sizeof *item);
 	if (!item)
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 	else {
 		item->next = *head;
 		item->data = data;

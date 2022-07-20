@@ -36,10 +36,10 @@
 #include <pthread.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-wsapi.h"
-#include "sys/verbose.h"
 #include "sys/x-errno.h"
 
 /******** implementation of internal binder protocol per api **************/
@@ -852,7 +852,7 @@ static void on_binary(void *closure, char *data, size_t size)
 			if (rc > 0)
 				clientcb(wsapi->closure, &msg->msg);
 			else {
-				ERROR("ignoring message of type %d", (int)msg->msg.type);
+				RP_ERROR("ignoring message of type %d", (int)msg->msg.type);
 				msg_unref(msg);
 				/* TODO: close the connection? */
 			}

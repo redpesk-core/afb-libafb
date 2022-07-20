@@ -30,12 +30,12 @@
 
 #include <afb/afb-event-x2-itf.h>
 #include <rp-utils/rp-uuid.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-evt.h"
 #include "core/afb-hook.h"
 #include "core/afb-data.h"
 #include "core/afb-data-array.h"
-#include "sys/verbose.h"
 #include "core/afb-sched.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
@@ -326,7 +326,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	/* create the structure for the job */
 	jb = make_evt_broadcasted(event, nparams, params, uuid, hop);
 	if (jb == NULL) {
-		ERROR("Can't create broadcast string job item for %s", event);
+		RP_ERROR("Can't create broadcast string job item for %s", event);
 		return X_ENOMEM;
 	}
 
@@ -335,7 +335,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	if (rc >= 0)
 		rc = 0;
 	else {
-		ERROR("Can't queue broadcast string job item for %s", event);
+		RP_ERROR("Can't queue broadcast string job item for %s", event);
 		destroy_evt_broadcasted(jb);
 	}
 	return rc;
@@ -437,7 +437,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 
 	je = make_evt_pushed(evt, nparams, params);
 	if (je == NULL) {
-		ERROR("Can't create push evt job item for %s", evt->fullname);
+		RP_ERROR("Can't create push evt job item for %s", evt->fullname);
 		return X_ENOMEM;
 	}
 
@@ -445,7 +445,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 	if (rc >= 0)
 		rc = 1;
 	else {
-		ERROR("Can't queue push evt job item for %s", evt->fullname);
+		RP_ERROR("Can't queue push evt job item for %s", evt->fullname);
 		destroy_evt_pushed(je);
 	}
 
@@ -535,7 +535,7 @@ static int create_evt(struct afb_evt **evt, const char *fullname, size_t len)
 		x_rwlock_unlock(&events_rwlock);
 		x_rwlock_destroy(&nevt->rwlock);
 		free(nevt);
-		ERROR("Can't create more events");
+		RP_ERROR("Can't create more events");
 		*evt = NULL;
 		return X_ECANCELED;
 	}
@@ -620,7 +620,7 @@ void afb_evt_unref(struct afb_evt *evt)
 			if (oev == evt)
 				break;
 			if (!oev) {
-				ERROR("unexpected event");
+				RP_ERROR("unexpected event");
 				x_rwlock_unlock(&events_rwlock);
 				return;
 			}
@@ -859,7 +859,7 @@ void afb_evt_listener_unref(struct afb_evt_listener *listener)
 			if (olis == listener)
 				break;
 			if (!olis) {
-				ERROR("unexpected listener");
+				RP_ERROR("unexpected listener");
 				x_rwlock_unlock(&listeners_rwlock);
 				return;
 			}

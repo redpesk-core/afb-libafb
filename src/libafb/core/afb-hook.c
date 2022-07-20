@@ -36,6 +36,7 @@
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
+#include <rp-utils/rp-verbose.h>
 
 #include <afb/afb-arg.h>
 #include <afb/afb-event-x2.h>
@@ -51,7 +52,6 @@
 
 #include "utils/globmatch.h"
 #include "utils/namecmp.h"
-#include "sys/verbose.h"
 #include "sys/x-uio.h"
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
@@ -333,9 +333,9 @@ static void hook_req_vverbose_cb(void *closure, const struct afb_hookid *hookid,
 	va_end(ap);
 
 	if (len < 0)
-		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, func, fmt);
+		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, rp_verbose_name_of_level(level), file, line, func, fmt);
 	else {
-		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, func, msg);
+		_hook_req_(req, "vverbose(%d:%s, %s, %d, %s) -> %s", level, rp_verbose_name_of_level(level), file, line, func, msg);
 		free(msg);
 	}
 }
@@ -801,9 +801,9 @@ static void hook_api_vverbose_cb(void *closure, const struct afb_hookid *hookid,
 	va_end(ap);
 
 	if (len < 0)
-		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, function, fmt);
+		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, rp_verbose_name_of_level(level), file, line, function, fmt);
 	else {
-		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, function, msg);
+		_hook_api_(comapi, "vverbose(%d:%s, %s, %d, %s) -> %s", level, rp_verbose_name_of_level(level), file, line, function, msg);
 		free(msg);
 	}
 }
@@ -1779,9 +1779,9 @@ static void hook_global_vverbose_cb(void *closure, const struct afb_hookid *hook
 	va_end(ap);
 
 	if (len < 0)
-		_hook_global_("vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, verbose_name_of_level(level), file, line, func, fmt);
+		_hook_global_("vverbose(%d:%s, %s, %d, %s) -> %s ? ? ?", level, rp_verbose_name_of_level(level), file, line, func, fmt);
 	else {
-		_hook_global_("vverbose(%d:%s, %s, %d, %s) -> %s", level, verbose_name_of_level(level), file, line, func, msg);
+		_hook_global_("vverbose(%d:%s, %s, %d, %s) -> %s", level, rp_verbose_name_of_level(level), file, line, func, msg);
 		free(msg);
 	}
 }
@@ -1831,7 +1831,7 @@ static void update_global()
 			flags = hook->flags;
 		hook = hook->next;
 	}
-	verbose_observer = (flags & afb_hook_flag_global_vverbose) ? afb_hook_global_vverbose : NULL;
+	rp_verbose_observer = (flags & afb_hook_flag_global_vverbose) ? afb_hook_global_vverbose : NULL;
 	x_rwlock_unlock(&rwlock);
 }
 

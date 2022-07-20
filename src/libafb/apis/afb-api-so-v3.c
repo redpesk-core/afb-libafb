@@ -32,6 +32,7 @@
 
 #include <json-c/json.h>
 #include <afb/afb-binding-v3.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "sys/x-dynlib.h"
 #include "sys/x-errno.h"
@@ -41,7 +42,6 @@
 #include "core/afb-api-v3.h"
 #include "core/afb-apiset.h"
 #include "sys/x-realpath.h"
-#include "sys/verbose.h"
 
 /*
  * names of symbols
@@ -89,31 +89,31 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 	if (!a.desc && !a.entry)
 		return 0;
 
-	INFO("binding [%s] looks like an AFB binding V3", path);
+	RP_INFO("binding [%s] looks like an AFB binding V3", path);
 
 	/* basic checks */
 	x_dynlib_symbol(dynlib, afb_api_so_v3_root, (void**)&a.root);
 	if (!a.root) {
-		ERROR("binding [%s] incomplete symbol set: %s is missing",
+		RP_ERROR("binding [%s] incomplete symbol set: %s is missing",
 			path, afb_api_so_v3_root);
 		rc = X_EINVAL;
 		goto error;
 	}
 	if (a.desc) {
 		if (a.desc->api == NULL || *a.desc->api == 0) {
-			ERROR("binding [%s] bad api name...", path);
+			RP_ERROR("binding [%s] bad api name...", path);
 			rc = X_EINVAL;
 			goto error;
 		}
 		if (!afb_apiname_is_valid(a.desc->api)) {
-			ERROR("binding [%s] invalid api name...", path);
+			RP_ERROR("binding [%s] invalid api name...", path);
 			rc = X_EINVAL;
 			goto error;
 		}
 		if (!a.entry)
 			a.entry = a.desc->preinit;
 		else if (a.desc->preinit && a.desc->preinit != a.entry) {
-			ERROR("binding [%s] clash: you can't define %s and %s.preinit, choose only one",
+			RP_ERROR("binding [%s] clash: you can't define %s and %s.preinit, choose only one",
 				path, afb_api_so_v3_entry, afb_api_so_v3_desc);
 			rc = X_EINVAL;
 			goto error;
@@ -129,7 +129,7 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 			rpath, Afb_String_Copy);
 	} else {
 		if (!a.entry) {
-			ERROR("binding [%s] incomplete symbol set: %s is missing",
+			RP_ERROR("binding [%s] incomplete symbol set: %s is missing",
 				path, afb_api_so_v3_entry);
 			rc = X_EINVAL;
 			goto error;
@@ -147,7 +147,7 @@ int afb_api_so_v3_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
 	if (rc >= 0)
 		return 1;
 
-	ERROR("binding [%s] initialisation failed", path);
+	RP_ERROR("binding [%s] initialisation failed", path);
 
 error:
 	return rc;

@@ -29,9 +29,10 @@
 #include <signal.h>
 #include <limits.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-jobs.h"
 #include "core/afb-sig-monitor.h"
-#include "sys/verbose.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
@@ -187,7 +188,7 @@ int afb_jobs_post(
 
 	/* check availability */
 	if (pending_count >= max_pending_count) {
-		ERROR("too many jobs");
+		RP_ERROR("too many jobs");
 		rc = X_EBUSY;
 	} else {
 		/* add the job */

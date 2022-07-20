@@ -28,11 +28,12 @@
 #include <string.h>
 #include <systemd/sd-event.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "misc/afb-systemd.h"
 #include "core/afb-ev-mgr.h"
 #include "sys/systemd.h"
 #include "sys/x-errno.h"
-#include "sys/verbose.h"
 
 static void onprepare(struct ev_prepare *prep, void *closure)
 {
@@ -52,7 +53,7 @@ static void onprepare(struct ev_prepare *prep, void *closure)
 			rc = sd_event_prepare(ev);
 		}
 		if (rc < 0)
-			ERROR("sd_event_prepare returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
+			RP_ERROR("sd_event_prepare returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 		/*@fallthrough@*/
 	default:
 		break;
@@ -68,7 +69,7 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	if (rc > 0)
 		sd_event_dispatch(ev);
 	if (rc < 0)
-		ERROR("sd_event_wait returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
+		RP_ERROR("sd_event_wait returned %d (state %d) %s", rc, sd_event_get_state(ev), strerror(-rc));
 }
 
 struct sd_event *afb_systemd_get_event_loop()

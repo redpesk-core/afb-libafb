@@ -31,7 +31,7 @@
 #include <check.h>
 
 #include "core/afb-token.h"
-#include "sys/verbose.h"
+#include <rp-utils/rp-verbose.h>
 
 #define TOKEN_NAME "Test Token"
 

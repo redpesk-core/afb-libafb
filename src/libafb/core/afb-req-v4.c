@@ -29,6 +29,8 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "afb-v4-itf.h"
 
 #include "sys/x-errno.h"
@@ -45,8 +47,6 @@
 #include "core/afb-req-v4.h"
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
-
-#include "sys/verbose.h"
 
 #include "containerof.h"
 #include <stdarg.h>

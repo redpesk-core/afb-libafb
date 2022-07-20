@@ -29,6 +29,7 @@
 
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-v4-itf.h"
 
@@ -56,7 +57,6 @@
 #include "sys/systemd.h"
 #endif
 
-#include "sys/verbose.h"
 #include "utils/globmatch.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
@@ -762,7 +762,7 @@ afb_api_v4_create(
 	/* allocates the description */
 	apiv4 = calloc(1, strsz + sizeof *apiv4);
 	if (!apiv4) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}
@@ -802,7 +802,7 @@ afb_api_v4_create(
 #if WITH_AFB_HOOK
 	afb_api_v4_update_hooks(apiv4);
 #endif
-	afb_api_v4_logmask_set(apiv4, logmask);
+	afb_api_v4_logmask_set(apiv4, rp_logmask);
 
 	/* declare the api */
 	if (name != NULL) {

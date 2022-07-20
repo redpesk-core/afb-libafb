@@ -35,12 +35,14 @@
 # define ck_assert_ptr_nonnull(X)   ck_assert_ptr_ne(X, NULL)
 #endif
 
+#include <rp-utils/rp-verbose.h>
+
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
+
 #include "core/afb-apiset.h"
 #include "core/afb-api-v3.h"
 #include "core/afb-string-mode.h"
-#include "sys/verbose.h"
 
 struct inapis {
 	struct afb_binding_v3 desc;
@@ -176,7 +178,7 @@ START_TEST (test)
 {
 	int rc;
 
-	verbosity_set(-1);
+	rp_set_logmask(-1);
 	apiset = afb_apiset_create("test-apiv3", 1);
 	ck_assert_ptr_nonnull(apiset);
 

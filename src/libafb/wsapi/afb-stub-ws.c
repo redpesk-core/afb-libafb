@@ -30,6 +30,7 @@
 #include <unistd.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include <afb/afb-event-x2.h>
 #include <afb/afb-binding-x4.h>
@@ -46,7 +47,6 @@
 #include "core/afb-token.h"
 #include "core/afb-error-text.h"
 #include "core/afb-sched.h"
-#include "sys/verbose.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
 #include "sys/x-errno.h"
@@ -167,7 +167,7 @@ static void server_req_reply_cb(struct afb_req_common *comreq, int status, unsig
 	rd.call = wreq->call;
 	rc = afb_json_legacy_do_reply_json_c(&rd, status, nreplies, replies, server_req_reply_cb2);
 	if (rc < 0 || rd.rc < 0)
-		ERROR("error while sending reply");
+		RP_ERROR("error while sending reply");
 }
 
 static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
@@ -179,7 +179,7 @@ static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_evt
 	if (rc >= 0)
 		rc = afb_proto_ws_call_subscribe(wreq->call,  afb_evt_id(event));
 	if (rc < 0)
-		ERROR("error while subscribing event");
+		RP_ERROR("error while subscribing event");
 	return rc;
 }
 
@@ -190,7 +190,7 @@ static int server_req_unsubscribe_cb(struct afb_req_common *comreq, struct afb_e
 
 	rc = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_id(event));
 	if (rc < 0)
-		ERROR("error while unsubscribing event");
+		RP_ERROR("error while unsubscribing event");
 	return rc;
 }
 
@@ -390,11 +390,11 @@ static void client_on_event_create_cb(void *closure, uint16_t event_id, const ch
 
 	/* check conflicts */
 	if (afb_evt_create(&event, event_name) < 0)
-		ERROR("can't create event %s, out of memory", event_name);
+		RP_ERROR("can't create event %s, out of memory", event_name);
 	else {
 		rc = u16id2ptr_add(&stubws->event_proxies, event_id, event);
 		if (rc < 0) {
-			ERROR("can't record event %s", event_name);
+			RP_ERROR("can't record event %s", event_name);
 			afb_evt_unref(event);
 		}
 	}
@@ -420,7 +420,7 @@ static void client_on_event_subscribe_cb(void *closure, void *request, uint16_t 
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
 	if (rc < 0 || !event || afb_req_common_subscribe_hookable(comreq, event) < 0)
-		ERROR("can't subscribe: %m");
+		RP_ERROR("can't subscribe: %m");
 }
 
 static void client_on_event_unsubscribe_cb(void *closure, void *request, uint16_t event_id)
@@ -432,7 +432,7 @@ static void client_on_event_unsubscribe_cb(void *closure, void *request, uint16_
 
 	rc = u16id2ptr_get(stubws->event_proxies, event_id, (void**)&event);
 	if (rc < 0 || !event || afb_req_common_unsubscribe_hookable(comreq, event) < 0)
-		ERROR("can't unsubscribe: %m");
+		RP_ERROR("can't unsubscribe: %m");
 }
 
 static void client_on_event_push_cb(void *closure, uint16_t event_id, struct json_object *data)
@@ -445,7 +445,7 @@ static void client_on_event_push_cb(void *closure, uint16_t event_id, struct jso
 	if (rc >= 0 && event)
 		rc = afb_json_legacy_event_push_hookable(event, data);
 	else
-		ERROR("unreadable push event");
+		RP_ERROR("unreadable push event");
 	if (rc <= 0)
 		afb_proto_ws_client_event_unexpected(stubws->proto, event_id);
 }
@@ -464,12 +464,12 @@ static struct afb_session *server_add_session(struct afb_stub_ws *stubws, uint16
 
 	rc = afb_session_get(&session, sessionstr, AFB_SESSION_TIMEOUT_DEFAULT, &created);
 	if (rc < 0)
-		ERROR("can't create session %s", sessionstr);
+		RP_ERROR("can't create session %s", sessionstr);
 	else {
 		afb_session_set_autoclose(session, 1);
 		rc = u16id2ptr_add(&stubws->session_proxies, sessionid, session);
 		if (rc < 0) {
-			ERROR("can't record session %s", sessionstr);
+			RP_ERROR("can't record session %s", sessionstr);
 			afb_session_unref(session);
 			session = NULL;
 		}
@@ -503,11 +503,11 @@ static void server_on_token_create_cb(void *closure, uint16_t tokenid, const cha
 
 	rc = afb_token_get(&token, tokenstr);
 	if (rc < 0)
-		ERROR("can't create token %s, out of memory", tokenstr);
+		RP_ERROR("can't create token %s, out of memory", tokenstr);
 	else {
 		rc = u16id2ptr_add(&stubws->token_proxies, tokenid, token);
 		if (rc < 0) {
-			ERROR("can't record token %s", tokenstr);
+			RP_ERROR("can't record token %s", tokenstr);
 			afb_token_unref(token);
 		}
 	}

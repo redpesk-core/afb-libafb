@@ -33,6 +33,7 @@
 #include <check.h>
 
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #if !defined(ck_assert_ptr_null)
 # define ck_assert_ptr_null(X)      ck_assert_ptr_eq(X, NULL)
@@ -55,7 +56,6 @@
 #include "core/afb-data.h"
 #include "core/afb-hook.h"
 #include "sys/x-errno.h"
-#include "sys/verbose.h"
 
 #if WITH_REQ_PROCESS_ASYNC
 #define RUNJOB afb_sched_wait_idle(1,1);
@@ -82,7 +82,7 @@ START_TEST (test_init)
 	struct afb_api_common *comapi = &capi;
 	struct afb_session *s;
 
-	verbosity_set(-1);
+	rp_set_logmask(-1);
 	declset = afb_apiset_create("test-apiv3-decl", 1);
 	ck_assert_ptr_nonnull(declset);
 	callset = afb_apiset_create("test-apiv3-call", 1);
@@ -301,11 +301,11 @@ START_TEST (test_functional)
 
 	observation = 0;
 	va_list test_va_list;
-	verbose_observer = observe;
+	rp_verbose_observer = observe;
 	afb_api_common_vverbose_hookable(comapi, 4, "test", 666, "this_is_a_test", "test message", test_va_list);
 	fprintf(stderr, "vverbose test message observerd %d time\n", observation);
 	ck_assert_int_eq(1, observation);
-	verbose_observer = NULL;
+	rp_verbose_observer = NULL;
 
 	/******** event_broadcast ********/
 	fprintf(stderr, "\n******** event_broadcast ********\n");

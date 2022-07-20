@@ -33,8 +33,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-cred.h"
-#include "sys/verbose.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 

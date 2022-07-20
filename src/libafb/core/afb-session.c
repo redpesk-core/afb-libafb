@@ -31,10 +31,10 @@
 #include <string.h>
 
 #include <rp-utils/rp-uuid.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-session.h"
 #include "core/afb-hook.h"
-#include "sys/verbose.h"
 #include "utils/pearson.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"

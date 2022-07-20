@@ -35,9 +35,10 @@
 #include <signal.h>
 #include <pthread.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-sig-monitor.h"
 #include "core/afb-jobs.h"
-#include "sys/verbose.h"
 
 /*********************************************************************/
 
@@ -183,7 +184,7 @@ START_TEST (dumpstack_test)
 {
 	gval = 0;
 	observation = 0;
-	verbose_observer = observe;
+	rp_verbose_observer = observe;
 
 	fprintf(stderr,"\n*************** dumpstack_test ***************\n");
 
@@ -204,7 +205,7 @@ START_TEST (dumpstack_test)
 	ck_assert_int_ne(observation,0);
 
 	dumpstack = FALSE;
-	verbose_observer = NULL;
+	rp_verbose_observer = NULL;
 }
 END_TEST
 

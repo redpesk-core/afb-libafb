@@ -64,9 +64,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-sig-monitor.h"
 
-#include "sys/verbose.h"
 #include "sys/x-thread.h"
 
 /******************************************************************************/
@@ -95,7 +96,7 @@ static void dumpstack(int crop, int signum)
 	count -= crop;
 	locations = backtrace_symbols(&addresses[crop], count);
 	if (locations == NULL)
-		ERROR("can't get the backtrace (returned %d addresses)", count);
+		RP_ERROR("can't get the backtrace (returned %d addresses)", count);
 	else {
 		length = sizeof buffer - 1;
 		pos = 0;
@@ -107,9 +108,9 @@ static void dumpstack(int crop, int signum)
 		}
 		buffer[length] = 0;
 		if (signum)
-			ERROR("BACKTRACE due to signal %s/%d:\n%s", strsignal(signum), signum, buffer);
+			RP_ERROR("BACKTRACE due to signal %s/%d:\n%s", strsignal(signum), signum, buffer);
 		else
-			ERROR("BACKTRACE:\n%s", buffer);
+			RP_ERROR("BACKTRACE:\n%s", buffer);
 		free(locations);
 	}
 }
@@ -288,7 +289,7 @@ static int set_signals_handler(void (*handler)(int), int *signals)
 	sa.sa_flags = SA_NODEFER;
 	while(*signals > 0) {
 		if (sigaction(*signals, &sa, NULL) < 0) {
-			ERROR("failed to install signal handler for signal %s: %m", strsignal(*signals));
+			RP_ERROR("failed to install signal handler for signal %s: %m", strsignal(*signals));
 			result = -errno;
 		}
 		signals++;
@@ -301,7 +302,7 @@ static int set_signals_handler(void (*handler)(int), int *signals)
  */
 static void on_rescue_exit(int signum)
 {
-	ERROR("Rescue exit for signal %d: %s", signum, strsignal(signum));
+	RP_ERROR("Rescue exit for signal %d: %s", signum, strsignal(signum));
 	_exit(exiting);
 }
 
@@ -351,7 +352,7 @@ static void safe_dumpstack_cb(int signum, void *closure)
 {
 	int *args = closure;
 	if (signum)
-		ERROR("Can't provide backtrace: raised signal %s", strsignal(signum));
+		RP_ERROR("Can't provide backtrace: raised signal %s", strsignal(signum));
 	else
 		dumpstack(args[0], args[1]);
 }
@@ -376,7 +377,7 @@ static inline int is_in_safe_dumpstack()
 static void on_signal_terminate (int signum)
 {
 	if (!is_in_safe_dumpstack()) {
-		ERROR("Terminating signal %d received: %s", signum, strsignal(signum));
+		RP_ERROR("Terminating signal %d received: %s", signum, strsignal(signum));
 		if (dumpstack_enabled && signum == SIGABRT)
 			safe_dumpstack(3, signum);
 	}
@@ -387,14 +388,14 @@ static void on_signal_terminate (int signum)
 static void on_signal_error(int signum)
 {
 	if (!is_in_safe_dumpstack()) {
-		ERROR("ALERT! signal %d received: %s", signum, strsignal(signum));
+		RP_ERROR("ALERT! signal %d received: %s", signum, strsignal(signum));
 		if (dumpstack_enabled)
 			safe_dumpstack(3, signum);
 	}
 	monitor_raise(signum);
 
 	if (signum != SIG_FOR_TIMER) {
-		ERROR("Unmonitored signal %d received: %s", signum, strsignal(signum));
+		RP_ERROR("Unmonitored signal %d received: %s", signum, strsignal(signum));
 		safe_exit(2);
 	}
 }

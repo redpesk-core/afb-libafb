@@ -29,12 +29,12 @@
 #include <sys/types.h>
 #include <sys/timerfd.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "sys/x-errno.h"
 #include "sys/x-epoll.h"
 
 #include "sys/ev-mgr.h"
-
-#include "sys/verbose.h"
 
 /******************************************************************************/
 #undef WAKEUP_TGKILL
@@ -1028,7 +1028,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	/* creates the ev_mgr on need */
 	mgr = calloc(1, sizeof *mgr);
 	if (!mgr) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}
@@ -1037,7 +1037,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	rc = epoll_create1(EPOLL_CLOEXEC);
 	if (rc < 0) {
 		rc = -errno;
-		ERROR("can't make new epollfd");
+		RP_ERROR("can't make new epollfd");
 		goto error2;
 	}
 	mgr->epollfd = rc;
@@ -1047,7 +1047,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	rc = eventfd(0, EFD_CLOEXEC|EFD_SEMAPHORE);
 	if (rc < 0) {
 		rc = -errno;
-		ERROR("can't make eventfd for events");
+		RP_ERROR("can't make eventfd for events");
 		goto error3;
 	}
 	mgr->eventfd = rc;
@@ -1057,7 +1057,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->eventfd, &ee);
 	if (rc < 0) {
 		rc = -errno;
-		ERROR("can't poll the eventfd");
+		RP_ERROR("can't poll the eventfd");
 		close(mgr->eventfd);
 		goto error3;
 	}
@@ -1065,7 +1065,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	rc = pipe2(mgr->pipefds, O_CLOEXEC);
 	if (rc < 0) {
 		rc = -errno;
-		ERROR("can't make pipes for events");
+		RP_ERROR("can't make pipes for events");
 		goto error3;
 	}
 
@@ -1074,7 +1074,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->pipefds[0], &ee);
 	if (rc < 0) {
 		rc = -errno;
-		ERROR("can't poll the pipes");
+		RP_ERROR("can't poll the pipes");
 		close(mgr->pipefds[0]);
 		close(mgr->pipefds[1]);
 		goto error3;

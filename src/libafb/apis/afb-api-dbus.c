@@ -32,6 +32,7 @@
 
 #include <systemd/sd-bus.h>
 
+#include <rp-utils/rp-verbose.h>
 #include <afb/afb-event-x2.h>
 
 #include "core/afb-session.h"
@@ -48,7 +49,6 @@
 #include "core/containerof.h"
 #include "core/afb-error-text.h"
 
-#include "sys/verbose.h"
 #include "misc/afb-systemd.h"
 #include "sys/x-errno.h"
 
@@ -397,7 +397,7 @@ static int api_dbus_client_on_broadcast_event(sd_bus_message *m, void *userdata,
 
 	int rc = sd_bus_message_read(m, "ssayy", &event, &data, &uuid, &szuuid, &hop);
 	if (rc < 0)
-		ERROR("unreadable broadcasted event");
+		RP_ERROR("unreadable broadcasted event");
 	else {
 		data = *data ? data : "null";
 		rc = afb_data_create_raw(&param, &afb_type_predefined_json, data, 1+strlen(data),
@@ -446,7 +446,7 @@ static void api_dbus_client_event_create(struct api_dbus *api, int id, const cha
 			return;
 		}
 	}
-	ERROR("can't create event %s, out of memory", name);
+	RP_ERROR("can't create event %s, out of memory", name);
 }
 
 /* removes an eventid */
@@ -457,7 +457,7 @@ static void api_dbus_client_event_drop(struct api_dbus *api, int id, const char 
 	/* retrieves the event */
 	ev = api_dbus_client_event_search(api, id, name);
 	if (ev == NULL) {
-		ERROR("event %s not found", name);
+		RP_ERROR("event %s not found", name);
 		return;
 	}
 
@@ -486,7 +486,7 @@ static void api_dbus_client_event_push(struct api_dbus *api, int id, const char 
 	/* retrieves the event */
 	ev = api_dbus_client_event_search(api, id, name);
 	if (ev == NULL) {
-		ERROR("event %s not found", name);
+		RP_ERROR("event %s not found", name);
 		return;
 	}
 
@@ -508,21 +508,21 @@ static void api_dbus_client_event_subscribe(struct api_dbus *api, int id, const 
 	/* retrieves the event */
 	ev = api_dbus_client_event_search(api, id, name);
 	if (ev == NULL) {
-		ERROR("event %s not found", name);
+		RP_ERROR("event %s not found", name);
 		return;
 	}
 
 	/* retrieves the memo */
 	memo = api_dbus_client_memo_search(api, msgid);
 	if (memo == NULL) {
-		ERROR("message not found");
+		RP_ERROR("message not found");
 		return;
 	}
 
 	/* subscribe the request to the event */
 	rc = afb_req_common_subscribe(memo->comreq, ev->event);
 	if (rc < 0)
-		ERROR("can't subscribe: %s", strerror(-rc));
+		RP_ERROR("can't subscribe: %s", strerror(-rc));
 }
 
 /* unsubscribes an event */
@@ -535,21 +535,21 @@ static void api_dbus_client_event_unsubscribe(struct api_dbus *api, int id, cons
 	/* retrieves the event */
 	ev = api_dbus_client_event_search(api, id, name);
 	if (ev == NULL) {
-		ERROR("event %s not found", name);
+		RP_ERROR("event %s not found", name);
 		return;
 	}
 
 	/* retrieves the memo */
 	memo = api_dbus_client_memo_search(api, msgid);
 	if (memo == NULL) {
-		ERROR("message not found");
+		RP_ERROR("message not found");
 		return;
 	}
 
 	/* unsubscribe the request from the event */
 	rc = afb_req_common_unsubscribe(memo->comreq, ev->event);
 	if (rc < 0)
-		ERROR("can't unsubscribe: %s", strerror(-rc));
+		RP_ERROR("can't unsubscribe: %s", strerror(-rc));
 }
 
 /* receives calls for event */
@@ -574,7 +574,7 @@ static int api_dbus_client_on_manage_event(sd_bus_message *m, void *userdata, sd
 	/* reads the message */
 	rc = sd_bus_message_read(m, "yisst", &order, &eventid, &eventname, &data, &msgid);
 	if (rc < 0) {
-		ERROR("unreadable event");
+		RP_ERROR("unreadable event");
 		return 1;
 	}
 
@@ -597,7 +597,7 @@ static int api_dbus_client_on_manage_event(sd_bus_message *m, void *userdata, sd
 		break;
 	default:
 		/* unexpected order */
-		ERROR("unexpected order '%c' received", (char)order);
+		RP_ERROR("unexpected order '%c' received", (char)order);
 		break;
 	}
 	return 1;
@@ -623,21 +623,21 @@ int afb_api_dbus_add_client(const char *path, struct afb_apiset *declare_set, st
 	/* connect to broadcasted events */
 	rc = asprintf(&match, "type='signal',path='%s',interface='%s',member='broadcast'", api->path, api->name);
 	if (rc < 0) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}
 	rc = sd_bus_add_match(api->sdbus, &api->client.slot_broadcast, match, api_dbus_client_on_broadcast_event, api);
 	free(match);
 	if (rc < 0) {
-		ERROR("can't add dbus match %s for %s", api->path, api->name);
+		RP_ERROR("can't add dbus match %s for %s", api->path, api->name);
 		goto error;
 	}
 
 	/* connect to event management */
 	rc = sd_bus_add_object(api->sdbus, &api->client.slot_event, api->path, api_dbus_client_on_manage_event, api);
 	if (rc < 0) {
-		ERROR("can't add dbus object %s for %s", api->path, api->name);
+		RP_ERROR("can't add dbus object %s for %s", api->path, api->name);
 		goto error;
 	}
 
@@ -857,7 +857,7 @@ void dbus_req_raw_reply_cb(void *closure, const char *object, const char *error,
 		error ?: "",
 		info ?: "");
 	if (rc < 0)
-		ERROR("sending the reply failed");
+		RP_ERROR("sending the reply failed");
 }
 
 void dbus_req_raw_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
@@ -923,7 +923,7 @@ static void afb_api_dbus_server_event_send(struct origin *origin, char order, co
 		goto end;
 
 error:
-	ERROR("error while send event %c%s(%d) to %s", order, event, eventid, origin->name);
+	RP_ERROR("error while send event %c%s(%d) to %s", order, event, eventid, origin->name);
 end:
 	sd_bus_message_unref(msg);
 }
@@ -965,7 +965,7 @@ static void server_event_broadcast_cb(void *closure1, const char *json, const vo
 			"ssayy", event->data.name, json,
 			event->uuid, RP_UUID_BINARY_LENGTH, event->hop);
 	if (rc < 0)
-		ERROR("error while broadcasting event %s", event->data.name);
+		RP_ERROR("error while broadcasting event %s", event->data.name);
 }
 
 static void afb_api_dbus_server_event_broadcast(void *closure, const struct afb_evt_broadcasted *event)
@@ -1053,17 +1053,17 @@ int afb_api_dbus_add_server(const char *path, struct afb_apiset *declare_set, st
 	/* request the service object name */
 	rc = sd_bus_request_name(api->sdbus, api->name, 0);
 	if (rc < 0) {
-		ERROR("can't register name %s", api->name);
+		RP_ERROR("can't register name %s", api->name);
 		goto error2;
 	}
 
 	/* connect the service to the dbus object */
 	rc = sd_bus_add_object(api->sdbus, &api->server.slot_call, api->path, api_dbus_server_on_object_called, api);
 	if (rc < 0) {
-		ERROR("can't add dbus object %s for %s", api->path, api->name);
+		RP_ERROR("can't add dbus object %s for %s", api->path, api->name);
 		goto error3;
 	}
-	INFO("afb service over dbus installed, name %s, path %s", api->name, api->path);
+	RP_INFO("afb service over dbus installed, name %s, path %s", api->name, api->path);
 
 	api->server.listener = afb_evt_listener_create(&evt_broadcast_itf, api);
 	api->server.apiset = afb_apiset_addref(call_set);

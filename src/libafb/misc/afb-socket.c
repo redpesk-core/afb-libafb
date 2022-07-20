@@ -31,9 +31,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "misc/afb-socket.h"
 
-#include "sys/verbose.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 
@@ -470,7 +471,7 @@ int afb_socket_open_scheme(const char *uri, int server, const char *scheme)
 {
 	int fd = open_uri(uri, server, scheme);
 	if (fd < 0)
-		ERROR("can't open %s socket for %s: %s", server ? "server" : "client", uri, strerror(-fd));
+		RP_ERROR("can't open %s socket for %s: %s", server ? "server" : "client", uri, strerror(-fd));
 	return fd;
 }
 

@@ -30,6 +30,8 @@
 #include <assert.h>
 #include <time.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
 #include "sys/x-thread.h"
@@ -41,7 +43,6 @@
 #include "core/afb-ev-mgr.h"
 #include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
-#include "sys/verbose.h"
 
 #define CLASSID_MAIN   1
 #define CLASSID_OTHERS 2
@@ -114,7 +115,7 @@ static struct ev_mgr *evmgr;
 static void evloop_sig_run(int signum, void *closure)
 {
 	if (signum) {
-		ERROR("Signal %s catched in evloop", strsignal(signum));
+		RP_ERROR("Signal %s catched in evloop", strsignal(signum));
 		ev_mgr_recover_run(evmgr);
 	}
 	else {
@@ -459,7 +460,7 @@ int afb_sched_start(
 
 	/* check whether already running */
 	if (allowed_thread_count) {
-		ERROR("sched already started");
+		RP_ERROR("sched already started");
 		exiting.code = X_EINVAL;
 		goto error;
 	}
@@ -472,7 +473,7 @@ int afb_sched_start(
 	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
 		exiting.code = start_one_thread();
 		if (exiting.code != 0) {
-			ERROR("Not all threads can be started");
+			RP_ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
 			afb_threads_stop(CLASSID_OTHERS, INT_MAX);
 			goto error;

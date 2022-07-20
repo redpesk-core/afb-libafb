@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "wsj1/afb-wsj1.h"
 #include "wsj1/afb-ws-json1.h"
@@ -45,7 +46,6 @@
 #include "core/containerof.h"
 
 #include "sys/systemd.h"
-#include "sys/verbose.h"
 
 /* predeclaration of structures */
 struct afb_ws_json1;
@@ -223,7 +223,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	int rc;
 
 	object = afb_wsj1_msg_object_s(msg, &len);
-	DEBUG("received websocket request for %s/%s: %s", api, verb, object);
+	RP_DEBUG("received websocket request for %s/%s: %s", api, verb, object);
 
 	/* make params */
 	afb_wsj1_msg_addref(msg);
@@ -276,7 +276,7 @@ static void aws_on_event(struct afb_ws_json1 *aws, const struct afb_evt_data *ev
 		free(msg);
 	}
 	if (rc < 0)
-		ERROR("Can't send event %s: %m", event->name);
+		RP_ERROR("Can't send event %s: %m", event->name);
 }
 
 static void aws_on_push_cb(void *closure, const struct afb_evt_pushed *event)
@@ -321,7 +321,7 @@ static void wsreq_reply(struct afb_req_common *comreq, int status, unsigned npar
 		free(msg);
 	}
 	if (rc < 0)
-		ERROR("Can't send reply: %m");
+		RP_ERROR("Can't send reply: %m");
 }
 
 static int wsreq_subscribe(struct afb_req_common *comreq, struct afb_evt *event)

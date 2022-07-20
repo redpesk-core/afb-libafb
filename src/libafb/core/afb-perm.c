@@ -28,13 +28,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-perm.h"
 #include "core/afb-cred.h"
 #include "core/afb-token.h"
 #include "core/afb-sched.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
-#include "sys/verbose.h"
 
 /*********************************************************************************/
 
@@ -104,7 +105,7 @@ static void async_check_cb(void *closure, int status)
 	memo->status = status;
 	rc = afb_sched_post_job(NULL, 0, 0, async_job_cb, memo, Afb_Sched_Mode_Normal);
 	if (rc < 0)
-		ERROR("cynagora encountered error when queing job");
+		RP_ERROR("cynagora encountered error when queing job");
 }
 
 static void evfdcb(struct ev_fd *evfd, int fd, uint32_t events, void *closure)
@@ -150,12 +151,12 @@ static int cynagora_acquire()
 		rc = cynagora_create(&cynagora, cynagora_Check, 1000, NULL);
 		if (rc < 0) {
 			cynagora = NULL;
-			ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
+			RP_ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
 			unlock(&mutex);
 		} else {
 			rc = cynagora_async_setup(cynagora, cynagora_async_ctl_cb, NULL);
 			if (rc < 0) {
-				ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
+				RP_ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
 				cynagora_destroy(cynagora);
 				cynagora = NULL;
 				unlock(&mutex);
@@ -181,7 +182,7 @@ void afb_perm_check_req_async(
 		rc = 1;
 	}
 	else if (!permission) {
-		ERROR("Got a null permission!");
+		RP_ERROR("Got a null permission!");
 		rc = 0;
 	}
 	else {
@@ -190,7 +191,7 @@ void afb_perm_check_req_async(
 			memo = malloc(sizeof *memo);
 			if (memo == NULL) {
 				rc = -ENOMEM;
-				ERROR("Can't query cynagora: %s", strerror(-rc));
+				RP_ERROR("Can't query cynagora: %s", strerror(-rc));
 			}
 			else {
 				memo->status = -EFAULT;
@@ -204,7 +205,7 @@ void afb_perm_check_req_async(
 				unlock();
 				if (rc >= 0)
 					return;
-				ERROR("Can't query cynagora: %s", strerror(-rc));
+				RP_ERROR("Can't query cynagora: %s", strerror(-rc));
 			}
 		}
 	}
@@ -220,7 +221,7 @@ void afb_perm_check_req_async(
 	void (*callback)(void *_closure, int _status),
 	void *closure
 ) {
-	NOTICE("Granting permission %s by default of backend", permission ?: "(null)");
+	RP_NOTICE("Granting permission %s by default of backend", permission ?: "(null)");
 	callback(closure, !!permission);
 }
 

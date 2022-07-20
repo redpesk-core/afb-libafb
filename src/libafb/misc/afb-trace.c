@@ -37,6 +37,7 @@
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #include <afb/afb-arg.h>
 
@@ -53,7 +54,6 @@
 #include "core/afb-evt.h"
 #include "misc/afb-trace.h"
 
-#include "sys/verbose.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
@@ -198,7 +198,7 @@ static const char *verbosity_level_name(int level)
 		"debug"
 	};
 
-	return level >= Log_Level_Error && level <= Log_Level_Debug ? names[level - Log_Level_Error] : NULL;
+	return level >= rp_Log_Level_Error && level <= rp_Log_Level_Debug ? names[level - rp_Log_Level_Error] : NULL;
 }
 
 /* generic hook */

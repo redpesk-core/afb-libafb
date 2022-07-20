@@ -32,6 +32,7 @@
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
+#include <rp-utils/rp-verbose.h>
 
 #include <afb/afb-auth.h>
 #include <afb/afb-session.h>
@@ -54,8 +55,6 @@
 #include "core/afb-session.h"
 #include "core/afb-perm.h"
 #include "core/afb-permission-text.h"
-
-#include "sys/verbose.h"
 
 #include "containerof.h"
 
@@ -235,7 +234,7 @@ set_args(
 	else {
 		dest = malloc(ndata * sizeof *dest);
 		if (!dest) {
-			ERROR("fail to allocate memory for afb_req_common_arg");
+			RP_ERROR("fail to allocate memory for afb_req_common_arg");
 			afb_data_array_unref(ndata - REQ_COMMON_NDATA_DEF, &data[REQ_COMMON_NDATA_DEF]);
 			ndata = REQ_COMMON_NDATA_DEF;
 			dest = args->local;
@@ -453,7 +452,7 @@ static void req_common_process_async_cb(int signum, void *arg)
 
 	if (signum != 0) {
 		/* emit the error (assumes that hooking is initialised) */
-		ERROR("received signal %d (%s) when processing request", signum, strsignal(signum));
+		RP_ERROR("received signal %d (%s) when processing request", signum, strsignal(signum));
 		afb_req_common_reply_internal_error_hookable(req, X_EINTR);
 	} else {
 		/* invoke api call method to process the x2 */
@@ -472,7 +471,7 @@ static void req_common_process_api(struct afb_req_common *req, int timeout)
 	rc = afb_sched_post_job(req->api->group, 0, timeout, req_common_process_async_cb, req, Afb_Sched_Mode_Normal);
 	if (rc < 0) {
 		/* TODO: allows or not to proccess it directly as when no threading? (see above) */
-		ERROR("can't process job with threads: %s", strerror(-rc));
+		RP_ERROR("can't process job with threads: %s", strerror(-rc));
 		afb_req_common_reply_internal_error_hookable(req, rc);
 		afb_req_common_unref(req);
 	}
@@ -578,10 +577,10 @@ afb_req_common_process_on_behalf(
 
 	rc = afb_cred_import(&cred, import);
 	if (rc < 0) {
-		ERROR("Can't import on behalf credentials: %m");
+		RP_ERROR("Can't import on behalf credentials: %m");
 	}
 	else if (afb_req_common_async_push2(req, apiset, cred) == 0) {
-		ERROR("internal error when importing creds");
+		RP_ERROR("internal error when importing creds");
 		afb_cred_unref(cred);
 		rc = X_EOVERFLOW;
 	}
@@ -899,9 +898,9 @@ afb_req_common_vverbose_hookable(
 	}
 #endif
 	if (!fmt || vasprintf(&p, fmt, args) < 0)
-		vverbose(level, file, line, func, fmt, args);
+		rp_vverbose(level, file, line, func, fmt, args);
 	else {
-		verbose(level, file, line, func, "[REQ/API %s] %s", req->apiname, p);
+		rp_verbose(level, file, line, func, "[REQ/API %s] %s", req->apiname, p);
 		free(p);
 	}
 }
@@ -977,7 +976,7 @@ afb_req_common_reply_hookable(
 #endif
 	if (req->replied) {
 		/* it is an error to reply more than one time */
-		ERROR("reply called more than one time!!");
+		RP_ERROR("reply called more than one time!!");
 		afb_data_array_unref(nreplies, replies);
 	}
 	else {
@@ -995,12 +994,12 @@ afb_req_common_subscribe(
 	struct afb_evt *evt
 ) {
 	if (req->replied) {
-		ERROR("request replied, subscription impossible");
+		RP_ERROR("request replied, subscription impossible");
 		return X_EINVAL;
 	}
 	if (req->queryitf->subscribe)
 		return req->queryitf->subscribe(req, evt);
-	ERROR("no event listener, subscription impossible");
+	RP_ERROR("no event listener, subscription impossible");
 	return X_ENOTSUP;
 }
 
@@ -1023,12 +1022,12 @@ afb_req_common_unsubscribe(
 	struct afb_evt *evt
 ) {
 	if (req->replied) {
-		ERROR("request replied, unsubscription impossible");
+		RP_ERROR("request replied, unsubscription impossible");
 		return X_EINVAL;
 	}
 	if (req->queryitf->unsubscribe)
 		return req->queryitf->unsubscribe(req, evt);
-	ERROR("no event listener, unsubscription impossible");
+	RP_ERROR("no event listener, unsubscription impossible");
 	return X_ENOTSUP;
 }
 

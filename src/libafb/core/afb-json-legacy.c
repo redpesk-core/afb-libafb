@@ -34,6 +34,7 @@
 
 #include <afb/afb-errno.h>
 #include <rp-utils/rp-jsonstr.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-type.h"
 #include "core/afb-type-predefined.h"
@@ -43,7 +44,6 @@
 #include "core/afb-json-legacy.h"
 #include "core/afb-error-text.h"
 #include "sys/x-errno.h"
-#include "sys/verbose.h"
 
 #define SLEN(s) ((s) ? 1 + strlen(s) : 0)
 
@@ -633,7 +633,7 @@ afb_json_legacy_event_rebroadcast_name(
 	if (rc >= 0)
 		rc = afb_evt_rebroadcast_name_hookable(event, 1, &data, uuid, hop);
 	else {
-		ERROR("impossible to create the data to rebroadcast");
+		RP_ERROR("impossible to create the data to rebroadcast");
 	}
 	return rc;
 }
@@ -650,7 +650,7 @@ afb_json_legacy_event_push(
 	if (rc >= 0)
 		rc = afb_evt_push(evt, 1, &data);
 	else {
-		ERROR("impossible to create the data to push");
+		RP_ERROR("impossible to create the data to push");
 	}
 	return rc;
 }
@@ -667,7 +667,7 @@ afb_json_legacy_event_push_hookable(
 	if (rc >= 0)
 		rc = afb_evt_push_hookable(evt, 1, &data);
 	else {
-		ERROR("impossible to create the data to push");
+		RP_ERROR("impossible to create the data to push");
 	}
 	return rc;
 }
@@ -684,7 +684,7 @@ afb_json_legacy_event_broadcast_hookable(
 	if (rc >= 0)
 		rc = afb_evt_broadcast_hookable(evt, 1, &data);
 	else {
-		ERROR("impossible to create the data to broadcast");
+		RP_ERROR("impossible to create the data to broadcast");
 	}
 	return rc;
 }
@@ -702,7 +702,7 @@ afb_json_legacy_event_hooked_push(
 	if (rc >= 0)
 		rc = afb_evt_push_hookable(evt, 1, &data);
 	else {
-		ERROR("impossible to create the data to push");
+		RP_ERROR("impossible to create the data to push");
 	}
 	return rc;
 }
@@ -719,7 +719,7 @@ afb_json_legacy_event_hooked_broadcast(
 	if (rc >= 0)
 		rc = afb_evt_broadcast_hookable(evt, 1, &data);
 	else {
-		ERROR("impossible to create the data to broadcast");
+		RP_ERROR("impossible to create the data to broadcast");
 	}
 	return rc;
 }

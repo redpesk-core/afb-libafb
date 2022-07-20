@@ -29,10 +29,10 @@
 #include <fcntl.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "misc/afb-ws.h"
 #include "wsapi/afb-proto-ws.h"
-#include "sys/verbose.h"
 #include "sys/x-endian.h"
 #include "sys/x-uio.h"
 #include "sys/x-mutex.h"
@@ -589,7 +589,7 @@ static void client_on_event_create(struct afb_proto_ws *protows, struct readbuf 
 			&& readbuf_string(rb, &event_name, NULL))
 		protows->client_itf->on_event_create(protows->closure, event_id, event_name);
 	else
-		ERROR("Ignoring creation of event");
+		RP_ERROR("Ignoring creation of event");
 }
 
 /* removes an event */
@@ -600,7 +600,7 @@ static void client_on_event_remove(struct afb_proto_ws *protows, struct readbuf 
 	if (protows->client_itf->on_event_remove && readbuf_uint16(rb, &event_id))
 		protows->client_itf->on_event_remove(protows->closure, event_id);
 	else
-		ERROR("Ignoring deletion of event");
+		RP_ERROR("Ignoring deletion of event");
 }
 
 /* subscribes an event */
@@ -612,7 +612,7 @@ static void client_on_event_subscribe(struct afb_proto_ws *protows, struct readb
 	if (protows->client_itf->on_event_subscribe && client_msg_call_get(protows, rb, &call) && readbuf_uint16(rb, &event_id))
 		protows->client_itf->on_event_subscribe(protows->closure, call->request, event_id);
 	else
-		ERROR("Ignoring subscription to event");
+		RP_ERROR("Ignoring subscription to event");
 }
 
 /* unsubscribes an event */
@@ -624,7 +624,7 @@ static void client_on_event_unsubscribe(struct afb_proto_ws *protows, struct rea
 	if (protows->client_itf->on_event_unsubscribe && client_msg_call_get(protows, rb, &call) && readbuf_uint16(rb, &event_id))
 		protows->client_itf->on_event_unsubscribe(protows->closure, call->request, event_id);
 	else
-		ERROR("Ignoring unsubscription to event");
+		RP_ERROR("Ignoring unsubscription to event");
 }
 
 /* receives broadcasted events */
@@ -641,7 +641,7 @@ static void client_on_event_broadcast(struct afb_proto_ws *protows, struct readb
 			json_object_put(object);
 	}
 	else
-		ERROR("Ignoring broadcast of event");
+		RP_ERROR("Ignoring broadcast of event");
 }
 
 /* pushs an event */
@@ -653,7 +653,7 @@ static void client_on_event_push(struct afb_proto_ws *protows, struct readbuf *r
 	if (protows->client_itf->on_event_push && readbuf_uint16(rb, &event_id) && readbuf_object(rb, &object))
 		protows->client_itf->on_event_push(protows->closure, event_id, object);
 	else
-		ERROR("Ignoring push of event");
+		RP_ERROR("Ignoring push of event");
 }
 
 static void client_on_reply(struct afb_proto_ws *protows, struct readbuf *rb)

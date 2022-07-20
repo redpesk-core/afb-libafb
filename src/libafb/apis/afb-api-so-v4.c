@@ -31,6 +31,7 @@
 #include <stdarg.h>
 
 #include <json-c/json.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-v4-itf.h"
 
@@ -43,7 +44,6 @@
 #include "core/afb-api-v4.h"
 #include "core/afb-apiset.h"
 #include "sys/x-realpath.h"
-#include "sys/verbose.h"
 
 /**
  * Temporary structure holding important data used in initialisation callbacks
@@ -156,44 +156,44 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	if (!iniv4.dlv4.desc && !iniv4.dlv4.mainctl)
 		return 0;
 
-	INFO("binding [%s] looks like an AFB binding V4", path);
+	RP_INFO("binding [%s] looks like an AFB binding V4", path);
 
 	/* check interface */
 	if (iniv4.dlv4.itfrev == 0) {
-		ERROR("binding [%s] incomplete symbol set: interface is missing", path);
+		RP_ERROR("binding [%s] incomplete symbol set: interface is missing", path);
 		rc = X_EINVAL;
 		goto error;
 	}
 
 	/* check root api */
 	if (!iniv4.dlv4.root) {
-		ERROR("binding [%s] incomplete symbol set: root is missing", path);
+		RP_ERROR("binding [%s] incomplete symbol set: root is missing", path);
 		rc = X_EINVAL;
 		goto error;
 	}
 
 	/* check the interface revision */
 	if (iniv4.dlv4.itfrev > AFB_BINDING_X4R1_ITF_CURRENT_REVISION) {
-		ERROR("binding [%s] interface v4 revision %d isn't supported (greater than %d)",
+		RP_ERROR("binding [%s] interface v4 revision %d isn't supported (greater than %d)",
 				path, (int)iniv4.dlv4.itfrev, AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
 		rc = X_EINVAL;
 		goto error;
 	}
 
 	if (iniv4.dlv4.itfrev < AFB_BINDING_X4R1_ITF_CURRENT_REVISION)
-		NOTICE("binding [%s] interface v4 revision %d lesser than current %d",
+		RP_NOTICE("binding [%s] interface v4 revision %d lesser than current %d",
 				path, iniv4.dlv4.itfrev, AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
 
 	if (iniv4.dlv4.desc) {
 		/* case where a main API is described */
 		/* check validity */
 		if (iniv4.dlv4.desc->api == NULL || *iniv4.dlv4.desc->api == 0) {
-			ERROR("binding [%s] bad api name...", path);
+			RP_ERROR("binding [%s] bad api name...", path);
 			rc = X_EINVAL;
 			goto error;
 		}
 		if (!afb_apiname_is_valid(iniv4.dlv4.desc->api)) {
-			ERROR("binding [%s] invalid api name...", path);
+			RP_ERROR("binding [%s] invalid api name...", path);
 			rc = X_EINVAL;
 			goto error;
 		}
@@ -202,14 +202,14 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 			iniv4.dlv4.mainctl = iniv4.dlv4.desc->mainctl;
 		else if (iniv4.dlv4.desc->mainctl
 		      && iniv4.dlv4.desc->mainctl != iniv4.dlv4.mainctl) {
-			ERROR("binding [%s] clash of entries", path);
+			RP_ERROR("binding [%s] clash of entries", path);
 			rc = X_EINVAL;
 			goto error;
 		}
 	} else {
 		/* check validity of the root routine */
 		if (!iniv4.dlv4.mainctl) {
-			ERROR("binding [%s] incomplete symbol set: root entry is missing", path);
+			RP_ERROR("binding [%s] incomplete symbol set: root entry is missing", path);
 			rc = X_EINVAL;
 			goto error;
 		}
@@ -245,7 +245,7 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	if (rc >= 0)
 		return 1;
 
-	ERROR("binding [%s] initialisation failed", path);
+	RP_ERROR("binding [%s] initialisation failed", path);
 
 error:
 	return rc;

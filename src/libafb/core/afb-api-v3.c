@@ -30,6 +30,7 @@
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
 #include <rp-utils/rp-jsonc.h>
+#include <rp-utils/rp-verbose.h>
 
 #include "containerof.h"
 
@@ -54,7 +55,6 @@
 #if WITH_SYSTEMD
 #include "misc/afb-systemd.h"
 #endif
-#include "sys/verbose.h"
 #include "utils/globmatch.h"
 #include "utils/globset.h"
 #include "core/afb-sig-monitor.h"
@@ -460,7 +460,7 @@ static void x3_api_legacy_call_hookable(
 		void (*callback)(void*, int, struct json_object*, struct afb_api_x3*),
 		void *closure)
 {
-	ERROR("Legacy calls are not supported");
+	RP_ERROR("Legacy calls are not supported");
 	if (callback)
 		callback(closure, X_ENOTSUP, NULL, apix3);
 }
@@ -472,7 +472,7 @@ static int x3_api_legacy_call_sync_hookable(
 		struct json_object *args,
 		struct json_object **result)
 {
-	ERROR("Legacy calls are not supported");
+	RP_ERROR("Legacy calls are not supported");
 	if (result)
 		*result = NULL;
 	return X_ENOTSUP;
@@ -559,7 +559,7 @@ x3_api_set_verbs_v2_hookable(
 	struct afb_api_x3 *apix3,
 	const struct afb_verb_v2 *verbs
 ) {
-	ERROR("Set verbs v2 is not supported");
+	RP_ERROR("Set verbs v2 is not supported");
 	return X_ENOTSUP;
 }
 
@@ -663,7 +663,7 @@ x3_api_set_on_init_hookable(
 	int r;
 
 	if (apiv3->comapi.state != Api_State_Pre_Init) {
-		ERROR("[API %s] Bad call to 'afb_api_x3_on_init', must be in PreInit", apiv3->comapi.name);
+		RP_ERROR("[API %s] Bad call to 'afb_api_x3_on_init', must be in PreInit", apiv3->comapi.name);
 		r = X_EINVAL;
 	}
 	else {
@@ -1316,7 +1316,7 @@ afb_api_v3_create(
 	/* allocates the description */
 	apiv3 = malloc(strsz + sizeof *apiv3);
 	if (!apiv3) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}
@@ -1356,7 +1356,7 @@ afb_api_v3_create(
 	/* init xapi */
 	apiv3->xapi.apiname = apiv3->comapi.name;
 	apiv3->xapi.itf = &api_x3_itf;
-	afb_api_v3_logmask_set(apiv3, logmask);
+	afb_api_v3_logmask_set(apiv3, rp_logmask);
 
 	/* declare the api */
 	if (name != NULL) {

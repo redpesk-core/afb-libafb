@@ -31,6 +31,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include <rp-utils/rp-verbose.h>
+
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"
 #include "apis/afb-api-ws.h"
@@ -38,7 +40,6 @@
 #include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
 #include "wsapi/afb-stub-ws.h"
-#include "sys/verbose.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 
@@ -57,7 +58,7 @@ struct api_ws_server
 static void client_on_hangup(struct afb_stub_ws *client)
 {
 	const char *apiname = afb_stub_ws_apiname(client);
-	WARNING("Disconnected of API %s", apiname);
+	RP_WARNING("Disconnected of API %s", apiname);
 	afb_monitor_api_disconnected(apiname);
 }
 
@@ -67,7 +68,7 @@ static int reopen_client(void *closure)
 	const char *apiname = afb_socket_api(uri);
 	int fd = afb_socket_open(uri, 0);
 	if (fd >= 0)
-		INFO("Reconnected to API %s", apiname);
+		RP_INFO("Reconnected to API %s", apiname);
 	return fd;
 }
 
@@ -80,7 +81,7 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 	/* check the api name */
 	api = afb_socket_api(uri);
 	if (api == NULL || !afb_apiname_is_valid(api)) {
-		ERROR("invalid (too long) ws client uri %s", uri);
+		RP_ERROR("invalid (too long) ws client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
@@ -92,7 +93,7 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 		fd = rc;
 		stubws = afb_stub_ws_create_client(fd, 1, api, call_set);
 		if (!stubws) {
-			ERROR("can't setup client ws service to %s", uri);
+			RP_ERROR("can't setup client ws service to %s", uri);
 			rc = X_ENOMEM;
 		} else {
 			if (afb_stub_ws_client_add(stubws, declare_set) >= 0) {
@@ -106,7 +107,7 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 				afb_stub_ws_set_on_hangup(stubws, client_on_hangup);
 				return 0;
 			}
-			ERROR("can't add the client to the apiset for service %s", uri);
+			RP_ERROR("can't add the client to the apiset for service %s", uri);
 			afb_stub_ws_unref(stubws);
 			rc = X_ENOMEM;
 		}
@@ -132,7 +133,7 @@ int afb_api_ws_add_client_weak(const char *uri, struct afb_apiset *declare_set, 
 static void server_on_hangup(struct afb_stub_ws *server)
 {
 	const char *apiname = afb_stub_ws_apiname(server);
-	INFO("Disconnection of client of API %s", apiname);
+	RP_INFO("Disconnection of client of API %s", apiname);
 	afb_stub_ws_unref(server);
 }
 
@@ -146,7 +147,7 @@ static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
 	if (fdc < 0) {
-		ERROR("can't accept connection to %s: %m", apiws->uri);
+		RP_ERROR("can't accept connection to %s: %m", apiws->uri);
 	} else {
 		int opt = 1;
 		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &opt, (socklen_t)sizeof opt);
@@ -154,7 +155,7 @@ static void api_ws_server_accept(struct api_ws_server *apiws, int fd)
 		if (server)
 			afb_stub_ws_set_on_hangup(server, server_on_hangup);
 		else
-			ERROR("can't serve accepted connection to %s", apiws->uri);
+			RP_ERROR("can't serve accepted connection to %s", apiws->uri);
 	}
 }
 
@@ -186,14 +187,14 @@ static int api_ws_server_connect(struct api_ws_server *apiws)
 	/* request the service object name */
 	rc = afb_socket_open(apiws->uri, 1);
 	if (rc < 0)
-		ERROR("can't create socket %s", apiws->uri);
+		RP_ERROR("can't create socket %s", apiws->uri);
 	else {
 		/* listen for service */
 		fd = rc;
 		rc = afb_ev_mgr_add_fd(&apiws->efd, fd, EPOLLIN, api_ws_server_listen_callback, apiws, 0, 1);
 		if (rc < 0) {
 			close(fd);
-			ERROR("can't connect socket %s", apiws->uri);
+			RP_ERROR("can't connect socket %s", apiws->uri);
 		}
 	}
 	return rc;
@@ -210,7 +211,7 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 	/* check the size */
 	luri = strlen(uri);
 	if (luri > 4000) {
-		ERROR("can't create socket %s", uri);
+		RP_ERROR("can't create socket %s", uri);
 		rc = X_E2BIG;
 		goto error;
 	}
@@ -218,7 +219,7 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 	/* check the api name */
 	api = afb_socket_api(uri);
 	if (api == NULL || !afb_apiname_is_valid(api)) {
-		ERROR("invalid api name in ws uri %s", uri);
+		RP_ERROR("invalid api name in ws uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
@@ -226,7 +227,7 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 	/* check api name */
 	rc = afb_apiset_get_api(call_set, api, 1, 0, NULL);
 	if (rc < 0) {
-		ERROR("Can't provide ws-server for URI %s API %s", uri, api);
+		RP_ERROR("Can't provide ws-server for URI %s API %s", uri, api);
 		goto error;
 	}
 
@@ -235,7 +236,7 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 	extra = luri == (size_t)(api - uri) + lapi ? 0 : lapi + 1;
 	apiws = malloc(sizeof * apiws + 1 + luri + extra);
 	if (!apiws) {
-		ERROR("out of memory");
+		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
 		goto error;
 	}

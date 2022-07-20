@@ -36,7 +36,6 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/core/afb-jobs.c
 	${DIR}/sys/ev-mgr.c
 	${DIR}/sys/systemd.c
-	${DIR}/sys/verbose.c
 	${DIR}/utils/websock.c
 	${DIR}/wsapi/afb-proto-ws.c
 	${DIR}/wsapi/afb-wsapi.c
@@ -63,13 +62,14 @@ target_link_libraries(libafbcliso
 	${libsystemd_LDFLAGS}
 	${json-c_LDFLAGS}
 	${gnutls_LDFLAGS}
+	${librp-utils_LDFLAGS}
 	-lpthread
 	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/export-libafbcli.map
 	-Wl,--as-needed
 	-Wl,--gc-sections
 )
 
-set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${gnutls_LDFLAGS} -lpthread)
+set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${gnutls_LDFLAGS} ${librp-utils_LDFLAGS} -lpthread)
 list(JOIN PCLIBSPRIV " " PCLIBSPRIV)
 
 INSTALL(TARGETS libafbclista ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

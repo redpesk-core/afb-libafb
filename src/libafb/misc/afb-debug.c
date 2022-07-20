@@ -40,7 +40,8 @@
 #include <sys/personality.h>
 #endif
 
-#include "sys/verbose.h"
+#include <rp-utils/rp-verbose.h>
+
 #include "utils/namecmp.h"
 
 static char key_env_break[] = "AFB_DEBUG_BREAK";
@@ -93,7 +94,7 @@ void afb_debug_wait(const char *key)
 	sigset_t ss, oss;
 
 	key = key ?: "NULL";
-	NOTICE("DEBUG WAIT before %s", key);
+	RP_NOTICE("DEBUG WAIT before %s", key);
 	sigfillset(&ss);
 	sigdelset(&ss, SIGINT);
 	sigprocmask(SIG_SETMASK, &ss, &oss);
@@ -107,7 +108,7 @@ void afb_debug_wait(const char *key)
 	sigaction(SIGINT, &psa, NULL);
 	indicate(NULL);
 	sigprocmask(SIG_SETMASK, &oss, NULL);
-	NOTICE("DEBUG WAIT after %s", key);
+	RP_NOTICE("DEBUG WAIT after %s", key);
 #if WITH_CALL_PERSONALITY
 	personality((unsigned long)-1L);
 #endif
@@ -118,13 +119,13 @@ void afb_debug_break(const char *key)
 	struct sigaction sa, psa;
 
 	key = key ?: "NULL";
-	NOTICE("DEBUG BREAK before %s", key);
+	RP_NOTICE("DEBUG BREAK before %s", key);
 	memset(&sa, 0, sizeof sa);
 	sa.sa_handler = handler;
 	sigaction(SIGINT, &sa, &psa);
 	raise(SIGINT);
 	sigaction(SIGINT, &psa, NULL);
-	NOTICE("DEBUG BREAK after %s", key);
+	RP_NOTICE("DEBUG BREAK after %s", key);
 }
 
 void afb_debug(const char *key)
