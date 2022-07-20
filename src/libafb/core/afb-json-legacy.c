@@ -33,6 +33,7 @@
 #endif
 
 #include <afb/afb-errno.h>
+#include <rp-utils/rp-jsonstr.h>
 
 #include "core/afb-type.h"
 #include "core/afb-type-predefined.h"
@@ -41,7 +42,6 @@
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-error-text.h"
-#include "utils/jsonstr.h"
 #include "sys/x-errno.h"
 #include "sys/verbose.h"
 
@@ -638,7 +638,6 @@ afb_json_legacy_event_rebroadcast_name(
 	return rc;
 }
 
-
 int
 afb_json_legacy_event_push(
 	struct afb_evt *evt,
@@ -734,13 +733,13 @@ afb_json_legacy_event_hooked_broadcast(
  */
 static char *escjson_stpcpy(char *dest, const char *string)
 {
-	return &dest[jsonstr_string_escape_unsafe(dest, string, SIZE_MAX)];
+	return &dest[rp_jsonstr_string_escape_unsafe(dest, string, SIZE_MAX)];
 }
 
 /* compute the length of string as escaped for JSON */
 static size_t escjson_strlen(const char *string)
 {
-	return jsonstr_string_escape_length(string, SIZE_MAX);
+	return rp_jsonstr_string_escape_length(string, SIZE_MAX);
 }
 
 /**

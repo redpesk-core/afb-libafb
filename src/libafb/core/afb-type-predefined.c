@@ -36,6 +36,8 @@
 #include <limits.h>
 #include <stdio.h>
 
+#include <rp-utils/rp-jsonstr.h>
+
 #include "afb-type.h"
 #include "afb-type-internal.h"
 #include "afb-type-predefined.h"
@@ -43,7 +45,6 @@
 #include "afb-data.h"
 
 #include "sys/x-errno.h"
-#include "utils/jsonstr.h"
 
 #include <json-c/json.h>
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
@@ -413,14 +414,14 @@ CONVERT(stringz,json)
 		return afb_data_create_raw(out, type, "\"\"", 3, 0, 0);
 
 	/* compute escaped size and allocate it */
-	osz = jsonstr_string_escape_length(istr, isz - 1);
+	osz = rp_jsonstr_string_escape_length(istr, isz - 1);
 	ostr = malloc(3 + osz);
 	if (!ostr)
 		return X_ENOMEM;
 
 	/* make the json string */
 	ostr[0] = '"';
-	jsonstr_string_escape_unsafe(&ostr[1], istr, isz - 1);
+	rp_jsonstr_string_escape_unsafe(&ostr[1], istr, isz - 1);
 	ostr[osz + 1] = '"';
 	ostr[osz + 2] = 0;
 
