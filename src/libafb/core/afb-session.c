@@ -32,10 +32,10 @@
 
 #include <rp-utils/rp-uuid.h>
 #include <rp-utils/rp-verbose.h>
+#include <rp-utils/rp-pearson.h>
 
 #include "core/afb-session.h"
 #include "core/afb-hook.h"
-#include "utils/pearson.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
@@ -193,7 +193,7 @@ static uint8_t sessionset_make_uuid (rp_uuid_stringz_t uuid)
 
 	do {
 		rp_uuid_new_stringz(uuid);
-		hashidx = pearson4(uuid);
+		hashidx = rp_pearson4(uuid);
 	} while(sessionset_search(uuid, hashidx));
 	return hashidx;
 }
@@ -391,7 +391,7 @@ struct afb_session *afb_session_search (const char *uuid)
 
 	sessionset_lock();
 	sessionset_cleanup(0);
-	session = sessionset_search(uuid, pearson4(uuid));
+	session = sessionset_search(uuid, rp_pearson4(uuid));
 	session = afb_session_addref(session);
 	sessionset_unlock();
 	return session;
@@ -462,7 +462,7 @@ int afb_session_get (struct afb_session **psession, const char *uuid, int timeou
 		hashidx = sessionset_make_uuid(_uuid_);
 		uuid = _uuid_;
 	} else {
-		hashidx = pearson4(uuid);
+		hashidx = rp_pearson4(uuid);
 		session = sessionset_search(uuid, hashidx);
 		if (session) {
 			/* session found */

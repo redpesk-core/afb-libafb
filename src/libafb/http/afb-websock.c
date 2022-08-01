@@ -30,9 +30,9 @@
 #include <string.h>
 
 #include <microhttpd.h>
+#include <rp-utils/sha1.h>
 
 #include "wsj1/afb-ws-json1.h"
-#include "utils/sha1.h"
 
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"

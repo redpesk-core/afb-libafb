@@ -29,8 +29,6 @@
 #include "utils/lockany.h"
 #include "utils/namecmp.h"
 #include "utils/path-search.h"
-#include "utils/pearson.h"
-#include "utils/sha1.h"
 #include "utils/u16id.h"
 #include "utils/websock.h"
 #include "utils/ws.h"
