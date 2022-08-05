@@ -23,7 +23,7 @@
 
 #define _GNU_SOURCE /* for secure_getenv */
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 #if WITH_EXTENSION || WITH_DYNAMIC_BINDING
 

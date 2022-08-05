@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "misc/afb-autoset.h"
 #include "misc/afb-debug.h"
 #include "misc/afb-monitor.h"

@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "legacy/afb-fdev.h"
 #include "legacy/afb-socket-fdev.h"
 #include "legacy/evmgr.h"

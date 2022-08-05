@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "rpc/afb-rpc.h"
 #include "rpc/afb-rpc-sock.h"
 #include "rpc/afb-rpc-v0.h"

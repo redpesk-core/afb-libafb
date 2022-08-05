@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 #if WITH_CASE_FOLDING
 #  define namecmp(a,b)    strcasecmp(a,b)

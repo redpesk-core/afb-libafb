@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 #include <stdint.h>
 #include <stdarg.h>

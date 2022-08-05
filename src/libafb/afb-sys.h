@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "sys/ev-mgr.h"
 #include "sys/process-name.h"
 #include "sys/subpath.h"

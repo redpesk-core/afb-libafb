@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 struct locale_root;
 struct locale_search;

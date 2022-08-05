@@ -23,5 +23,6 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "wsj1/afb-wsj1.h"
 #include "wsj1/afb-ws-json1.h"

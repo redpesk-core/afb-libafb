@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "utils/globmatch.h"
 #include "utils/globset.h"
 #include "utils/locale-root.h"

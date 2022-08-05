@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 struct path_search;
 

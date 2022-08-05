@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "core/afb-api-common.h"
 #include "core/afb-apiname.h"
 #include "core/afb-apiset.h"

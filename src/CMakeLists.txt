@@ -87,11 +87,12 @@ if(WITH_SIG_MONITOR_TIMERS)
 	set(privs ${privs} -lrt)
 endif()
 
-INCLUDE_DIRECTORIES(${incdirs})
+include_directories(${incdirs})
 
 ############################################################################
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/libafb)
+configure_file(libafb/libafb-config.h.in libafb-config.h @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/libafb)
 
 ############################################################################
 

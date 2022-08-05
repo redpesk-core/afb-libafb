@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 #if WITH_DYNAMIC_BINDING
 

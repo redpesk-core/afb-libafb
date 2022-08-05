@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "libafb-config.h"
+#include "../libafb-config.h"
 
 #include <stdlib.h>
 #include <string.h>

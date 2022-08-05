@@ -23,4 +23,5 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "extend/afb-extend.h"

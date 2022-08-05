@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include <libafb/libafb-config.h>
+#include "../libafb-config.h"
 
 extern void afb_common_default_locale_set(const char *locale);
 extern const char *afb_common_default_locale_get();

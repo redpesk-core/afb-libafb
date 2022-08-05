@@ -22,7 +22,7 @@
  $RP_END_LICENSE$
 */
 
-#include "libafb-config.h"
+#include "../libafb-config.h"
 
 #if WITH_AFB_DEBUG
 

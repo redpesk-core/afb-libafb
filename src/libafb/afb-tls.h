@@ -23,4 +23,5 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "tls/tls.h"

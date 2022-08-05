@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "libafb-config.h"
 #include "afb-core.h"
 #include "afb-http.h"
 
