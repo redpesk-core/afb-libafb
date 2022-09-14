@@ -50,7 +50,7 @@ target_include_directories(libafbcli PRIVATE ${DIR})
 add_library(libafbclista STATIC $<TARGET_OBJECTS:libafbcli>)
 set_target_properties(libafbclista PROPERTIES
 	OUTPUT_NAME afbcli
-	VERSION ${LIBAFB_VERSION}
+	VERSION ${LIBAFBCLI_VERSION}
 )
 
 add_library(libafbcliso SHARED $<TARGET_OBJECTS:libafbcli>)
@@ -89,4 +89,3 @@ INSTALL(FILES
 	DESTINATION
 		${CMAKE_INSTALL_LIBDIR}/pkgconfig
 )
-
