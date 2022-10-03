@@ -199,6 +199,22 @@ void dataClosureCB(void *arg)
 	*val = *val + 1;
 }
 
+void test_vverbose(struct afb_api_common *comapi, ...)
+{
+	/******** vverbose ********/
+	fprintf(stderr, "\n******** vverbose ********\n");
+
+	observation = 0;
+	va_list test_va_list;
+	rp_verbose_observer = observe;
+	va_start(test_va_list, comapi);
+	afb_api_common_vverbose_hookable(comapi, 4, "test", 666, "this_is_a_test", "test message %d", test_va_list);
+	va_end(test_va_list);
+	fprintf(stderr, "vverbose test message observerd %d time\n", observation);
+	ck_assert_int_eq(1, observation);
+	rp_verbose_observer = NULL;
+}
+
 START_TEST (test_functional)
 {
 	struct afb_api_common *comapi = &capi;
@@ -297,15 +313,7 @@ START_TEST (test_functional)
 	ck_assert_int_eq(X_EINVAL, rc);
 
 	/******** vverbose ********/
-	fprintf(stderr, "\n******** vverbose ********\n");
-
-	observation = 0;
-	va_list test_va_list;
-	rp_verbose_observer = observe;
-	afb_api_common_vverbose_hookable(comapi, 4, "test", 666, "this_is_a_test", "test message", test_va_list);
-	fprintf(stderr, "vverbose test message observerd %d time\n", observation);
-	ck_assert_int_eq(1, observation);
-	rp_verbose_observer = NULL;
+	test_vverbose(comapi, 444);
 
 	/******** event_broadcast ********/
 	fprintf(stderr, "\n******** event_broadcast ********\n");

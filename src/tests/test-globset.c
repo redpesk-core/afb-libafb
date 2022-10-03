@@ -109,6 +109,7 @@ int main(int ac, char **av)
 		out = tmpfile();
 		if (out == NULL) {
 			fprintf(stderr, "Can't create temporary file: %m\n");
+			fclose(ref);
 			return 1;
 		}
 	}
@@ -119,7 +120,12 @@ int main(int ac, char **av)
 		rewind(out);
 		if (compare(out, ref))
 			return 1;
+		fclose(ref);
 	}
+	if (in != stdin)
+		fclose(in);
+	if (out != stdout)
+		fclose(out);
 
 	return 0;
 }
