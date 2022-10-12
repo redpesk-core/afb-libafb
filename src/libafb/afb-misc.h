@@ -32,5 +32,6 @@
 #include "misc/afb-supervisor.h"
 #include "misc/afb-systemd.h"
 #include "misc/afb-trace.h"
+#include "misc/afb-verbose.h"
 #include "misc/afb-watchdog.h"
 #include "misc/afb-ws.h"
