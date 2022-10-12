@@ -34,8 +34,9 @@
 
 #include <check.h>
 
-#include "utils/path-search.h"
 #include "sys/x-errno.h"
+
+#include <rp-utils/rp-path-search.h>
 
 /*********************************************************************/
 
@@ -49,18 +50,13 @@ struct listck {
     char **values;
 };
 
-void listcb(void *closure, const char *path)
-{
-    int *pi = closure;
-    printf("PATH %d: %s\n", ++*pi, path);
-}
-
-void cklistcb(void *closure, const char *path)
+int cklistcb(void *closure, const char *path, size_t size)
 {
     struct listck *l = closure;
     printf("PATH %d: %s/%s\n", 1+l->idx, path, l->values[l->idx]);
     ck_assert_str_eq(path, l->values[l->idx]);
     l->idx++;
+    return 0;
 }
 
 /*********************************************************************/
@@ -68,7 +64,7 @@ void cklistcb(void *closure, const char *path)
 START_TEST (check_addins)
 {
 	int rc, i, n;
-	struct path_search *search, *next;
+	rp_path_search_t *search, *next;
 	struct listck l;
 	char *expecteds[] = {
 		"0",
@@ -89,63 +85,79 @@ START_TEST (check_addins)
 		l.idx = 0;
 		l.values = &expecteds[(n - i) >> 1];
 		if (i & 1)
-			rc = path_search_add_dirs(&next, l.values[i - 1], 0, search);
+			rc = rp_path_search_add_dirs(&next, l.values[i - 1], 0, search);
 		else
-			rc = path_search_add_dirs(&next, l.values[0], 1, search);
+			rc = rp_path_search_add_dirs(&next, l.values[0], 1, search);
 		ck_assert_int_ge(rc, 0);
 
-		path_search_unref(search);
+		rp_path_search_unref(search);
 		search = next;
 
-		path_search_list(search, cklistcb, &l);
+		rp_path_search_list(search, cklistcb, &l);
 		ck_assert_int_eq(l.idx, i);
 	}
 
-	path_search_unref(search);
+	rp_path_search_unref(search);
 }
 END_TEST
 
 /*********************************************************************/
 
-int cbsearch(void *closure, struct path_search_item *item)
+int cbsearch(void *closure, const rp_path_search_entry_t *item)
 {
     fprintf(stdout, "%s %s\n", item->isDir ? "D" : "F", item->path);
     return 0;
 }
 
-static int filter(void *closure, struct path_search_item *item)
+static int filter(void *closure, const rp_path_search_entry_t *item)
 {
-	return strcmp(item->name, "CMakeFiles") != 0;
+	return item->name != NULL && strcmp(item->name, "CMakeFiles") != 0;
+}
+
+int get_path_cb(void *closure, const rp_path_search_entry_t *item)
+{
+	char **path = closure;
+	*path = strdup(item->path);
+	return *path == NULL ? X_ENOMEM : 1;
+}
+
+int get_path(rp_path_search_t *search, char **path, const char *name, const char *ext)
+{
+	*path = NULL;
+	int rc = rp_path_search_match(search, RP_PATH_SEARCH_FILE | RP_PATH_SEARCH_RECURSIVE, name, ext, get_path_cb, path);
+	return rc < 0 ? rc : rc == 1 ? 0 : X_ENOENT;
 }
 
 START_TEST (check_search)
 {
 #if WITH_DIRENT
 	int rc, i;
-	struct path_search *search;
+	rp_path_search_t *search;
 	char *path;
 
 	fprintf(stdout, "\n************************************ CHECK SEARCH\n\n");
 
-	rc = path_search_add_dirs(&search, base, 0, 0);
+	rc = rp_path_search_add_dirs(&search, base, 0, 0);
 	ck_assert_int_ge(rc, 0);
 
-	rc = path_search_get_path(search, &path, 1, "test-path-search", 0);
+	rc = get_path(search, &path, "test-path-search", 0);
 	ck_assert_int_eq(rc, 0);
-	ck_assert_ptr_ne(path, 0);
+	ck_assert_ptr_ne(path, NULL);
+	free(path);
 
-	rc = path_search_get_path(search, &path, 1, "t-e-s-t-path-search", 0);
+	rc = get_path(search, &path, "t-e-s-t-path-search", 0);
 	ck_assert_int_le(rc, 0);
-	ck_assert_ptr_eq(path, 0);
+	ck_assert_ptr_eq(path, NULL);
+	free(path);
 
 	fprintf(stdout, "\n************************************ FULL\n\n");
-	i = PATH_SEARCH_FILE | PATH_SEARCH_DIRECTORY | PATH_SEARCH_RECURSIVE;
-	path_search(search, i, cbsearch, 0);
+	i = RP_PATH_SEARCH_FILE | RP_PATH_SEARCH_DIRECTORY | RP_PATH_SEARCH_RECURSIVE;
+	rp_path_search(search, i, cbsearch, 0);
 
 	fprintf(stdout, "\n************************************ FILTERED\n\n");
-	path_search_filter(search, i, cbsearch, 0, filter);
+	rp_path_search_filter(search, i, cbsearch, 0, filter, 0);
 
-	path_search_unref(search);
+	rp_path_search_unref(search);
 #endif
 }
 END_TEST

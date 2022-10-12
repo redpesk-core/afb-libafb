@@ -39,7 +39,7 @@
 #include "core/afb-v4-itf.h"
 
 #if WITH_DIRENT
-#include "utils/path-search.h"
+#include <rp-utils/rp-path-search.h>
 #endif
 
 #define MANIFEST	"AfbExtensionManifest"
@@ -224,7 +224,7 @@ static void load_extension_cb(void *closure, struct json_object *value)
 /**
  * callback of files
  */
-static int try_extension(void *closure, struct path_search_item *item)
+static int try_extension(void *closure, const rp_path_search_entry_t *item)
 {
 	static char extension[] = ".so";
 	int rc, *ret = closure;
@@ -247,9 +247,9 @@ static int try_extension(void *closure, struct path_search_item *item)
 /**
  * function to filter out the directories that must not be entered
  */
-static int filterdirs(void *closure, struct path_search_item *item)
+static int filterdirs(void *closure, const rp_path_search_entry_t *item)
 {
-	int result = item->name[0] != '.';
+	int result = item->name == NULL || item->name[0] != '.';
 	if (result)
 		RP_INFO("Scanning dir=[%s] for extensions", item->path);
 	return result;
@@ -258,13 +258,13 @@ static int filterdirs(void *closure, struct path_search_item *item)
 static int load_extpath(const char *value)
 {
 	int rc;
-	struct path_search *ps;
+	rp_path_search_t *ps;
 
-	rc = path_search_make_dirs(&ps, value);
+	rc = rp_path_search_make_dirs(&ps, value);
 	if (rc >= 0) {
-		path_search_filter(ps, PATH_SEARCH_FILE|PATH_SEARCH_RECURSIVE|PATH_SEARCH_FLEXIBLE,
-			try_extension, &rc, filterdirs);
-		path_search_unref(ps);
+		rp_path_search_filter(ps, RP_PATH_SEARCH_FILE|RP_PATH_SEARCH_RECURSIVE|RP_PATH_SEARCH_FLEXIBLE,
+			try_extension, &rc, filterdirs, NULL);
+		rp_path_search_unref(ps);
 	}
 	return rc;
 }

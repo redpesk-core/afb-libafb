@@ -38,7 +38,6 @@
 #include "apis/afb-api-so-v3.h"
 #include "apis/afb-api-so-v4.h"
 #include "core/afb-sig-monitor.h"
-#include "utils/path-search.h"
 
 struct safe_dlopen
 {
@@ -151,7 +150,7 @@ struct search
 /**
  * callback of files
  */
-static int processfiles(void *closure, struct path_search_item *item)
+static int processfiles(void *closure, const rp_path_search_entry_t *item)
 {
 	int rc;
 	struct search *s = closure;
@@ -173,7 +172,7 @@ static int processfiles(void *closure, struct path_search_item *item)
 /**
  * function to filter out the directories that must not be entered
  */
-static int filterdirs(void *closure, struct path_search_item *item)
+static int filterdirs(void *closure, const rp_path_search_entry_t *item)
 {
 /*
 Exclude from the search of bindings any
@@ -207,10 +206,10 @@ See https://sourceware.org/bugzilla/show_bug.cgi?id=22101
 	int result;
 #if !defined(AFB_API_SO_ACCEPT_DOT_PREFIXED_DIRS) /* not defined by default */
 	/* ignore any directory beginning with a dot */
-	result = item->name[0] != '.';
+	result = item->name == NULL || item->name[0] != '.';
 #elif  !defined(AFB_API_SO_ACCEPT_DOT_DEBUG_DIRS) /* not defined by default */
 	/* ignore directories '.debug' */
-	result = strcmp(item->name, ".debug") != 0;
+	result = item->name == NULL || strcmp(item->name, ".debug") != 0;
 #else
 	result = 1;
 #endif
@@ -219,22 +218,22 @@ See https://sourceware.org/bugzilla/show_bug.cgi?id=22101
 	return result;
 }
 
-int afb_api_so_add_path_search(struct path_search *pathsearch, struct afb_apiset *declare_set, struct afb_apiset *call_set, int failstops)
+int afb_api_so_add_path_search(rp_path_search_t *pathsearch, struct afb_apiset *declare_set, struct afb_apiset *call_set, int failstops)
 {
 	struct search s = { .declare_set = declare_set, .call_set = call_set, .failstops = failstops, .status = 0 };
-	path_search_filter(pathsearch, PATH_SEARCH_FILE|PATH_SEARCH_RECURSIVE|PATH_SEARCH_FLEXIBLE, processfiles, &s, filterdirs);
+	rp_path_search_filter(pathsearch, RP_PATH_SEARCH_FILE|RP_PATH_SEARCH_RECURSIVE|RP_PATH_SEARCH_FLEXIBLE, processfiles, &s, filterdirs, &s);
 	return s.status;
 }
 
 int afb_api_so_add_pathset(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops)
 {
 	int rc;
-	struct path_search *ps;
+	rp_path_search_t *ps;
 
-	rc = path_search_make_dirs(&ps, pathset);
+	rc = rp_path_search_make_dirs(&ps, pathset);
 	if (rc >= 0) {
 		rc = afb_api_so_add_path_search(ps, declare_set, call_set, failstops);
-		path_search_unref(ps);
+		rp_path_search_unref(ps);
 	}
 	return rc;
 }

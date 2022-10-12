@@ -35,8 +35,8 @@ extern int afb_api_so_add_binding(const char *path, struct afb_apiset *declare_s
 extern int afb_api_so_add_binding_config(const char *path, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config);
 
 #if WITH_DIRENT
-struct path_search;
-extern int afb_api_so_add_path_search(struct path_search *pathsearch, struct afb_apiset *declare_set, struct afb_apiset *call_set, int failstops);
+#include <rp-utils/rp-path-search.h>
+extern int afb_api_so_add_path_search(rp_path_search_t *pathsearch, struct afb_apiset *declare_set, struct afb_apiset *call_set, int failstops);
 extern int afb_api_so_add_pathset(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set, int failstops);
 extern int afb_api_so_add_pathset_fails(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set);
 extern int afb_api_so_add_pathset_nofails(const char *pathset, struct afb_apiset *declare_set, struct afb_apiset * call_set);
