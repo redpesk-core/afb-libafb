@@ -46,13 +46,14 @@ extern void afb_vverbose(int loglevel, const char *file, int line, const char *f
 extern int  afb_verbose_wants(int lvl);
 
 extern void afb_verbose_set(int mask);
-extern void afb_verbose_dec();
-extern void afb_verbose_inc();
-extern void afb_verbose_clear();
+extern int  afb_verbose_get(void);
+extern void afb_verbose_dec(void);
+extern void afb_verbose_inc(void);
+extern void afb_verbose_clear(void);
 extern void afb_verbose_add(int level);
 extern void afb_verbose_sub(int level);
 extern int afb_verbose_colorize(int value);
-extern int afb_verbose_is_colorized();
+extern int afb_verbose_is_colorized(void);
 extern int afb_verbose_level_of_name(const char *name);
 extern const char *afb_verbose_name_of_level(int level);
 

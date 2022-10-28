@@ -33,6 +33,11 @@ void afb_verbose_set(int mask)
 	rp_set_logmask(mask);
 }
 
+int afb_verbose_get()
+{
+	return rp_logmask;
+}
+
 void afb_verbose(int loglevel, const char *file, int line, const char *function, const char *fmt, ...)
 {
 	va_list args;
