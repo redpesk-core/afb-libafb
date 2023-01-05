@@ -1,0 +1,6 @@
+
+add	pkg	libafb libafbcli
+req	pkg	afb-binding>=4.1.0 librp-utils>=0.0.3
+req	pkg	json-c
+opt	pkg	libsystemd>=222 cynagora gnutls>=3.3 libmicrohttpd>=0.9.60 uuid
+
