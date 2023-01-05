@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2023 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -1058,7 +1058,7 @@ afb_req_common_param_convert(
 
 	after = NULL;
 	if (index >= req->params.ndata)
-		rc = -X_EINVAL;
+		rc = X_EINVAL;
 	else {
 		before = req->params.data[index];
 		rc = afb_data_convert(before, type, &after);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2023 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -112,7 +112,7 @@ static int job_add(
 		/* allocation without blocking */
 		job = malloc(sizeof *job);
 		if (!job) {
-			rc = -X_ENOMEM;
+			rc = X_ENOMEM;
 			goto end;
 		}
 	}

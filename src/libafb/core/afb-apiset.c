@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2022 IoT.bzh Company
+ * Copyright (C) 2015-2023 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -1108,6 +1108,8 @@ int afb_apiset_require(struct afb_apiset *declset, const char *apiname, struct a
 			d->callset = callset;
 			strcpy(d->name, required);
 			rc = api_array_add(&a->require.apis, d);
+			if (rc < 0)
+				free(d);
 		}
 	}
 	return rc;
@@ -1120,6 +1122,7 @@ int afb_apiset_require(struct afb_apiset *declset, const char *apiname, struct a
  */
 int afb_apiset_require_class(struct afb_apiset *declset, const char *apiname, const char *classname)
 {
+	int r;
 	struct api_desc *a = searchrec(declset, apiname);
 	struct api_class *c = class_search(classname, 1);
 	return a && c ? api_array_add(&a->require.classes, c) : X_ENOENT;
