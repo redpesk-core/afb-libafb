@@ -465,6 +465,13 @@ afb_api_common_post_job(
 	void *group
 );
 
+extern
+int
+afb_api_common_abort_job(
+	const struct afb_api_common *comapi,
+	int jobid
+);
+
 /***************************************************************************
 * SECTION of HOOKABLES
 * the functions belaow are the same than the ones above but may be hooked
@@ -521,6 +528,13 @@ afb_api_common_post_job_hookable(
 	void (*callback)(int signum, void *arg),
 	void *argument,
 	void *group
+);
+
+extern
+int
+afb_api_common_abort_job_hookable(
+	const struct afb_api_common *comapi,
+	int jobid
 );
 
 extern

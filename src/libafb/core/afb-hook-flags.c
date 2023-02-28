@@ -102,6 +102,7 @@ static struct flag api_flags[] = { /* must be sorted by names */
 		{ "api_set_verbs",	afb_hook_flag_api_api_set_verbs },
 		{ "call",		afb_hook_flag_api_call },
 		{ "callsync",		afb_hook_flag_api_callsync },
+		{ "abort_job",		afb_hook_flag_api_abort_job },
 		{ "class_provide",	afb_hook_flag_api_class_provide },
 		{ "class_require",	afb_hook_flag_api_class_require },
 		{ "common",		afb_hook_flags_api_common },

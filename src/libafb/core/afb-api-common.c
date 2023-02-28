@@ -270,6 +270,14 @@ afb_api_common_post_job(
 }
 
 int
+afb_api_common_abort_job(
+	const struct afb_api_common *comapi,
+	int jobid
+) {
+	return afb_sched_abort_job(jobid);
+}
+
+int
 afb_api_common_require_api(
 	const struct afb_api_common *comapi,
 	const char *name,
@@ -500,8 +508,21 @@ afb_api_common_post_job_hookable(
 ) {
 	int r = afb_api_common_post_job(comapi, delayms, timeout, callback, argument, group);
 #if WITH_AFB_HOOK
-	if (comapi->hookflags & afb_hook_flag_api_post_job)
+	if (comapi != NULL && (comapi->hookflags & afb_hook_flag_api_post_job))
 		return afb_hook_api_post_job(comapi, delayms, timeout, callback, argument, group, r);
+#endif
+	return r;
+}
+
+int
+afb_api_common_abort_job_hookable(
+	const struct afb_api_common *comapi,
+	int jobid
+) {
+	int r = afb_api_common_abort_job(comapi, jobid);
+#if WITH_AFB_HOOK
+	if (comapi != NULL && (comapi->hookflags & afb_hook_flag_api_abort_job))
+		return afb_hook_api_abort_job(comapi, jobid, r);
 #endif
 	return r;
 }

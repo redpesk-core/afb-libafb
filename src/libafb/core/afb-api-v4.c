@@ -43,6 +43,7 @@
 #include "core/afb-common.h"
 #include "core/afb-data.h"
 #include "core/afb-evt.h"
+#include "core/afb-global.h"
 #include "core/afb-hook.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
@@ -985,10 +986,17 @@ afb_api_v4_post_job_hookable(
 	void *argument,
 	void *group
 ) {
-	if (apiv4 != NULL)
-		return afb_api_common_post_job_hookable(
-				&apiv4->comapi, delayms, timeout, callback, argument, group);
-	return afb_sched_post_job(group, delayms, timeout, callback, argument, Afb_Sched_Mode_Normal);
+	const struct afb_api_common *comapi = apiv4 ? &apiv4->comapi : afb_global_api();
+	return afb_api_common_post_job_hookable(comapi, delayms, timeout, callback, argument, group);
+}
+
+int
+afb_api_v4_abort_job_hookable(
+	struct afb_api_v4 *apiv4,
+	int jobid
+) {
+	const struct afb_api_common *comapi = apiv4 ? &apiv4->comapi : afb_global_api();
+	return afb_api_common_abort_job_hookable(comapi, jobid);
 }
 
 int

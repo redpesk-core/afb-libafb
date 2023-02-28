@@ -229,6 +229,12 @@ int afb_sched_post_job(
 	return rc;
 }
 
+/* Schedule the given job */
+int afb_sched_abort_job(int jobid)
+{
+	return afb_jobs_abort(jobid);
+}
+
 /* call a monitored routine synchronousely, taking care of releasing event loop */
 void afb_sched_call(
 		int timeout,

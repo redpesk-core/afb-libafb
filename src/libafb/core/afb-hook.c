@@ -850,6 +850,11 @@ static void hook_api_post_job_cb(void *closure, const struct afb_hookid *hookid,
 	_hook_api_(comapi, "post_job(%p, %p, %p, %d, %ld) -> %d", callback, argument, group, timeout, delayms, result);
 }
 
+static void hook_api_abort_job_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int jobid, int result)
+{
+	_hook_api_(comapi, "abort_job(%d) -> %d", jobid, result);
+}
+
 static void hook_api_require_api_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, int initialized)
 {
 	_hook_api_(comapi, "require_api(%s, %d)...", name, initialized);
@@ -1001,6 +1006,7 @@ static struct afb_hook_api_itf hook_api_default_itf = {
 	.hook_api_rootdir_get_fd = hook_api_rootdir_get_fd_cb,
 	.hook_api_rootdir_open_locale = hook_api_rootdir_open_locale_cb,
 	.hook_api_post_job = hook_api_post_job_cb,
+	.hook_api_abort_job = hook_api_abort_job_cb,
 	.hook_api_require_api = hook_api_require_api_cb,
 	.hook_api_require_api_result = hook_api_require_api_result_cb,
 	.hook_api_add_alias = hook_api_add_alias_cb,
@@ -1110,6 +1116,12 @@ int afb_hook_api_rootdir_open_locale(const struct afb_api_common *comapi, const 
 int afb_hook_api_post_job(const struct afb_api_common *comapi, long delayms, int timeout, void (*callback)(int signum, void *arg), void *argument, void *group, int result)
 {
 	_HOOK_API_(post_job, comapi, delayms, timeout, callback, argument, group, result);
+	return result;
+}
+
+int afb_hook_api_abort_job(const struct afb_api_common *comapi, int jobid, int result)
+{
+	_HOOK_API_(abort_job, comapi, jobid, result);
 	return result;
 }
 

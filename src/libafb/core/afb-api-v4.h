@@ -698,6 +698,14 @@ afb_api_v4_post_job_hookable(
 
 extern
 int
+afb_api_v4_abort_job_hookable(
+	struct afb_api_v4 *apiv4,
+	int jobid
+);
+
+
+extern
+int
 afb_api_v4_add_alias_hookable(
 	struct afb_api_v4 *apiv4,
 	const char *apiname,

@@ -149,6 +149,15 @@ extern int afb_sched_post_job(
 		enum afb_sched_mode mode);
 
 /**
+ * Aborts the job of given id, if not started, the job receives SIGABORT
+ *
+ * @param jobid the jobid to abort
+ *
+ * @return 0 on success or a negative error code
+ */
+extern int afb_sched_abort_job(int jobid);
+
+/**
  * Calls synchronously in the current thread the job represented
  * by 'callback' and 'arg'.
  * The advantage of calling this function intead of calling
