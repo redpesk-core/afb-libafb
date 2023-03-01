@@ -330,6 +330,11 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 
 	/* allocates enough for the result */
 	for (n = 0, ext = extensions ; ext ; ext = ext->next, n++);
+	if (n == 0) {
+		*options_array_result = NULL;
+		*names = NULL;
+		return 0;
+	}
 	*options_array_result = oar = malloc((unsigned)n * sizeof *oar);
 	*names = enam = malloc((unsigned)n * sizeof *enam);
 	if (!oar || !enam) {

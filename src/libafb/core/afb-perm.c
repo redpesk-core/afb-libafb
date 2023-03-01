@@ -142,7 +142,7 @@ static int cynagora_acquire()
 
 	/* cynagora isn't reentrant */
 	pthread_once(&once, mkmutex);
-	lock(&mutex);
+	lock();
 
 	if (cynagora)
 		rc = 0;
@@ -152,14 +152,14 @@ static int cynagora_acquire()
 		if (rc < 0) {
 			cynagora = NULL;
 			RP_ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
-			unlock(&mutex);
+			unlock();
 		} else {
 			rc = cynagora_async_setup(cynagora, cynagora_async_ctl_cb, NULL);
 			if (rc < 0) {
 				RP_ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
 				cynagora_destroy(cynagora);
 				cynagora = NULL;
-				unlock(&mutex);
+				unlock();
 			}
 		}
 	}
