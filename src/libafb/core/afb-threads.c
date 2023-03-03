@@ -169,10 +169,12 @@ PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 		status = me->getjob(me->getjobcls, &jobdesc, tid);
 		if (status > 0) {
 			/* run the job */
+PRINT("++++++++++++ TR run B%p classid=%d\n",me,me->classid);
 			jobdesc.run(jobdesc.job, tid);
 			x_mutex_lock(&mutex);
 		}
 		else {
+PRINT("++++++++++++ TR ??? B%p classid=%d\n",me,me->classid);
 			x_mutex_lock(&mutex);
 			if (me->active) {
 				if (status < 0)

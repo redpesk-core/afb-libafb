@@ -178,9 +178,17 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	return get_job((int)(intptr_t)closure, desc, tid);
 }
 
-static int start_one_thread()
+static int start_one_thread(enum afb_sched_mode mode)
 {
-	int classid = afb_threads_active_count(ANY_CLASSID) < allowed_thread_count ? CLASSID_OTHERS : CLASSID_EXTRA;
+	int classid;
+	if (afb_threads_active_count(ANY_CLASSID) < allowed_thread_count)
+		classid = CLASSID_OTHERS;
+	else if (mode == Afb_Sched_Mode_Start)
+		classid = CLASSID_EXTRA;
+	else {
+		afb_ev_mgr_wakeup();
+		return 0;
+	}
 	return afb_threads_start(classid, get_job_cb, (void*)(intptr_t)classid);
 }
 
@@ -189,11 +197,8 @@ static int start_one_thread()
  */
 static void adapt(enum afb_sched_mode mode)
 {
-	if (!afb_threads_wakeup(ANY_CLASSID, 1)) {
-		afb_ev_mgr_wakeup();
-		if (mode != Afb_Sched_Mode_Normal)
-			start_one_thread();
-	}
+	if (!afb_threads_wakeup(ANY_CLASSID, 1))
+		start_one_thread(mode);
 }
 
 /**
@@ -208,9 +213,14 @@ static int post_job(
 	void *arg,
 	enum afb_sched_mode mode
 ) {
-	int rc = afb_jobs_post(group, delayms, timeout, callback, arg);
+	int rc;
+
+	x_mutex_lock(&mutex);
+	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
 	if (rc >= 0)
 		adapt(mode); //delayms > 0);
+	x_mutex_unlock(&mutex);
+
 	return rc;
 }
 
@@ -323,9 +333,6 @@ int afb_sched_enter(
 	sync.arg = closure;
 	sync.handler = enter_cb;
 
-	if (afb_ev_mgr_release_for_me())
-		adapt(Afb_Sched_Mode_Normal);
-
 	x_cond_init(&sync.condsync);
 
 	x_mutex_lock(&sync_jobs_mutex);
@@ -334,6 +341,7 @@ int afb_sched_enter(
 		sync.id = ++sync_jobs_cptr;
 	sync.next = sync_jobs_head;
 	sync_jobs_head = &sync;
+	afb_ev_mgr_release_for_me();
 	rc = post_job(group, 0, timeout, enter_cb, (void*)sync.id, Afb_Sched_Mode_Start);
 	if (rc >= 0) {
 		if (sync.timeout) {
@@ -414,7 +422,7 @@ int afb_sched_call_job_sync(
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
 	if (afb_threads_active_count(ANY_CLASSID) <= afb_threads_has_me())
-		start_one_thread();
+		start_one_thread(Afb_Sched_Mode_Start);
 	return afb_threads_wait_idle(ANY_CLASSID, timeout * 1000);
 }
 
@@ -477,7 +485,7 @@ int afb_sched_start(
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
-		exiting.code = start_one_thread();
+		exiting.code = start_one_thread(Afb_Sched_Mode_Start);
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
