@@ -176,6 +176,8 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	if (iniv4.dlv4.itfrev > AFB_BINDING_X4R1_ITF_CURRENT_REVISION) {
 		RP_ERROR("binding [%s] interface v4 revision %d isn't supported (greater than %d)",
 				path, (int)iniv4.dlv4.itfrev, AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
+		RP_ERROR("HINT! for supporting older version, try: #define AFB_BINDING_X4R1_ITF_REVISION %d",
+				AFB_BINDING_X4R1_ITF_CURRENT_REVISION);
 		rc = X_EINVAL;
 		goto error;
 	}
