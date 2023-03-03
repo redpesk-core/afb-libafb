@@ -21,7 +21,6 @@
  * $RP_END_LICENSE$
  */
 
-
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>
@@ -58,13 +57,9 @@ static struct waithold *awaiters;
  */
 static void unhold_evmgr()
 {
-	struct waithold *waiter;
 	holder = INVALID_THREAD_ID;
-	waiter = awaiters;
-	if (waiter) {
-		awaiters = waiter->next;
-		x_cond_signal(&waiter->cond);
-	}
+	if (awaiters)
+		x_cond_signal(&awaiters->cond);
 }
 
 /**
@@ -101,25 +96,26 @@ int afb_ev_mgr_release(x_thread_t tid)
 struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid)
 {
 	x_mutex_lock(&mutex);
-	int gotit = try_hold_evmgr(tid);
+	int gotit = !awaiters && try_hold_evmgr(tid);
 	x_mutex_unlock(&mutex);
 	return gotit ? evmgr : 0;
 }
-
 struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
 {
 	/* lock */
 	x_mutex_lock(&mutex);
 
 	/* try to hold the event loop under lock */
-	while (!try_hold_evmgr(tid) && evmgr) {
+	if ((awaiters || !try_hold_evmgr(tid)) && evmgr) {
 		struct waithold wait = { 0, X_COND_INITIALIZER };
 		struct waithold **piw = &awaiters;
-		while (*piw)
-			piw = &(*piw)->next;
+		while (*piw) piw = &(*piw)->next;
 		*piw = &wait;
-		ev_mgr_wakeup(evmgr);
-		x_cond_wait(&wait.cond, &mutex);
+		do {
+			ev_mgr_wakeup(evmgr);
+			x_cond_wait(&wait.cond, &mutex);
+		} while(!try_hold_evmgr(tid));
+		awaiters = wait.next;
 	}
 
 	/* unlock */
