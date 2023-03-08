@@ -127,9 +127,21 @@ static struct json_object *make_settings(struct afb_api_common *comapi)
 /* the common session for services sharing their session */
 static struct afb_session *common_session;
 
-static
+int
+afb_api_common_set_common_session_uuid(
+	const char *uuid
+) {
+        struct afb_session *session;
+        int rc = afb_session_get(&session, uuid, 0, NULL);
+        if (rc >= 0) {
+		afb_session_unref(common_session);
+                common_session = session;
+        }
+        return rc;
+}
+
 struct afb_session *
-session_get_common()
+afb_api_common_get_common_session()
 {
 	struct afb_session *result;
 
@@ -160,7 +172,7 @@ afb_api_common_session_get(
 #if WITH_API_SESSIONS
 	return comapi->session;
 #else
-	return session_get_common();
+	return afb_api_common_get_common_session();
 #endif
 }
 
@@ -169,7 +181,7 @@ int
 afb_api_common_unshare_session(
 	struct afb_api_common *comapi
 ) {
-	struct afb_session *common = session_get_common();
+	struct afb_session *common = afb_api_common_get_common_session();
 	struct afb_session *current = comapi->session;
 
 	if (current == common) {
@@ -816,7 +828,7 @@ afb_api_common_init(
 	comapi->onevent = NULL;
 
 #if WITH_API_SESSIONS
-	comapi->session = afb_session_addref(session_get_common());
+	comapi->session = afb_session_addref(afb_api_common_get_common_session());
 #endif
 
 #if WITH_AFB_HOOK

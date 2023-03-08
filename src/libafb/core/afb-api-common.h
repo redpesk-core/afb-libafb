@@ -293,6 +293,25 @@ afb_api_common_session_get(
 	struct afb_api_common *comapi
 );
 
+/**
+ * Get the common session of APIs
+ * @return the common session of APIs
+ */
+extern
+struct afb_session *
+afb_api_common_get_common_session();
+
+/**
+ * Set the common UID of the API's session
+ * @param uuid the uid of the session or NULL for a random one
+ * @return 0 on success or a negative error code
+ */
+extern
+int
+afb_api_common_set_common_session_uuid(
+	const char *uuid
+);
+
 #if WITH_API_SESSIONS
 /**
  * Tell the api to use its own session

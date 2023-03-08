@@ -1,3 +1,33 @@
+Version 5.0.1
+-------------
+
+  features
+   - implementation of afb_job_abort
+   - added management of common session UUID
+
+  fixes
+   - race in awaiting evmgr
+   - afb_sched_mode behaviour
+
+  minor/details
+   - analysis tools improvements
+
+Version 5.0.0
+-------------
+
+  features
+   - relies on rp-libutils
+   - integration of RPC WSAPI version 3
+   - tuning of RPC version at build
+
+  fixes
+   - issue in includes
+   - fix deadlock in querying cynagora
+
+  minor/details
+   - schedule the callback of cynagora permission
+   - numeric error code to reply "disconnected"
+
 Version 4.1.0
 -------------
 
