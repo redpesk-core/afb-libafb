@@ -230,12 +230,6 @@ afb_api_common_new_event(
 	const char *name,
 	struct afb_evt **evt
 ) {
-	/* check daemon state */
-	if (comapi->state == Api_State_Pre_Init) {
-		RP_ERROR("[API %s] Bad call to 'afb_daemon_event_make(%s)', must not be in PreInit", comapi->name, name);
-		*evt = NULL;
-		return X_EINVAL;
-	}
 	return afb_evt_create2(evt, comapi->name, name);
 }
 
