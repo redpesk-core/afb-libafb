@@ -456,6 +456,18 @@ api_service_start_cb(
 		apiv4);
 }
 
+static
+void
+api_service_exit_cb(
+	void *closure,
+	int code
+) {
+	struct afb_api_v4 *apiv4 = closure;
+	union afb_ctlarg arg = { .exiting = { .code = code }};
+	if (apiv4->mainctl)
+		apiv4->mainctl(apiv4, afb_ctlid_Exiting, &arg, apiv4->userdata);
+}
+
 static void api_process_cb(void *closure, struct afb_req_common *req)
 	__attribute__((alias("afb_api_v4_process_call")));
 
@@ -500,6 +512,7 @@ static struct afb_api_itf export_api_itf =
 {
 	.process = api_process_cb,
 	.service_start = api_service_start_cb,
+	.service_exit = api_service_exit_cb,
 #if WITH_AFB_HOOK
 	.update_hooks = api_update_hooks_cb,
 #endif

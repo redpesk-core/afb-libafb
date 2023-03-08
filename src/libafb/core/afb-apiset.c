@@ -891,6 +891,27 @@ int afb_apiset_start_all_services(struct afb_apiset *set)
 	return ret;
 }
 
+/**
+ * Exits all started services
+ * @param set the api set
+ * @return 0 on success or a negative number when an error is found
+ */
+void afb_apiset_exit_all_services(struct afb_apiset *set, int code)
+{
+	struct api_desc *api;
+	int i;
+
+	while (set) {
+		for (i = set->apis.count; i > 0 ; ) {
+			api = set->apis.apis[--i];
+			if (0 == api->status && api->api.itf->service_exit)
+				api->api.itf->service_exit(api->api.closure, code);
+			api->status = 0;
+		}
+		set = set->subset;
+	}
+}
+
 #if WITH_AFB_HOOK
 /**
  * Ask to update the hook flags of the 'api'

@@ -33,6 +33,7 @@ struct afb_api_itf
 {
 	void (*process)(void *closure, struct afb_req_common *req);
 	int (*service_start)(void *closure);
+	void (*service_exit)(void *closure, int code);
 #if WITH_AFB_HOOK
 	void (*update_hooks)(void *closure);
 #endif
@@ -81,6 +82,7 @@ extern int afb_apiset_get_api(struct afb_apiset *set, const char *name, int rec,
 
 extern int afb_apiset_start_service(struct afb_apiset *set, const char *name);
 extern int afb_apiset_start_all_services(struct afb_apiset *set);
+extern void afb_apiset_exit_all_services(struct afb_apiset *set, int code);
 
 #if WITH_AFB_HOOK
 extern void afb_apiset_update_hooks(struct afb_apiset *set, const char *name);

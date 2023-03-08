@@ -5,6 +5,7 @@ Version 5.0.1
    - implementation of afb_job_abort
    - added management of common session UUID
    - allows creation of events in pre-init state
+   - implement service exiting and afb_ctlid_Exiting
 
   fixes
    - race in awaiting evmgr
