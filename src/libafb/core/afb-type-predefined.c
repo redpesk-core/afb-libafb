@@ -448,10 +448,26 @@ CONVERT(stringz,bytearray)
 	return rc;
 }
 
+CONVERT(stringz,json_c)
+{
+	int rc;
+	json_object *json;
+	enum json_tokener_error jerr;
+	const char *str;
+
+	str = afb_data_ro_pointer(in);
+	json = json_tokener_parse_verbose(str, &jerr);
+	if (jerr != json_tokener_success)
+		json = json_object_new_string(str);
+	rc = make_json_c(out, json);
+	return rc;
+}
+
 PREDEFINED_OPERATION(stringz)
 	{
 		CONVERT_TO(stringz, opaque),
 		CONVERT_TO(stringz, bytearray),
+		CONVERT_TO(stringz, json_c),
 		CONVERT_TO(stringz, json)
 	};
 
@@ -470,8 +486,9 @@ CONVERT(json,json_c)
 	str = afb_data_ro_pointer(in);
 	json = json_tokener_parse_verbose(str, &jerr);
 	if (jerr != json_tokener_success)
-		json = json_object_new_string(str);
-	rc = make_json_c(out, json);
+		rc = X_EINVAL;
+	else
+		rc = make_json_c(out, json);
 	return rc;
 }
 

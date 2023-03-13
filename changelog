@@ -6,6 +6,9 @@ Version 5.0.1
    - added management of common session UUID
    - allows creation of events in pre-init state
    - implement service exiting and afb_ctlid_Exiting
+   - reworked conversion of data:
+      - stringz -> json_c : try to interpret json string first
+      - json -> json_c : return an error if parse failed
 
   fixes
    - race in awaiting evmgr
