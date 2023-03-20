@@ -27,6 +27,7 @@
 
 struct afb_api_v4;
 struct afb_verb_v4;
+struct afb_req_v4;
 
 /**
  * Checks whether the request 'req' is valid or not.
