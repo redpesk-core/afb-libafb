@@ -204,7 +204,7 @@ struct ev_timer;
  * @param decount reverse index of the event: zero for infinite timer
  *                or a decreasing value finishing with 1
  */
-typedef void (*ev_timer_cb_t)(struct ev_timer *timer, void *closure, int decount);
+typedef void (*ev_timer_cb_t)(struct ev_timer *timer, void *closure, unsigned decount);
 
 extern int ev_mgr_add_timer(
 		struct ev_mgr *mgr,

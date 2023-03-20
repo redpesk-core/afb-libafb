@@ -25,13 +25,13 @@
 
 #include "afb-v4-itf.h"
 
-#include "afb-data.h"
-#include "afb-req-v4.h"
-#include "afb-evt.h"
-#include "afb-type.h"
-#include "afb-type-predefined.h"
-#include "afb-api-v4.h"
-#include "afb-ev-mgr.h"
+#include "core/afb-data.h"
+#include "core/afb-req-v4.h"
+#include "core/afb-evt.h"
+#include "core/afb-type.h"
+#include "core/afb-type-predefined.h"
+#include "core/afb-api-v4.h"
+#include "core/afb-ev-mgr.h"
 
 #include "sys/ev-mgr.h"
 #include "sys/x-errno.h"

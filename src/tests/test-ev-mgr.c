@@ -123,9 +123,9 @@ START_TEST (fd)
 }
 END_TEST
 
-int timerdata;
+unsigned timerdata;
 
-void timercb(struct ev_timer *timer, void *closure, int decount)
+void timercb(struct ev_timer *timer, void *closure, unsigned decount)
 {
 	timerdata += decount;
 }
@@ -148,7 +148,7 @@ START_TEST (timer)
 	}
 	while(rc == 1);
 	ck_assert_int_eq(rc, 0);
-	ck_assert_int_eq(timerdata, 1 + 2 + 3);
+	ck_assert_uint_eq(timerdata, 1 + 2 + 3);
 
 	ev_mgr_unref(mgr);
 }

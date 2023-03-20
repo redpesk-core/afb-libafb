@@ -1,3 +1,12 @@
+Version 5.0.2 (in progress)
+-------------
+
+  fixes
+   - coherent callbacks for timers (now unsigned decount)
+
+  minor/details
+   - improved include order
+
 Version 5.0.1
 -------------
 
