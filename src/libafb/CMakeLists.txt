@@ -54,7 +54,7 @@ set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 ###########################################################################
 
 add_library(libafb OBJECT ${LIBAFBSRCS})
-target_include_directories(libafb PUBLIC ${LIBAFB_SOURCE_DIR})
+target_include_directories(libafb BEFORE PUBLIC ${LIBAFB_SOURCE_DIR})
 
 ###########################################################################
 
