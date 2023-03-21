@@ -23,6 +23,7 @@
 
 #include "../libafb-config.h"
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -138,14 +139,14 @@ static int open_unix(const char *spec, int server)
 	if (length >= 108)
 		return X_ENAMETOOLONG;
 
-	/* remove the file on need */
-	if (server && !abstract)
-		unlink(spec);
-
 	/* create a  socket */
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0)
 		return fd;
+
+	/* remove the file on need */
+	if (server && !abstract)
+		unlink(spec);
 
 	/* prepare address  */
 	memset(&addr, 0, sizeof addr);
@@ -154,10 +155,11 @@ static int open_unix(const char *spec, int server)
 	if (abstract)
 		addr.sun_path[0] = 0; /* implement abstract sockets */
 
+	length += offsetof(struct sockaddr_un, sun_path) + !abstract;
 	if (server) {
-		rc = bind(fd, (struct sockaddr *) &addr, (socklen_t)(sizeof addr));
+		rc = bind(fd, (struct sockaddr *) &addr, (socklen_t)length);
 	} else {
-		rc = connect(fd, (struct sockaddr *) &addr, (socklen_t)(sizeof addr));
+		rc = connect(fd, (struct sockaddr *) &addr, (socklen_t)length);
 	}
 	if (rc < 0) {
 		close(fd);
