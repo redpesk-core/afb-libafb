@@ -217,8 +217,10 @@ static int post_job(
 
 	x_mutex_lock(&mutex);
 	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc >= 0)
+	if (rc >= 0) {
 		adapt(mode); //delayms > 0);
+		afb_ev_mgr_wakeup();
+	}
 	x_mutex_unlock(&mutex);
 
 	return rc;
