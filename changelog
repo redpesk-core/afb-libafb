@@ -1,3 +1,11 @@
+Version 5.0.3
+-------------
+
+  fixes
+   - calling call-sync functions in timers
+   - lock of event loop when posting jobs
+   - length of abstract unix sockets
+
 Version 5.0.2
 -------------
 
