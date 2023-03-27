@@ -128,7 +128,6 @@ static void evloop_sig_run(int signum, void *closure)
 				ev_mgr_dispatch(evmgr);
 		}
 	}
-	evmgr = 0;
 }
 
 static void run_event_loop(void *closure, x_thread_t tid)
