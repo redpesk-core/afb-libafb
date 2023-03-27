@@ -229,36 +229,75 @@ static inline void monitor_raise(int signum) {}
 
 #include <setjmp.h>
 
-/* local handler */
-X_TLS(sigjmp_buf, error_handler);
+#if !SIG_MONITOR_RECOVER_COUNT
+#define SIG_MONITOR_RECOVER_COUNT 3
+#endif
 
-static void monitor(int timeout, void (*function)(int sig, void*), void *arg)
+struct undoer
+{
+	void (*function)(int sig, void *arg);
+	void *arg;
+	struct undoer *previous;
+};
+
+struct recovery
+{
+	struct undoer *undoers;
+	sigjmp_buf jmpbuf;
+};
+
+/* local handler */
+X_TLS(struct recovery, error_handler);
+
+static void monitor_run(int timeout, void (*function)(int sig, void*), void *arg)
 {
 	volatile int signum, signum2;
-	sigjmp_buf jmpbuf, *older;
+	struct recovery recovery, *older;
 
 	older = x_tls_get_error_handler();
-	signum = sigsetjmp(jmpbuf, 1);
+	recovery.undoers = NULL;
+	signum = sigsetjmp(recovery.jmpbuf, 1);
 	if (signum == 0) {
-		x_tls_set_error_handler(&jmpbuf);
-		if (timeout)
+		x_tls_set_error_handler(&recovery);
+		if (timeout > 0)
 			timeout_arm(timeout);
 		function(0, arg);
 	} else {
-		signum2 = sigsetjmp(jmpbuf, 1);
+		signum2 = sigsetjmp(recovery.jmpbuf, 1);
 		if (signum2 == 0)
 			function(signum, arg);
 	}
-	if (timeout)
+	if (timeout > 0)
 		timeout_disarm();
 	x_tls_set_error_handler(older);
 }
 
-static inline void monitor_raise(int signum)
+static inline void monitor_raise(int signo)
 {
-	sigjmp_buf *eh = x_tls_get_error_handler();
-	if (eh != NULL)
-		siglongjmp(*eh, signum == SIG_FOR_TIMER ? SIGALRM : signum);
+	struct recovery *recovery = x_tls_get_error_handler();
+	if (recovery != NULL) {
+		int signum = signo == SIG_FOR_TIMER ? SIGALRM : signo ? signo : SIGABRT;
+		struct undoer *undoer = recovery->undoers;
+		while(undoer != NULL) {
+			recovery->undoers = undoer->previous;
+			undoer->function(signum, undoer->arg);
+			undoer = recovery->undoers;
+		}
+		siglongjmp(recovery->jmpbuf, signum);
+	}
+}
+
+static inline void monitor_do(void (*function)(int sig, void*), void *arg)
+{
+	struct recovery *recovery = x_tls_get_error_handler();
+	if (recovery == NULL)
+		function(0, arg);
+	else {
+		struct undoer undo = { function, arg, recovery->undoers };
+		recovery->undoers = &undo;
+		function(0, arg);
+		recovery->undoers = undo.previous;
+	}
 }
 #endif
 /******************************************************************************/
@@ -443,7 +482,17 @@ void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *ar
 {
 #if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 	if (enabled)
-		monitor(timeout, function, arg);
+		monitor_run(timeout, function, arg);
+	else
+#endif
+		function(0, arg);
+}
+
+void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg)
+{
+#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
+	if (enabled)
+		monitor_do(function, arg);
 	else
 #endif
 		function(0, arg);

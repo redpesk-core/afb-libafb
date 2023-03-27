@@ -45,10 +45,18 @@ extern void afb_sig_monitor_clean_timeouts();
 extern int afb_sig_monitor_init_timeouts();
 
 /**
- * Run a job with signal monitoring if it has been set up perviously,
- * else just run the job with signal O for default action.
+ * When monitoring is enabled (@see function afb_sig_monitor_init)
+ * run the given function within monitoring of signals and timeout.
+ * So the function is called with a signal number of zero when it is
+ * run directly. But if it fails by raising a signal or by taking
+ * more time than set by timeout, its execution is cancelled and the
+ * given function is called a second time with the value of the
+ * signal that produced the cancellation (SIGALRM for timeout expiration).
  *
- * @param timeout   timeout for the job in secondes
+ * When monitoring is not enable, the function is just directly
+ * called with signal == 0.
+ *
+ * @param timeout   timeout for the job in secondes (<= 0 for no timeout)
  *
  * @param function  the job to run as void callback function
  *
@@ -56,6 +64,20 @@ extern int afb_sig_monitor_init_timeouts();
  */
 extern void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *arg);
 
+/**
+ * Call the function the function directly with signal == 0 and the given arg.
+ *
+ * If the monitoring is enabled and is active for the current thread (activated
+ * through call to afb_sig_monitor_run), and if a signal is trapped, the function
+ * is called with the value of the signal, letting the function cleanup the process
+ * state before returning to the main entry point (the one set
+ * with afb_sig_monitor_run)
+ *
+ * @param function  the job to run as void callback function
+ *
+ * @param arg       the arguments to pass to the job
+ */
+extern void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg);
 
 /**
  * Dumps the current stack
