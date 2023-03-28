@@ -271,7 +271,7 @@ void test_job_enter(int sig, void * arg, struct afb_sched_lock * sched_lock){
 
 void test_job_enter_timeout(int sig, void * arg, struct afb_sched_lock * sched_lock){
     int r;
-    fprintf(stderr, "entering test_job_enter_timeout\n");
+    fprintf(stderr, "entering test_job_enter_timeout sig=%d\n",sig);
     sleep(2);
     r = afb_sched_leave(sched_lock);
     if(r)reachError++;
