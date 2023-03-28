@@ -258,36 +258,36 @@ struct psync
 	struct afb_data **replies;
 	struct afb_req_common *caller;
 	int flags;
-
-	struct afb_sched_lock *lock;
 	int completed;
 };
 
 static void call_sync_leave(void *closure1, void *closure2, void *closure3, int status, unsigned nreplies, struct afb_data * const replies[])
 {
-	struct psync *ps = closure1;
+	struct afb_sched_lock *lock = closure1;
+	struct psync *ps = afb_sched_lock_arg(lock);
 
-	if (ps->nreplies) {
-		if (ps->replies) {
-			if (nreplies > *ps->nreplies)
-				nreplies = *ps->nreplies;
-			afb_data_array_copy_addref(nreplies, replies, ps->replies);
+	if (ps != NULL) {
+		if (ps->nreplies) {
+			if (ps->replies) {
+				if (nreplies > *ps->nreplies)
+					nreplies = *ps->nreplies;
+				afb_data_array_copy_addref(nreplies, replies, ps->replies);
+			}
+			*ps->nreplies = nreplies;
 		}
-		*ps->nreplies = nreplies;
+		if (ps->status)
+			*ps->status = status;
+		ps->completed = 1;
 	}
-	if (ps->status)
-		*ps->status = status;
-	ps->completed = 1;
-	afb_sched_leave(ps->lock);
+	afb_sched_leave(lock);
 }
 
-static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lock *afb_sched_lock)
+static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lock *lock)
 {
 	struct psync *ps = closure;
 	if (!signum) {
-		ps->lock = afb_sched_lock;
 		process(ps->comapi, ps->apiname, ps->verbname, ps->nparams, ps->params,
-			call_sync_leave, ps, 0, 0,
+			call_sync_leave, lock, 0, 0,
 			ps->caller, ps->flags, &req_call_itf, 0);
 	}
 }

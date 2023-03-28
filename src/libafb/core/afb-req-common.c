@@ -1335,7 +1335,6 @@ afb_req_common_check_permission_hookable(
 
 struct has_permission_s
 {
-	struct afb_sched_lock *schedlock;
 	struct afb_req_common *req;
 	const char *permision;
 	int rc;
@@ -1347,9 +1346,11 @@ has_permission_cb(
 	void *closure,
 	int status
 ) {
-	struct has_permission_s *hasp = closure;
-	hasp->rc = status;
-	afb_sched_leave(hasp->schedlock);
+	struct afb_sched_lock *lock = closure;
+	struct has_permission_s *hasp = afb_sched_lock_arg(lock);
+	if (hasp != NULL)
+		hasp->rc = status;
+	afb_sched_leave(lock);
 }
 
 static
@@ -1357,17 +1358,15 @@ void
 has_permission_job_cb(
 	int signum,
 	void *closure,
-	struct afb_sched_lock *schedlock
+	struct afb_sched_lock *lock
 ) {
 	struct has_permission_s *hasp = closure;
 
-	if (signum) {
-		hasp->rc = X_EINTR;
-		afb_sched_leave(schedlock);
-	}
+	if (signum == 0)
+		afb_perm_check_req_async(hasp->req, hasp->permision, has_permission_cb, lock);
 	else {
-		hasp->schedlock = schedlock;
-		afb_perm_check_req_async(hasp->req, hasp->permision, has_permission_cb, hasp);
+		hasp->rc = X_EINTR;
+		afb_sched_leave(lock);
 	}
 }
 
