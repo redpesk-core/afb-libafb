@@ -106,7 +106,7 @@ struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
 	x_mutex_lock(&mutex);
 
 	/* try to hold the event loop under lock */
-	if ((awaiters || !try_hold_evmgr(tid)) && evmgr) {
+	if (holder != tid && (awaiters || !try_hold_evmgr(tid)) && evmgr) {
 		struct waithold wait = { 0, X_COND_INITIALIZER };
 		struct waithold **piw = &awaiters;
 		while (*piw) piw = &(*piw)->next;
