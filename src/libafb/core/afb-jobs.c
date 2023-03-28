@@ -54,10 +54,13 @@ struct afb_job
 #if WITH_SIG_MONITOR_TIMERS
 	int timeout;         /**< timeout in second for processing the request */
 #endif
-	uint16_t id;         /**< id of the job */
-	uint8_t  blocked: 1; /**< is an other request blocking this one ? */
-	uint8_t  active: 1;  /**< is the request active ? */
+	int id;              /**< id of the job */
+	uint8_t blocked: 1;  /**< is an other request blocking this one ? */
+	uint8_t active: 1;   /**< is the request active ? */
 };
+
+#define NEXT_ID(id)   ((((id) + 1) & 0x7fffffff) ?: 1)
+
 
 /* synchronization */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
@@ -65,7 +68,7 @@ static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 /* counts for jobs */
 static int max_pending_count = AFB_JOBS_DEFAULT_MAX_COUNT;  /** maximum count of pending jobs */
 static int pending_count = 0;      /** count of pending jobs */
-static uint16_t idgen;
+static int idgen;
 
 /* queue of jobs */
 static struct afb_job *pending_jobs;
@@ -144,7 +147,7 @@ static int job_add(
 	job->blocked = 0;
 	job->active = 0;
 	job->next = NULL;
-	job->id = idgen ?: 1;
+	job->id = NEXT_ID(idgen);
 
 	/* search end and blockers */
 	pjob = &pending_jobs;
@@ -153,7 +156,7 @@ static int job_add(
 		if (group && ijob->group == group)
 			job->blocked = 1;
 		if (ijob->id == job->id) {
-			job->id = job->id + 1 ?: 1;
+			job->id = NEXT_ID(job->id);
 			pjob = &pending_jobs;
 			ijob = pending_jobs;
 		}
@@ -164,7 +167,7 @@ static int job_add(
 	}
 
 	/* queue the jobs */
-	idgen = job->id + 1;
+	idgen = job->id;
 	*pjob = job;
 	rc = ++pending_count;
 end:
