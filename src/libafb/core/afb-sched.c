@@ -60,8 +60,14 @@ struct sync_job
 	/** identifier */
 	uintptr_t id;
 
+	/** synchronize mutex */
+	x_mutex_t mutex;
+
 	/** synchronize condition */
 	x_cond_t condsync;
+
+	/** job id */
+	int jobid;
 
 	/** return code */
 	int rc;
@@ -69,22 +75,11 @@ struct sync_job
 	/** timeout of the job */
 	int timeout;
 
-	/** group of the job */
-	const void *group;
-
-	/** handler */
-	void (*handler)(int, void*);
+	/** the entering callback */
+	void (*enter)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock);
 
 	/** the argument of the job's callback */
 	void *arg;
-
-	union {
-		/** the synchronous callback for call_sync */
-		void (*callback)(int, void*);
-
-		/** the entering callback */
-		void (*enter)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock);
-	};
 };
 
 /* synchronisation of threads */
@@ -292,14 +287,50 @@ static void enter_cb(int signum, void *closure)
 	x_mutex_lock(&sync_jobs_mutex);
 	sync = get_sync_job(id, 0);
 	if (sync == NULL)
-		enter = NULL;
+		x_mutex_unlock(&sync_jobs_mutex);
 	else {
+		x_mutex_lock(&sync->mutex);
+		x_mutex_unlock(&sync_jobs_mutex);
 		enter = sync->enter;
 		arg = sync->arg;
-	}
-	x_mutex_unlock(&sync_jobs_mutex);
-	if (enter)
+		sync->jobid = 0;
+		x_mutex_unlock(&sync->mutex);
 		enter(signum, arg, (struct afb_sched_lock*)id);
+	}
+}
+
+/**
+* internal handler for recovering from signal while in
+* afb_sched_enter.
+*/
+static void do_enter_and_wait_with_recovery(int signum, void *closure)
+{
+	struct sync_job *sync = closure;
+	if (signum != 0) {
+		afb_jobs_abort(sync->jobid);
+		sync->rc = X_EINTR;
+	}
+	else if (sync->timeout <= 0) {
+		sync->rc = 0;
+		x_cond_wait(&sync->condsync, &sync->mutex);
+	}
+	else {
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		ts.tv_sec += sync->timeout;
+		sync->rc = x_cond_timedwait(&sync->condsync, &sync->mutex, &ts);
+		if (sync->rc != 0) {
+			afb_jobs_abort(sync->jobid);
+			if (sync->rc < 0)
+				sync->rc = -errno;
+			else if (sync->rc > 0)
+				sync->rc = -sync->rc;
+		}
+	}
+
+	x_mutex_lock(&sync_jobs_mutex);
+	get_sync_job(sync->id, 1);
+	x_mutex_unlock(&sync_jobs_mutex);
 }
 
 /**
@@ -317,52 +348,35 @@ static void enter_cb(int signum, void *closure)
  * @param closure the argument to the callback
  * @return 0 on success or -1 in case of error
  */
-#include <stdio.h>
 int afb_sched_enter(
 		const void *group,
 		int timeout,
 		void (*callback)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock),
 		void *closure
 ) {
-	int rc;
 	struct sync_job sync;
 
-	sync.id = 0;
-	sync.group = group;
-	sync.timeout = timeout;
-	sync.enter = callback;
-	sync.arg = closure;
-	sync.handler = enter_cb;
+	afb_ev_mgr_release_for_me();
 
+	x_mutex_init(&sync.mutex);
 	x_cond_init(&sync.condsync);
-
 	x_mutex_lock(&sync_jobs_mutex);
 	sync.id = ++sync_jobs_cptr;
-	if (sync.id == 0)
-		sync.id = ++sync_jobs_cptr;
-	sync.next = sync_jobs_head;
-	sync_jobs_head = &sync;
-	afb_ev_mgr_release_for_me();
-	rc = post_job(group, 0, timeout, enter_cb, (void*)sync.id, Afb_Sched_Mode_Start);
-	if (rc >= 0) {
-		if (sync.timeout) {
-			struct timespec ts;
-			clock_gettime(CLOCK_REALTIME, &ts);
-			ts.tv_sec += sync.timeout;
-			rc = x_cond_timedwait(&sync.condsync, &sync_jobs_mutex, &ts);
-			if (rc < 0)
-				rc = -errno;
-			else if (rc > 0)
-				rc = -rc;
-		}
-		else {
-			x_cond_wait(&sync.condsync, &sync_jobs_mutex);
-			rc = 0;
-		}
+	sync.rc = post_job(group, 0, timeout, enter_cb, (void*)sync.id, Afb_Sched_Mode_Start);
+	if (sync.rc < 0)
+		x_mutex_unlock(&sync_jobs_mutex);
+	else {
+		sync.jobid = sync.rc;
+		sync.next = sync_jobs_head;
+		sync.timeout = timeout;
+		sync.enter = callback;
+		sync.arg = closure;
+		sync_jobs_head = &sync;
+		x_mutex_lock(&sync.mutex);
+		x_mutex_unlock(&sync_jobs_mutex);
+		afb_sig_monitor_do(do_enter_and_wait_with_recovery, &sync);
 	}
-	get_sync_job(sync.id, 1);
-	x_mutex_unlock(&sync_jobs_mutex);
-	return rc;
+	return sync.rc;
 }
 
 /**
