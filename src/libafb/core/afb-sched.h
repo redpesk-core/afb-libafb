@@ -57,11 +57,23 @@ extern int afb_sched_enter(
 		void *closure);
 
 /**
- * Unlocks the execution flow designed by 'jobloop'.
- * @param jobloop indication of the flow to unlock
+ * Unlocks the execution flow locked by 'lock'.
+ * Execution flows are locked by 'afb_sched_enter'.
+ *
+ * @param lock indication of the execution flow to unlock
  * @return 0 in case of success of -1 on error
  */
-extern int afb_sched_leave(struct afb_sched_lock *afb_sched_lock);
+extern int afb_sched_leave(struct afb_sched_lock *lock);
+
+/**
+ * Get the arguments of the execution flow locked by 'lock'.
+ * Execution flows are locked by 'afb_sched_enter'.
+ * If the execution flow is already unlocked, return NULL.
+ *
+ * @param lock indication of the execution flow
+ * @return the argument 'arg' passed tot 'afb_sched_enter' or NULL
+ */
+extern void *afb_sched_lock_arg(struct afb_sched_lock *lock);
 
 /**
  * Calls synchronously the job represented by 'callback' and 'arg1'

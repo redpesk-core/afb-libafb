@@ -384,13 +384,13 @@ int afb_sched_enter(
  * @param afb_sched_lock indication of the flow to unlock
  * @return 0 in case of success of -1 on error
  */
-int afb_sched_leave(struct afb_sched_lock *afb_sched_lock)
+int afb_sched_leave(struct afb_sched_lock *lock)
 {
 	int rc;
 	struct sync_job *sync;
 
 	x_mutex_lock(&sync_jobs_mutex);
-	sync = get_sync_job((uintptr_t)afb_sched_lock, 1);
+	sync = get_sync_job((uintptr_t)lock, 1);
 	if (sync == NULL)
 		rc = X_EINVAL;
 	else {
@@ -403,6 +403,21 @@ int afb_sched_leave(struct afb_sched_lock *afb_sched_lock)
 	return rc;
 
 }
+
+/* return the argument of the sched_enter */
+void *afb_sched_lock_arg(struct afb_sched_lock *lock)
+{
+	void *result;
+	struct sync_job *sync;
+
+	x_mutex_lock(&sync_jobs_mutex);
+	sync = get_sync_job((uintptr_t)lock, 0);
+	result = sync == NULL ? NULL : sync->arg;
+	x_mutex_unlock(&sync_jobs_mutex);
+	return result;
+
+}
+
 
 struct call_job_sync {
 	void (*callback)(int, void*);
