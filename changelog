@@ -1,3 +1,9 @@
+Version 5.0.5
+-------------
+
+  fixes
+   - data translation strinz -> json-c when NULL
+
 Version 5.0.4
 -------------
 
