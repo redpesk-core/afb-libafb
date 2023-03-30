@@ -456,9 +456,13 @@ CONVERT(stringz,json_c)
 	const char *str;
 
 	str = afb_data_ro_pointer(in);
-	json = json_tokener_parse_verbose(str, &jerr);
-	if (jerr != json_tokener_success)
-		json = json_object_new_string(str);
+	if (str == NULL)
+		json = NULL;
+	else {
+		json = json_tokener_parse_verbose(str, &jerr);
+		if (jerr != json_tokener_success)
+			json = json_object_new_string(str);
+	}
 	rc = make_json_c(out, json);
 	return rc;
 }
