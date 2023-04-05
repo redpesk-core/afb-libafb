@@ -1,3 +1,9 @@
+Version 5.0.6
+-------------
+
+  fixes
+   - unreferencing API for destroying it
+
 Version 5.0.5
 -------------
 
