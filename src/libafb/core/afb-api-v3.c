@@ -902,8 +902,24 @@ static void api_describe_cb(void *closure, void (*describecb)(void *, struct jso
 	describecb(clocb, afb_api_v3_make_description_openAPIv3(apiv3));
 }
 
+static
+void
+destroy_api_v3(
+	struct afb_api_v3 *apiv3
+) {
+	afb_api_common_cleanup(&apiv3->comapi);
+	while (apiv3->dyn_verb_count)
+		free(apiv3->verbs.dynamics[--apiv3->dyn_verb_count]);
+	free(apiv3->verbs.dynamics);
+	free(apiv3);
+}
+
 static void api_unref_cb(void *closure)
-	__attribute__((alias("afb_api_v3_unref")));
+{
+	struct afb_api_v3 *apiv3 = closure;
+	if (apiv3 && afb_api_common_decref(&apiv3->comapi))
+		destroy_api_v3(apiv3);
+}
 
 static struct afb_api_itf export_api_itf =
 {
@@ -1100,14 +1116,11 @@ void
 afb_api_v3_unref(
 	struct afb_api_v3 *apiv3
 ) {
-	if (apiv3 && afb_api_common_decref(&apiv3->comapi)) {
-		if (apiv3->comapi.name != NULL)
+	if (apiv3) {
+		if (apiv3->comapi.refcount == 1 && apiv3->comapi.name != NULL)
 			afb_apiset_del(apiv3->comapi.declare_set, apiv3->comapi.name);
-		afb_api_common_cleanup(&apiv3->comapi);
-		while (apiv3->dyn_verb_count)
-			free(apiv3->verbs.dynamics[--apiv3->dyn_verb_count]);
-		free(apiv3->verbs.dynamics);
-		free(apiv3);
+		else if (afb_api_common_decref(&apiv3->comapi))
+			destroy_api_v3(apiv3);
 	}
 }
 
@@ -1360,7 +1373,7 @@ afb_api_v3_create(
 
 	/* declare the api */
 	if (name != NULL) {
-		afb_api.closure = afb_api_v3_addref(apiv3);
+		afb_api.closure = apiv3;
 		afb_api.itf = &export_api_itf;
 		afb_api.group = noconcurrency ? apiv3 : NULL;
 		rc = afb_apiset_add(apiv3->comapi.declare_set, apiv3->comapi.name, afb_api);
@@ -1381,6 +1394,7 @@ afb_api_v3_create(
 
 error3:
 	if (name != NULL) {
+		afb_api_v3_addref(apiv3); /* avoid side-effect freeing the api */
 		afb_apiset_del(apiv3->comapi.declare_set, apiv3->comapi.name);
 	}
 error2:
