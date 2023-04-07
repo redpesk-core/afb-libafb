@@ -885,7 +885,8 @@ int afb_session_cookie_get(
 
 	/* unlock the session and return the value */
 	session_unlock(session);
-	*cookieval = value;
+	if (cookieval != NULL)
+		*cookieval = value;
 	return rc;
 }
 
