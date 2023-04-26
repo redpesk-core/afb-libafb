@@ -36,6 +36,7 @@ struct afb_apiset;
 struct afb_api_item;
 struct afb_data;
 struct afb_type;
+struct afb_session;
 
 struct afb_auth;
 struct afb_event_x2;
