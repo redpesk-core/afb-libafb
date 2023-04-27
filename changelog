@@ -1,3 +1,10 @@
+Version 5.0.7
+-------------
+
+  features
+   - Allows pasing NULL to 'afb_session_cookie_get'
+   - Optimize dynamic verb allocation
+
 Version 5.0.6
 -------------
 

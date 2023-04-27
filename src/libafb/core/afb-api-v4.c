@@ -361,47 +361,62 @@ afb_api_v4_add_verb(
 	uint32_t session,
 	int glob
 ) {
-	struct afb_verb_v4 *v, **vv;
+	struct afb_verb_v4 *verbrec, **vv;
 	char *txt;
 	int i;
 
+	/* check not sealed */
 	if (is_sealed(apiv4))
 		return X_EPERM;
 
+	/* check the verb is not already existing */
 	for (i = 0 ; i < apiv4->dyn_verb_count ; i++) {
-		v = apiv4->verbs.dynamics[i];
-		if (glob == v->glob && !namecmp(verb, v->verb)) {
+		verbrec = apiv4->verbs.dynamics[i];
+		if (glob == verbrec->glob && !namecmp(verb, verbrec->verb)) {
 			/* refuse to redefine a dynamic verb */
 			return X_EEXIST;
 		}
 	}
 
-	vv = realloc(apiv4->verbs.dynamics, (1 + apiv4->dyn_verb_count) * sizeof *vv);
-	if (!vv)
+	/* check no count overflow */
+	if (apiv4->dyn_verb_count + 1 <= 0)
+		return X_EOVERFLOW;
+
+	/* allocates room on need for the new verb */
+	if ((apiv4->dyn_verb_count & (apiv4->dyn_verb_count - 1)) == 0) {
+		size_t size = apiv4->dyn_verb_count;
+		size = size < 8 ? 8 : size << 1; /* !! min size must be a power of 2 */
+		size *= sizeof *vv;
+		vv = realloc(apiv4->verbs.dynamics, size);
+		if (!vv)
+			return X_ENOMEM;
+		apiv4->verbs.dynamics = vv;
+	}
+
+	/* allocate the verb record */
+	verbrec = malloc(sizeof *verbrec + (1 + strlen(verb)) + (info ? 1 + strlen(info) : 0));
+	if (!verbrec)
 		return X_ENOMEM;
-	apiv4->verbs.dynamics = vv;
 
-	v = malloc(sizeof *v + (1 + strlen(verb)) + (info ? 1 + strlen(info) : 0));
-	if (!v)
-		return X_ENOMEM;
-
-	v->callback = callback;
-	v->vcbdata = vcbdata;
-	v->auth = auth;
-	v->session = (uint16_t)session;
-	v->glob = !!glob;
-
-	txt = (char*)(v + 1);
-	v->verb = txt;
+	/* initialize the record */
+	verbrec->callback = callback;
+	verbrec->vcbdata = vcbdata;
+	verbrec->auth = auth;
+	verbrec->session = (uint16_t)session;
+	verbrec->glob = !!glob;
+	txt = (char*)(verbrec + 1);
+	verbrec->verb = txt;
 	txt = stpcpy(txt, verb);
 	if (!info)
-		v->info = NULL;
+		verbrec->info = NULL;
 	else {
-		v->info = ++txt;
+		verbrec->info = ++txt;
 		strcpy(txt, info);
 	}
 
-	apiv4->verbs.dynamics[apiv4->dyn_verb_count++] = v;
+	/* record the verb */
+	apiv4->verbs.dynamics[apiv4->dyn_verb_count] = verbrec;
+	apiv4->dyn_verb_count++;
 	return 0;
 }
 
