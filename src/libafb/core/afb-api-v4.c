@@ -69,6 +69,8 @@
  * internal types
  ************************************************************************/
 
+typedef uint16_t verb_count_t;
+
 /*
  * structure of the exported API
  */
@@ -92,8 +94,8 @@ struct afb_api_v4
 		struct afb_verb_v4 **dynamics;
 	} verbs;
 
-	uint16_t sta_verb_count;
-	uint16_t dyn_verb_count;
+	verb_count_t sta_verb_count;
+	verb_count_t dyn_verb_count;
 
 	/** mask of loging */
 	int16_t logmask;
@@ -335,16 +337,24 @@ afb_api_v4_set_verbs(
 	const struct afb_verb_v4 *verbs
 ) {
 	int r;
+	verb_count_t cnt;
 
 	if (is_sealed(apiv4))
 		r = X_EPERM;
 	else {
-		apiv4->verbs.statics = verbs;
-		apiv4->sta_verb_count = 0;
-		if (verbs)
-			while (verbs[apiv4->sta_verb_count].verb)
-				apiv4->sta_verb_count++;
 		r = 0;
+		cnt = 0;
+		if (verbs != NULL) {
+			while (verbs[cnt].verb)
+				if (++cnt <= 0) {
+					r = X_EOVERFLOW;
+					break;
+				}
+		}
+		if (r == 0) {
+			apiv4->verbs.statics = verbs;
+			apiv4->sta_verb_count = cnt;
+		}
 	}
 	return r;
 }
@@ -363,7 +373,7 @@ afb_api_v4_add_verb(
 ) {
 	struct afb_verb_v4 *verbrec, **vv;
 	char *txt;
-	int i;
+	verb_count_t i;
 
 	/* check not sealed */
 	if (is_sealed(apiv4))
@@ -379,7 +389,7 @@ afb_api_v4_add_verb(
 	}
 
 	/* check no count overflow */
-	if (apiv4->dyn_verb_count + 1 <= 0)
+	if ((verb_count_t)(apiv4->dyn_verb_count + 1) <= 0)
 		return X_EOVERFLOW;
 
 	/* allocates room on need for the new verb */
@@ -427,7 +437,7 @@ afb_api_v4_del_verb(
 	void **vcbdata
 ) {
 	struct afb_verb_v4 *v;
-	int i;
+	verb_count_t i;
 
 	if (is_sealed(apiv4))
 		return X_EPERM;
