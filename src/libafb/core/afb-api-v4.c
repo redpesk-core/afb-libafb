@@ -372,7 +372,7 @@ afb_api_v4_add_verb(
 	/* check the verb is not already existing */
 	for (i = 0 ; i < apiv4->dyn_verb_count ; i++) {
 		verbrec = apiv4->verbs.dynamics[i];
-		if (glob == verbrec->glob && !namecmp(verb, verbrec->verb)) {
+		if (!namecmp(verb, verbrec->verb)) {
 			/* refuse to redefine a dynamic verb */
 			return X_EEXIST;
 		}
