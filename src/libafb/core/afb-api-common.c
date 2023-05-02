@@ -812,6 +812,9 @@ afb_api_common_init(
 	/* not sealed */
 	comapi->sealed = 0;
 
+	/* not dirty */
+	comapi->dirty = 0;
+
 	/* event listener for service or NULL */
 	comapi->listener = NULL;
 

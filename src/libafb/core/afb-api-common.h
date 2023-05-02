@@ -88,6 +88,9 @@ struct afb_api_common
 	uint16_t free_info: 1;
 	uint16_t free_path: 1;
 
+	/* internal dirty flag */
+	uint16_t dirty: 1;
+
 	/* initial name */
 	const char *name;
 
