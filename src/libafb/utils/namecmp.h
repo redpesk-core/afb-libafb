@@ -29,9 +29,11 @@
 #  define namecmp(a,b)    strcasecmp(a,b)
 #  define namencmp(a,b,s) strncasecmp(a,b,s)
 #  define NAME_FOLD_FNM   FNM_CASEFOLD
+#  define namefoldc(x)    ((char)tolower((unsigned char)(x)))
 #else
 #  define namecmp(a,b)    strcmp(a,b)
 #  define namencmp(a,b,s) strncmp(a,b,s)
 #  define NAME_FOLD_FNM   0
+#  define namefoldc(x)    ((char)(x))
 #endif
 
