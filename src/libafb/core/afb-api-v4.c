@@ -265,24 +265,42 @@ afb_api_v4_set_mainctl(
 	apiv4->mainctl = mainctl;
 }
 
-static int verb_name_compare(const struct afb_verb_v4 *verb, const char *name)
+static int verb_sort_cb(const void *pa, const void *pb)
 {
-	return verb->glob
-		? fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM)
-		: namecmp(verb->verb, name);
+	const struct afb_verb_v4 * const *va = pa, * const *vb = pb;
+	return namecmp((*va)->verb, (*vb)->verb);
+}
+
+static int match_glob_pattern(const struct afb_verb_v4 *verb, const char *name)
+{
+	return fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM);
 }
 
 static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const char *name)
 {
-	struct afb_verb_v4 **v, **e, *i;
+	struct afb_verb_v4 **base, *verb;
+	unsigned low, up, mid;
+	int cmp;
 
-	v = api->verbs.dynamics;
-	e = &v[api->dyn_verb_count];
-	while (v != e) {
-		i = *v;
-		if (!verb_name_compare(i, name))
-			return i;
-		v++;
+	base = api->verbs.dynamics;
+	if (api->comapi.dirty) {
+		qsort(base, api->dyn_verb_count, sizeof *base, verb_sort_cb);
+		api->comapi.dirty = 0;
+	}
+	low = 0;
+	up = api->dyn_verb_count;
+	while(low < up) {
+		mid = (low + up) >> 1;
+		verb = base[mid];
+		if (verb->glob && match_glob_pattern(verb, name) == 0)
+			return verb;
+		cmp = namecmp(verb->verb, name);
+		if (cmp == 0)
+			return verb;
+		if (cmp < 0)
+			low = mid + 1;
+		else
+			up = mid;
 	}
 	return 0;
 }
@@ -302,7 +320,7 @@ afb_api_v4_verb_matching(
 		while (verb) {
 			if (!verb->verb)
 				verb = 0;
-			else if (!verb_name_compare(verb, name))
+			else if ((verb->glob ? match_glob_pattern(verb, name) : namecmp(verb->verb, name)) == 0)
 				break;
 			else
 				verb++;
@@ -427,6 +445,7 @@ afb_api_v4_add_verb(
 	/* record the verb */
 	apiv4->verbs.dynamics[apiv4->dyn_verb_count] = verbrec;
 	apiv4->dyn_verb_count++;
+	apiv4->comapi.dirty = 1;
 	return 0;
 }
 
@@ -449,6 +468,7 @@ afb_api_v4_del_verb(
 			if (vcbdata)
 				*vcbdata = v->vcbdata;
 			free(v);
+			apiv4->comapi.dirty = 1;
 			return 0;
 		}
 	}
