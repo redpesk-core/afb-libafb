@@ -123,13 +123,11 @@ START_TEST (test_init)
 
 	s = afb_api_common_session_get(comapi);
 	ck_assert_ptr_ne(NULL, s);
-#if WITH_API_SESSIONS
 	ck_assert_ptr_eq(s, comapi->session);
 	ck_assert_int_eq(0, afb_api_common_unshare_session(comapi));
 	ck_assert_ptr_ne(s, comapi->session);
 	s = afb_api_common_session_get(comapi);
 	ck_assert_ptr_eq(s, comapi->session);
-#endif
 
 #if WITH_AFB_HOOK
 	ck_assert_int_eq(0, comapi->hookflags);

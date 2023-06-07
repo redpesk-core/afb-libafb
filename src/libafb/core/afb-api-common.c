@@ -160,23 +160,16 @@ void
 session_cleanup(
 	struct afb_api_common *comapi
 ) {
-#if WITH_API_SESSIONS
 	afb_session_unref(comapi->session);
-#endif
 }
 
 struct afb_session *
 afb_api_common_session_get(
 	struct afb_api_common *comapi
 ) {
-#if WITH_API_SESSIONS
 	return comapi->session;
-#else
-	return afb_api_common_get_common_session();
-#endif
 }
 
-#if WITH_API_SESSIONS
 int
 afb_api_common_unshare_session(
 	struct afb_api_common *comapi
@@ -185,15 +178,14 @@ afb_api_common_unshare_session(
 	struct afb_session *current = comapi->session;
 
 	if (current == common) {
-		current = afb_session_create (0);
-		if (!current)
-			return X_ENOMEM;
+		int rc = afb_session_create (&current, 0);
+		if (rc < 0)
+			return rc;
 		comapi->session = current;
 		afb_session_unref(common);
 	}
 	return 0;
 }
-#endif
 
 /******************************************************************************
  ******************************************************************************
@@ -824,9 +816,7 @@ afb_api_common_init(
 	/* handler of events */
 	comapi->onevent = NULL;
 
-#if WITH_API_SESSIONS
 	comapi->session = afb_session_addref(afb_api_common_get_common_session());
-#endif
 
 #if WITH_AFB_HOOK
 	/* hooking flags */

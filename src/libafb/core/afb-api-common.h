@@ -118,10 +118,8 @@ struct afb_api_common
 	/* settings */
 	struct json_object *settings;
 
-#if WITH_API_SESSIONS
 	/* session for service */
 	struct afb_session *session;
-#endif
 
 #if WITH_AFB_HOOK
 	/* hooking flags */
@@ -315,7 +313,6 @@ afb_api_common_set_common_session_uuid(
 	const char *uuid
 );
 
-#if WITH_API_SESSIONS
 /**
  * Tell the api to use its own session
  *
@@ -327,7 +324,6 @@ int
 afb_api_common_unshare_session(
 	struct afb_api_common *comapi
 );
-#endif
 
 /**
  * Get the settings of the api

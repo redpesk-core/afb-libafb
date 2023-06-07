@@ -74,7 +74,6 @@
 #cmakedefine01 WITH_CRED
 #cmakedefine01 WITH_UNIX_SOCKET
 #cmakedefine01 WITH_THREAD_LOCAL
-#cmakedefine01 WITH_API_SESSIONS
 #cmakedefine01 WITH_API_CREATOR
 #cmakedefine01 WITH_REQ_PROCESS_ASYNC
 #cmakedefine01 WITH_CASE_FOLDING
