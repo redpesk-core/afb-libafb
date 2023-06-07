@@ -1093,6 +1093,14 @@ afb_api_v4_add_alias_hookable(
 	return afb_api_common_add_alias_hookable(&apiv4->comapi, apiname, aliasname);
 }
 
+int
+afb_api_v4_unshare_session_hookable(
+	struct afb_api_v4 *apiv4
+) {
+	return afb_api_common_unshare_session_hookable(&apiv4->comapi);
+}
+
+
 void
 afb_api_v4_seal_hookable(
 	struct afb_api_v4 *apiv4

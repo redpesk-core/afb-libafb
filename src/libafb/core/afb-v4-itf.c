@@ -235,6 +235,12 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.job_abort = afb_api_v4_abort_job_hookable,
 
 #endif
+/*-- BEGIN OF VERSION 4r1  REVISION  6 --------------------*/
+#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 6
+
+	.api_unshare_session = afb_api_v4_unshare_session_hookable,
+
+#endif
 /*-- END -----------------------------------*/
 };
 

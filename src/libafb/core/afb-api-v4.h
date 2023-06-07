@@ -711,3 +711,9 @@ afb_api_v4_add_alias_hookable(
 	const char *apiname,
 	const char *aliasname
 );
+
+extern
+int
+afb_api_v4_unshare_session_hookable(
+	struct afb_api_v4 *apiv4
+);

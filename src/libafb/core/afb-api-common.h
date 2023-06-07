@@ -597,3 +597,9 @@ afb_api_common_settings_hookable(
 	const struct afb_api_common *comapi
 );
 
+extern
+int
+afb_api_common_unshare_session_hookable(
+	struct afb_api_common *comapi
+);
+

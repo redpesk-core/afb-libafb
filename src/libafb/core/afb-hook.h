@@ -222,6 +222,7 @@ extern int afb_hook_req_interface_by_id(const struct afb_req_common *req, int id
 #define afb_hook_flag_api_abort_job			0x08000000
 #define afb_hook_flag_api_on_event_handler		0x10000000
 #define afb_hook_flag_api_settings			0x20000000
+#define afb_hook_flag_api_unshare_session		0x40000000
 
 /* common flags */
 /* extra flags */
@@ -235,7 +236,8 @@ extern int afb_hook_req_interface_by_id(const struct afb_req_common *req, int id
 					|afb_hook_flag_api_start\
 					|afb_hook_flag_api_post_job\
 					|afb_hook_flag_api_abort_job\
-					|afb_hook_flag_api_settings)
+					|afb_hook_flag_api_settings\
+					|afb_hook_flag_api_unshare_session)
 
 
 #define afb_hook_flags_api_extra	(afb_hook_flag_api_get_event_loop\
@@ -338,6 +340,7 @@ struct afb_hook_api_itf {
 	void (*hook_api_on_event_handler_before)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern);
 	void (*hook_api_on_event_handler_after)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern);
 	void (*hook_api_settings)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, struct json_object *object);
+	void (*hook_api_unshare_session)(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int rc);
 };
 
 extern void afb_hook_api_event_broadcast_before(const struct afb_api_common *comapi, const char *name, unsigned nparams, struct afb_data * const params[]);
@@ -379,6 +382,7 @@ extern int afb_hook_api_delete_api(const struct afb_api_common *comapi, int resu
 extern void afb_hook_api_on_event_handler_before(const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern);
 extern void afb_hook_api_on_event_handler_after(const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern);
 extern struct json_object *afb_hook_api_settings(const struct afb_api_common *comapi, struct json_object *object);
+extern int afb_hook_api_unshare_session(const struct afb_api_common *comapi, int rc);
 
 extern unsigned afb_hook_flags_api(const char *api);
 extern struct afb_hook_api *afb_hook_create_api(const char *api, unsigned flags, struct afb_hook_api_itf *itf, void *closure);

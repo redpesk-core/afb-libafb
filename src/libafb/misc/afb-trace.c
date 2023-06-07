@@ -833,6 +833,11 @@ static void hook_api_settings(void *closure, const struct afb_hookid *hookid, co
 	hook_api(closure, hookid, comapi, "settings", "{sO}", "settings", object);
 }
 
+static void hook_api_unshare_session(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int rc)
+{
+	hook_api(closure, hookid, comapi, "unshare_session", "{si}", "status", rc);
+}
+
 static struct afb_hook_api_itf hook_api_itf = {
 	.hook_api_event_broadcast_before = hook_api_event_broadcast_before,
 	.hook_api_event_broadcast_after = hook_api_event_broadcast_after,
@@ -873,6 +878,7 @@ static struct afb_hook_api_itf hook_api_itf = {
 	.hook_api_on_event_handler_before = hook_api_on_event_handler_before,
 	.hook_api_on_event_handler_after = hook_api_on_event_handler_after,
 	.hook_api_settings = hook_api_settings,
+	.hook_api_unshare_session = hook_api_unshare_session,
 };
 
 /*******************************************************************************/

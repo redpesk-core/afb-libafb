@@ -4,6 +4,7 @@ Version 5.0.7
   features
    - Allows pasing NULL to 'afb_session_cookie_get'
    - Optimize dynamic verb allocation and search
+   - Implement afb_api_unshare_session for bindings >= 4.1.4
 
 Version 5.0.6
 -------------

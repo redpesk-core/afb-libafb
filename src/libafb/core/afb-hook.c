@@ -995,6 +995,11 @@ static void hook_api_settings_cb(void *closure, const struct afb_hookid *hookid,
 	_hook_api_(comapi, "settings -> %s", json_object_to_json_string_ext(object, JSON_C_TO_STRING_NOSLASHESCAPE));
 }
 
+static void hook_api_unshare_session_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int rc)
+{
+	_hook_api_(comapi, "unshare_session -> %d", rc);
+}
+
 static struct afb_hook_api_itf hook_api_default_itf = {
 	.hook_api_event_broadcast_before = hook_api_event_broadcast_before_cb,
 	.hook_api_event_broadcast_after = hook_api_event_broadcast_after_cb,
@@ -1035,6 +1040,7 @@ static struct afb_hook_api_itf hook_api_default_itf = {
 	.hook_api_on_event_handler_before = hook_api_on_event_handler_before_cb,
 	.hook_api_on_event_handler_after = hook_api_on_event_handler_after_cb,
 	.hook_api_settings = hook_api_settings_cb,
+	.hook_api_unshare_session = hook_api_unshare_session_cb,
 };
 
 /******************************************************************************
@@ -1279,6 +1285,13 @@ struct json_object *afb_hook_api_settings(const struct afb_api_common *comapi, s
 	_HOOK_API_(settings, comapi, object);
 	return object;
 }
+
+int afb_hook_api_unshare_session(const struct afb_api_common *comapi, int rc)
+{
+	_HOOK_API_(unshare_session, comapi, rc);
+	return rc;
+}
+
 
 /******************************************************************************
  * section: hooking comapi

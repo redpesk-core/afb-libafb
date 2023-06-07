@@ -609,6 +609,19 @@ afb_api_common_settings_hookable(
 	return r;
 }
 
+int
+afb_api_common_unshare_session_hookable(
+	struct afb_api_common *comapi
+) {
+	int rc = afb_api_common_unshare_session(comapi);
+#if WITH_AFB_HOOK
+	if (comapi->hookflags & afb_hook_flag_api_unshare_session)
+		rc = afb_hook_api_unshare_session(comapi, rc);
+#endif
+	return rc;
+}
+
+
 /******************************************************************************
  ******************************************************************************
  ******************************************************************************
