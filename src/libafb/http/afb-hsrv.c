@@ -612,6 +612,13 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 		return 0;
 	}
 
+	/* be sure that epoll is allowed */
+	if (info->epoll_fd < 0) {
+		MHD_stop_daemon(httpd);
+		RP_ERROR("hsrv start, bad pollfd");
+		return 0;
+	}
+
 	/* record it to the main loop */
 	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EPOLLIN, listen_callback, hsrv, 0, 0) < 0) {
 		MHD_stop_daemon(httpd);

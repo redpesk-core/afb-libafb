@@ -6,6 +6,9 @@ Version 5.0.7
    - Optimize dynamic verb allocation and search
    - Implement afb_api_unshare_session for bindings >= 4.1.4
 
+  fixes
+   - Check epoll_fd returned by libmicrohttpd
+
 Version 5.0.6
 -------------
 
