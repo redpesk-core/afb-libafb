@@ -42,10 +42,11 @@ typedef
 		void (*cleanup)(void*),
 		void *cleanup_closure);
 
-struct protodef
+struct wsprotodef
 {
-	const char *name;
+	struct wsprotodef *next;
 	wscreator_t create;
+	char name[];
 };
 
 extern int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset);

@@ -100,30 +100,30 @@ static int headerhas(const char *header, const char *needle)
 	}
 }
 
-static const struct protodef *search_proto(const struct protodef *protodefs, const char *protocols)
+static const struct wsprotodef *search_proto(const struct wsprotodef *protodefs, const char *protocols)
 {
-	int i;
 	size_t len;
+	const struct wsprotodef *iter;
 
 	if (protocols == NULL) {
 		/* return NULL; */
-		return protodefs != NULL && protodefs->name != NULL ? protodefs : NULL;
+		return protodefs != NULL ? protodefs : NULL;
 	}
 	for(;;) {
 		protocols += strspn(protocols, vseparators);
 		if (!*protocols)
 			return NULL;
 		len = strcspn(protocols, vseparators);
-		for (i = 0 ; protodefs[i].name != NULL ; i++)
-			if (!strncasecmp(protodefs[i].name, protocols, len)
-			 && !protodefs[i].name[len])
-				return &protodefs[i];
+		for (iter = protodefs ; iter != NULL ; iter = iter->next)
+			if (!strncasecmp(iter->name, protocols, len)
+			 && !iter->name[len])
+				return iter;
 		protocols += len;
 	}
 }
 
 struct memo_websocket {
-	const struct protodef *proto;
+	const struct wsprotodef *proto;
 	struct afb_hreq *hreq;
 	struct afb_apiset *apiset;
 };
@@ -157,14 +157,14 @@ static void upgrade_to_websocket(
 	free(memo);
 }
 
-static int check_websocket_upgrade(struct MHD_Connection *con, const struct protodef *protodefs, struct afb_hreq *hreq, struct afb_apiset *apiset)
+static int check_websocket_upgrade(struct MHD_Connection *con, const struct wsprotodef *protodefs, struct afb_hreq *hreq, struct afb_apiset *apiset)
 {
 	struct memo_websocket *memo;
 	struct MHD_Response *response;
 	const char *connection, *upgrade, *key, *version, *protocols;
 	char acceptval[29];
 	int vernum;
-	const struct protodef *proto;
+	const struct wsprotodef *proto;
 
 	/* is an upgrade to websocket ? */
 	upgrade = MHD_lookup_connection_value(con, MHD_HEADER_KIND, MHD_HTTP_HEADER_UPGRADE);

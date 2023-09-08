@@ -775,15 +775,16 @@ static void *afb_ws_json1_create_adaptor(
 	return afb_ws_json1_create(fd, autoclose, apiset, session, token, cleanup, cleanup_closure);
 }
 
-static const struct protodef protodefs[] = {
-	{ "x-afb-ws-json1",	afb_ws_json1_create_adaptor },
-	{ NULL, NULL }
+static const struct wsprotodef default_wsprotodef = {
+	.next = NULL,
+	.create = afb_ws_json1_create_adaptor,
+	.name = "x-afb-ws-json1"
 };
 
 
-const struct protodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
+const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
 {
-	return protodefs;
+	return &default_wsprotodef;
 }
 
 
