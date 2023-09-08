@@ -101,22 +101,6 @@ static int headerhas(const char *header, const char *needle)
 	}
 }
 
-typedef
-	void *(*wscreator_t)(
-		int fd,
-		int autoclose,
-		struct afb_apiset *apiset,
-		struct afb_session *session,
-		struct afb_token *token,
-		void (*cleanup)(void*),
-		void *cleanup_closure);
-
-struct protodef
-{
-	const char *name;
-	wscreator_t create;
-};
-
 static const struct protodef *search_proto(const struct protodef *protodefs, const char *protocols)
 {
 	int i;

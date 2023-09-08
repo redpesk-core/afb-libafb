@@ -29,6 +29,24 @@
 
 struct afb_hreq;
 struct afb_apiset;
+struct afb_session;
+struct afb_token;
+
+typedef
+	void *(*wscreator_t)(
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure);
+
+struct protodef
+{
+	const char *name;
+	wscreator_t create;
+};
 
 extern int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset);
 
