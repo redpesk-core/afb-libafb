@@ -33,6 +33,7 @@
 struct afb_hsrv;
 struct afb_hreq;
 struct locale_root;
+struct protodef;
 
 extern struct afb_hsrv *afb_hsrv_create();
 extern void afb_hsrv_put(struct afb_hsrv *hsrv);
@@ -50,6 +51,7 @@ extern int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix,
 extern int afb_hsrv_add_handler(struct afb_hsrv *hsrv, const char *prefix, int (*handler) (struct afb_hreq *, void *), void *data, int priority);
 extern int afb_hsrv_add_interface(struct afb_hsrv *hsrv, const char *uri);
 extern int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t port);
+extern const struct protodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv);
 
 extern void afb_hsrv_run(struct afb_hsrv *hsrv);
 

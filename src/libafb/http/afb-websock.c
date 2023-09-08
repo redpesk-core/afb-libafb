@@ -32,10 +32,9 @@
 #include <microhttpd.h>
 #include <rp-utils/sha1.h>
 
-#include "wsj1/afb-ws-json1.h"
-
 #include "http/afb-method.h"
 #include "http/afb-hreq.h"
+#include "http/afb-hsrv.h"
 #include "http/afb-websock.h"
 
 /**************** WebSocket connection upgrade ****************************/
@@ -228,23 +227,6 @@ static int check_websocket_upgrade(struct MHD_Connection *con, const struct prot
 	return 1;
 }
 
-static void *afb_ws_json1_create_adaptor(
-		int fd,
-		int autoclose,
-		struct afb_apiset *apiset,
-		struct afb_session *session,
-		struct afb_token *token,
-		void (*cleanup)(void*),
-		void *cleanup_closure
-) {
-	return afb_ws_json1_create(fd, autoclose, apiset, session, token, cleanup, cleanup_closure);
-}
-
-static const struct protodef protodefs[] = {
-	{ "x-afb-ws-json1",	afb_ws_json1_create_adaptor },
-	{ NULL, NULL }
-};
-
 int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset)
 {
 	int rc;
@@ -254,7 +236,7 @@ int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset)
 	 || strcasecmp(hreq->version, MHD_HTTP_VERSION_1_1))
 		return 0;
 
-	rc = check_websocket_upgrade(hreq->connection, protodefs, hreq, apiset);
+	rc = check_websocket_upgrade(hreq->connection, afb_hsrv_ws_protocols(hreq->hsrv), hreq, apiset);
 	if (rc == 1) {
 		hreq->replied = 1;
 	}

@@ -60,6 +60,9 @@ typedef enum MHD_Result mhd_result_t;
 #include "http/afb-hsrv.h"
 #include "sys/x-socket.h"
 
+#include "http/afb-websock.h"
+#include "wsj1/afb-ws-json1.h"
+
 #define JSON_CONTENT  "application/json"
 #define FORM_CONTENT  MHD_HTTP_POST_ENCODING_MULTIPART_FORMDATA
 
@@ -91,6 +94,7 @@ struct afb_hsrv {
 	struct MHD_Daemon *httpd;
 	struct ev_fd *efd;
 	char *cache_to;
+	struct protodef *protos;
 };
 
 static void reply_error(struct MHD_Connection *connection, unsigned int status)
@@ -757,5 +761,30 @@ int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t 
 		return X_EINVAL;
 	return afb_hsrv_add_interface(hsrv, buffer);
 }
+
+
+static void *afb_ws_json1_create_adaptor(
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure
+) {
+	return afb_ws_json1_create(fd, autoclose, apiset, session, token, cleanup, cleanup_closure);
+}
+
+static const struct protodef protodefs[] = {
+	{ "x-afb-ws-json1",	afb_ws_json1_create_adaptor },
+	{ NULL, NULL }
+};
+
+
+const struct protodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
+{
+	return protodefs;
+}
+
 
 #endif
