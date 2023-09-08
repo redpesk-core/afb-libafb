@@ -146,7 +146,7 @@ static void upgrade_to_websocket(
 	struct memo_websocket *memo = cls;
 	void *ws;
 
-	ws = memo->proto->create(sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
+	ws = memo->proto->create(memo->proto->closure, sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
 	if (ws == NULL) {
 		/* TODO */
 		close_websocket(urh);

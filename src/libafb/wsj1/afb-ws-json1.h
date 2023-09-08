@@ -31,6 +31,7 @@ struct afb_apiset;
 extern
 struct afb_ws_json1 *
 afb_ws_json1_create(
+	void *closure,
 	int fd,
 	int autoclose,
 	struct afb_apiset *apiset,

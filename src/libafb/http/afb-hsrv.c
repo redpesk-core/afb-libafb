@@ -100,7 +100,8 @@ struct afb_hsrv {
 static const struct wsprotodef default_wsprotodef = {
 	.next = NULL,
 	.name = "x-afb-ws-json1",
-	.create = (wscreator_t)afb_ws_json1_create /* cast needed to convert result to void* */
+	.create = (wscreator_t)afb_ws_json1_create, /* cast needed to convert result to void* */
+	.closure = NULL
 };
 
 static void reply_error(struct MHD_Connection *connection, unsigned int status)
@@ -780,7 +781,7 @@ const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
 	return hsrv->wsprotos ?: &default_wsprotodef;
 }
 
-int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t create)
+int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t create, void *closure)
 {
 	struct wsprotodef *head = malloc(sizeof *head);
 	if (head == NULL)
@@ -788,6 +789,7 @@ int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_
 	head->next = hsrv->wsprotos;
 	head->name = name;
 	head->create = create;
+	head->closure = closure;
 	hsrv->wsprotos = head;
 	return 0;
 }
