@@ -339,10 +339,15 @@ static struct afb_wsj1_msg *wsj1_msg_make(struct afb_wsj1 *wsj1, char *text, siz
 		msg->id = wsj1_msg_parse_string(text, items[1][0], items[1][1]);
 		msg->api = wsj1_msg_parse_string(text, items[2][0], items[2][1]);
 		verb = strchr(msg->api, '/');
-		if (verb == NULL) goto bad_header;
-		*verb++ = 0;
-		if (!*verb || *verb == '/') goto bad_header;
-		msg->verb = verb;
+		if (verb == NULL) {
+			msg->verb = msg->api;
+			msg->api = NULL;
+		}
+		else {
+			*verb++ = 0;
+			if (!*verb || *verb == '/') goto bad_header;
+			msg->verb = verb;
+		}
 		msg->object_s = wsj1_msg_parse_extract(text, items[3][0], items[3][1]);
 		msg->object_s_length = items[3][1];
 		msg->token = n == 5 ? wsj1_msg_parse_string(text, items[4][0], items[4][1]) : NULL;
@@ -663,11 +668,14 @@ int afb_wsj1_call_s(struct afb_wsj1 *wsj1, const char *api, const char *verb, co
 	}
 
 	/* makes the tag */
-	tag = alloca(2 + strlen(api) + strlen(verb));
-	stpcpy(stpcpy(stpcpy(tag, api), "/"), verb);
+	if (api != NULL) {
+		tag = alloca(2 + strlen(api) + strlen(verb));
+		stpcpy(stpcpy(stpcpy(tag, api), "/"), verb);
+		verb = tag;
+	}
 
 	/* makes the call */
-	rc = wsj1_send_issot(wsj1, CALL, call->id, tag, object, NULL);
+	rc = wsj1_send_issot(wsj1, CALL, call->id, verb, object, NULL);
 	if (rc < 0) {
 		wsj1_call_search(wsj1, call->id, 1);
 		free(call);

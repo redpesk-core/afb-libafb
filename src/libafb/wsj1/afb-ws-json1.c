@@ -222,7 +222,13 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	size_t len;
 	int rc;
 
+	/* check api is not NULL */
 	object = afb_wsj1_msg_object_s(msg, &len);
+	if (api == NULL) {
+		RP_ERROR("received websocket request with NULL api %s: %s", verb, object);
+		afb_wsj1_close(ws->wsj1, 1008, NULL);
+		return;
+	}
 	RP_DEBUG("received websocket request for %s/%s: %s", api, verb, object);
 
 	/* make params */
