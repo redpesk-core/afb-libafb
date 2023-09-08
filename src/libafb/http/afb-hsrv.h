@@ -35,6 +35,27 @@ struct afb_hreq;
 struct locale_root;
 struct protodef;
 
+struct afb_apiset;
+struct afb_session;
+struct afb_token;
+
+typedef
+	void *(*wscreator_t)(
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure);
+
+struct wsprotodef
+{
+	const char *name;
+	const struct wsprotodef *next;
+	wscreator_t create;
+};
+
 extern struct afb_hsrv *afb_hsrv_create();
 extern void afb_hsrv_put(struct afb_hsrv *hsrv);
 
@@ -51,7 +72,9 @@ extern int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix,
 extern int afb_hsrv_add_handler(struct afb_hsrv *hsrv, const char *prefix, int (*handler) (struct afb_hreq *, void *), void *data, int priority);
 extern int afb_hsrv_add_interface(struct afb_hsrv *hsrv, const char *uri);
 extern int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t port);
+
 extern const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv);
+extern int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t create);
 
 extern void afb_hsrv_run(struct afb_hsrv *hsrv);
 

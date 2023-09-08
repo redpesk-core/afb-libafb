@@ -94,7 +94,13 @@ struct afb_hsrv {
 	struct MHD_Daemon *httpd;
 	struct ev_fd *efd;
 	char *cache_to;
-	struct protodef *protos;
+	const struct wsprotodef *wsprotos;
+};
+
+static const struct wsprotodef default_wsprotodef = {
+	.next = NULL,
+	.name = "x-afb-ws-json1",
+	.create = (wscreator_t)afb_ws_json1_create /* cast needed to convert result to void* */
 };
 
 static void reply_error(struct MHD_Connection *connection, unsigned int status)
@@ -653,8 +659,10 @@ void afb_hsrv_stop(struct afb_hsrv *hsrv)
 struct afb_hsrv *afb_hsrv_create()
 {
 	struct afb_hsrv *result = calloc(1, sizeof(struct afb_hsrv));
-	if (result != NULL)
+	if (result != NULL) {
 		result->refcount = 1;
+		result->wsprotos = &default_wsprotodef;
+	}
 	return result;
 }
 
@@ -663,6 +671,11 @@ void afb_hsrv_put(struct afb_hsrv *hsrv)
 	assert(hsrv->refcount != 0);
 	if (!--hsrv->refcount) {
 		afb_hsrv_stop(hsrv);
+		while (hsrv->wsprotos != &default_wsprotodef) {
+			struct wsprotodef *p = (struct wsprotodef *)hsrv->wsprotos;
+			hsrv->wsprotos = p->next;
+			free(p);
+		}
 		free(hsrv);
 	}
 }
@@ -762,29 +775,21 @@ int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t 
 	return afb_hsrv_add_interface(hsrv, buffer);
 }
 
-
-static void *afb_ws_json1_create_adaptor(
-		int fd,
-		int autoclose,
-		struct afb_apiset *apiset,
-		struct afb_session *session,
-		struct afb_token *token,
-		void (*cleanup)(void*),
-		void *cleanup_closure
-) {
-	return afb_ws_json1_create(fd, autoclose, apiset, session, token, cleanup, cleanup_closure);
-}
-
-static const struct wsprotodef default_wsprotodef = {
-	.next = NULL,
-	.create = afb_ws_json1_create_adaptor,
-	.name = "x-afb-ws-json1"
-};
-
-
 const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
 {
-	return &default_wsprotodef;
+	return hsrv->wsprotos ?: &default_wsprotodef;
+}
+
+int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t create)
+{
+	struct wsprotodef *head = malloc(sizeof *head);
+	if (head == NULL)
+		return X_ENOMEM;
+	head->next = hsrv->wsprotos;
+	head->name = name;
+	head->create = create;
+	hsrv->wsprotos = head;
+	return 0;
 }
 
 
