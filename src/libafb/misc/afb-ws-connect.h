@@ -23,16 +23,16 @@
 
 #pragma once
 
-#include "libafb-config.h"
-#include "misc/afb-autoset.h"
-#include "misc/afb-debug.h"
-#include "misc/afb-monitor.h"
-#include "misc/afb-socket.h"
-#include "misc/afb-supervision.h"
-#include "misc/afb-supervisor.h"
-#include "misc/afb-systemd.h"
-#include "misc/afb-trace.h"
-#include "misc/afb-verbose.h"
-#include "misc/afb-watchdog.h"
-#include "misc/afb-ws.h"
-#include "misc/afb-ws-connect.h"
+struct ev_mgr;
+
+/**
+* connect to the server designated by 'uri' and negociates the websocket upgrade
+*
+* @param mgr the event manager
+* @param uri the URI for connection
+* @param protocols the list of protocols to negociate in the preferred order
+* @param idxproto on success, the index in protocols of the accepted protocol (can be NULL)
+*
+* @return the file descriptor of the negociated websocket or a negative error code
+*/
+extern int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, int *idxproto);
