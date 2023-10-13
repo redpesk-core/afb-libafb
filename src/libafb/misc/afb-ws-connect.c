@@ -74,8 +74,12 @@ static char *strjoin(int count, const char **strings, const char *separ)
 	int idx;
 
 	/* creates the count if needed */
-	if (count < 0)
-		for(count = 0 ; strings[count] != NULL ; count++);
+	if (count < 0) {
+		count = 0;
+		if (strings != NULL)
+			while (strings[count] != NULL)
+				count++;
+	}
 
 	/* compute the length of the result */
 	if (count == 0)
@@ -91,8 +95,8 @@ static char *strjoin(int count, const char **strings, const char *separ)
 	if (result) {
 		/* create the result */
 		if (count != 0) {
-			iter = stpcpy(result, strings[idx = 0]);
-			while (++idx < count)
+			iter = stpcpy(result, strings[0]);
+			for (idx = 1 ; idx < count ; idx++)
 				iter = stpcpy(stpcpy(iter, separ), strings[idx]);
 			// assert(iter - result == length);
 		}
