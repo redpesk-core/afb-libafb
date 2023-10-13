@@ -360,7 +360,7 @@ static int negociate(struct ev_mgr *mgr, int fd, const char **protocols, const c
 int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, int *idxproto)
 {
 	int rc, fd, tls;
-	char *host, *service, xhost[32];
+	char *host, *service;
 	const char *path;
 	struct addrinfo hint, *rai, *iai;
 
@@ -374,20 +374,15 @@ int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, 
 	hint.ai_family = AF_INET;
 	hint.ai_socktype = SOCK_STREAM;
 	rc = getaddrinfo(host, service, &hint, &rai);
-	free(host);
 	free(service);
-	if (rc != 0)
+	if (rc != 0) {
+		free(host);
 		return rc;
+	}
 
 	/* get the socket */
 	iai = rai;
 	while (iai != NULL) {
-		struct sockaddr_in *a = (struct sockaddr_in*)(iai->ai_addr);
-		unsigned char *ipv4 = (unsigned char*)&(a->sin_addr.s_addr);
-		unsigned char *port = (unsigned char*)&(a->sin_port);
-		sprintf(xhost, "%d.%d.%d.%d:%d",
-			(int)ipv4[0], (int)ipv4[1], (int)ipv4[2], (int)ipv4[3],
-			(((int)port[0]) << 8)|(int)port[1]);
 		fd = socket(iai->ai_family, iai->ai_socktype, iai->ai_protocol);
 		if (fd >= 0) {
 			rc = 1;
@@ -409,6 +404,8 @@ int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, 
 				if (rc >= 0) {
 					if (idxproto != NULL)
 						*idxproto = rc;
+					freeaddrinfo(rai);
+					free(host);
 					return fd;
 				}
 			}
@@ -418,5 +415,6 @@ int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, 
 		iai = iai->ai_next;
 	}
 	freeaddrinfo(rai);
+	free(host);
 	return X_ENOENT;
 }
