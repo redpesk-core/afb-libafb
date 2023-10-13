@@ -105,31 +105,6 @@ static char *strjoin(int count, const char **strings, const char *separ)
 	return result;
 }
 
-/* creates the http message for the request */
-static int make_request(char **request, const char *path, const char *host, const char *key, const char *protocols)
-{
-	int rc = asprintf(request,
-			"GET %s HTTP/1.1\r\n"
-			"Host: %s\r\n"
-			"Upgrade: websocket\r\n"
-			"Connection: Upgrade\r\n"
-			"Sec-WebSocket-Version: 13\r\n"
-			"Sec-WebSocket-Key: %s\r\n"
-			"Sec-WebSocket-Protocol: %s\r\n"
-			"Content-Length: 0\r\n"
-			"\r\n"
-			, path
-			, host
-			, key
-			, protocols
-		);
-	if (rc < 0) {
-		rc = -errno;
-		*request = NULL;
-	}
-	return rc;
-}
-
 /* write the buffer of size to fd */
 static int writeall(int fd, const void *buffer, size_t size)
 {
@@ -154,21 +129,48 @@ static int writeall(int fd, const void *buffer, size_t size)
 }
 
 /* create the request and send it to fd, returns the expected accept string */
-static int send_request(int fd, const char **protocols, const char *path, const char *host, const char **ack)
-{
+static int send_request(
+		int fd,
+		const char **protocols,
+		const char *path,
+		const char *host,
+		const char **headers,
+		const char **ack
+) {
 	const char *key;
-	char *protolist, *request;
+	char *protolist, *request, *heads;
 	int length, rc;
 
 	/* make the list of accepted protocols */
 	protolist = strjoin(-1, protocols, ", ");
 	if (protolist == NULL)
 		return X_ENOMEM;
+	heads = strjoin(-1, headers, "\r\n");
+	if (heads == NULL) {
+		free(protolist);
+		return X_ENOMEM;
+	}
 
 	/* create the request */
 	getkeypair(&key, ack);
-	length = make_request(&request, path, host, key, protolist);
+	length = asprintf(&request,
+			"GET %s HTTP/1.1\r\n"
+			"Host: %s\r\n"
+			"Upgrade: websocket\r\n"
+			"Connection: Upgrade\r\n"
+			"Sec-WebSocket-Version: 13\r\n"
+			"Sec-WebSocket-Key: %s\r\n"
+			"Sec-WebSocket-Protocol: %s\r\n"
+			"Content-Length: 0\r\n"
+			"%s%s\r\n"
+			, path
+			, host
+			, key
+			, protolist
+			, heads, *heads ? "\r\n" : ""
+		);
 	free(protolist);
+	free(heads);
 	if (length < 0)
 		return X_ENOMEM;
 
@@ -347,18 +349,28 @@ static int parse_uri(const char *uri, char **host, char **service, const char **
 	return X_ENOMEM;
 }
 
-
-static int negociate(struct ev_mgr *mgr, int fd, const char **protocols, const char *path, const char *host)
-{
+static int negociate(
+	struct ev_mgr *mgr,
+	int fd,
+	const char **protocols,
+	const char *path,
+	const char *host,
+	const char **headers
+) {
 	const char *ack;
-	int rc = send_request(fd, protocols, path, host, &ack);
+	int rc = send_request(fd, protocols, path, host, headers, &ack);
 	if (rc >= 0)
 		rc = receive_response(mgr, fd, protocols, ack);
 	return rc;
 }
 
-int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, int *idxproto)
-{
+int afb_ws_connect(
+	struct ev_mgr *mgr,
+	const char *uri,
+	const char **protocols,
+	int *idxproto,
+	const char **headers
+) {
 	int rc, fd, tls;
 	char *host, *service;
 	const char *path;
@@ -400,7 +412,7 @@ int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, 
 			}
 #endif
 			if (rc == 0) {
-				rc = negociate(mgr, fd, protocols, path, xhost);
+				rc = negociate(mgr, fd, protocols, path, host, headers);
 				if (rc >= 0) {
 					if (idxproto != NULL)
 						*idxproto = rc;

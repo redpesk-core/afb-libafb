@@ -32,7 +32,13 @@ struct ev_mgr;
 * @param uri the URI for connection
 * @param protocols the list of protocols to negociate in the preferred order
 * @param idxproto on success, the index in protocols of the accepted protocol (can be NULL)
+* @param headers more headers to send in the upgrade request
 *
 * @return the file descriptor of the negociated websocket or a negative error code
 */
-extern int afb_ws_connect(struct ev_mgr *mgr, const char *uri, const char **protocols, int *idxproto);
+extern int afb_ws_connect(
+		struct ev_mgr *mgr,
+		const char *uri,
+		const char **protocols,
+		int *idxproto,
+		const char **headers);
