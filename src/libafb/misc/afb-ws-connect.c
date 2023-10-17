@@ -42,6 +42,7 @@
 #include "tls/tls.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
+#include "misc/afb-verbose.h"
 
 /**************** WebSocket handshake ****************************/
 
@@ -198,7 +199,7 @@ static int receive_one_line(struct ev_mgr *mgr, int fd, char *line, int size)
 					ev_mgr_dispatch(mgr);
 			}
 			else if (errno != EINTR)
-				return -1;
+				return -errno;
 		}
 		if (line[length] == '\r')
 			cr = 1;
@@ -227,18 +228,20 @@ static int receive_response(struct ev_mgr *mgr, int fd, const char **protocols, 
 	/* check the header line to be something like: "HTTP/1.1 101 Switching Protocols" */
 	rc = receive_one_line(mgr, fd, line, (int)sizeof(line));
 	if (rc < 0)
-		goto error;
+		goto bad_read;
 	len = strcspn(line, " ");
 	if (len != 8 || 0 != strncmp(line, "HTTP/1.1", 8))
-		goto abort;
+		goto bad_http;
 	it = line + len;
 	len = strspn(it, " ");
 	if (len == 0)
-		goto abort;
+		goto bad_http;
 	it += len;
 	len = strcspn(it, " ");
-	if (len != 3 || 0 != strncmp(it, "101", 3))
+	if (len != 3 || 0 != strncmp(it, "101", 3)) {
+		LIBAFB_ERROR("ws-connect, no upgrade: %s", it);
 		goto abort;
+	}
 
 	/* reads the rest of the response until empty line */
 	clen = 0;
@@ -246,7 +249,7 @@ static int receive_response(struct ev_mgr *mgr, int fd, const char **protocols, 
 	for(;;) {
 		rc = receive_one_line(mgr, fd, line, (int)sizeof(line));
 		if (rc < 0)
-			goto error;
+			goto bad_read;
 		if (rc == 0)
 			break;
 		len = strcspn(line, ": ");
@@ -257,14 +260,14 @@ static int receive_response(struct ev_mgr *mgr, int fd, const char **protocols, 
 			it[strcspn(it, " ,")] = 0;
 			if (isheader(line, len, "Sec-WebSocket-Accept")) {
 				if (strcmp(it, ack) != 0)
-					haserr = 1;
+					haserr |= 1;
 			} else if (isheader(line, len, "Sec-WebSocket-Protocol")) {
 				result = 0;
 				while(protocols[result] != NULL && strcmp(it, protocols[result]) != 0)
 					result++;
 			} else if (isheader(line, len, "Upgrade")) {
 				if (strcmp(it, "websocket") != 0)
-					haserr = 1;
+					haserr |= 2;
 			} else if (isheader(line, len, "Content-Length")) {
 				clen = (long unsigned)atol(it);
 			}
@@ -276,12 +279,31 @@ static int receive_response(struct ev_mgr *mgr, int fd, const char **protocols, 
 		while (read(fd, line, sizeof line) < 0 && errno == EINTR);
 		clen -= sizeof line;
 	}
-	if (clen > 0) {
-		while (read(fd, line, len) < 0 && errno == EINTR);
+	while (clen > 0) {
+		ssize_t rlen = read(fd, line, clen > sizeof line ? sizeof line : clen);
+		if (rlen >= 0)
+			clen -= (size_t)rlen;
+		else if (errno != EINTR)
+			goto bad_read;
 	}
-	if (haserr != 0 || result < 0)
-		goto abort;
-	return result;
+	if (haserr == 0 && result >= 0)
+		return result;
+
+	if (result < 0)
+		LIBAFB_ERROR("ws-connect, no protocol given");
+	if (haserr & 1)
+		LIBAFB_ERROR("ws-connect, wrong accept");
+	if (haserr & 2)
+		LIBAFB_ERROR("ws-connect, no websocket");
+	goto abort;
+
+bad_read:
+	LIBAFB_ERROR("ws-connect, read error: %s", strerror(-rc));
+	goto error;
+
+bad_http:
+	LIBAFB_ERROR("ws-connect, bad HTTP: %s", line);
+
 abort:
 	rc = X_ECONNABORTED;
 error:
