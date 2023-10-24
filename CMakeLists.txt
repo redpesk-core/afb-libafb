@@ -25,16 +25,11 @@
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(afb-libafb C)
-
-set(PROJECT_NAME "afb-libafb")
-set(PROJECT_PRETTY_NAME "Application Framework Binder core library")
-set(PROJECT_DESCRIPTION "Core library for implementing Application framework Binder")
-set(PROJECT_VERSION 5.0.6)
-set(PROJECT_VERSION_MAJOR 5)
-set(PROJECT_VERSION_MINOR 0)
-set(PROJECT_VERSION_PATCH 6)
-set(PROJECT_URL "https://github.com/redpesk-core/afb-libafb")
+project(afb-libafb
+	VERSION 5.0.7
+	DESCRIPTION "Core library for implementing Application framework Binder"
+	HOMEPAGE_URL "https://github.com/redpesk-core/afb-libafb"
+	LANGUAGES C)
 
 set(LIBAFB_VERSION "5.0")
 set(LIBAFB_SOVERSION "5")
