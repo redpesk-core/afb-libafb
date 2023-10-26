@@ -68,6 +68,8 @@
 #define STATE_LENGTH  2
 #define STATE_DATA    3
 
+#define HEADER_MAX_SIZE   14   /* 2 + 8 + 4 */
+
 static size_t default_maxlength = WEBSOCKET_DEFAULT_MAXLENGTH;
 
 struct websock {
@@ -76,14 +78,116 @@ struct websock {
 	int lenhead, szhead;
 	uint64_t length;
 	uint32_t mask;
-	unsigned char header[14];	/* 2 + 8 + 4 */
+	uint32_t outmask;
+	unsigned char header[HEADER_MAX_SIZE];
 	const struct websock_itf *itf;
 	void *closure;
 };
 
+static uint32_t domask(uint32_t mask, const void *inbuf, void *outbuf, size_t count)
+{
+	union { uint32_t u32; uint8_t u8[4]; } umask;
+	const uint8_t *ib8 = inbuf;
+	uint8_t *ob8 = outbuf;
+	uint8_t u8;
+
+	umask.u32 = mask;
+#define A32(x) (((uintptr_t)(x)) & (sizeof(uint32_t)-1))
+	while (count && (!A32(ib8) || !A32(ob8))) {
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*ob8++ = u8 ^ *ib8++;
+		count--;
+	}
+	if (count >= sizeof(uint32_t)) {
+		const uint32_t *ib32 = (const uint32_t*)ib8;
+		uint32_t *ob32 = (uint32_t*)ob8;
+		do {
+			*ob32++ = umask.u32 ^ *ib32++;
+			count -= sizeof(uint32_t);
+		}
+		while (count >= sizeof(uint32_t));
+		ib8 = (const uint8_t*)ib32;
+		ob8 = (uint8_t*)ob32;
+	}
+	while (count) {
+		u8 = umask.u8[0];
+		umask.u8[0] = umask.u8[1];
+		umask.u8[1] = umask.u8[2];
+		umask.u8[2] = umask.u8[3];
+		umask.u8[3] = u8;
+		*ob8++ = u8 ^ *ib8++;
+		count--;
+	}
+#undef A32
+	return umask.u32;
+}
+
 static ssize_t ws_writev(struct websock *ws, const struct iovec *iov, int iovcnt)
 {
 	return ws->itf->writev(ws->closure, iov, iovcnt);
+}
+
+static ssize_t ws_writev_masked(struct websock *ws, const struct iovec *iov, int iovcnt)
+{
+	ssize_t res, auxres;
+	struct iovec lociov;
+	uint32_t buffer[1024];
+	uint32_t mask;
+	int idx;
+	size_t off, remain, avail, sz;
+	const void *iptr;
+	void *optr;
+
+	/* put the cork */
+	if (ws->itf->cork)
+		ws->itf->cork(ws->closure, 1);
+
+	/* write the head */
+	res = ws_writev(ws, iov, 1);
+
+	/* write the content but masked */
+	lociov.iov_base = buffer;
+	mask = ws->outmask;
+	idx = 1; /* iov iterator */
+	off = 0; /* offset iterator within the iov */
+	while (res >= 0 && idx < iovcnt) {
+		/* compose a new buffer */
+		optr = buffer;
+		remain = sizeof buffer;
+		/* fill the buffer with masked data until end or full */
+		while (idx < iovcnt && remain > 0) {
+			/* available count in iov */
+			iptr = iov[idx].iov_base + off;
+			avail = iov[idx].iov_len - off;
+			/* masked size */
+			if (remain < avail)
+				sz = remain;
+			else {
+				sz = avail;
+				/* and shift to next iov */
+				off = 0;
+				idx++;
+			}
+			mask = domask(mask, iptr, optr, sz);
+			lociov.iov_len += sz;
+			optr += sz;
+			remain -= sz;
+		}
+		lociov.iov_len = sizeof buffer - remain;
+		auxres = ws_writev(ws, &lociov, 1);
+		res = auxres < 0 ? auxres : res + auxres;
+	}
+	ws->outmask = mask;
+
+	/* remove the cork */
+	if (ws->itf->cork)
+		ws->itf->cork(ws->closure, 0);
+
+	return res;
 }
 
 static ssize_t ws_readv(struct websock *ws, const struct iovec *iov, int iovcnt)
@@ -105,7 +209,8 @@ static int websock_send_internal_v(struct websock *ws, unsigned char first, cons
 	int i, j;
 	size_t pos, size, len;
 	ssize_t rc;
-	unsigned char header[32];
+	unsigned char masked;
+	unsigned char header[HEADER_MAX_SIZE];
 
 	/* checks count */
 	if (count < 0 || (count + 1) > (int)(sizeof iov / sizeof * iov))
@@ -127,14 +232,15 @@ static int websock_send_internal_v(struct websock *ws, unsigned char first, cons
 	/* makes the header */
 	pos = 0;
 	header[pos++] = first;
-	size = (uint64_t) size;
+	masked = (unsigned char)FRAME_SET_MASK(ws->outmask != 0 && size != 0);
+	size = (uint64_t)size;
 	if (size < 126) {
-		header[pos++] = FRAME_SET_MASK(0) | FRAME_SET_LENGTH(size, 0);
+		header[pos++] = masked | FRAME_SET_LENGTH(size, 0);
 	} else {
 		if (size < 65536) {
-			header[pos++] = FRAME_SET_MASK(0) | 126;
+			header[pos++] = masked | 126;
 		} else {
-			header[pos++] = FRAME_SET_MASK(0) | 127;
+			header[pos++] = masked | 127;
 			header[pos++] = FRAME_SET_LENGTH(size, 7);
 			header[pos++] = FRAME_SET_LENGTH(size, 6);
 			header[pos++] = FRAME_SET_LENGTH(size, 5);
@@ -145,12 +251,21 @@ static int websock_send_internal_v(struct websock *ws, unsigned char first, cons
 		header[pos++] = FRAME_SET_LENGTH(size, 1);
 		header[pos++] = FRAME_SET_LENGTH(size, 0);
 	}
+	/* compute the mask */
+	if (masked) {
+		ws->outmask = (ws->outmask * 97 + 1734) | 1;
+		header[pos++] = ((unsigned char *)&ws->outmask)[0];
+		header[pos++] = ((unsigned char *)&ws->outmask)[1];
+		header[pos++] = ((unsigned char *)&ws->outmask)[2];
+		header[pos++] = ((unsigned char *)&ws->outmask)[3];
+	}
 
 	/* allocates the vec */
 	iov[0].iov_base = header;
 	iov[0].iov_len = pos;
-	rc = ws_writev(ws, iov, i);
 
+	/* write it now */
+	rc = (masked ? ws_writev_masked : ws_writev)(ws, iov, i);
 	return rc < 0 ? -errno : 0;
 }
 
@@ -593,6 +708,11 @@ void websock_set_max_length(struct websock *ws, size_t maxlen)
 	ws->maxlength = (uint64_t)maxlen;
 }
 
+void websock_set_masking(struct websock *ws, int onoff)
+{
+	ws->outmask = onoff ? (uint32_t)rand() : 0;
+}
+
 const char *websocket_explain_error(uint16_t code)
 {
 	static const char *msgs[] = {
@@ -613,3 +733,4 @@ const char *websocket_explain_error(uint16_t code)
 		return "?";
 	return msgs[code - 1000];
 }
+

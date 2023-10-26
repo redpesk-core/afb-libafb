@@ -44,6 +44,7 @@
  */
 static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt);
 static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt);
+static void aws_cork(struct afb_ws *ws, int onoff);
 static void aws_on_close(struct afb_ws *ws, uint16_t code, size_t size);
 static void aws_on_text(struct afb_ws *ws, int last, size_t size);
 static void aws_on_binary(struct afb_ws *ws, int last, size_t size);
@@ -54,6 +55,7 @@ static void aws_on_error(struct afb_ws *ws, uint16_t code, const void *data, siz
 static struct websock_itf aws_itf = {
 	.writev = (void*)aws_writev,
 	.readv = (void*)aws_readv,
+	.cork = (void*)aws_cork,
 
 	.on_ping = NULL,
 	.on_pong = NULL,
@@ -220,6 +222,14 @@ void afb_ws_destroy(struct afb_ws *ws)
 void afb_ws_hangup(struct afb_ws *ws)
 {
 	aws_disconnect(ws, 1);
+}
+
+/*
+ * Set or not masking output
+ */
+void afb_ws_set_masking(struct afb_ws *ws, int onoff)
+{
+	websock_set_masking(ws->ws, onoff);
 }
 
 /*
@@ -411,6 +421,15 @@ static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt)
 	else if (rc < 0)
 		rc = -errno;
 	return rc;
+}
+
+/*
+ * callback for corking emissions
+ */
+static void aws_cork(struct afb_ws *ws, int onoff)
+{
+	int optval = !!onoff;
+	setsockopt(ws->fd, IPPROTO_TCP, TCP_CORK, &optval, sizeof optval);
 }
 
 /*

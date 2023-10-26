@@ -49,6 +49,7 @@ struct iovec;
 struct websock_itf {
 	ssize_t (*writev) (void *, const struct iovec *, int);
 	ssize_t (*readv) (void *, const struct iovec *, int);
+	void (*cork) (void *, int);
 
 	void (*on_ping) (void *, size_t size); /* optional, if not NULL, responsible of pong */
 	void (*on_pong) (void *, size_t size); /* optional */
@@ -86,5 +87,6 @@ extern void websock_destroy(struct websock *ws);
 
 extern void websock_set_default_max_length(size_t maxlen);
 extern void websock_set_max_length(struct websock *ws, size_t maxlen);
+extern void websock_set_masking(struct websock *ws, int onoff);
 
 extern const char *websocket_explain_error(uint16_t code);

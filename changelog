@@ -1,3 +1,12 @@
+Version 5.0.8
+-------------
+
+  features
+   - Implement optionnal masking for websockets
+
+  fixes
+   - Dont close extension on exit
+
 Version 5.0.7
 -------------
 

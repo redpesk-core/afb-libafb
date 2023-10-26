@@ -145,6 +145,11 @@ void afb_wsj1_unref(struct afb_wsj1 *wsj1)
 	}
 }
 
+void afb_wsj1_set_masking(struct afb_wsj1 *wsj1, int onoff)
+{
+	afb_ws_set_masking(wsj1->ws, onoff);
+}
+
 static void wsj1_on_hangup(struct afb_wsj1 *wsj1)
 {
 	struct wsj1_call *call, *ncall;
