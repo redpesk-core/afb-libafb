@@ -480,7 +480,7 @@ int afb_extend_exit(struct afb_apiset *declare_set)
 			if (s < 0)
 				rc = s;
 		}
-		x_dynlib_close(&ext->handle);
+		/* x_dynlib_close(&ext->handle); no because may lead to faults */
 		free(ext);
 	}
 	return rc;
