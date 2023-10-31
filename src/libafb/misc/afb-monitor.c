@@ -126,7 +126,7 @@ void afb_monitor_api_disconnected(const char *apiname)
 	struct afb_data *param;
 	if (evt_disconnected) {
 		afb_data_create_copy(&param, &afb_type_predefined_stringz, apiname, 1 + strlen(apiname));
-		afb_evt_push(evt_disconnected, 1, &param);
+		afb_evt_push_hookable(evt_disconnected, 1, &param);
 	}
 }
 
