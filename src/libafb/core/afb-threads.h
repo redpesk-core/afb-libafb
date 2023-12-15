@@ -139,9 +139,9 @@ extern int afb_threads_asleep_count(int classid);
 extern int afb_threads_wakeup(int classid, int count);
 
 /**
- * Wake up the managed threads matching the classid mask.
+ * Stop the managed threads matching the classid mask.
  *
- * @param classid the mask of the threads to wakeup
+ * @param classid the mask of the threads to stop
  * @param count   the maximum count of thread to stop
  *
  * @return the count of thread stopped
