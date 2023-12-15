@@ -1186,15 +1186,16 @@ afb_api_v4_call_hookable(
 		struct afb_api_v4 *api),
 	void *closure)
 {
+	void *handler = callback ? call_x4_cb : NULL;
 #if WITH_AFB_HOOK
 	if (apiv4->comapi.hookflags & afb_hook_flag_api_call)
 		return afb_calls_call_hooking(&apiv4->comapi,
 				apiname, verbname, nparams, params,
-				call_x4_cb, apiv4, callback, closure);
+				handler, apiv4, callback, closure);
 #endif
 	return afb_calls_call(&apiv4->comapi,
 				apiname, verbname, nparams, params,
-				call_x4_cb, apiv4, callback, closure);
+				handler, apiv4, callback, closure);
 }
 
 int

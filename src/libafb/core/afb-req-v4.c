@@ -379,19 +379,20 @@ afb_req_v4_subcall_hookable(
 	void (*callback)(void *closure, int status, unsigned, struct afb_data * const[], struct afb_req_v4 *reqv4),
 	void *closure
 ) {
+	void *handler = callback ? subcall_cb : NULL;
 	afb_req_v4_addref(reqv4);
 #if WITH_AFB_HOOK
 	if (reqv4->hookflags & afb_hook_flag_req_subcall) {
 		afb_calls_subcall_hooking(afb_api_v4_get_api_common(reqv4->api),
 					apiname, verbname, nparams, params,
-					subcall_cb, reqv4, callback, closure, reqv4->comreq, flags);
+					handler, reqv4, callback, closure, reqv4->comreq, flags);
 		return;
 	}
 #endif
 	afb_calls_subcall
 		(afb_api_v4_get_api_common(reqv4->api),
 			apiname, verbname, nparams, params,
-			subcall_cb, reqv4, callback, closure, reqv4->comreq, flags);
+			handler, reqv4, callback, closure, reqv4->comreq, flags);
 }
 
 int

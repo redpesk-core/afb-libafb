@@ -1,3 +1,9 @@
+Version 5.0.9
+-------------
+
+  features
+  - calls and subcalls accept NULL callback (for later optimization)
+
 Version 5.0.8
 -------------
 

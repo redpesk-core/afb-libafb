@@ -325,20 +325,20 @@ static void x2_req_subcall_hookable(
 	int rc;
 
 	rc = afb_json_legacy_make_data_json_c(&data, args);
-	if (rc < 0) {
-		callback(closure, 0, afb_error_text(rc), 0, reqx2);
-	}
-	else {
+	if (rc >= 0) {
+		void *handler = callback ? subcall_cb : NULL;
 		afb_req_v3_addref(req);
 #if WITH_AFB_HOOK
 		if (req->comreq->hookflags & afb_hook_flag_req_subcall)
 			afb_calls_subcall_hooking(afb_api_v3_get_api_common(req->api), api, verb, 1, &data,
-					subcall_cb, req, callback, closure, req->comreq, flags);
+					handler, req, callback, closure, req->comreq, flags);
 		else
 #endif
 			afb_calls_subcall(afb_api_v3_get_api_common(req->api), api, verb, 1, &data,
-					subcall_cb, req, callback, closure, req->comreq, flags);
+					handler, req, callback, closure, req->comreq, flags);
 	}
+	else if (callback)
+		callback(closure, 0, afb_error_text(rc), 0, reqx2);
 }
 
 static

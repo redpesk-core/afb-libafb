@@ -399,17 +399,18 @@ static void x3_api_call_hookable(
 	struct afb_api_v3 *apiv3 = api_x3_to_api_v3(apix3);
 	struct afb_data *data;
 	int rc;
+	void *handler = callback ? x3_api_call_cb : NULL;
 
 	rc = afb_json_legacy_make_data_json_c(&data, args);
 	if (rc >= 0) {
 #if WITH_AFB_HOOK
 		if (apiv3->comapi.hookflags & afb_hook_flag_api_callsync)
-			afb_calls_call_hooking(&apiv3->comapi, api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+			afb_calls_call_hooking(&apiv3->comapi, api, verb, 1, &data, handler, apix3, callback, closure);
 		else
 #endif
-			afb_calls_call(&apiv3->comapi, api, verb, 1, &data, x3_api_call_cb, apix3, callback, closure);
+			afb_calls_call(&apiv3->comapi, api, verb, 1, &data, handler, apix3, callback, closure);
 	}
-	else
+	else if (callback)
 		callback(closure, NULL, "error", NULL, apix3);
 }
 
