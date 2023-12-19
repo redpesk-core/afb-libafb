@@ -3,6 +3,7 @@ Version 5.0.9
 
   features
    - calls and subcalls accept NULL callback (for later optimization)
+   - automatic remove of sessions without cookie value
 
   minor/details
    - remove lang field in afb-session

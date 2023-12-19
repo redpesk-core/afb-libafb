@@ -237,6 +237,25 @@ static void session_close(struct afb_session *session)
 	}
 }
 
+/* check if the 'session' is still needed i.e. if it has a value */
+static int session_is_needed(struct afb_session *session)
+{
+	int idx;
+	struct cookie *cookie;
+
+	/* release cookies */
+	for (idx = 0 ; idx < COOKIECOUNT ; idx++) {
+		cookie = session->cookies[idx];
+		while (cookie) {
+			if (COOKIE_HAS_VALUE(cookie))
+				return 1;
+			cookie = cookie->next;
+		}
+	}
+	return 0;
+}
+
+
 /* destroy the 'session' */
 static void session_destroy (struct afb_session *session)
 {
@@ -508,7 +527,7 @@ void afb_session_unref(struct afb_session *session)
 #endif
 	session_lock(session);
 	if (!--session->refcount) {
-		if (session->autoclose)
+		if (session->autoclose || !session_is_needed(session))
 			session_close(session);
 		if (session->notinset) {
 			session_destroy(session);

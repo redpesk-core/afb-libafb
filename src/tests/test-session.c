@@ -85,18 +85,10 @@ START_TEST (check_creation)
 	x = afb_session_search(uuid);
 	ck_assert(x == s);
 
-	/* still alive after search */
+	/* release the sessions */
 	afb_session_unref(x);
 	afb_session_unref(s);
-	s = afb_session_search(uuid);
-	ck_assert(s);
-	ck_assert(x == s);
 
-	/* but not after closing */
-	afb_session_close(s);
-	ck_assert(afb_session_is_closed(s));
-	afb_session_unref(s);
-	afb_session_purge();
 	s = afb_session_search(uuid);
 	ck_assert(!s);
 	free(uuid);
