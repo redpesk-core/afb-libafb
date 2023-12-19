@@ -77,7 +77,7 @@ json_object_to_json_string_length(
 # define WITH_RPC_V1  1
 #endif
 #if !defined(WITH_RPC_V2)
-# define WITH_RPC_V2  1
+# define WITH_RPC_V2  0
 #endif
 #if !defined(WITH_RPC_V3)
 # define WITH_RPC_V3  1
