@@ -185,26 +185,6 @@ extern struct afb_session *afb_session_touch(struct afb_session *session);
 extern int afb_session_set_timeout(struct afb_session *session, int timeout);
 
 /**
- * Set the language attached to the session
- *
- * @param session the session to set
- * @param lang    the language specifiction to set to session
- *
- * @return 0 in case of success or -1 in case of error
- */
-extern int afb_session_set_language(struct afb_session *session, const char *lang);
-
-/**
- * Get the language attached to the session
- *
- * @param session the session to query
- * @param lang    a default language specifiction
- *
- * @return the language specification to use for session
- */
-extern const char *afb_session_get_language(struct afb_session *session, const char *lang);
-
-/**
  * drop loa and cookie of the given key
  *
  * @param session	the session

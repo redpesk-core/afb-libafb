@@ -2,7 +2,10 @@ Version 5.0.9
 -------------
 
   features
-  - calls and subcalls accept NULL callback (for later optimization)
+   - calls and subcalls accept NULL callback (for later optimization)
+
+  minor/details
+   - remove lang field in afb-session
 
 Version 5.0.8
 -------------

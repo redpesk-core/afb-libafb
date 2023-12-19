@@ -87,7 +87,6 @@ struct afb_session
 	time_t expiration;	/**< expiration time of the session */
 	x_mutex_t mutex;	/**< mutex of the session */
 	struct cookie *cookies[COOKIECOUNT]; /**< cookies of the session */
-	char *lang;		/**< current language setting for the session */
 	uint8_t closed: 1;      /**< is the session closed ? */
 	uint8_t autoclose: 1;   /**< close the session when unreferenced */
 	uint8_t notinset: 1;	/**< session removed from the set of sessions */
@@ -245,7 +244,6 @@ static void session_destroy (struct afb_session *session)
 	afb_hook_session_destroy(session);
 #endif
 	x_mutex_destroy(&session->mutex);
-	free(session->lang);
 	free(session);
 }
 
@@ -709,27 +707,6 @@ void afb_session_drop_key(struct afb_session *session, const void *key)
 
 	/* unlock the session and return the value */
 	session_unlock(session);
-}
-
-/* Set the language attached to the session */
-int afb_session_set_language(struct afb_session *session, const char *lang)
-{
-	char *oldl, *newl;
-
-	newl = strdup(lang);
-	if (newl == NULL)
-		return -1;
-
-	oldl = session->lang;
-	session->lang = newl;
-	free(oldl);
-	return 0;
-}
-
-/* Get the language attached to the session */
-const char *afb_session_get_language(struct afb_session *session, const char *lang)
-{
-	return session->lang ?: lang;
 }
 
 /* initialize the cookie if not already done */
