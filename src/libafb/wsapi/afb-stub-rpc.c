@@ -2078,7 +2078,7 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = afb_sched_post_job(NULL, 0, 0, describe_job_cb, indesc, Afb_Sched_Mode_Normal);
+		rc = queue_job(stub, describe_job_cb, indesc);
 		if (rc < 0) {
 			RP_ERROR("can't schedule describe request %d", (int)callid);
 			indesc_reply_description(indesc, NULL);
