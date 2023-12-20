@@ -179,6 +179,16 @@ enum outcall_type
 	outcall_type_describe
 };
 
+/**
+ * structure for waiting version set
+ */
+struct version_waiter
+{
+	struct afb_stub_rpc   *stub;
+	struct version_waiter *next;
+	struct afb_sched_lock *lock;
+};
+
 /******************* stub description for client or servers ******************/
 
 struct afb_stub_rpc
@@ -233,6 +243,8 @@ struct afb_stub_rpc
 	/* client side */
 	/***************/
 
+	/** waiter for version */
+
 	/** event from server */
 	struct u16id2ptr *event_proxies;
 
@@ -244,6 +256,9 @@ struct afb_stub_rpc
 
 	/** free indescs */
 	struct indesc *indesc_pool;
+
+	/** waiters for version */
+	struct version_waiter *version_waiters;
 
 	afb_rpc_decoder_t decoder;
 	afb_rpc_coder_t coder;
@@ -287,9 +302,67 @@ struct afb_stub_rpc
 /**
  * enqueue a job
  */
-static int queue_job(struct afb_stub_rpc *stub, void (*callback)(int signum, void* arg), void *arg)
+static int queue_job(void *group, void (*callback)(int signum, void* arg), void *arg)
 {
-	return afb_sched_post_job(stub, 0, 0, callback, arg, Afb_Sched_Mode_Normal);
+	return afb_sched_post_job(group, 0, 0, callback, arg, Afb_Sched_Mode_Normal);
+}
+
+/******************* wait version *****************/
+/* TODO: this is not a thread safe implementation */
+static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lock)
+{
+	struct version_waiter *awaiter = closure;
+	struct afb_stub_rpc *stub = awaiter->stub;
+	if (signum != 0) {
+		struct version_waiter **prv = &stub->version_waiters;
+		while (*prv != NULL)
+			if ((*prv) != awaiter)
+				prv = &(*prv)->next;
+			else {
+				*prv = awaiter->next;
+				break;
+			}
+		afb_sched_leave(lock);
+	}
+	else if (stub->version != AFBRPC_PROTO_VERSION_UNSET)
+		afb_sched_leave(lock);
+	else {
+		awaiter->lock = lock;
+		awaiter->next = stub->version_waiters;
+		stub->version_waiters = awaiter;
+	}
+}
+
+static int wait_version(struct afb_stub_rpc *stub)
+{
+	int rc = 0;
+
+	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
+		struct version_waiter awaiter;
+		awaiter.stub = stub;
+		awaiter.next = NULL;
+		awaiter.lock = NULL;
+		rc = afb_sched_enter(NULL, 0, wait_version_cb, &awaiter);
+		if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
+			rc = X_EBUSY;
+	}
+	return rc;
+}
+
+static void wait_version_unlock(struct version_waiter *waiter)
+{
+	if (waiter != NULL) {
+		wait_version_unlock(waiter->next);
+		if (waiter->lock != NULL)
+			afb_sched_leave(waiter->lock);
+	}
+}
+
+static void wait_version_done(struct afb_stub_rpc *stub)
+{
+	struct version_waiter *head = stub->version_waiters;
+	stub->version_waiters = NULL;
+	wait_version_unlock(head);
 }
 
 /******************* memory *****************/
@@ -1157,6 +1230,8 @@ static int send_session_create(struct afb_stub_rpc *stub, uint16_t id, const cha
 	case AFBRPC_PROTO_VERSION_3:
 		return send_session_create_v3(stub, id, value);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_session_create(stub, id, value);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1177,6 +1252,8 @@ static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 	case AFBRPC_PROTO_VERSION_3:
 		return send_token_create_v3(stub, id, value);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_token_create(stub, id, value);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1197,6 +1274,8 @@ static int send_event_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_create_v3(stub, id, value);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_create(stub, id, value);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1217,6 +1296,8 @@ static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t id)
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_destroy_v3(stub, id);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_destroy(stub, id);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1237,6 +1318,8 @@ static int send_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unexpected_v3(stub, eventid);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_unexpected(stub, eventid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1257,6 +1340,8 @@ static int send_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsigned
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_push_v3(stub, eventid, nparams, params);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_push(stub, eventid, nparams, params);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1277,6 +1362,8 @@ static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_broadcast_v3(stub, eventname, nparams, params, uuid, hop);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_broadcast(stub, eventname, nparams, params, uuid, hop);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1297,6 +1384,8 @@ static int send_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_subscribe_v3(stub, callid, eventid);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_subscribe(stub, callid, eventid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1317,6 +1406,8 @@ static int send_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, ui
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unsubscribe_v3(stub, callid, eventid);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_event_unsubscribe(stub, callid, eventid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1337,6 +1428,8 @@ static int send_call_reply(struct afb_stub_rpc *stub, int status, unsigned nrepl
 	case AFBRPC_PROTO_VERSION_3:
 		return send_call_reply_v3(stub, status, nreplies, replies, callid);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_call_reply(stub, status, nreplies, replies, callid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1365,6 +1458,8 @@ static int send_call_request(
 	case AFBRPC_PROTO_VERSION_3:
 		return send_call_request_v3(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_call_request(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1385,6 +1480,8 @@ static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	case AFBRPC_PROTO_VERSION_3:
 		return send_describe_request_v3(stub, callid);
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_describe_request(stub, callid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1405,6 +1502,8 @@ static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const
 	case AFBRPC_PROTO_VERSION_3:
 		return send_describe_reply_v3(stub, callid, description);;
 #endif
+	case AFBRPC_PROTO_VERSION_UNSET:
+		return wait_version(stub) ?: send_describe_reply(stub, callid, description);
 	default:
 		return X_ENOTSUP;
 	}
@@ -2806,9 +2905,11 @@ static int decode_v0(struct afb_stub_rpc *stub)
 			}
 			rc = afb_rpc_v0_code_version_set(&stub->coder, stub->version);
 			emit(stub);
+			wait_version_done(stub);
 			break;
 		case afb_rpc_v0_msg_type_version_set:
 			stub->version = m0.version_set.version;
+			wait_version_done(stub);
 			break;
 		default:
 			break;
@@ -2964,7 +3065,7 @@ struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub)
 int afb_stub_rpc_offer(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
-	if (stub->version == 0) {
+	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
 		uint8_t versions[] = {
 #if WITH_RPC_V1
 			AFBRPC_PROTO_VERSION_1,
@@ -3042,6 +3143,7 @@ static void disconnect(struct afb_stub_rpc *stub)
 	struct u16id2ptr *i2p;
 	struct u16id2bool *i2b;
 
+	wait_version_done(stub);
 	release_all_outcalls(stub);
 
 	i2p = __atomic_exchange_n(&stub->event_proxies, NULL, __ATOMIC_RELAXED);

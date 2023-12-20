@@ -263,7 +263,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 			else {
 				rc = afb_stub_rpc_client_add(stub, declare_set);
 				if (rc >= 0) {
-					afb_stub_rpc_offer(stub);
+					afb_stub_rpc_offer_version(stub);
 					return 0;
 				}
 				RP_ERROR("can't add the client to the apiset for service %s", uri);
