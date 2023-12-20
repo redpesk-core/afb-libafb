@@ -68,7 +68,7 @@ extern int afb_stub_rpc_emit_is_ready(struct afb_stub_rpc *stub);
 extern struct afb_rpc_coder *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub);
 extern void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_stub_rpc*), void *closure);
 
-extern int afb_stub_rpc_offer(struct afb_stub_rpc *stub);
+extern int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub);
 
 #if WITH_CRED
 extern void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cred);

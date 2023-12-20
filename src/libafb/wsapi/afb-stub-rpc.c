@@ -3062,7 +3062,7 @@ struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub)
 }
 
 /* offer the version */
-int afb_stub_rpc_offer(struct afb_stub_rpc *stub)
+int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
 	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
