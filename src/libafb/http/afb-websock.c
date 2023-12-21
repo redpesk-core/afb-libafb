@@ -36,6 +36,98 @@
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
 #include "http/afb-websock.h"
+#include "sys/x-errno.h"
+
+#include "wsj1/afb-ws-json1.h"
+
+
+/**************** management of lists of protocol ****************************/
+
+/**
+* definition of a protocol
+*/
+struct wsprotodef
+{
+	/** name of the protocol */
+	const char *name;
+
+	/** link to the next definition */
+	struct wsprotodef *next;
+
+	/** creation function */
+	wscreator_t creator;
+
+	/** closure of the creator */
+	void *closure;
+};
+
+/**
+* default websocket protocols
+*/
+static const struct wsprotodef default_protocols[] = {
+	{
+		.next = NULL,
+		.name = "x-afb-ws-json1",
+		.creator = (wscreator_t)afb_ws_json1_create, /* cast needed to convert result to void* */
+		.closure = NULL
+	}
+};
+
+/**
+* check if 'protodef' is a default protocol
+*/
+static inline int is_default_protodef(const struct wsprotodef *protodef)
+{
+	const uintptr_t begin = (uintptr_t)default_protocols;
+	const uintptr_t end = begin + (uintptr_t)(sizeof default_protocols);
+	const uintptr_t ptr = (uintptr_t)protodef;
+	return begin <= ptr && ptr < end;
+}
+
+/* see afb-websock.h */
+void afb_websock_init_with_defaults(struct wsprotodef **head)
+{
+	*head = (struct wsprotodef*)default_protocols;
+}
+
+/* see afb-websock.h */
+int afb_websock_add(
+		struct wsprotodef **head,
+		const char *name,
+		wscreator_t creator,
+		void *closure
+) {
+	struct wsprotodef *protodef = malloc(sizeof *protodef);
+	if (protodef == NULL)
+		return X_ENOMEM;
+	protodef->name = name;
+	protodef->creator = creator;
+	protodef->closure = closure;
+	protodef->next = *head;
+	*head = protodef;
+	return 0;
+}
+
+/* see afb-websock.h */
+int afb_websock_remove(
+		struct wsprotodef **head,
+		const char *name
+) {
+	for (;;) {
+		struct wsprotodef *protodef = *head;
+		if (protodef == NULL)
+			return X_ENOENT;
+		if (is_default_protodef(protodef))
+			return 0;
+		if (name == NULL || strcmp(name, protodef->name) == 0) {
+			*head = protodef->next;
+			free(protodef);
+			if (name != NULL)
+				return 0;
+		}
+		head = &protodef->next;
+	}
+}
 
 /**************** WebSocket connection upgrade ****************************/
 
@@ -146,7 +238,7 @@ static void upgrade_to_websocket(
 	struct memo_websocket *memo = cls;
 	void *ws;
 
-	ws = memo->proto->create(memo->proto->closure, sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
+	ws = memo->proto->creator(memo->proto->closure, sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
 	if (ws == NULL) {
 		/* TODO */
 		close_websocket(urh);

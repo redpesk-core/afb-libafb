@@ -61,7 +61,6 @@ typedef enum MHD_Result mhd_result_t;
 #include "sys/x-socket.h"
 
 #include "http/afb-websock.h"
-#include "wsj1/afb-ws-json1.h"
 
 #define JSON_CONTENT  "application/json"
 #define FORM_CONTENT  MHD_HTTP_POST_ENCODING_MULTIPART_FORMDATA
@@ -94,14 +93,7 @@ struct afb_hsrv {
 	struct MHD_Daemon *httpd;
 	struct ev_fd *efd;
 	char *cache_to;
-	const struct wsprotodef *wsprotos;
-};
-
-static const struct wsprotodef default_wsprotodef = {
-	.next = NULL,
-	.name = "x-afb-ws-json1",
-	.create = (wscreator_t)afb_ws_json1_create, /* cast needed to convert result to void* */
-	.closure = NULL
+	struct wsprotodef *wsprotos;
 };
 
 static void reply_error(struct MHD_Connection *connection, unsigned int status)
@@ -662,7 +654,7 @@ struct afb_hsrv *afb_hsrv_create()
 	struct afb_hsrv *result = calloc(1, sizeof(struct afb_hsrv));
 	if (result != NULL) {
 		result->refcount = 1;
-		result->wsprotos = &default_wsprotodef;
+		afb_websock_init_with_defaults(&result->wsprotos);
 	}
 	return result;
 }
@@ -672,11 +664,7 @@ void afb_hsrv_put(struct afb_hsrv *hsrv)
 	assert(hsrv->refcount != 0);
 	if (!--hsrv->refcount) {
 		afb_hsrv_stop(hsrv);
-		while (hsrv->wsprotos != &default_wsprotodef) {
-			struct wsprotodef *p = (struct wsprotodef *)hsrv->wsprotos;
-			hsrv->wsprotos = p->next;
-			free(p);
-		}
+		afb_websock_remove(&hsrv->wsprotos, NULL);
 		free(hsrv);
 	}
 }
@@ -778,20 +766,12 @@ int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t 
 
 const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv)
 {
-	return hsrv->wsprotos ?: &default_wsprotodef;
+	return hsrv->wsprotos;
 }
 
-int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t create, void *closure)
+int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t creator, void *closure)
 {
-	struct wsprotodef *head = malloc(sizeof *head);
-	if (head == NULL)
-		return X_ENOMEM;
-	head->next = hsrv->wsprotos;
-	head->name = name;
-	head->create = create;
-	head->closure = closure;
-	hsrv->wsprotos = head;
-	return 0;
+	return afb_websock_add(&hsrv->wsprotos, name, creator, closure);
 }
 
 
