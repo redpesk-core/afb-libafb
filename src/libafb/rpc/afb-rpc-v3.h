@@ -160,6 +160,7 @@ typedef struct afb_rpc_v3_msg_resource_destroy   afb_rpc_v3_msg_resource_destroy
 /* call request */
 struct afb_rpc_v3_msg_call_request {
 	afb_rpc_v3_call_id_t   callid;
+	afb_rpc_v3_value_t     api;
 	afb_rpc_v3_value_t     verb;
 	afb_rpc_v3_value_t     session;
 	afb_rpc_v3_value_t     token;

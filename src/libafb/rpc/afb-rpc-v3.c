@@ -183,6 +183,8 @@ int afb_rpc_v3_code_call_request_body(afb_rpc_coder_t *coder, const afb_rpc_v3_m
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_uint16le(coder, values ? values->count : 0);
 	if (rc >= 0)
+		rc = opt_param_resource_write(coder, &msg->api, AFB_RPC_V3_ID_KIND_API);
+	if (rc >= 0)
 		rc = opt_param_resource_write(coder, &msg->verb, AFB_RPC_V3_ID_KIND_VERB);
 	if (rc >= 0)
 		rc = opt_param_resource_write(coder, &msg->session, AFB_RPC_V3_ID_KIND_SESSION);
@@ -468,6 +470,9 @@ static int set_request_resource(afb_rpc_v3_msg_call_request_t *msg, struct param
 		break;
 	case AFB_RPC_V3_ID_KIND_TOKEN:
 		val = &msg->token;
+		break;
+	case AFB_RPC_V3_ID_KIND_API:
+		val = &msg->api;
 		break;
 	case AFB_RPC_V3_ID_KIND_VERB:
 		val = &msg->verb;

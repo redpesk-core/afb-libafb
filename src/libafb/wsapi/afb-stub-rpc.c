@@ -1780,6 +1780,7 @@ static int add_session(struct afb_stub_rpc *stub, uint16_t sessionid, const char
 static int receive_call_request(
 	struct afb_stub_rpc *stub,
 	uint16_t callid,
+	const char *api,
 	const char *verb,
 	unsigned ndata,
 	struct afb_data *data[],
@@ -1816,7 +1817,7 @@ static int receive_call_request(
 	/* initialise */
 	incall->inblock = inblock_addref(stub->receive.current_inblock);
 	incall->callid = callid;
-	afb_req_common_init(&incall->comreq, &incall_common_itf, stub->apiname, verb, ndata, data);
+	afb_req_common_init(&incall->comreq, &incall_common_itf, api == NULL ? stub->apiname : api, verb, ndata, data);
 	afb_req_common_set_session(&incall->comreq, session);
 	afb_req_common_set_token(&incall->comreq, token);
 #if WITH_CRED
@@ -2097,7 +2098,7 @@ static int decode_call_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_call_t *msg)
 	struct afb_data *arg;
 	int rc = afb_data_create_raw(&arg, &afb_type_predefined_json, msg->data, msg->data_len, inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
 	if (rc >= 0)
-		rc = receive_call_request(stub, msg->callid, msg->verb, 1, &arg, msg->sessionid, msg->tokenid, msg->user_creds);
+		rc = receive_call_request(stub, msg->callid, NULL, msg->verb, 1, &arg, msg->sessionid, msg->tokenid, msg->user_creds);
 	return rc;
 }
 
@@ -2405,7 +2406,7 @@ static int decode_call_request_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_call
 		/* normal case */
 		rc = value_array_to_data_array_v2(stub, count, values->values, datas);
 		if (rc >= 0)
-			rc = receive_call_request(stub, msg->callid, verb, count, datas, msg->session.id, msg->token.id, msg->creds.data);
+			rc = receive_call_request(stub, msg->callid, NULL, verb, count, datas, msg->session.id, msg->token.id, msg->creds.data);
 	}
 	return rc;
 }
@@ -2682,10 +2683,11 @@ static int value_array_to_data_array_v3(struct afb_stub_rpc *stub, unsigned coun
 static int decode_call_request_v3(struct afb_stub_rpc *stub, afb_rpc_v3_msg_call_request_t *msg, afb_rpc_v3_value_array_t *values)
 {
 	int rc;
-	const char *verb;
+	const char *verb, *api;
 	unsigned count = values->count;
 	struct afb_data *datas[count];
 
+	api = msg->api.data;
 	verb = msg->verb.data;
 	if (verb == NULL) {
 		/* ATM special cases are treated here */
@@ -2702,7 +2704,7 @@ static int decode_call_request_v3(struct afb_stub_rpc *stub, afb_rpc_v3_msg_call
 		/* normal case */
 		rc = value_array_to_data_array_v3(stub, count, values->values, datas);
 		if (rc >= 0)
-			rc = receive_call_request(stub, msg->callid, verb, count, datas, msg->session.id, msg->token.id, msg->creds.data);
+			rc = receive_call_request(stub, msg->callid, api, verb, count, datas, msg->session.id, msg->token.id, msg->creds.data);
 	}
 	return rc;
 }
