@@ -252,19 +252,18 @@ destroy_evt_pushed(
 /*
  * Broadcasts the 'event' of 'id' with its 'object'
  */
-static void broadcast(struct afb_evt_broadcasted *jb)
+static void broadcast(struct afb_evt_broadcasted *jb, struct afb_evt_listener *listener)
 {
-	struct afb_evt_listener *listener;
-
-	x_rwlock_rdlock(&listeners_rwlock);
-	listener = listeners;
-	while(listener) {
-		if (listener->itf->broadcast != NULL)
-			listener->itf->broadcast(listener->closure, jb);
-
+	while (listener && listener->itf->broadcast == NULL)
 		listener = listener->next;
+	if (!listener)
+		x_rwlock_unlock(&listeners_rwlock);
+	else {
+		void *closure = listener->closure;
+		void (*callback)(void*, const struct afb_evt_broadcasted*) = listener->itf->broadcast;
+		broadcast(jb, listener->next);
+		callback(closure, jb);
 	}
-	x_rwlock_unlock(&listeners_rwlock);
 }
 
 /*
@@ -274,8 +273,10 @@ static void broadcast_job(int signum, void *closure)
 {
 	struct afb_evt_broadcasted *jb = closure;
 
-	if (signum == 0)
-		broadcast(jb);
+	if (signum == 0) {
+		x_rwlock_rdlock(&listeners_rwlock);
+		broadcast(jb, listeners);
+	}
 	destroy_evt_broadcasted(jb);
 }
 
@@ -389,22 +390,17 @@ int afb_evt_broadcast_name_hookable(const char *event, unsigned nparams, struct 
  * Pushes the event 'evt' with 'obj' to its listeners
  * Returns the count of listener that received the event.
  */
-static void push_evt(struct afb_evt_pushed *je)
+static void push_evt(struct afb_evt_watch *watch, struct afb_evt_pushed *je)
 {
-	struct afb_evt_watch *watch;
-	struct afb_evt_listener *listener;
-	struct afb_evt *evt;
-
-	evt = je->evt;
-	x_rwlock_rdlock(&evt->rwlock);
-	watch = evt->watchs;
-	while(watch) {
-		listener = watch->listener;
-		assert(listener->itf->push != NULL);
-		listener->itf->push(listener->closure, je);
-		watch = watch->next_by_evt;
+	if (!watch)
+		x_rwlock_unlock(&je->evt->rwlock);
+	else {
+		void *closure = watch->listener->closure;
+		void (*callback)(void*, const struct afb_evt_pushed*) = watch->listener->itf->push;
+		assert(callback != NULL);
+		push_evt(watch->next_by_evt, je);
+		callback(closure, je);
 	}
-	x_rwlock_unlock(&evt->rwlock);
 }
 
 /*
@@ -414,8 +410,10 @@ static void push_afb_evt_pushed(int signum, void *closure)
 {
 	struct afb_evt_pushed *je = closure;
 
-	if (signum == 0)
-		push_evt(je);
+	if (signum == 0) {
+		x_rwlock_rdlock(&je->evt->rwlock);
+		push_evt(je->evt->watchs, je);
+	}
 	destroy_evt_pushed(je);
 }
 
