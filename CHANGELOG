@@ -1,3 +1,12 @@
+Version 5.0.10
+--------------
+
+  fixes
+   - Interlock of event (push -> unsubscribe) removed by copying on stack
+
+  features
+   - RPC v3 calls can tell the API name
+
 Version 5.0.9
 -------------
 
