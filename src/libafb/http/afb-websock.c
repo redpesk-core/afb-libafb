@@ -40,7 +40,6 @@
 
 #include "wsj1/afb-ws-json1.h"
 
-
 /**************** management of lists of protocol ****************************/
 
 /**
@@ -174,28 +173,12 @@ static void make_accept_value(const char *key, char result[29])
 	result[28] = 0;
 }
 
-static const char vseparators[] = " \t,";
-
-static int headerhas(const char *header, const char *needle)
-{
-	size_t len, n;
-
-	n = strlen(needle);
-	for(;;) {
-		header += strspn(header, vseparators);
-		if (!*header)
-			return 0;
-		len = strcspn(header, vseparators);
-		if (n == len && 0 == strncasecmp(needle, header, n))
-			return 1;
-		header += len;
-	}
-}
-
 static const struct wsprotodef *search_proto(const struct wsprotodef *protodefs, const char *protocols)
 {
 	size_t len;
 	const struct wsprotodef *iter;
+	const char *vseparators = " \t,";
+
 
 	if (protocols == NULL) {
 		/* return NULL; */
@@ -214,60 +197,33 @@ static const struct wsprotodef *search_proto(const struct wsprotodef *protodefs,
 	}
 }
 
-struct memo_websocket {
-	const struct wsprotodef *proto;
-	struct afb_hreq *hreq;
-	struct afb_apiset *apiset;
-};
+/**************** WebSocket connection upgrade ****************************/
 
-static void close_websocket(void *closure)
-{
-	struct MHD_UpgradeResponseHandle *urh = closure;
-	MHD_upgrade_action (urh, MHD_UPGRADE_ACTION_CLOSE);
+static int upgrading_cb(
+		const void *closure,
+		struct afb_hreq *hreq,
+		struct afb_apiset *apiset,
+		int fd,
+		void (*cleanup)(void*),
+		void *cleanup_closure
+) {
+	const struct wsprotodef *proto = closure;
+
+	void *ws = proto->creator(proto->closure, fd, 0, apiset,
+				 hreq->comreq.session, hreq->comreq.token,
+				 cleanup, cleanup_closure);
+	return ws == NULL ? -1 : 0;
 }
 
-static void upgrade_to_websocket(
-			void *cls,
-			struct MHD_Connection *connection,
-			void *con_cls,
-			const char *extra_in,
-			size_t extra_in_size,
-			MHD_socket sock,
-			struct MHD_UpgradeResponseHandle *urh)
+int afb_websock_upgrader(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset)
 {
-	struct memo_websocket *memo = cls;
-	void *ws;
-
-	ws = memo->proto->creator(memo->proto->closure, sock, 0, memo->apiset, memo->hreq->comreq.session, memo->hreq->comreq.token, close_websocket, urh);
-	if (ws == NULL) {
-		/* TODO */
-		close_websocket(urh);
-	}
-#if MHD_VERSION <= 0x00095900
-	afb_hreq_unref(memo->hreq);
-#endif
-	free(memo);
-}
-
-static int check_websocket_upgrade(struct MHD_Connection *con, const struct wsprotodef *protodefs, struct afb_hreq *hreq, struct afb_apiset *apiset)
-{
-	struct memo_websocket *memo;
 	struct MHD_Response *response;
-	const char *connection, *upgrade, *key, *version, *protocols;
+	const char *key, *version, *protocols, *headval[6];
+	const struct wsprotodef *protodefs;
+	struct MHD_Connection *con = hreq->connection;
 	char acceptval[29];
 	int vernum;
 	const struct wsprotodef *proto;
-
-	/* is an upgrade to websocket ? */
-	upgrade = MHD_lookup_connection_value(con, MHD_HEADER_KIND, MHD_HTTP_HEADER_UPGRADE);
-	if (upgrade == NULL || strcasecmp(upgrade, websocket_s))
-		return 0;
-
-	/* is a connection for upgrade ? */
-	connection = MHD_lookup_connection_value(con, MHD_HEADER_KIND, MHD_HTTP_HEADER_CONNECTION);
-	if (connection == NULL
-	 || !headerhas (connection, MHD_HTTP_HEADER_UPGRADE))
-		return 0;
 
 	/* has a key and a version ? */
 	key = MHD_lookup_connection_value(con, MHD_HEADER_KIND, sec_websocket_key_s);
@@ -287,6 +243,7 @@ static int check_websocket_upgrade(struct MHD_Connection *con, const struct wspr
 
 	/* is the protocol supported ? */
 	protocols = MHD_lookup_connection_value(con, MHD_HEADER_KIND, sec_websocket_protocol_s);
+	protodefs = afb_hsrv_ws_protocols(hreq->hsrv);
 	proto = search_proto(protodefs, protocols);
 	if (proto == NULL) {
 		response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
@@ -295,44 +252,15 @@ static int check_websocket_upgrade(struct MHD_Connection *con, const struct wspr
 		return 1;
 	}
 
-	/* record context */
-	memo = malloc(sizeof *memo);
-	if (memo == NULL) {
-		response = MHD_create_response_from_buffer(0, NULL, MHD_RESPMEM_PERSISTENT);
-		MHD_queue_response(con, MHD_HTTP_INTERNAL_SERVER_ERROR, response);
-		MHD_destroy_response(response);
-		return 1;
-	}
-	memo->proto = proto;
-	memo->hreq = hreq;
-	memo->apiset = apiset;
-
 	/* send the accept connection */
-	response = MHD_create_response_for_upgrade(upgrade_to_websocket, memo);
 	make_accept_value(key, acceptval);
-	MHD_add_response_header(response, sec_websocket_accept_s, acceptval);
-	MHD_add_response_header(response, sec_websocket_protocol_s, proto->name);
-	MHD_add_response_header(response, MHD_HTTP_HEADER_UPGRADE, websocket_s);
-	MHD_queue_response(con, MHD_HTTP_SWITCHING_PROTOCOLS, response);
-	MHD_destroy_response(response);
-
-	return 1;
-}
-
-int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset)
-{
-	int rc;
-
-	/* is a get ? */
-	if (hreq->method != afb_method_get
-	 || strcasecmp(hreq->version, MHD_HTTP_VERSION_1_1))
-		return 0;
-
-	rc = check_websocket_upgrade(hreq->connection, afb_hsrv_ws_protocols(hreq->hsrv), hreq, apiset);
-	if (rc == 1) {
-		hreq->replied = 1;
-	}
-	return rc;
+	headval[0] = sec_websocket_accept_s;
+	headval[1] = acceptval;
+	headval[2] = sec_websocket_protocol_s;
+	headval[3] = proto->name;
+	headval[4] = MHD_HTTP_HEADER_UPGRADE;
+	headval[5] = websocket_s;
+	return afb_upgrade_reply(upgrading_cb, proto, hreq, apiset, 6, headval);
 }
 
 #endif

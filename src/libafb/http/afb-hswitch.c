@@ -33,7 +33,7 @@
 #include "core/afb-apiset.h"
 #include "core/afb-session.h"
 #include "http/afb-hreq.h"
-#include "http/afb-websock.h"
+#include "http/afb-upgrade.h"
 
 int afb_hswitch_apis(struct afb_hreq *hreq, void *data)
 {
@@ -95,14 +95,17 @@ int afb_hswitch_one_page_api_redirect(struct afb_hreq *hreq, void *data)
 	return 1;
 }
 
-int afb_hswitch_websocket_switch(struct afb_hreq *hreq, void *data)
+int afb_hswitch_upgrade(struct afb_hreq *hreq, void *data)
 {
 	struct afb_apiset *apiset = data;
 
 	if (hreq->lentail != 0)
 		return 0;
 
-	return afb_websock_check_upgrade(hreq, apiset);
+	return afb_upgrade_check_upgrade(hreq, apiset);
 }
+
+int afb_hswitch_websocket_switch(struct afb_hreq *hreq, void *data)
+	__attribute__((alias("afb_hswitch_upgrade")));
 
 #endif

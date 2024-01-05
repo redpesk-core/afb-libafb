@@ -81,7 +81,7 @@ int afb_api_ws_add_client(const char *uri, struct afb_apiset *declare_set, struc
 	/* check the api name */
 	api = afb_socket_api(uri);
 	if (api == NULL || !afb_apiname_is_valid(api)) {
-		RP_ERROR("invalid (too long) ws client uri %s", uri);
+		RP_ERROR("invalid API name in ws client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}

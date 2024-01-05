@@ -54,14 +54,6 @@ typedef
 		void *cleanup_closure);
 
 /**
-* check if the http request 'hreq' is an upgrade request
-* matching a protodef of the server of the request
-* returns 0 if its does not match or an other value if the reply
-* was sent
-*/
-extern int afb_websock_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset);
-
-/**
 * initialize with the default definitions (otherwise, should be intialized to NULL)
 */
 extern void afb_websock_init_with_defaults(struct wsprotodef **head);
@@ -84,6 +76,8 @@ extern int afb_websock_remove(
 		struct wsprotodef **head,
 		const char *name
 );
+
+extern int afb_websock_upgrader(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset);
 
 #endif
 

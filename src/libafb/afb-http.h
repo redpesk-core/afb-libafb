@@ -28,4 +28,5 @@
 #include "http/afb-hsrv.h"
 #include "http/afb-hswitch.h"
 #include "http/afb-method.h"
+#include "http/afb-upgrade.h"
 #include "http/afb-websock.h"

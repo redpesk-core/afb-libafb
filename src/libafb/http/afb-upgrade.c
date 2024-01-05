@@ -35,6 +35,7 @@
 #include "http/afb-hreq.h"
 #include "http/afb-hsrv.h"
 #include "http/afb-upgrade.h"
+#include "http/afb-websock.h"
 #include "sys/x-errno.h"
 
 /**************** management of lists of upgrader definitions ****************************/
@@ -57,18 +58,30 @@ struct upgradedef
 	void *closure;
 };
 
+static const struct upgradedef default_upgraders[] = {
+	{
+		.name     = "websocket",
+		.next     = NULL,
+		.upgrader = afb_websock_upgrader,
+		.closure  = NULL
+	}
+};
+
 /**
 * check if 'upgdef' is a default protocol
 */
 static inline int is_default_upgradedef(const struct upgradedef *upgdef)
 {
-	return 0;
+	const uintptr_t begin = (uintptr_t)default_upgraders;
+	const uintptr_t end = begin + (uintptr_t)(sizeof default_upgraders);
+	const uintptr_t ptr = (uintptr_t)upgdef;
+	return begin <= ptr && ptr < end;
 }
 
 /* see afb-upgrade.h */
 void afb_upgrade_init_with_defaults(struct upgradedef **head)
 {
-	*head = NULL;
+	*head = (struct upgradedef*)default_upgraders;
 }
 
 /* see afb-upgrade.h */
@@ -198,12 +211,10 @@ int afb_upgrade_reply(
 
 /**************** check upgrade ****************************/
 
-static const char vseparators[] = " \t,";
-
-
 static int headerhas(const char *header, const char *needle)
 {
 	size_t len, n;
+	const char *vseparators = " \t,";
 
 	n = strlen(needle);
 	for(;;) {
@@ -242,7 +253,7 @@ int afb_upgrade_check_upgrade(struct afb_hreq *hreq, struct afb_apiset *apiset)
 		return 0;
 
 	/* search the upgrader */
-	iter = NULL;//afb_hsrv_upgraders(hreq->hsrv);
+	iter = afb_hsrv_upgraders(hreq->hsrv);
 	while (iter != NULL) {
 		if (!strcasecmp(upgrade, iter->name)) {
 			/* do upgrade */
