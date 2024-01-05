@@ -53,10 +53,14 @@ extern int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, ui
 
 extern void afb_hsrv_run(struct afb_hsrv *hsrv);
 
-
 #include "afb-websock.h"
 
 extern const struct wsprotodef *afb_hsrv_ws_protocols(const struct afb_hsrv *hsrv);
 extern int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_t creator, void *closure);
+
+#include "afb-upgrade.h"
+
+extern const struct upgradedef *afb_hsrv_upgraders(const struct afb_hsrv *hsrv);
+extern int afb_hsrv_add_upgrader(struct afb_hsrv *hsrv, const char *name, afb_upgrader_t upgrader, void *closure);
 
 #endif

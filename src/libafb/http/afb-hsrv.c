@@ -94,6 +94,7 @@ struct afb_hsrv {
 	struct ev_fd *efd;
 	char *cache_to;
 	struct wsprotodef *wsprotos;
+	struct upgradedef *upgraders;
 };
 
 static void reply_error(struct MHD_Connection *connection, unsigned int status)
@@ -655,6 +656,7 @@ struct afb_hsrv *afb_hsrv_create()
 	if (result != NULL) {
 		result->refcount = 1;
 		afb_websock_init_with_defaults(&result->wsprotos);
+		afb_upgrade_init_with_defaults(&result->upgraders);
 	}
 	return result;
 }
@@ -665,6 +667,7 @@ void afb_hsrv_put(struct afb_hsrv *hsrv)
 	if (!--hsrv->refcount) {
 		afb_hsrv_stop(hsrv);
 		afb_websock_remove(&hsrv->wsprotos, NULL);
+		afb_upgrade_remove(&hsrv->upgraders, NULL);
 		free(hsrv);
 	}
 }
@@ -774,5 +777,14 @@ int afb_hsrv_add_ws_protocol(struct afb_hsrv *hsrv, const char *name, wscreator_
 	return afb_websock_add(&hsrv->wsprotos, name, creator, closure);
 }
 
+const struct upgradedef *afb_hsrv_upgraders(const struct afb_hsrv *hsrv)
+{
+	return hsrv->upgraders;
+}
+
+int afb_hsrv_add_upgrader(struct afb_hsrv *hsrv, const char *name, afb_upgrader_t upgrader, void *closure)
+{
+	return afb_upgrade_add(&hsrv->upgraders, name, upgrader, closure);
+}
 
 #endif
