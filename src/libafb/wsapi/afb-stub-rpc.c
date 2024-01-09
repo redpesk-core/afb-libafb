@@ -1792,20 +1792,28 @@ static int receive_call_request(
 	struct afb_session *session;
 	struct afb_token *token;
 	int rc;
-
-	int err = AFB_ERRNO_OUT_OF_MEMORY;
+	int err;
 
 	afb_stub_rpc_addref(stub);
 
-	/* get tokens and sessions */
+	/* get api */
+	if (api == NULL) {
+		api = stub->apiname;
+		if (api == NULL)
+			goto invalid;
+	}
+
+	/* get session */
 	rc = u16id2ptr_get(stub->session_proxies, sessionid, (void**)&session);
 	if (rc < 0) {
 		if (sessionid != 0)
-			goto no_session;
+			goto invalid;
 		rc = add_session(stub, sessionid, NULL, &session);
 		if (rc < 0)
 			goto out_of_memory;
 	}
+
+	/* get token */
 	if (!tokenid || u16id2ptr_get(stub->token_proxies, tokenid, (void**)&token) < 0)
 		token = NULL;
 
@@ -1817,7 +1825,7 @@ static int receive_call_request(
 	/* initialise */
 	incall->inblock = inblock_addref(stub->receive.current_inblock);
 	incall->callid = callid;
-	afb_req_common_init(&incall->comreq, &incall_common_itf, api == NULL ? stub->apiname : api, verb, ndata, data);
+	afb_req_common_init(&incall->comreq, &incall_common_itf, api, verb, ndata, data);
 	afb_req_common_set_session(&incall->comreq, session);
 	afb_req_common_set_token(&incall->comreq, token);
 #if WITH_CRED
@@ -1826,9 +1834,12 @@ static int receive_call_request(
 	afb_req_common_process_on_behalf(&incall->comreq, incall->stub->call_set, user_creds);
 	return 0;
 
-no_session:
-	err = AFB_ERRNO_INVALID_REQUEST;
 out_of_memory:
+	err = AFB_ERRNO_OUT_OF_MEMORY;
+	goto error;
+invalid:
+	err = AFB_ERRNO_INVALID_REQUEST;
+error:
 	afb_data_array_unref(ndata, data);
 	send_call_reply(stub, err, 0, 0, callid);
 	afb_stub_rpc_unref(stub);
