@@ -31,4 +31,3 @@
 #include "utils/namecmp.h"
 #include "utils/u16id.h"
 #include "utils/websock.h"
-#include "utils/ws.h"
