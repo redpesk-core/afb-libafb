@@ -69,7 +69,7 @@ json_object_to_json_string_length(
 #include "core/containerof.h"
 #include "sys/x-errno.h"
 
-#include "wsapi/afb-stub-rpc.h"
+#include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
 #include "rpc/afb-rpc-decoder.h"
 

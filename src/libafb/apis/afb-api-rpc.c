@@ -43,7 +43,7 @@
 #include "misc/afb-ws.h"
 #include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
-#include "wsapi/afb-stub-rpc.h"
+#include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"

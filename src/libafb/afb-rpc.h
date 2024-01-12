@@ -24,8 +24,10 @@
 #pragma once
 
 #include "libafb-config.h"
-#include "rpc/afb-rpc.h"
+#include "rpc/afb-rpc-coder.h"
+#include "rpc/afb-rpc-decoder.h"
 #include "rpc/afb-rpc-sock.h"
 #include "rpc/afb-rpc-v0.h"
 #include "rpc/afb-rpc-v1.h"
 #include "rpc/afb-rpc-v2.h"
+#include "rpc/afb-stub-rpc.h"
