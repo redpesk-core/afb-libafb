@@ -785,18 +785,20 @@ static int start_array_depends(struct api_array *array)
 	while (i < array->count) {
 		api = searchrec(array->depends[i]->callset, array->depends[i]->name);
 		if (!api) {
-			rc = X_ENOENT;
+			RP_ERROR("required api %s not found", array->depends[i]->name);
+			if (rc == 0)
+				rc = X_ENOENT;
 			i++;
 		} else {
 			rc2 = api->status;
 			if (rc2 == NOT_STARTED) {
 				rc2 = start_api(api);
-				if (rc2 < 0)
+				if (rc2 < 0 && rc == 0)
 					rc = rc2;
 				i = 0;
 			} else {
-				if (rc2)
-					rc = -rc2;
+				if (rc2 < 0  && rc == 0)
+					rc = rc2;
 				i++;
 			}
 		}
