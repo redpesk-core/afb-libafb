@@ -29,5 +29,5 @@
 #include "rpc/afb-rpc-sock.h"
 #include "rpc/afb-rpc-v0.h"
 #include "rpc/afb-rpc-v1.h"
-#include "rpc/afb-rpc-v2.h"
+#include "rpc/afb-rpc-v3.h"
 #include "rpc/afb-stub-rpc.h"

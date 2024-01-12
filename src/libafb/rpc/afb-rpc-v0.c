@@ -66,34 +66,16 @@ int afb_rpc_v0_code_version_offer_v1(afb_rpc_coder_t *coder)
 	return afb_rpc_v0_code_version_offer(coder, 1, versions);
 }
 
-int afb_rpc_v0_code_version_offer_v2(afb_rpc_coder_t *coder)
-{
-	uint8_t versions[] = { AFBRPC_PROTO_VERSION_2 };
-	return afb_rpc_v0_code_version_offer(coder, 1, versions);
-}
-
 int afb_rpc_v0_code_version_offer_v3(afb_rpc_coder_t *coder)
 {
 	uint8_t versions[] = { AFBRPC_PROTO_VERSION_3 };
 	return afb_rpc_v0_code_version_offer(coder, 1, versions);
 }
 
-int afb_rpc_v0_code_version_offer_v1_or_v2(afb_rpc_coder_t *coder)
-{
-	uint8_t versions[] = { AFBRPC_PROTO_VERSION_1, AFBRPC_PROTO_VERSION_2 };
-	return afb_rpc_v0_code_version_offer(coder, 2, versions);
-}
-
 int afb_rpc_v0_code_version_offer_v1_or_v3(afb_rpc_coder_t *coder)
 {
 	uint8_t versions[] = { AFBRPC_PROTO_VERSION_1, AFBRPC_PROTO_VERSION_3 };
 	return afb_rpc_v0_code_version_offer(coder, 2, versions);
-}
-
-int afb_rpc_v0_code_version_offer_v1_v2_or_v3(afb_rpc_coder_t *coder)
-{
-	uint8_t versions[] = { AFBRPC_PROTO_VERSION_1, AFBRPC_PROTO_VERSION_2, AFBRPC_PROTO_VERSION_3 };
-	return afb_rpc_v0_code_version_offer(coder, 3, versions);
 }
 
 int afb_rpc_v0_code_version_set(afb_rpc_coder_t *coder, uint8_t version)
@@ -109,11 +91,6 @@ int afb_rpc_v0_code_version_set(afb_rpc_coder_t *coder, uint8_t version)
 int afb_rpc_v0_code_version_set_v1(afb_rpc_coder_t *coder)
 {
 	return afb_rpc_v0_code_version_set(coder, AFBRPC_PROTO_VERSION_1);
-}
-
-int afb_rpc_v0_code_version_set_v2(afb_rpc_coder_t *coder)
-{
-	return afb_rpc_v0_code_version_set(coder, AFBRPC_PROTO_VERSION_2);
 }
 
 int afb_rpc_v0_code_version_set_v3(afb_rpc_coder_t *coder)

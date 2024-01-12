@@ -63,14 +63,10 @@ typedef struct afb_rpc_v0_msg afb_rpc_v0_msg_t;
 
 extern int afb_rpc_v0_code_version_offer(struct afb_rpc_coder *coder, uint8_t count, const uint8_t *versions);
 extern int afb_rpc_v0_code_version_offer_v1(struct afb_rpc_coder *coder);
-extern int afb_rpc_v0_code_version_offer_v2(struct afb_rpc_coder *coder);
 extern int afb_rpc_v0_code_version_offer_v3(struct afb_rpc_coder *coder);
-extern int afb_rpc_v0_code_version_offer_v1_or_v2(struct afb_rpc_coder *rpc);
 extern int afb_rpc_v0_code_version_offer_v1_or_v3(struct afb_rpc_coder *rpc);
-extern int afb_rpc_v0_code_version_offer_v1_v2_or_v3(struct afb_rpc_coder *rpc);
 extern int afb_rpc_v0_code_version_set(struct afb_rpc_coder *coder, uint8_t version);
 extern int afb_rpc_v0_code_version_set_v1(struct afb_rpc_coder *coder);
-extern int afb_rpc_v0_code_version_set_v2(struct afb_rpc_coder *coder);
 extern int afb_rpc_v0_code_version_set_v3(struct afb_rpc_coder *coder);
 
 extern int afb_rpc_v0_code(struct afb_rpc_coder *coder, afb_rpc_v0_msg_t *msg);

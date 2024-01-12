@@ -76,9 +76,6 @@ json_object_to_json_string_length(
 #if !defined(WITH_RPC_V1)
 # define WITH_RPC_V1  1
 #endif
-#if !defined(WITH_RPC_V2)
-# define WITH_RPC_V2  0
-#endif
 #if !defined(WITH_RPC_V3)
 # define WITH_RPC_V3  1
 #endif
@@ -86,9 +83,6 @@ json_object_to_json_string_length(
 #include "rpc/afb-rpc-v0.h"
 #if WITH_RPC_V1
 # include "rpc/afb-rpc-v1.h"
-#endif
-#if WITH_RPC_V2
-# include "rpc/afb-rpc-v2.h"
 #endif
 #if WITH_RPC_V3
 # include "rpc/afb-rpc-v3.h"
@@ -751,236 +745,6 @@ static int send_describe_reply_v1(struct afb_stub_rpc *stub, uint16_t callid, co
 }
 
 #endif
-#if WITH_RPC_V2
-/**************************************************************************
-* PART - SENDING FOR V2
-**************************************************************************/
-
-static int datas_to_values_v2(unsigned ndata, struct afb_data * const datas[], afb_rpc_v2_value_t values[])
-{
-	unsigned i;
-	void *cptr;
-	size_t size;
-	uint16_t typenum;
-	struct afb_data *data;
-
-	for (i = 0 ; i < ndata ; i++) {
-		data = datas[i];
-		typenum = afb_typeid(afb_data_type(data));
-		afb_data_get_constant(data, &cptr, &size);
-		switch (typenum) {
-		case Afb_Typeid_Predefined_Opaque:
-			typenum = AFB_RPC_V2_ID_TYPE_OPAQUE;
-			break;
-		case Afb_Typeid_Predefined_Bytearray:
-			typenum = AFB_RPC_V2_ID_TYPE_BYTEARRAY;
-			break;
-		case Afb_Typeid_Predefined_Stringz:
-			typenum = AFB_RPC_V2_ID_TYPE_STRINGZ;
-			break;
-		case Afb_Typeid_Predefined_Json_C:
-			cptr = (void*)json_object_to_json_string_length((json_object*)cptr, 0, &size);
-			size++;
-			/*@fallthrough@*/
-		case Afb_Typeid_Predefined_Json:
-			typenum = AFB_RPC_V2_ID_TYPE_JSON;
-			break;
-		case Afb_Typeid_Predefined_Bool:
-			typenum = AFB_RPC_V2_ID_TYPE_BOOL;
-			break;
-		case Afb_Typeid_Predefined_I8:
-			typenum = AFB_RPC_V2_ID_TYPE_I8; /* TODO not a predefined type */
-			break;
-		case Afb_Typeid_Predefined_U8:
-			typenum = AFB_RPC_V2_ID_TYPE_U8; /* TODO not a predefined type */
-			break;
-		case Afb_Typeid_Predefined_I16:
-		case Afb_Typeid_Predefined_U16:
-		case Afb_Typeid_Predefined_I32:
-		case Afb_Typeid_Predefined_U32:
-		case Afb_Typeid_Predefined_I64:
-		case Afb_Typeid_Predefined_U64:
-		case Afb_Typeid_Predefined_Float:
-		case Afb_Typeid_Predefined_Double:
-		default:
-			typenum = 0; /* TODO */
-		}
-		if (size > UINT16_MAX - 8)
-			return X_EOVERFLOW;
-		values[i].id = typenum;
-		values[i].data = cptr ? cptr : &values[i].data;
-		values[i].length = (uint16_t)size;
-	}
-	return 0;
-}
-
-static void dispose_dataids_v2(void *closure, void *arg)
-{
-	afb_data_array_unref((unsigned)(intptr_t)closure, (struct afb_data**)arg);
-}
-
-static int send_resource_create_v2(struct afb_stub_rpc *stub, uint16_t id, const char *value, uint16_t kind)
-{
-	afb_rpc_v2_msg_resource_create_t creres;
-
-	creres.kind = kind;
-	creres.id = id;
-	creres.data = (void*)value;
-	creres.length = value ? (uint16_t)(1 + strlen(value)) : 0; /* TODO check size */
-	return afb_rpc_v2_code_resource_create(&stub->coder, &creres);
-}
-
-static int send_resource_destroy_v2(struct afb_stub_rpc *stub, uint16_t id, uint16_t kind)
-{
-	afb_rpc_v2_msg_resource_destroy_t desres;
-
-	desres.kind = kind;
-	desres.id = id;
-	return afb_rpc_v2_code_resource_destroy(&stub->coder, &desres);
-}
-
-static int send_session_create_v2(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return send_resource_create_v2(stub, id, value, AFB_RPC_V2_ID_KIND_SESSION);
-}
-
-static int send_token_create_v2(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return send_resource_create_v2(stub, id, value, AFB_RPC_V2_ID_KIND_TOKEN);
-}
-
-static int send_event_create_v2(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return send_resource_create_v2(stub, id, value, AFB_RPC_V2_ID_KIND_EVENT);
-}
-
-static int send_event_destroy_v2(struct afb_stub_rpc *stub, uint16_t id)
-{
-	return send_resource_destroy_v2(stub, id, AFB_RPC_V2_ID_KIND_EVENT);
-}
-
-static int send_event_unexpected_v2(struct afb_stub_rpc *stub, uint16_t id)
-{
-	afb_rpc_v2_msg_event_unexpected_t msg = { .eventid = id };
-	return afb_rpc_v2_code_event_unexpected(&stub->coder, &msg);
-}
-
-static int send_event_push_v2(struct afb_stub_rpc *stub, uint16_t eventid, unsigned nparams, struct afb_data * const params[])
-{
-	afb_rpc_v2_msg_event_push_t push;
-	afb_rpc_v2_value_t values[nparams];
-	afb_rpc_v2_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
-
-	int rc = datas_to_values_v2(nparams, params, values);
-	if (rc >= 0) {
-		push.eventid = eventid;
-		rc = afb_rpc_v2_code_event_push(&stub->coder, &push, &valarr);
-		if (rc >= 0) {
-			afb_data_array_addref(nparams, params);
-			afb_rpc_coder_on_dispose2_output(&stub->coder, dispose_dataids_v2, (void*)(intptr_t)nparams, (void*)params);
-		}
-	}
-	return rc;
-}
-
-static int send_event_broadcast_v2(struct afb_stub_rpc *stub, const char *eventname, unsigned nparams, struct afb_data * const params[], const unsigned char uuid[16], uint8_t hop)
-{
-/* TODO */return 0;
-}
-
-static int send_event_subscribe_v2(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
-{
-	afb_rpc_v2_msg_event_subscribe_t sub;
-	sub.callid = callid;
-	sub.eventid = eventid;
-	return afb_rpc_v2_code_event_subscribe(&stub->coder, &sub);
-}
-
-static int send_event_unsubscribe_v2(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
-{
-	afb_rpc_v2_msg_event_unsubscribe_t sub;
-	sub.callid = callid;
-	sub.eventid = eventid;
-	return afb_rpc_v2_code_event_unsubscribe(&stub->coder, &sub);
-}
-
-static int send_call_reply_v2(struct afb_stub_rpc *stub, int status, unsigned nparams, struct afb_data * const params[], uint16_t callid)
-{
-	afb_rpc_v2_msg_call_reply_t reply;
-	afb_rpc_v2_value_t values[nparams];
-	afb_rpc_v2_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
-
-	int rc = datas_to_values_v2(nparams, params, values);
-	if (rc >= 0) {
-		reply.callid = callid;
-		reply.status = (int32_t)status;
-		rc = afb_rpc_v2_code_call_reply(&stub->coder, &reply, &valarr);
-		if (rc >= 0) {
-			afb_data_array_addref(nparams, params);
-			afb_rpc_coder_on_dispose2_output(&stub->coder, dispose_dataids_v2, (void*)(intptr_t)nparams, (void*)params);
-		}
-	}
-	return rc;
-}
-
-static int send_call_request_v2(
-	struct afb_stub_rpc *stub,
-	uint16_t callid,
-	uint16_t sessionid,
-	uint16_t tokenid,
-	const char *verbname,
-	const char *usrcreds,
-	unsigned nparams,
-	struct afb_data * const params[])
-{
-	afb_rpc_v2_msg_call_request_t request;
-	afb_rpc_v2_value_t values[nparams];
-	afb_rpc_v2_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
-
-	int rc = datas_to_values_v2(nparams, params, values);
-	if (rc >= 0) {
-		memset(&request, 0, sizeof request);
-		request.callid = callid;
-		request.verb.data = verbname;
-		request.verb.length = (uint16_t)(1 + strlen(verbname));
-		request.session.id = sessionid;
-		request.token.id = tokenid;
-		request.creds.length = usrcreds ? (uint16_t)(1 + strlen(usrcreds)) : 0;
-		rc = afb_rpc_v2_code_call_request(&stub->coder, &request, &valarr);
-		if (rc >= 0) {
-			afb_data_array_addref(nparams, params);
-			afb_rpc_coder_on_dispose2_output(&stub->coder, dispose_dataids_v2, (void*)(intptr_t)nparams, (void*)params);
-		}
-	}
-	return rc;
-}
-
-static int send_describe_request_v2(struct afb_stub_rpc *stub, uint16_t callid)
-{
-	afb_rpc_v2_msg_call_request_t request;
-
-	memset(&request, 0, sizeof request);
-	request.callid = callid;
-	request.verb.id = AFB_RPC_V2_ID_VERB_DESCRIBE;
-	return afb_rpc_v2_code_call_request(&stub->coder, &request, NULL);
-}
-
-static int send_describe_reply_v2(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
-{
-	return afb_rpc_v1_code_description(&stub->coder, callid, description);
-	afb_rpc_v2_value_t value;
-	afb_rpc_v2_value_array_t valarr = { .count = 1, .values = &value };;
-	afb_rpc_v2_msg_call_reply_t reply;
-
-	value.id = 0;
-	value.data = description;
-	value.length = description ? (uint16_t)(1 + strlen(description)) : 0;
-	reply.callid = callid;
-	reply.status = 0;
-	return afb_rpc_v2_code_call_reply(&stub->coder, &reply, &valarr);
-}
-
-#endif
 #if WITH_RPC_V3
 /**************************************************************************
 * PART - SENDING FOR V3
@@ -1222,10 +986,6 @@ static int send_session_create(struct afb_stub_rpc *stub, uint16_t id, const cha
 	case AFBRPC_PROTO_VERSION_1:
 		return send_session_create_v1(stub, id, value);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_session_create_v2(stub, id, value);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_session_create_v3(stub, id, value);
@@ -1243,10 +1003,6 @@ static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_token_create_v1(stub, id, value);
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_token_create_v2(stub, id, value);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -1266,10 +1022,6 @@ static int send_event_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_create_v1(stub, id, value);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_create_v2(stub, id, value);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_create_v3(stub, id, value);
@@ -1287,10 +1039,6 @@ static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t id)
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_destroy_v1(stub, id);
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_destroy_v2(stub, id);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -1310,10 +1058,6 @@ static int send_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_unexpected_v1(stub, eventid);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_unexpected_v2(stub, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unexpected_v3(stub, eventid);
@@ -1331,10 +1075,6 @@ static int send_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsigned
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_push_v1(stub, eventid, nparams, params);
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_push_v2(stub, eventid, nparams, params);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -1354,10 +1094,6 @@ static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_broadcast_v1(stub, eventname, nparams, params, uuid, hop);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_broadcast_v2(stub, eventname, nparams, params, uuid, hop);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_broadcast_v3(stub, eventname, nparams, params, uuid, hop);
@@ -1375,10 +1111,6 @@ static int send_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_subscribe_v1(stub, callid, eventid);
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_subscribe_v2(stub, callid, eventid);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -1398,10 +1130,6 @@ static int send_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, ui
 	case AFBRPC_PROTO_VERSION_1:
 		return send_event_unsubscribe_v1(stub, callid, eventid);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_event_unsubscribe_v2(stub, callid, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unsubscribe_v3(stub, callid, eventid);
@@ -1419,10 +1147,6 @@ static int send_call_reply(struct afb_stub_rpc *stub, int status, unsigned nrepl
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_call_reply_v1(stub, status, nreplies, replies, callid);
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_call_reply_v2(stub, status, nreplies, replies, callid);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -1450,10 +1174,6 @@ static int send_call_request(
 	case AFBRPC_PROTO_VERSION_1:
 		return send_call_request_v1(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_call_request_v2(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_call_request_v3(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
@@ -1472,10 +1192,6 @@ static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	case AFBRPC_PROTO_VERSION_1:
 		return send_describe_request_v1(stub, callid);
 #endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_describe_request_v2(stub, callid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_describe_request_v3(stub, callid);
@@ -1493,10 +1209,6 @@ static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
 		return send_describe_reply_v1(stub, callid, description);;
-#endif
-#if WITH_RPC_V2
-	case AFBRPC_PROTO_VERSION_2:
-		return send_describe_reply_v2(stub, callid, description);;
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
@@ -2287,303 +1999,6 @@ static int decode_v1(struct afb_stub_rpc *stub)
 }
 
 #endif
-#if WITH_RPC_V2
-/**************************************************************************
-* PART - PROCESS INCOMING MESSAGES V2
-**************************************************************************/
-
-static int typed_value_to_data_v2(struct afb_stub_rpc *stub, uint16_t typenum, uint32_t length, const void *value, struct afb_data **data)
-{
-	int rc;
-	struct afb_type *type1 = 0, *type2 = 0;
-	uint8_t size;
-
-	switch (typenum) {
-	case AFB_RPC_V2_ID_TYPE_OPAQUE:
-		type1 = &afb_type_predefined_opaque;
-		break;
-	case AFB_RPC_V2_ID_TYPE_BYTEARRAY:
-		type1 = &afb_type_predefined_bytearray;
-		break;
-	case AFB_RPC_V2_ID_TYPE_STRINGZ:
-		type1 = &afb_type_predefined_stringz;
-		break;
-	case AFB_RPC_V2_ID_TYPE_JSON:
-		type1 = &afb_type_predefined_json;
-		break;
-	case AFB_RPC_V2_ID_TYPE_BOOL:
-		size = 1;
-		type2 = &afb_type_predefined_bool;
-		break;
-	case AFB_RPC_V2_ID_TYPE_I32:
-		size = 4;
-		type2 = &afb_type_predefined_i32;
-		break;
-	case AFB_RPC_V2_ID_TYPE_U32:
-		size = 4;
-		type2 = &afb_type_predefined_u32;
-		break;
-	case AFB_RPC_V2_ID_TYPE_I64:
-		size = 8;
-		type2 = &afb_type_predefined_i64;
-		break;
-	case AFB_RPC_V2_ID_TYPE_U64:
-		size = 8;
-		type2 = &afb_type_predefined_u64;
-		break;
-	case AFB_RPC_V2_ID_TYPE_DOUBLE:
-		size = 8;
-		type2 = &afb_type_predefined_double;
-		break;
-	default:
-		rc = X_ENOTSUP; /* TODO */
-		break;
-	}
-	if (type1) {
-		if (length)
-			rc = afb_data_create_raw(data, type1, value, length,
-					inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-		else
-			rc = afb_data_create_raw(data, type1, NULL, 0, 0, 0);
-	}
-	else if (type2) {
-		if (size != length)
-			rc = X_EPROTO;
-		else {
-#if BYTE_ORDER == LITTLE_ENDIAN
-			rc = afb_data_create_copy(data, type2, value, length);
-#else
-			char buffer[8];
-			uint32_t idx;
-			for (idx = 0 ; idx < size ; idx++)
-				buffer[idx] = ((const char*)value)[size - (idx + 1)];
-			rc = afb_data_create_copy(data, type2, buffer, length);
-#endif
-		}
-	}
-
-	return rc;
-}
-
-static int value_to_data_v2(struct afb_stub_rpc *stub, afb_rpc_v2_value_t *value, struct afb_data **data)
-{
-	int rc;
-	if (value->id && value->data) {
-		rc = typed_value_to_data_v2(stub, value->id, value->length, value->data, data);
-	}
-	else if (value->id) {
-		/* data value */
-		rc = X_ENOTSUP; /* TODO */
-	}
-	else {
-		rc = typed_value_to_data_v2(stub, AFB_RPC_V2_ID_TYPE_OPAQUE, value->length, value->data, data);
-	}
-	return rc;
-}
-
-static int value_array_to_data_array_v2(struct afb_stub_rpc *stub, unsigned count, afb_rpc_v2_value_t values[], struct afb_data *datas[])
-{
-	int rc;
-	unsigned idx;
-
-	for (idx = 0, rc = 0 ; idx < count && rc >= 0 ; idx++) {
-		rc = value_to_data_v2(stub, &values[idx], &datas[idx]);
-		if (rc < 0 && idx)
-			afb_data_array_unref(idx, datas);
-	}
-	return rc;
-}
-
-static int decode_call_request_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_call_request_t *msg, afb_rpc_v2_value_array_t *values)
-{
-	int rc;
-	const char *verb;
-	unsigned count = values->count;
-	struct afb_data *datas[count];
-
-	verb = msg->verb.data;
-	if (verb == NULL) {
-		/* ATM special cases are treated here */
-		switch (msg->verb.id) {
-		case AFB_RPC_V2_ID_VERB_DESCRIBE:
-			rc = receive_describe_request(stub, msg->callid);
-			break;
-		default:
-			rc = X_ENOTSUP; /*TODO*/
-			break;
-		}
-	}
-	else {
-		/* normal case */
-		rc = value_array_to_data_array_v2(stub, count, values->values, datas);
-		if (rc >= 0)
-			rc = receive_call_request(stub, msg->callid, NULL, verb, count, datas, msg->session.id, msg->token.id, msg->creds.data);
-	}
-	return rc;
-}
-
-static int decode_call_reply_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_call_reply_t *msg, afb_rpc_v2_value_array_t *values)
-{
-	int rc;
-	unsigned count = values->count;
-	struct afb_data *datas[count];
-
-	rc = value_array_to_data_array_v2(stub, count, values->values, datas);
-	if (rc >= 0)
-		rc = receive_call_reply(stub, msg->callid, msg->status, count, datas);
-	return rc;
-}
-
-static int decode_event_push_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_event_push_t *msg, afb_rpc_v2_value_array_t *values)
-{
-	int rc;
-	unsigned count = values->count;
-	struct afb_data *datas[count];
-
-	rc = value_array_to_data_array_v2(stub, count, values->values, datas);
-	if (rc >= 0)
-		rc = receive_event_push(stub, msg->eventid, count, datas);
-	return rc;
-}
-
-static int decode_event_subscribe_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_event_subscribe_t *msg)
-{
-	return receive_event_subscribe(stub, msg->callid, msg->eventid);
-}
-
-static int decode_event_unsubscribe_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_event_unsubscribe_t *msg)
-{
-	return receive_event_unsubscribe(stub, msg->callid, msg->eventid);
-}
-
-static int decode_event_unexpected_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_event_unexpected_t *msg)
-{
-	return receive_event_unexpected(stub, msg->eventid);
-}
-
-static int decode_event_broadcast_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_event_broadcast_t *msg, afb_rpc_v2_value_array_t *values)
-{
-	int rc;
-	unsigned count = values->count;
-	struct afb_data *datas[count];
-
-	rc = value_array_to_data_array_v2(stub, count, values->values, datas);
-	if (rc >= 0)
-		rc = receive_event_broadcast(stub, msg->event, count, datas, *msg->uuid, msg->hop);
-	return rc;
-}
-
-static int decode_resource_create_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_resource_create_t *msg)
-{
-	int rc = 0;
-	switch (msg->kind) {
-	case AFB_RPC_V2_ID_KIND_SESSION:
-		rc = receive_session_create(stub, msg->id, msg->data);
-		break;
-	case AFB_RPC_V2_ID_KIND_TOKEN:
-		rc = receive_token_create(stub, msg->id, msg->data);
-		break;
-	case AFB_RPC_V2_ID_KIND_EVENT:
-		rc = receive_event_create(stub, msg->id, msg->data);
-		break;
-	case AFB_RPC_V2_ID_KIND_API:
-	case AFB_RPC_V2_ID_KIND_VERB:
-	case AFB_RPC_V2_ID_KIND_TYPE:
-	case AFB_RPC_V2_ID_KIND_DATA:
-	case AFB_RPC_V2_ID_KIND_KIND:
-	case AFB_RPC_V2_ID_KIND_CREDS:
-	case AFB_RPC_V2_ID_KIND_OPERATOR:
-		rc = X_ENOTSUP;
-		break;
-	}
-	return rc;
-}
-
-static int decode_resource_destroy_v2(struct afb_stub_rpc *stub, afb_rpc_v2_msg_resource_destroy_t *msg)
-{
-	int rc = 0;
-	switch (msg->kind) {
-	case AFB_RPC_V2_ID_KIND_SESSION:
-		rc = receive_session_destroy(stub, msg->id);
-		break;
-	case AFB_RPC_V2_ID_KIND_TOKEN:
-		rc = receive_token_destroy(stub, msg->id);
-		break;
-	case AFB_RPC_V2_ID_KIND_EVENT:
-		rc = receive_event_destroy(stub, msg->id);
-		break;
-	case AFB_RPC_V2_ID_KIND_API:
-	case AFB_RPC_V2_ID_KIND_VERB:
-	case AFB_RPC_V2_ID_KIND_TYPE:
-	case AFB_RPC_V2_ID_KIND_DATA:
-	case AFB_RPC_V2_ID_KIND_KIND:
-	case AFB_RPC_V2_ID_KIND_CREDS:
-	case AFB_RPC_V2_ID_KIND_OPERATOR:
-		rc = X_ENOTSUP;
-		break;
-	}
-	return rc;
-}
-
-static int decode_v2(struct afb_stub_rpc *stub)
-{
-	afb_rpc_v2_pckt_t packet;
-	afb_rpc_v2_msg_t msg;
-	afb_rpc_v2_value_t values[64];
-	afb_rpc_v2_value_array_t valarr;
-
-	int rc = afb_rpc_v2_decode_packet(&stub->decoder, &packet);
-	if (rc >= 0) {
-		if (afb_rpc_v2_is_single_packet_std_oper(&packet)) {
-			valarr.values = values;
-			valarr.count = sizeof values / sizeof *values;
-			msg.values.array = &valarr;
-			msg.values.allocator = NULL;
-			rc = afb_rpc_v2_decode_single_packet_std_oper(&packet, &msg);
-			if (rc >= 0) {
-				switch(msg.oper) {
-				case AFB_RPC_V2_ID_OP_CALL_REQUEST:
-					rc = decode_call_request_v2(stub, &msg.head.call_request, &valarr);
-					break;
-				case AFB_RPC_V2_ID_OP_CALL_REPLY:
-					rc = decode_call_reply_v2(stub, &msg.head.call_reply, &valarr);
-					break;
-				case AFB_RPC_V2_ID_OP_EVENT_PUSH:
-					rc = decode_event_push_v2(stub, &msg.head.event_push, &valarr);
-					break;
-				case AFB_RPC_V2_ID_OP_EVENT_SUBSCRIBE:
-					rc = decode_event_subscribe_v2(stub, &msg.head.event_subscribe);
-					break;
-				case AFB_RPC_V2_ID_OP_EVENT_UNSUBSCRIBE:
-					rc = decode_event_unsubscribe_v2(stub, &msg.head.event_unsubscribe);
-					break;
-				case AFB_RPC_V2_ID_OP_EVENT_UNEXPECTED:
-					rc = decode_event_unexpected_v2(stub, &msg.head.event_unexpected);
-					break;
-				case AFB_RPC_V2_ID_OP_EVENT_BROADCAST:
-					rc = decode_event_broadcast_v2(stub, &msg.head.event_broadcast, &valarr);
-					break;
-				case AFB_RPC_V2_ID_OP_RESOURCE_CREATE:
-					rc = decode_resource_create_v2(stub, &msg.head.resource_create);
-					break;
-				case AFB_RPC_V2_ID_OP_RESOURCE_DESTROY:
-					rc = decode_resource_destroy_v2(stub, &msg.head.resource_destroy);
-					break;
-				default:
-					rc = X_EPROTO;
-					break;
-				}
-			}
-		}
-		else {
-			/* TODO */
-			rc = X_EMSGSIZE;
-		}
-	}
-	return rc;
-}
-
-#endif
 #if WITH_RPC_V3
 /**************************************************************************
 * PART - PROCESS INCOMING MESSAGES V3
@@ -2903,9 +2318,6 @@ static int decode_v0(struct afb_stub_rpc *stub)
 #if WITH_RPC_V1
 				case AFBRPC_PROTO_VERSION_1:
 #endif
-#if WITH_RPC_V2
-				case AFBRPC_PROTO_VERSION_2:
-#endif
 #if WITH_RPC_V3
 				case AFBRPC_PROTO_VERSION_3:
 #endif
@@ -2952,11 +2364,6 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 #if WITH_RPC_V1
 		case AFBRPC_PROTO_VERSION_1:
 			rc = decode_v1(stub);
-			break;
-#endif
-#if WITH_RPC_V2
-		case AFBRPC_PROTO_VERSION_2:
-			rc = decode_v2(stub);
 			break;
 #endif
 #if WITH_RPC_V3
@@ -3082,9 +2489,6 @@ int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub)
 		uint8_t versions[] = {
 #if WITH_RPC_V1
 			AFBRPC_PROTO_VERSION_1,
-#endif
-#if WITH_RPC_V2
-			AFBRPC_PROTO_VERSION_2,
 #endif
 #if WITH_RPC_V3
 			AFBRPC_PROTO_VERSION_3,
