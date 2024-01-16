@@ -141,3 +141,45 @@ afb_data_array_copy_addref(
 	for (unsigned index = 0 ; index < count ; index++)
 		array_to[index] = afb_data_addref(array_from[index]);
 }
+
+#define AFB_DATA_ARRAY_PRINT_EMPTY 0
+#define AFB_DATA_ARRAY_PRINT_PREFIX 1
+#define AFB_DATA_ARRAY_PRINT_SEPARATOR 2
+#define AFB_DATA_ARRAY_PRINT_SUFFIX_FULL 3
+#define AFB_DATA_ARRAY_PRINT_SUFFIX_TRUNCATED 4
+
+/**
+ * Prints as well as possible values of data array in buffer
+ *
+ * when no data exist, i.e. count == 0, prints the 'empty' string
+ * (i.e. patterns[AFB_DATA_ARRAY_PRINT_EMPTY]) if it is not NULL
+ *
+ * when count > 0 then
+ *   - print the 'prefix' string (i.e. patterns[AFB_DATA_ARRAY_PRINT_EMPTY])
+ *     if not NULL
+ *   - print the itams of the array separated each another with
+ *     the 'separator' string (i.e. patterns[AFB_DATA_ARRAY_PRINT_SEPARATOR])
+ *     if not NULL
+ *   - print the 'suffix' string (i.e. patterns[AFB_DATA_ARRAY_PRINT_SUFFIX_FULL])
+ *     if not NULL
+ *   - check that all characters were in the buffer. If it is not the case
+ *     and if the 'truncated' string (i.e. patterns[AFB_DATA_ARRAY_PRINT_SUFFIX_TRUNCATED])
+ *     is not NULL then put it at the end of the buffer
+ *
+ * @param buffer buffer where to print the value
+ * @param size  size of the buffer
+ * @param patterns array of formatting patterns
+ * @param count the count of data in the array
+ * @param array the array of data
+ *
+ * @returns the count of characters written not including terminating null
+ */
+extern
+size_t
+afb_data_array_print(
+	char *buffer,
+	size_t size,
+	const char * const patterns[5],
+	unsigned count,
+	struct afb_data * const array[]
+);
