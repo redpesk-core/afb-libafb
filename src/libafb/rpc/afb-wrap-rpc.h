@@ -21,13 +21,39 @@
  * $RP_END_LICENSE$
  */
 
+
 #pragma once
 
-#include "libafb-config.h"
-#include "http/afb-hreq.h"
-#include "http/afb-hsrv.h"
-#include "http/afb-hswitch.h"
-#include "http/afb-method.h"
-#include "http/afb-upgrade.h"
-#include "http/afb-websock.h"
-#include "http/afb-upgd-rpc.h"
+struct afb_apiset;
+struct afb_session;
+struct afb_token;
+struct afb_wrap_rpc;
+
+/**
+ *
+ */
+extern int afb_wrap_rpc_create(struct afb_wrap_rpc **wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset);
+
+/**
+ *
+ */
+extern int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set);
+
+/**
+ * Function for implementing upgrade from HTTP or Websocket over HTTP.
+ */
+extern int afb_wrap_rpc_upgrade(
+		void *closure,
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure,
+		int websock);
+
+#if WITH_CRED
+struct afb_cred;
+extern void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred);
+#endif

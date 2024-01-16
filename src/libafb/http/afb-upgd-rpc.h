@@ -23,11 +23,29 @@
 
 #pragma once
 
-#include "libafb-config.h"
-#include "http/afb-hreq.h"
-#include "http/afb-hsrv.h"
-#include "http/afb-hswitch.h"
-#include "http/afb-method.h"
-#include "http/afb-upgrade.h"
-#include "http/afb-websock.h"
-#include "http/afb-upgd-rpc.h"
+#include "../libafb-config.h"
+
+#if WITH_LIBMICROHTTPD
+
+struct afb_hreq;
+struct afb_apiset;
+struct afb_session;
+struct afb_token;
+
+extern const char afb_upgd_rpc_protocol_name[];
+extern const char afb_upgd_rpc_ws_protocol_name[];
+
+extern int afb_rpc_upgd(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset);
+
+extern void *afb_rpc_upgd_ws(
+		void *closure,
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure);
+
+#endif
+

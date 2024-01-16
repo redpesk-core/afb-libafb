@@ -1,0 +1,293 @@
+/*
+ * Copyright (C) 2015-2024 IoT.bzh Company
+ * Author: José Bollo <jose.bollo@iot.bzh>
+ *
+ * $RP_BEGIN_LICENSE$
+ * Commercial License Usage
+ *  Licensees holding valid commercial IoT.bzh licenses may use this file in
+ *  accordance with the commercial license agreement provided with the
+ *  Software or, alternatively, in accordance with the terms contained in
+ *  a written agreement between you and The IoT.bzh Company. For licensing terms
+ *  and conditions see https://www.iot.bzh/terms-conditions. For further
+ *  information use the contact form at https://www.iot.bzh/contact.
+ *
+ * GNU General Public License Usage
+ *  Alternatively, this file may be used under the terms of the GNU General
+ *  Public license version 3. This license is as published by the Free Software
+ *  Foundation and appearing in the file LICENSE.GPLv3 included in the packaging
+ *  of this file. Please review the following information to ensure the GNU
+ *  General Public License requirements will be met
+ *  https://www.gnu.org/licenses/gpl-3.0.html.
+ * $RP_END_LICENSE$
+ */
+
+#include "../libafb-config.h"
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+
+#include <rp-utils/rp-verbose.h>
+
+#include "sys/x-uio.h"
+
+#include "misc/afb-ws.h"
+#include "rpc/afb-rpc-coder.h"
+#include "core/afb-ev-mgr.h"
+#include "core/afb-cred.h"
+#include "rpc/afb-stub-rpc.h"
+#include "rpc/afb-wrap-rpc.h"
+
+
+#define RECEIVE_BLOCK_LENGTH 4080
+#define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
+#define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
+
+
+/*
+*/
+struct afb_wrap_rpc
+{
+	struct afb_stub_rpc *stub;
+	struct afb_ws *ws;
+	struct ev_fd *efd;
+};
+
+/******************************************************************************/
+/***       D I R E C T                                                      ***/
+/******************************************************************************/
+
+#if 0 /* TODO manage reopening */
+static void client_on_hangup(struct afb_stub_rpc *client)
+{
+	const char *apiname = afb_stub_rpc_apiname(client);
+	RP_WARNING("Disconnected of API %s", apiname);
+	afb_monitor_api_disconnected(apiname);
+}
+
+static int reopen_client(void *closure)
+{
+	const char *uri = closure;
+	const char *apiname = afb_socket_api(uri);
+	int fd = afb_socket_open(uri, 0);
+	if (fd >= 0)
+		RP_INFO("Reconnected to API %s", apiname);
+	return fd;
+}
+#endif
+
+static void hangup(struct afb_wrap_rpc *wrap)
+{
+	afb_stub_rpc_unref(wrap->stub);
+	if (wrap->efd != NULL)
+		ev_fd_unref(wrap->efd);
+	if (wrap->ws != NULL)
+		{/*TODO*/}
+	free(wrap);
+}
+
+static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	void *buffer;
+	size_t esz;
+	ssize_t sz;
+	int rc, avail;
+
+	if (revents & EPOLLHUP) {
+		hangup(wrap);
+	}
+	else if (revents & EPOLLIN) {
+#if QUERY_RCV_SIZE
+		rc = ioctl(fd, FIONREAD, &avail);
+		esz = rc < 0 ? RECEIVE_BLOCK_LENGTH : (size_t)(unsigned)avail;
+#else
+		esz = RECEIVE_BLOCK_LENGTH;
+#endif
+		buffer = malloc(esz);
+		if (buffer != NULL) {
+#if USE_SND_RCV
+			sz = recv(fd, buffer, esz, MSG_DONTWAIT);
+#else
+			sz = read(fd, buffer, esz);
+#endif
+			if (sz >= 0) {
+				if (esz > (size_t)sz) {
+					void *newbuffer = realloc(buffer, (size_t)sz);
+					if (newbuffer != NULL)
+						buffer = newbuffer;
+				}
+				afb_stub_rpc_receive(wrap->stub, buffer, (size_t)sz);
+			}
+			else {
+				free(buffer);
+				buffer = NULL;
+			}
+		}
+		if (buffer == NULL) {
+			hangup(wrap);
+		}
+	}
+}
+
+static void notify(void *closure, struct afb_stub_rpc *stub)
+{
+	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
+	struct afb_wrap_rpc *wrap = closure;
+	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
+	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+	if (rc > 0) {
+		int fd = ev_fd_fd(wrap->efd);
+#if USE_SND_RCV
+		struct msghdr msg = {
+			.msg_name       = NULL,
+			.msg_namelen    = 0,
+			.msg_iov        = iovs,
+			.msg_iovlen     = (unsigned)rc,
+			.msg_control    = NULL,
+			.msg_controllen = 0,
+			.msg_flags      = 0
+		};
+		sendmsg(fd, &msg, 0);
+#else
+		writev(fd, iovs, rc);
+#endif
+		afb_rpc_coder_output_dispose(coder);
+	}
+}
+
+static void disposebufs(void *closure, void *buffer, size_t size)
+{
+	free(buffer);
+}
+
+/******************************************************************************/
+/***       W E B S O C K E T                                                ***/
+/******************************************************************************/
+
+static void notify_ws(void *closure, struct afb_stub_rpc *stub)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
+	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
+	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+	if (rc > 0) {
+		afb_ws_binary_v(wrap->ws, iovs, rc);
+		afb_rpc_coder_output_dispose(coder);
+	}
+}
+
+static void on_ws_binary(void *closure, char *buffer, size_t size)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	afb_stub_rpc_receive(wrap->stub, buffer, size);
+}
+
+static void on_ws_hangup(void *closure)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	hangup(wrap);
+	/* TODO no way to remove afb-ws structure from here */
+}
+
+static struct afb_ws_itf wsitf =
+{
+	.on_close = 0,
+	.on_text = 0,
+	.on_binary = on_ws_binary,
+	.on_error = 0,
+	.on_hangup = on_ws_hangup
+};
+
+/******************************************************************************/
+/***       W E B S O C K E T                                                ***/
+/******************************************************************************/
+
+static int init(struct afb_wrap_rpc *wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset)
+{
+	int rc;
+
+	rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+	if (rc < 0) {
+		close(fd);
+	} else {
+		if (websock) {
+			wrap->efd = NULL;
+			wrap->ws = afb_ws_create(fd, 1, &wsitf, wrap);
+			if (wrap->ws == NULL)
+				rc = X_ENOMEM;
+			else {
+				afb_stub_rpc_set_unpack(wrap->stub, 1);
+				afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
+				rc = 0;
+			}
+		}
+		else {
+			wrap->ws = NULL;
+			rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent, wrap, 0, 1);
+			if (rc >= 0)
+				afb_stub_rpc_emit_set_notify(wrap->stub, notify, wrap);
+		}
+		if (rc >= 0) {
+			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
+			return 0;
+		}
+		afb_stub_rpc_unref(wrap->stub);
+	}
+	return rc;
+}
+
+int afb_wrap_rpc_create(struct afb_wrap_rpc **wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset)
+{
+	int rc;
+	*wrap = malloc(sizeof **wrap);
+	if (*wrap == NULL) {
+		if (autoclose)
+			close(fd);
+		rc = X_ENOMEM;
+	}
+	else {
+		rc =  init(*wrap, fd, autoclose, websock, apiname, callset);
+		if (rc < 0) {
+			free(*wrap);
+			*wrap = NULL;
+		}
+	}
+	return rc;
+}
+
+int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set)
+{
+	int rc = afb_stub_rpc_client_add(wrap->stub, declare_set);
+	if (rc >= 0)
+		afb_stub_rpc_offer_version(wrap->stub);
+	return rc;
+}
+
+int afb_wrap_rpc_upgrade(
+		void *closure,
+		int fd,
+		int autoclose,
+		struct afb_apiset *callset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure,
+		int websock
+) {
+	struct afb_wrap_rpc *wrap;
+	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, websock, NULL, callset);
+	if (rc >= 0) {
+		afb_stub_rpc_set_session(wrap->stub, session);
+		afb_stub_rpc_set_token(wrap->stub, token);
+	}
+	return rc;
+}
+
+#if WITH_CRED
+void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred)
+{
+	afb_stub_rpc_set_cred(wrap->stub, cred);
+}
+#endif
+

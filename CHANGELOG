@@ -1,6 +1,11 @@
 Version 5.0.11 (next)
 --------------
 
+  features
+   - Upgrading to RPC v3
+   - Upgrading to RPC v3 / WebSocket
+   - Rewrite of afb-api-rpc for using afb-wrap-rpc
+
   fixes
    - Sequence events on their identity not globally (#6110)
    - Missing API message (#6105)
@@ -10,8 +15,8 @@ Version 5.0.11 (next)
    - Long pause time on corrupted heap backtrace
 
   change
-   - websockets now daughters of upgrade
-   - removed function afb_hswitch_websocket_switch
+   - Websockets now daughters of upgrade
+   - Removed function afb_hswitch_websocket_switch
      replaced by afb_hswitch_upgrade
 
   minor/details

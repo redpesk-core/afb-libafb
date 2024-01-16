@@ -43,15 +43,11 @@
 #include "misc/afb-ws.h"
 #include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
-#include "rpc/afb-stub-rpc.h"
+#include "rpc/afb-wrap-rpc.h"
 #include "rpc/afb-rpc-coder.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 #include "sys/x-uio.h"
-
-#define RECEIVE_BLOCK_LENGTH 4080
-#define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
-#define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
 
 /**
  * Structure holding server data
@@ -85,7 +81,7 @@ static const char *prefix_ws_remove(const char *uri)
 /******************************************************************************/
 
 #if 0 /* TODO manage reopening */
-static void client_on_hangup(struct afb_stub_rpc *client)
+static void client_on_hangup(struct afb_wrap_rpc *client)
 {
 	const char *apiname = afb_stub_rpc_apiname(client);
 	RP_WARNING("Disconnected of API %s", apiname);
@@ -103,127 +99,17 @@ static int reopen_client(void *closure)
 }
 #endif
 
-static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
-{
-	struct afb_stub_rpc *stub = closure;
-	void *buffer;
-	size_t esz;
-	ssize_t sz;
-	int rc, avail;
-
-	if (revents & EPOLLHUP) {
-		afb_stub_rpc_unref(stub);
-		ev_fd_unref(efd);
-	}
-	else if (revents & EPOLLIN) {
-#if QUERY_RCV_SIZE
-		rc = ioctl(fd, FIONREAD, &avail);
-		esz = rc < 0 ? RECEIVE_BLOCK_LENGTH : (size_t)(unsigned)avail;
-#else
-		esz = RECEIVE_BLOCK_LENGTH;
-#endif
-		buffer = malloc(esz);
-		if (buffer != NULL) {
-#if USE_SND_RCV
-			sz = recv(fd, buffer, esz, MSG_DONTWAIT);
-#else
-			sz = read(fd, buffer, esz);
-#endif
-			if (sz >= 0) {
-				if (esz > (size_t)sz) {
-					void *newbuffer = realloc(buffer, (size_t)sz);
-					if (newbuffer != NULL)
-						buffer = newbuffer;
-				}
-				afb_stub_rpc_receive(stub, buffer, (size_t)sz);
-			}
-			else {
-				free(buffer);
-				buffer = NULL;
-			}
-		}
-		if (buffer == NULL) {
-			afb_stub_rpc_unref(stub);
-			ev_fd_unref(efd);
-		}
-	}
-}
-
-static void notify(void *closure, struct afb_stub_rpc *stub)
-{
-	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
-	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
-	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-	if (rc > 0) {
-		int fd = (int)(intptr_t)closure;
-#if USE_SND_RCV
-		struct msghdr msg = {
-			.msg_name       = NULL,
-			.msg_namelen    = 0,
-			.msg_iov        = iovs,
-			.msg_iovlen     = (unsigned)rc,
-			.msg_control    = NULL,
-			.msg_controllen = 0,
-			.msg_flags      = 0
-		};
-		sendmsg(fd, &msg, 0);
-#else
-		writev(fd, iovs, rc);
-#endif
-		afb_rpc_coder_output_dispose(coder);
-	}
-}
-
-static void disposebufs(void *closure, void *buffer, size_t size)
-{
-	free(buffer);
-}
-
-static void notify_ws(void *closure, struct afb_stub_rpc *stub)
-{
-	struct afb_ws *ws = closure;
-	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
-	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
-	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-	if (rc > 0) {
-		afb_ws_binary_v(ws, iovs, rc);
-		afb_rpc_coder_output_dispose(coder);
-	}
-}
-
-static void on_ws_binary(void *closure, char *buffer, size_t size)
-{
-	struct afb_stub_rpc *stub = closure;
-	afb_stub_rpc_receive(stub, buffer, size);
-}
-
-static void on_ws_hangup(void *closure)
-{
-	struct afb_stub_rpc *stub = closure;
-	afb_stub_rpc_unref(stub);
-	/* no way to remove afb-ws structure from here */
-}
-
-static struct afb_ws_itf wsitf =
-{
-	.on_close = 0,
-	.on_text = 0,
-	.on_binary = on_ws_binary,
-	.on_error = 0,
-	.on_hangup = on_ws_hangup
-};
-
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
-	struct afb_stub_rpc *stub;
-	const char *api, *turi;
-	int rc, fd;
-	struct ev_fd *efd;
+	struct afb_wrap_rpc *wrap;
+	const char *apiname, *turi;
+	int rc, fd, websock;
 
 	/* check the api name */
 	turi = prefix_ws_remove(uri);
-	api = afb_socket_api(turi);
-	if (api == NULL || !afb_apiname_is_valid(api)) {
+	websock = turi != uri;
+	apiname = afb_socket_api(turi);
+	if (apiname == NULL || !afb_apiname_is_valid(apiname)) {
 		RP_ERROR("invalid (too long) rpc client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
@@ -232,43 +118,16 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	/* open the socket */
 	rc = afb_socket_open(turi, 0);
 	if (rc >= 0) {
-		/* create the client stub */
+		/* create the client wrap */
 		fd = rc;
-		rc = afb_stub_rpc_create(&stub, api, call_set);
-		if (rc < 0) {
-			close(fd);
-			RP_ERROR("can't create client rpc service to %s", uri);
-		} else {
-			if (uri == turi) {
-				rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, stub, 0, 1);
-				if (rc >= 0) {
-					afb_stub_rpc_emit_set_notify(stub, notify, (void*)(intptr_t)fd);
-					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
-				}
-			}
-			else {
-				struct afb_ws *ws = afb_ws_create(fd, 1, &wsitf, stub);
-				if (ws == NULL)
-					rc = X_ENOMEM;
-				else {
-					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
-					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
-					afb_stub_rpc_set_unpack(stub, 1);
-					rc = 0;
-				}
-			}
+		rc = afb_wrap_rpc_create(&wrap, fd, 1, websock, apiname, call_set);
+		if (rc >= 0) {
+			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
-				RP_ERROR("can't setup client rpc service to %s", uri);
-			else {
-				rc = afb_stub_rpc_client_add(stub, declare_set);
-				if (rc >= 0) {
-					afb_stub_rpc_offer_version(stub);
-					return 0;
-				}
-				RP_ERROR("can't add the client to the apiset for service %s", uri);
-			}
-			afb_stub_rpc_unref(stub);
+				{/*TODO afb_wrap_rpc_unref(wrap); */}
 		}
+		if (rc < 0 && strong)
+			RP_ERROR("can't create client rpc service to %s", uri);
 	}
 error:
 	return strong ? rc : 0;
@@ -289,7 +148,7 @@ int afb_api_rpc_add_client_weak(const char *uri, struct afb_apiset *declare_set,
 /******************************************************************************/
 
 #if JUNK
-static void server_on_hangup(struct afb_stub_rpc *server)
+static void server_on_hangup(struct afb_wrap_rpc *server)
 {
 	const char *apiname = afb_stub_rpc_apiname(server);
 	RP_INFO("Disconnection of client of API %s", apiname);
@@ -299,11 +158,11 @@ static void server_on_hangup(struct afb_stub_rpc *server)
 
 static void server_accept(struct server *server, int fd)
 {
-	int fdc, rc;
+	int fdc, rc, websock;
 	struct sockaddr addr;
 	socklen_t lenaddr;
-	struct afb_stub_rpc *stub;
-	struct ev_fd *efd;
+	struct afb_wrap_rpc *wrap;
+	const char *apiname;
 
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
@@ -312,7 +171,11 @@ static void server_accept(struct server *server, int fd)
 	} else {
 		rc = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
-		rc = afb_stub_rpc_create(&stub, &server->uri[server->offapi], server->apiset);
+		websock = server->uri != prefix_ws_remove(server->uri);
+		apiname = &server->uri[server->offapi];
+		if (apiname[0] == 0)
+			apiname = NULL;
+		rc = afb_wrap_rpc_create(&wrap, fdc, 1, websock, apiname, server->apiset);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
@@ -326,30 +189,8 @@ static void server_accept(struct server *server, int fd)
 			*/
 			struct afb_cred *cred;
 			afb_cred_create_for_socket(&cred, fdc); /* TODO: check retcode */
-			afb_stub_rpc_set_cred(stub, cred);
+			afb_wrap_rpc_set_cred(wrap, cred);
 #endif
-			if (server->uri == prefix_ws_remove(server->uri)) {
-				rc = afb_ev_mgr_add_fd(&efd, fdc, EPOLLIN, onevent, stub, 0, 1);
-				if (rc >= 0) {
-					afb_stub_rpc_emit_set_notify(stub, notify, (void*)(intptr_t)fdc);
-					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
-				}
-			}
-			else {
-				struct afb_ws *ws = afb_ws_create(fdc, 1, &wsitf, stub);
-				if (ws == NULL)
-					rc = X_ENOMEM;
-				else {
-					afb_stub_rpc_emit_set_notify(stub, notify_ws, ws);
-					afb_stub_rpc_receive_set_dispose(stub, disposebufs, 0);
-					afb_stub_rpc_set_unpack(stub, 1);
-					rc = 0;
-				}
-			}
-			if (rc < 0) {
-				RP_ERROR("can't serve connection to %s", server->uri);
-				afb_stub_rpc_unref(stub);
-			}
 		}
 	}
 }

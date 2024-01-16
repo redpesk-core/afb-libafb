@@ -324,9 +324,7 @@ int afb_rpc_coder_set_position(afb_rpc_coder_t *coder, uint32_t pos)
 int afb_rpc_coder_write_align_at(afb_rpc_coder_t *coder, uint32_t base, uint32_t index)
 {
 	uint32_t count, mask = base - 1;
-	if ((base & mask) != 0)
-		return X_EINVAL;
-	count = (uint32_t)((index-coder->size) & mask);
+	count = (uint32_t)((index - coder->size) & mask);
 	return count == 0 ? 0 : afb_rpc_coder_write_zeroes(coder, count);
 }
 

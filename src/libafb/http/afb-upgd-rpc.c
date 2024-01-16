@@ -21,13 +21,64 @@
  * $RP_END_LICENSE$
  */
 
-#pragma once
+#include "../libafb-config.h"
 
-#include "libafb-config.h"
-#include "http/afb-hreq.h"
-#include "http/afb-hsrv.h"
-#include "http/afb-hswitch.h"
-#include "http/afb-method.h"
+#if WITH_LIBMICROHTTPD
+
 #include "http/afb-upgrade.h"
-#include "http/afb-websock.h"
+#include "http/afb-hreq.h"
 #include "http/afb-upgd-rpc.h"
+#include "rpc/afb-wrap-rpc.h"
+
+const char afb_upgd_rpc_protocol_name[] = "x-afb-rpc";
+const char afb_upgd_rpc_ws_protocol_name[] = "x-afb-ws-rpc";
+
+static int upgrade_cb(
+		void *closure,
+		struct afb_hreq *hreq,
+		struct afb_apiset *apiset,
+		int fd,
+		void (*cleanup)(void*),
+		void *cleanup_closure
+) {
+	return afb_wrap_rpc_upgrade(
+		closure,
+		fd,
+		0,
+		apiset,
+		hreq->comreq.session,
+		hreq->comreq.token,
+		cleanup,
+		cleanup_closure,
+		0);
+}
+
+int afb_rpc_upgd(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset)
+{
+	return afb_upgrade_reply(upgrade_cb, NULL, hreq, apiset, afb_upgd_rpc_protocol_name, 0, NULL);
+}
+
+void *afb_rpc_upgd_ws(
+		void *closure,
+		int fd,
+		int autoclose,
+		struct afb_apiset *apiset,
+		struct afb_session *session,
+		struct afb_token *token,
+		void (*cleanup)(void*),
+		void *cleanup_closure)
+{
+	int rc = afb_wrap_rpc_upgrade(
+		closure,
+		fd,
+		autoclose,
+		apiset,
+		session,
+		token,
+		cleanup,
+		cleanup_closure,
+		1);
+	return (void*)(intptr_t)(rc == 0); /* TODO remove that hack */
+}
+
+#endif

@@ -39,6 +39,7 @@
 #include "sys/x-errno.h"
 
 #include "wsj1/afb-ws-json1.h"
+#include "http/afb-upgd-rpc.h"
 
 const char afb_websocket_protocol_name[] = "websocket";
 
@@ -67,9 +68,15 @@ struct wsprotodef
 */
 static const struct wsprotodef default_protocols[] = {
 	{
-		.next = NULL,
 		.name = "x-afb-ws-json1",
+		.next = (struct wsprotodef*)&default_protocols[1],
 		.creator = (wscreator_t)afb_ws_json1_create, /* cast needed to convert result to void* */
+		.closure = NULL
+	},
+	{
+		.name = afb_upgd_rpc_ws_protocol_name,
+		.next = NULL,
+		.creator = afb_rpc_upgd_ws,
 		.closure = NULL
 	}
 };

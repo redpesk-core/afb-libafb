@@ -31,3 +31,4 @@
 #include "rpc/afb-rpc-v1.h"
 #include "rpc/afb-rpc-v3.h"
 #include "rpc/afb-stub-rpc.h"
+#include "rpc/afb-wrap-rpc.h"

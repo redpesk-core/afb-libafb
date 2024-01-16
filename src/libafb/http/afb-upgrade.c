@@ -36,6 +36,7 @@
 #include "http/afb-hsrv.h"
 #include "http/afb-upgrade.h"
 #include "http/afb-websock.h"
+#include "http/afb-upgd-rpc.h"
 #include "sys/x-errno.h"
 
 /**************** management of lists of upgrader definitions ****************************/
@@ -61,8 +62,14 @@ struct upgradedef
 static const struct upgradedef default_upgraders[] = {
 	{
 		.name     = afb_websocket_protocol_name,
-		.next     = NULL,
+		.next     = (struct upgradedef*)&default_upgraders[1],
 		.upgrader = afb_websock_upgrader,
+		.closure  = NULL
+	},
+	{
+		.name     = afb_upgd_rpc_protocol_name,
+		.next     = NULL,
+		.upgrader = afb_rpc_upgd,
 		.closure  = NULL
 	}
 };
