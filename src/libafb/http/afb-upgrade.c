@@ -60,7 +60,7 @@ struct upgradedef
 
 static const struct upgradedef default_upgraders[] = {
 	{
-		.name     = "websocket",
+		.name     = afb_websocket_protocol_name,
 		.next     = NULL,
 		.upgrader = afb_websock_upgrader,
 		.closure  = NULL
@@ -142,7 +142,7 @@ struct upgrading
 	/** the call set */
 	struct afb_apiset *apiset;
 	/** closure of the callback */
-	const void *closure;
+	void *closure;
 };
 
 /** cleanup routine */
@@ -177,9 +177,10 @@ static void upgrade_begin(
 /* see afb-upgrade.h */
 int afb_upgrade_reply(
 		afb_upgrade_cb_t upgrdcb,
-		const void *closure,
+		void *closure,
 		struct afb_hreq *hreq,
 		struct afb_apiset *apiset,
+		const char *protocol,
 		unsigned count,
 		const char *headval[]
 ) {
@@ -201,6 +202,8 @@ int afb_upgrade_reply(
 	upgrading->closure = closure;
 	response = MHD_create_response_for_upgrade(upgrade_begin, upgrading);
 
+	if (protocol != NULL)
+		MHD_add_response_header(response, MHD_HTTP_HEADER_UPGRADE, protocol);
 	for(idx = 0; idx < count; idx += 2)
 		MHD_add_response_header(response, headval[idx], headval[idx + 1]);
 

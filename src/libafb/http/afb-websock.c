@@ -40,6 +40,8 @@
 
 #include "wsj1/afb-ws-json1.h"
 
+const char afb_websocket_protocol_name[] = "websocket";
+
 /**************** management of lists of protocol ****************************/
 
 /**
@@ -130,7 +132,6 @@ int afb_websock_remove(
 
 /**************** WebSocket connection upgrade ****************************/
 
-static const char websocket_s[] = "websocket";
 static const char sec_websocket_key_s[] = "Sec-WebSocket-Key";
 static const char sec_websocket_version_s[] = "Sec-WebSocket-Version";
 static const char sec_websocket_accept_s[] = "Sec-WebSocket-Accept";
@@ -200,7 +201,7 @@ static const struct wsprotodef *search_proto(const struct wsprotodef *protodefs,
 /**************** WebSocket connection upgrade ****************************/
 
 static int upgrading_cb(
-		const void *closure,
+		void *closure,
 		struct afb_hreq *hreq,
 		struct afb_apiset *apiset,
 		int fd,
@@ -218,7 +219,7 @@ static int upgrading_cb(
 int afb_websock_upgrader(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset)
 {
 	struct MHD_Response *response;
-	const char *key, *version, *protocols, *headval[6];
+	const char *key, *version, *protocols, *headval[4];
 	const struct wsprotodef *protodefs;
 	struct MHD_Connection *con = hreq->connection;
 	char acceptval[29];
@@ -258,9 +259,7 @@ int afb_websock_upgrader(void *closure, struct afb_hreq *hreq, struct afb_apiset
 	headval[1] = acceptval;
 	headval[2] = sec_websocket_protocol_s;
 	headval[3] = proto->name;
-	headval[4] = MHD_HTTP_HEADER_UPGRADE;
-	headval[5] = websocket_s;
-	return afb_upgrade_reply(upgrading_cb, proto, hreq, apiset, 6, headval);
+	return afb_upgrade_reply(upgrading_cb, (void*)proto, hreq, apiset, afb_websocket_protocol_name, 4, headval);
 }
 
 #endif

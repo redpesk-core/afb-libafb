@@ -77,6 +77,8 @@ extern int afb_websock_remove(
 		const char *name
 );
 
+extern const char afb_websocket_protocol_name[];
+
 extern int afb_websock_upgrader(void *closure, struct afb_hreq *hreq, struct afb_apiset *apiset);
 
 #endif

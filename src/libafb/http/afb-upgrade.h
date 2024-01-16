@@ -41,7 +41,7 @@ struct upgradedef;
 * - 'cleanup' and 'cleanup_closure' are to be called at end
 */
 typedef int (*afb_upgrade_cb_t)(
-		const void *closure,
+		void *closure,
 		struct afb_hreq *hreq,
 		struct afb_apiset *apiset,
 		int fd,
@@ -55,14 +55,16 @@ typedef int (*afb_upgrade_cb_t)(
 * @param closure closure for the callback
 * @param hreq    the HTTP request
 * @param apiset  the call set
+* @param protocol the protocol to put in the HTTP header UPGRADE (or NULL)
 * @param count   count of headval items, must be even
 * @param headval header and value to add the the reply [ H1 V1 H2 V2 ... ]
 */
 extern int afb_upgrade_reply(
 		afb_upgrade_cb_t upgrdcb,
-		const void *closure,
+		void *closure,
 		struct afb_hreq *hreq,
 		struct afb_apiset *apiset,
+		const char *protocol,
 		unsigned count,
 		const char **headval
 );
