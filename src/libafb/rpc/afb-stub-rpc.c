@@ -284,7 +284,7 @@ struct afb_stub_rpc
 		emit;
 
 	/* the api name */
-	char apiname[];
+	const char *apiname;
 };
 
 /**************************************************************************
@@ -1785,7 +1785,7 @@ static void got_description_cb(void *closure, struct json_object *object)
 static void describe_job_cb(int status, void *closure)
 {
 	struct indesc *indesc = closure;
-	if (status)
+	if (status || indesc->link.stub->apiname == NULL)
 		indesc_reply_description(indesc, NULL);
 	else
 		afb_apiset_describe(indesc->link.stub->call_set, indesc->link.stub->apiname, got_description_cb, indesc);
@@ -2442,11 +2442,15 @@ struct afb_stub_rpc *afb_stub_rpc_create(const char *apiname, struct afb_apiset 
 	struct afb_stub_rpc *stub;
 
 	/* allocation */
-	stub = calloc(1, sizeof *stub + 1 + strlen(apiname));
+	stub = calloc(1, sizeof *stub + (apiname == NULL ? 0 : 1 + strlen(apiname)));
 	if (stub) {
 		/* terminate initialization */
 		stub->refcount = 1;
-		strcpy(stub->apiname, apiname);
+		if (apiname != NULL) {
+			char *name = (char*)(&stub[1]);
+			strcpy(name, apiname);
+			stub->apiname = name;
+		}
 		stub->call_set = afb_apiset_addref(call_set);
 	}
 	return stub;
@@ -2463,6 +2467,8 @@ int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset *declar
 {
 	struct afb_api_item api;
 
+	if (stub->apiname == NULL)
+		return X_EINVAL;
 	if (stub->declare_set)
 		return X_EEXIST;
 
