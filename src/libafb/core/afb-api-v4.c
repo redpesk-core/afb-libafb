@@ -810,7 +810,15 @@ afb_api_v4_create(
 
 	/* check the name */
 	if (name == NULL) {
-		mode_name = Afb_String_Const;
+		if (path == NULL) {
+			name = "<ROOT>";
+			mode_name = Afb_String_Const;
+		}
+		else {
+			name = strrchr(path, '/');
+			name = name == NULL ? path : &name[1];
+			mode_name = Afb_String_Copy;
+		}
 	}
 	else {
 		if (!afb_apiname_is_valid(name)) {

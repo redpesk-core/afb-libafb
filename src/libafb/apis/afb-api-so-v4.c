@@ -141,7 +141,7 @@ int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *d
  * @return 0 if not a binding v4, 1 if valid binding V4 correctly pre-initialized,
  *         a negative number if invalid binding V4 or error when initializing.
  */
-int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set, struct json_object *config)
+int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset *call_set, struct json_object *config)
 {
 	int rc;
 	struct iniv4 iniv4;
@@ -243,7 +243,6 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 			0,
 			init_for_root, &iniv4,
 			rpath, Afb_String_Copy);
-
 	if (rc >= 0)
 		return 1;
 
