@@ -49,6 +49,7 @@
 #include "core/afb-api-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-apiname.h"
+#include "core/afb-data-array.h"
 
 #include "utils/globmatch.h"
 #include "utils/namecmp.h"
@@ -151,6 +152,16 @@ static struct afb_hook_global *list_of_global_hooks = NULL;
 /* hook id */
 static unsigned next_hookid = 0;
 
+/* printing data */
+#define PARAMS_TEXT_SIZE 60
+static const char *const daprt_patterns[5] = {
+	[AFB_DATA_ARRAY_PRINT_EMPTY] = "",
+	[AFB_DATA_ARRAY_PRINT_PREFIX] = " ",
+	[AFB_DATA_ARRAY_PRINT_SEPARATOR] = ", ",
+	[AFB_DATA_ARRAY_PRINT_SUFFIX_FULL] = "",
+	[AFB_DATA_ARRAY_PRINT_SUFFIX_TRUNCATED] = "..."
+};
+
 /******************************************************************************
  * section: hook id
  *****************************************************************************/
@@ -228,22 +239,22 @@ static void _hook_req_(const struct afb_req_common *req, const char *format, ...
 
 static void hook_req_begin_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
 {
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,req->params.ndata, req->params.data);
+	_hook_req_(req, "BEGIN%s", buffer);
 #if WITH_CRED
-	struct afb_cred *cred = req->credentials;
-
-	if (!cred)
-		_hook_req_(req, "BEGIN");
-	else
-		_hook_req_(req, "BEGIN uid=%d=%s gid=%d pid=%d label=%s id=%s",
-			(int)cred->uid,
-			cred->user,
-			(int)cred->gid,
-			(int)cred->pid,
-			cred->label?:"(null)",
-			cred->id?:"(null)"
-		);
-#else
-	_hook_req_(req, "BEGIN");
+	{
+		struct afb_cred *cred = req->credentials;
+		if (cred)
+			_hook_req_(req, "CRED uid=%d=%s gid=%d pid=%d label=%s id=%s",
+				(int)cred->uid,
+				cred->user,
+				(int)cred->gid,
+				(int)cred->pid,
+				cred->label?:"(null)",
+				cred->id?:"(null)"
+			);
+	}
 #endif
 }
 
@@ -262,9 +273,11 @@ static void hook_req_get_cb(void *closure, const struct afb_hookid *hookid, cons
 	_hook_req_(req, "get(%s) -> { name: %s, value: %s, path: %s }", name, arg.name, arg.value, arg.path);
 }
 
-static void hook_req_reply_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nparams, struct afb_data * const params[])
+static void hook_req_reply_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[])
 {
-	_hook_req_(req, "reply[%s: %d]", status >= 0 ? "success" : "error", status); /* TODO */
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nreplies, replies);
+	_hook_req_(req, "reply[%s: %d]%s", status >= 0 ? "success" : "error", status, buffer);
 }
 
 static void hook_req_addref_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req)
@@ -304,22 +317,30 @@ static void hook_req_unsubscribe_cb(void *closure, const struct afb_hookid *hook
 
 static void hook_req_subcall_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_req_(req, "subcall(%s/%s) ...", api, verb);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_req_(req, "subcall(%s/%s%s) ...", api, verb, buffer);
 }
 
 static void hook_req_subcall_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[])
 {
-	_hook_req_(req, "    ...subcall... [%s: %d]", status < 0 ? "error" : "success", status); /* TODO */
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nreplies, replies);
+	_hook_req_(req, "    ...subcall... [%s: %d]%s", status < 0 ? "error" : "success", status, buffer);
 }
 
 static void hook_req_subcallsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_req_(req, "subcallsync(%s/%s) ...", api, verb);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_req_(req, "subcallsync(%s/%s%s) ...", api, verb, buffer);
 }
 
 static void hook_req_subcallsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int result, int *status, unsigned *nreplies, struct afb_data * const replies[])
 {
-	_hook_req_(req, "    ...subcallsync... [%s: %d]", !status ? "?" : *status < 0 ? "error" : "success", status ? *status : 0); /* TODO */
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nreplies ? *nreplies : 0, replies);
+	_hook_req_(req, "    ...subcallsync... [%s: %d]%s", !status ? "?" : *status < 0 ? "error" : "success", status ? *status : 0, buffer);
 }
 
 static void hook_req_vverbose_cb(void *closure, const struct afb_hookid *hookid, const struct afb_req_common *req, int level, const char *file, int line, const char *func, const char *fmt, va_list args)
@@ -767,7 +788,9 @@ static void _hook_api_(const struct afb_api_common *comapi, const char *format, 
 
 static void hook_api_event_broadcast_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_api_(comapi, "event_broadcast.before(%s)....", name);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_api_(comapi, "event_broadcast.before(%s%s)....", name, buffer);
 }
 
 static void hook_api_event_broadcast_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *name, unsigned nparams, struct afb_data * const params[], int result)
@@ -882,7 +905,9 @@ static void hook_api_start_after_cb(void *closure, const struct afb_hookid *hook
 
 static void hook_api_on_event_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_api_(comapi, "on_event.before(%s, %d)", event, evt);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_api_(comapi, "on_event.before(%s, %d%s)", event, evt, buffer);
 }
 
 static void hook_api_on_event_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[])
@@ -892,22 +917,30 @@ static void hook_api_on_event_after_cb(void *closure, const struct afb_hookid *h
 
 static void hook_api_call_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_api_(comapi, "call(%s/%s) ...", api, verb);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_api_(comapi, "call(%s/%s%s) ...", api, verb, buffer);
 }
 
 static void hook_api_call_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int status, unsigned nreplies, struct afb_data * const replies[])
 {
-	_hook_api_(comapi, "    ...call... [%s: %d]", status < 0 ? "error" : "success", status);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nreplies, replies);
+	_hook_api_(comapi, "    ...call... [%s: %d]%s", status < 0 ? "error" : "success", status, buffer);
 }
 
 static void hook_api_callsync_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *verb, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_api_(comapi, "callsync(%s/%s) ...", api, verb);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_api_(comapi, "callsync(%s/%s%s) ...", api, verb, buffer);
 }
 
 static void hook_api_callsync_result_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, int result, int *status, unsigned *nreplies, struct afb_data * const replies[])
 {
-	_hook_api_(comapi, "    ...callsync... [%s: %d]", !status ? "?" : *status < 0 ? "error" : "success", status ? *status : 0); /* TODO */
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nreplies ? *nreplies : 0, replies);
+	_hook_api_(comapi, "    ...callsync... [%s: %d]%s", !status ? "?" : *status < 0 ? "error" : "success", status ? *status : 0, buffer);
 }
 
 static void hook_api_new_api_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *api, const char *info, int noconcurrency)
@@ -982,7 +1015,9 @@ static void hook_api_delete_api_cb(void *closure, const struct afb_hookid *hooki
 
 static void hook_api_on_event_handler_before_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern)
 {
-	_hook_api_(comapi, "on_event_handler[%s].before(%s, %d)", pattern, event, evt);
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_api_(comapi, "on_event_handler[%s].before(%s, %d%s)", pattern, event, evt, buffer);
 }
 
 static void hook_api_on_event_handler_after_cb(void *closure, const struct afb_hookid *hookid, const struct afb_api_common *comapi, const char *event, int evt, unsigned nparams, struct afb_data * const params[], const char *pattern)
@@ -1407,7 +1442,9 @@ static void hook_evt_create_cb(void *closure, const struct afb_hookid *hookid, c
 
 static void hook_evt_push_before_cb(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_evt_(evt, id, "push.before");
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_evt_(evt, id, "push.before%s", buffer);
 }
 
 
@@ -1418,7 +1455,9 @@ static void hook_evt_push_after_cb(void *closure, const struct afb_hookid *hooki
 
 static void hook_evt_broadcast_before_cb(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[])
 {
-	_hook_evt_(evt, id, "broadcast.before");
+	char buffer[PARAMS_TEXT_SIZE];
+	afb_data_array_print(buffer, PARAMS_TEXT_SIZE, daprt_patterns,nparams, params);
+	_hook_evt_(evt, id, "broadcast.before%s", buffer);
 }
 
 static void hook_evt_broadcast_after_cb(void *closure, const struct afb_hookid *hookid, const char *evt, int id, unsigned nparams, struct afb_data * const params[], int result)
