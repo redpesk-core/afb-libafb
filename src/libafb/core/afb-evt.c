@@ -142,7 +142,6 @@ static uint16_t event_count = 0;
 
 /* job groups for events push/broadcast */
 #define BROADCAST_JOB_GROUP  (&afb_evt_event_x2_itf)
-#define PUSH_JOB_GROUP       (&afb_evt_event_x2_itf)
 
 /* head of uniqueness of events */
 #if !defined(EVENT_BROADCAST_HOP_MAX)
@@ -439,7 +438,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 		return X_ENOMEM;
 	}
 
-	rc = afb_sched_post_job(PUSH_JOB_GROUP, 0, 0, push_afb_evt_pushed, je, Afb_Sched_Mode_Normal);
+	rc = afb_sched_post_job(evt, 0, 0, push_afb_evt_pushed, je, Afb_Sched_Mode_Normal);
 	if (rc >= 0)
 		rc = 1;
 	else {
