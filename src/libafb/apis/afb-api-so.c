@@ -112,6 +112,7 @@ static int load_binding(const char *path, struct afb_apiset *declare_set, struct
 	/* not a valid binding */
 	_RP_VERBOSE_(force ? rp_Log_Level_Error : rp_Log_Level_Info, "binding [%s] %s",
 					path, "isn't a supported AFB binding");
+	rc = X_ENOTSUP;
 
 error2:
 	x_dynlib_close(&dynlib);

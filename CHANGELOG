@@ -6,6 +6,7 @@ Version 5.0.11 (next)
    - Missing API message (#6105)
    - Default anonymous root API names (#6106, #6111)
    - Tracing of requests, calls, events (#6107)
+   - Report unsupported bindings (#6115)
 
 Version 5.0.10
 --------------
