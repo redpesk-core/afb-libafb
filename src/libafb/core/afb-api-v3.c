@@ -1293,7 +1293,7 @@ afb_api_v3_create(
 	const char* path,
 	enum afb_string_mode mode_path
 ) {
-	int rc;
+	int rc, decl;
 	struct afb_api_v3 *apiv3;
 	size_t strsz;
 	char *ptr, *p;
@@ -1301,17 +1301,8 @@ afb_api_v3_create(
 	strsz = 0;
 
 	/* check the name */
-	if (name == NULL) {
-		if (path == NULL) {
-			name = "<ROOT>";
-			mode_name = Afb_String_Const;
-		}
-		else {
-			name = strrchr(path, '/');
-			name = name == NULL ? path : &name[1];
-			mode_name = Afb_String_Copy;
-		}
-	}
+	if (name == NULL)
+		mode_name = Afb_String_Const;
 	else {
 		if (!afb_apiname_is_valid(name)) {
 			rc = X_EINVAL;
@@ -1365,6 +1356,19 @@ afb_api_v3_create(
 		mode_path = Afb_String_Const;
 	}
 
+	/* makes a name for root anonymous api */
+	if (name != NULL)
+		decl = 1;
+	else {
+		decl = 0;
+		if (path == NULL)
+			name = "<ROOT>";
+		else {
+			name = strrchr(path, '/');
+			name = name == NULL ? path : &name[1];
+		}
+	}
+
 	/* init comapi */
 	afb_api_common_init(
 		&apiv3->comapi,
@@ -1381,7 +1385,7 @@ afb_api_v3_create(
 	afb_api_v3_logmask_set(apiv3, rp_logmask);
 
 	/* declare the api */
-	if (name != NULL) {
+	if (decl) {
 		afb_api.closure = apiv3;
 		afb_api.itf = &export_api_itf;
 		afb_api.group = noconcurrency ? apiv3 : NULL;
@@ -1402,7 +1406,7 @@ afb_api_v3_create(
 	return 0;
 
 error3:
-	if (name != NULL) {
+	if (decl) {
 		afb_api_v3_addref(apiv3); /* avoid side-effect freeing the api */
 		afb_apiset_del(apiv3->comapi.declare_set, apiv3->comapi.name);
 	}

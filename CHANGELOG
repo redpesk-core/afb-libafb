@@ -4,7 +4,7 @@ Version 5.0.11 (next)
   fixes
    - Sequence events on their identity not globally (#6110)
    - Missing API message (#6105)
-   - Default anonymous root API names (#6106)
+   - Default anonymous root API names (#6106, #6111)
    - Tracing of requests, calls, events (#6107)
 
 Version 5.0.10
