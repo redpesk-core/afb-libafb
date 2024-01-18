@@ -9,6 +9,9 @@ Version 5.0.11 (next)
    - Report unsupported bindings (#6115)
    - Long pause time on corrupted heap backtrace
 
+  minor/details
+   - Avoid a second call to sigsetjmp on signal
+
 Version 5.0.10
 --------------
 

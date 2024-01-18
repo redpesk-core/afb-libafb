@@ -243,6 +243,7 @@ struct undoer
 struct recovery
 {
 	struct undoer *undoers;
+	int prevsig;
 	sigjmp_buf jmpbuf;
 };
 
@@ -251,21 +252,21 @@ X_TLS(struct recovery, error_handler);
 
 static void monitor_run(int timeout, void (*function)(int sig, void*), void *arg)
 {
-	volatile int signum, signum2;
+	int signum;
 	struct recovery recovery, *older;
 
 	older = x_tls_get_error_handler();
 	recovery.undoers = NULL;
+	recovery.prevsig = 0;
 	signum = sigsetjmp(recovery.jmpbuf, 1);
 	if (signum == 0) {
 		x_tls_set_error_handler(&recovery);
 		if (timeout > 0)
 			timeout_arm(timeout);
 		function(0, arg);
-	} else {
-		signum2 = sigsetjmp(recovery.jmpbuf, 1);
-		if (signum2 == 0)
-			function(signum, arg);
+	} else if (recovery.prevsig == 0) {
+		recovery.prevsig = signum;
+		function(signum, arg);
 	}
 	if (timeout > 0)
 		timeout_disarm();
