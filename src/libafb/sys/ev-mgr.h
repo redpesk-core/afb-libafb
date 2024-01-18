@@ -221,3 +221,6 @@ extern int ev_mgr_add_timer(
 
 extern struct ev_timer *ev_timer_addref(struct ev_timer *timer);
 extern void ev_timer_unref(struct ev_timer *timer);
+
+extern void ev_timer_modify_period(struct ev_timer *timer, unsigned period_ms);
+

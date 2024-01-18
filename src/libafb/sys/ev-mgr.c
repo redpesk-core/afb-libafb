@@ -749,6 +749,14 @@ void ev_timer_unref(struct ev_timer *timer)
 	}
 }
 
+/* modify the period of the timer */
+void ev_timer_modify_period(struct ev_timer *timer, unsigned period_ms)
+{
+	timer->period_ms = period_ms < PERIOD_MIN_MS ? PERIOD_MIN_MS : period_ms;
+	timer->next_ms = now_ms() + timer->period_ms;
+	timer_set(timer->mgr, TIME_MS_MAX);
+}
+
 /******************************************************************************/
 
 int ev_mgr_add_prepare(
