@@ -401,7 +401,7 @@ static void safe_dumpstack(int crop, int signum)
 	int args[2] = { crop + 3, signum };
 
 	x_tls_set_in_safe_dumpstack(safe_dumpstack);
-	afb_sig_monitor_run(0, safe_dumpstack_cb, args);
+	afb_sig_monitor_run(1, safe_dumpstack_cb, args);
 	x_tls_set_in_safe_dumpstack(0);
 }
 
