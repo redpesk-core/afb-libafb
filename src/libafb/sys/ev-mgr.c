@@ -548,7 +548,7 @@ static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
 	struct itimerspec its;
 	struct epoll_event epe;
 
-	if (when == mgr->last_timer)
+	if (mgr->last_timer && when >= mgr->last_timer)
 		return 0;
 
 	/* ensure existing timerfd */
@@ -672,6 +672,7 @@ static int timer_event(
 	int rc = (int)read(mgr->timerfd, &count, sizeof count);
 	if (rc < 0)
 		return -errno;
+	mgr->last_timer = 0;
 	if (count > 0)
 		timer_dispatch(mgr);
 	return 0;
