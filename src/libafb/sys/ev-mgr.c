@@ -134,8 +134,17 @@ typedef uint64_t time_ms_t;
 /** what clock to use for timers */
 #define CLOCK CLOCK_MONOTONIC
 
-/** Avoiding a period of 0 */
+/** minimal period value */
+#define PERIOD_MIN_MS 1
+
+/** default period */
 #define DEFAULT_PERIOD_MS 1000
+
+/** minimal period accuracy value */
+#define ACCURACY_MIN_MS 1
+
+/** default a period accuracy */
+#define DEFAULT_ACCURACY_MS 1
 
 /**
  * structure for recording timers
@@ -693,14 +702,18 @@ int ev_mgr_add_timer(
 		timer->handler = handler;
 		timer->closure = closure;
 		timer->decount = count;
-		timer->period_ms = period_ms ?: DEFAULT_PERIOD_MS;
-		timer->accuracy_ms = accuracy_ms ?: 1;
+		timer->period_ms = period_ms == 0 ? DEFAULT_PERIOD_MS
+		                 : period_ms < PERIOD_MIN_MS ? PERIOD_MIN_MS
+		                 : period_ms;
+		timer->accuracy_ms = accuracy_ms == 0 ? DEFAULT_ACCURACY_MS
+		                   : accuracy_ms < ACCURACY_MIN_MS ? ACCURACY_MIN_MS
+		                   : accuracy_ms;
 		if (absolute)
 			start_sec -= time(0);
 		timer->next_ms = now_ms()
 			+ (time_ms_t)start_sec * 1000
 			+ (time_ms_t)start_ms
-			- (time_ms_t)(accuracy_ms >> 1);
+			- (time_ms_t)(timer->accuracy_ms >> 1);
 		timer->is_deleted = 0;
 		timer->auto_unref = !!autounref;
 		timer->is_active = 1;
