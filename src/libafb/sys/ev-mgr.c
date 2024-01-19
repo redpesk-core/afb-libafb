@@ -125,26 +125,38 @@ struct ev_fd
 	uint16_t auto_unref: 1;
 };
 
-/** time for time in ms */
-typedef uint64_t time_ms_t;
+/** value of one second in nanosecond */
+#define ONESEC 1000000000
 
-/** maximum value of time_ms_t instances */
-#define TIME_MS_MAX UINT64_MAX
+/** value of one millisecond in nanosecond */
+#define ONEMILLISEC 1000000
+
+/** for times in nano seconds (685 years since 1970 -> 2655) */
+typedef uint64_t time_ns_t;
+
+/** maximum value of time_ns_t instances */
+#define TIME_NS_MAX INT64_MAX
 
 /** what clock to use for timers */
 #define CLOCK CLOCK_MONOTONIC
 
-/** minimal period value */
+/** minimal period value (milliseconds)  */
 #define PERIOD_MIN_MS 1
 
-/** default period */
+/** default period (milliseconds) */
 #define DEFAULT_PERIOD_MS 1000
 
-/** minimal period accuracy value */
+/** minimal period accuracy value (milliseconds) */
 #define ACCURACY_MIN_MS 1
 
-/** default a period accuracy */
+/** default a period accuracy (milliseconds) */
 #define DEFAULT_ACCURACY_MS 1
+
+/** converts a millisecond value to a nanosecond value */
+#define MS2NS(x)  (((time_ns_t)(ONEMILLISEC))*((time_ns_t)(x)))
+
+/** get the default or min or value of x */
+#define GETTM(x,def,min) ((x)==0 ? (def) : (x)<(min) ? (min) : (x))
 
 /**
  * structure for recording timers
@@ -163,14 +175,14 @@ struct ev_timer
 	/** closure of the handler */
 	void *closure;
 
-	/** time of the next expected occurence in milliseconds */
-	time_ms_t next_ms;
+	/** time of the next expected occurence in nanoseconds */
+	time_ns_t next_ns;
 
-	/** expected accuracy of the timer in milliseconds */
-	unsigned accuracy_ms;
+	/** expected accuracy of the timer in nanoseconds */
+	time_ns_t accuracy_ns;
 
-	/** period between 2 events in milliseconds */
-	unsigned period_ms;
+	/** period between 2 events in nanoseconds */
+	time_ns_t period_ns;
 
 	/** decount of occurences or zero if infinite */
 	unsigned decount;
@@ -270,7 +282,7 @@ struct ev_mgr
 	int timerfd;
 
 	/** last value set to the timer */
-	time_ms_t last_timer;
+	time_ns_t last_timer;
 
 	/** reference count */
 	uint16_t refcount;
@@ -532,20 +544,21 @@ static void timers_cleanup(struct ev_mgr *mgr)
 /**
  * returns the current value of the time in ms
  */
-static time_ms_t now_ms()
+static time_ns_t now_ns()
 {
 	struct timespec ts;
 	clock_gettime(CLOCK, &ts);
-	return (time_ms_t)ts.tv_sec * 1000 + (time_ms_t)ts.tv_nsec / 1000000;
+	return (time_ns_t)ts.tv_sec * ONESEC + (time_ns_t)ts.tv_nsec;
 }
 
 /**
  * Arm the timer
  */
-static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
+static int timer_arm(struct ev_mgr *mgr, time_ns_t when)
 {
 	int rc;
 	struct itimerspec its;
+	lldiv_t dr;
 	struct epoll_event epe;
 
 	if (mgr->last_timer && when >= mgr->last_timer)
@@ -571,10 +584,11 @@ static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
 	}
 
 	/* set the timer */
+	dr = lldiv((long long)when, ONESEC);
+	its.it_value.tv_sec = (time_t)dr.quot;
+	its.it_value.tv_nsec = (time_t)dr.rem;
 	its.it_interval.tv_sec = 0;
 	its.it_interval.tv_nsec = 0;
-	its.it_value.tv_sec = (time_t)(when / 1000);
-	its.it_value.tv_nsec = 1000000L * (long)(when % 1000);
 	rc = timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
 	if (rc < 0)
 		return -errno;
@@ -587,10 +601,10 @@ static int timer_arm(struct ev_mgr *mgr, time_ms_t when)
  * Compute the next time for blowing an event
  * Then arm the timer.
  */
-static int timer_set(struct ev_mgr *mgr, time_ms_t upper)
+static int timer_set(struct ev_mgr *mgr, time_ns_t upper)
 {
 	struct ev_timer *timer;
-	time_ms_t lower, lo, up;
+	time_ns_t lower, lo, up;
 
 	timers_cleanup(mgr);
 
@@ -599,9 +613,9 @@ static int timer_set(struct ev_mgr *mgr, time_ms_t upper)
 	timer = mgr->timers;
 	while (timer) {
 		if (timer->is_active) {
-			lo = timer->next_ms;
+			lo = timer->next_ns;
 			if (lo <= upper) {
-				up = lo + timer->accuracy_ms;
+				up = lo + timer->accuracy_ns;
 				if (up <= lower) {
 					lower = lo;
 					upper = up;
@@ -628,17 +642,17 @@ static void timer_dispatch(
 	struct ev_mgr *mgr
 ) {
 	struct ev_timer *timer, **prvtim;
-	time_ms_t now;
+	time_ns_t now;
 
 	/* extract expired timers */
-	now = now_ms();
+	now = now_ns();
 	prvtim = &mgr->timers;
 	while ((timer = *prvtim)) {
 		/* process the timer */
-		if (timer->is_active && timer->next_ms <= now) {
+		if (timer->is_active && timer->next_ns <= now) {
 			timer->handler(timer, timer->closure, timer->decount);
 			/* hack, hack, hack: below, just ignore blind events */
-			do { timer->next_ms += timer->period_ms; } while(timer->next_ms <= now);
+			do { timer->next_ns += timer->period_ns; } while(timer->next_ns <= now);
 			if (timer->decount) {
 				/* deactivate or delete if counted down */
 				timer->decount--;
@@ -647,7 +661,7 @@ static void timer_dispatch(
 					if (timer->auto_unref)
 						timer->is_deleted = 1;
 					else
-						timer->next_ms = TIME_MS_MAX;
+						timer->next_ns = TIME_NS_MAX;
 				}
 			}
 		}
@@ -703,25 +717,18 @@ int ev_mgr_add_timer(
 		timer->handler = handler;
 		timer->closure = closure;
 		timer->decount = count;
-		timer->period_ms = period_ms == 0 ? DEFAULT_PERIOD_MS
-		                 : period_ms < PERIOD_MIN_MS ? PERIOD_MIN_MS
-		                 : period_ms;
-		timer->accuracy_ms = accuracy_ms == 0 ? DEFAULT_ACCURACY_MS
-		                   : accuracy_ms < ACCURACY_MIN_MS ? ACCURACY_MIN_MS
-		                   : accuracy_ms;
+		timer->period_ns = MS2NS(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
+		timer->accuracy_ns = MS2NS(GETTM(accuracy_ms, DEFAULT_ACCURACY_MS, ACCURACY_MIN_MS));
 		if (absolute)
-			start_sec -= time(0);
-		timer->next_ms = now_ms()
-			+ (time_ms_t)start_sec * 1000
-			+ (time_ms_t)start_ms
-			- (time_ms_t)(timer->accuracy_ms >> 1);
+			start_sec -= time(NULL);
+		timer->next_ns = now_ns() + MS2NS(start_sec * 1000 + start_ms);
 		timer->is_deleted = 0;
 		timer->auto_unref = !!autounref;
 		timer->is_active = 1;
 		timer->refcount = 1;
 		timer->next = mgr->timers;
 		mgr->timers = timer;
-		rc = timer_set(mgr, TIME_MS_MAX);
+		rc = timer_set(mgr, TIME_NS_MAX);
 		if (rc < 0) {
 			timer->is_deleted = 1;
 			timer->is_active = 0;
@@ -752,9 +759,9 @@ void ev_timer_unref(struct ev_timer *timer)
 /* modify the period of the timer */
 void ev_timer_modify_period(struct ev_timer *timer, unsigned period_ms)
 {
-	timer->period_ms = period_ms < PERIOD_MIN_MS ? PERIOD_MIN_MS : period_ms;
-	timer->next_ms = now_ms() + timer->period_ms;
-	timer_set(timer->mgr, TIME_MS_MAX);
+	timer->period_ns = MS2NS(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
+	timer->next_ns = now_ns() + timer->period_ns;
+	timer_set(timer->mgr, TIME_NS_MAX);
 }
 
 /******************************************************************************/
@@ -853,7 +860,7 @@ static void do_cleanup(struct ev_mgr *mgr)
 /**
  * Prepare the event loop manager
  */
-static int do_prepare(struct ev_mgr *mgr, time_ms_t wakeup_ms)
+static int do_prepare(struct ev_mgr *mgr, time_ns_t wakeup_ms)
 {
 	int rc;
 
@@ -978,7 +985,7 @@ void *ev_mgr_try_change_holder(struct ev_mgr *mgr, void *holder, void *next)
  */
 int ev_mgr_prepare(struct ev_mgr *mgr)
 {
-	return do_prepare(mgr, TIME_MS_MAX);
+	return do_prepare(mgr, TIME_NS_MAX);
 }
 
 /**
@@ -986,7 +993,7 @@ int ev_mgr_prepare(struct ev_mgr *mgr)
  */
 int ev_mgr_prepare_with_wakeup(struct ev_mgr *mgr, int wakeup_ms)
 {
-	return do_prepare(mgr, wakeup_ms >= 0 ? now_ms() + (time_ms_t)wakeup_ms : TIME_MS_MAX);
+	return do_prepare(mgr, wakeup_ms >= 0 ? now_ns() + MS2NS(wakeup_ms) : TIME_NS_MAX);
 }
 
 /**
@@ -1012,7 +1019,7 @@ int ev_mgr_run(struct ev_mgr *mgr, int timeout_ms)
 {
 	int rc;
 
-	rc = do_prepare(mgr, TIME_MS_MAX);
+	rc = do_prepare(mgr, TIME_NS_MAX);
 	if (rc >= 0) {
 		rc = do_wait(mgr, timeout_ms);
 		if (rc > 0)
