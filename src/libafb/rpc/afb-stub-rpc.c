@@ -150,15 +150,37 @@ struct indesc
 };
 
 /**
+ * Type of out going call
+ */
+enum outcall_type
+{
+	/** unset */
+	outcall_type_unset,
+	/** standard call */
+	outcall_type_call,
+	/** call for describe */
+	outcall_type_describe
+};
+
+/**
  * structure for a request: requests on client side, the call went out
  */
 struct outcall
 {
+	/** link to the next */
 	struct outcall *next;
+
+	/** id of the request */
 	uint16_t id;
+
+	/** type of the call (a outcall_type value) */
 	uint8_t type;
+
 	union {
+		/** related request */
 		struct afb_req_common *comreq;
+
+		/** related describe request */
 		struct {
 			void (*callback)(void *, struct json_object *);
 			void *closure;
@@ -166,71 +188,79 @@ struct outcall
 	} item;
 };
 
-enum outcall_type
-{
-	outcall_type_unset,
-	outcall_type_call,
-	outcall_type_describe
-};
-
 /**
  * structure for waiting version set
  */
 struct version_waiter
 {
+	/** the stub */
 	struct afb_stub_rpc   *stub;
+	/** link to next waiter */
 	struct version_waiter *next;
+	/** the lock */
 	struct afb_sched_lock *lock;
 };
 
 /******************* stub description for client or servers ******************/
 
+/**
+ * Structure recording client or server stub linking together
+ * AFB internals and RPC protocols
+ */
 struct afb_stub_rpc
 {
-	/* count of references */
+	/** count of references */
 	unsigned refcount;
 
-	/* version of the protocol */
+	/** version of the protocol */
 	uint8_t version;
 
-	/* flag disallowing packing */
+	/** flag disallowing packing, packing allows to group messages before sending */
 	uint8_t unpack;
 
-	/* count of ids */
+	/** count of ids */
 	uint16_t idcount;
 
-	/* last given id */
+	/** last given id */
 	uint16_t idlast;
 
-	/* last given data id */
+	/** last given data id */
 	uint16_t dataidlast;
 
-	/* apiset */
+	/** apiset for declaration */
 	struct afb_apiset *declare_set;
+
+	/** apiset for calling */
 	struct afb_apiset *call_set;
 
 	/***************/
 	/* server side */
 	/***************/
 
-	/* listener for events */
+	/** listener for events */
 	struct afb_evt_listener *listener;
 
+	/** default remote session */
+	struct afb_session *session;
+
+	/** default remote token */
+	struct afb_token *token;
+
 #if WITH_CRED
-	/* credentials of the client */
+	/** credentials of the client */
 	struct afb_cred *cred;
 #endif
 
-	/* event from server */
+	/** event from server */
 	struct u16id2bool *event_flags;
 
-	/* transmitted sessions */
+	/** transmitted sessions */
 	struct u16id2ptr *session_proxies;
 
-	/* transmitted tokens */
+	/** transmitted tokens */
 	struct u16id2ptr *token_proxies;
 
-	/* outgoing calls (and describes) */
+	/** outgoing calls (and describes) */
 	struct outcall *outcalls;
 
 	/***************/
@@ -283,7 +313,7 @@ struct afb_stub_rpc
 	}
 		emit;
 
-	/* the api name */
+	/** the default api name or NULL */
 	const char *apiname;
 };
 
@@ -371,8 +401,10 @@ static void json_put_cb(void *closure)
 
 /******************* inblocks *****************/
 
+/** get a fresh new inblock for data of size */
 static int inblock_get(struct afb_stub_rpc *stub, void *data, size_t size, struct inblock **inblock)
 {
+	/* get a fresh */
 	struct inblock *result = stub->receive.pool;
 	if (result)
 		stub->receive.pool = result->data;
@@ -1516,18 +1548,28 @@ static int receive_call_request(
 	}
 
 	/* get session */
-	rc = u16id2ptr_get(stub->session_proxies, sessionid, (void**)&session);
-	if (rc < 0) {
-		if (sessionid != 0)
-			goto invalid;
-		rc = add_session(stub, sessionid, NULL, &session);
+	if (sessionid == 0) {
+		session = stub->session;
+		if (session == NULL) {
+			rc = afb_session_get(&session, NULL, AFB_SESSION_TIMEOUT_DEFAULT, &err);
+			if (rc < 0) {
+				RP_ERROR("can't create new session");
+				goto out_of_memory;
+			}
+			stub->session = session;
+		}
+	}
+	else {
+		rc = u16id2ptr_get(stub->session_proxies, sessionid, (void**)&session);
 		if (rc < 0)
-			goto out_of_memory;
+			goto invalid;
 	}
 
 	/* get token */
-	if (!tokenid || u16id2ptr_get(stub->token_proxies, tokenid, (void**)&token) < 0)
-		token = NULL;
+	if (tokenid == 0)
+		token = stub->token;
+	else if (u16id2ptr_get(stub->token_proxies, tokenid, (void**)&token) < 0)
+		goto invalid;
 
 	/* create the request */
 	rc = incall_get(stub, &incall);
@@ -2384,11 +2426,6 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 * PART - RECEIVING BUFFERS
 **************************************************************************/
 
-int afb_stub_rpc_can_receive(struct afb_stub_rpc *stub)
-{
-	return 1; /* TODO */
-}
-
 int afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size)
 {
 	struct inblock *inblock;
@@ -2511,6 +2548,18 @@ void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack)
 {
 	stub->unpack = unpack != 0;
 }
+
+void afb_stub_rpc_set_session(struct afb_stub_rpc *stub, struct afb_session *session)
+{
+	afb_session_unref(__atomic_exchange_n(&stub->session, afb_session_addref(session), __ATOMIC_RELAXED));
+}
+
+void afb_stub_rpc_set_token(struct afb_stub_rpc *stub, struct afb_token *token)
+{
+	afb_token_unref(__atomic_exchange_n(&stub->token, afb_token_addref(token), __ATOMIC_RELAXED));
+}
+
+
 
 #if WITH_CRED
 void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cred)
