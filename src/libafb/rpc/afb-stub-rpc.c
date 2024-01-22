@@ -2437,23 +2437,24 @@ void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void
  *
  * @return a handle on the created stub object
  */
-struct afb_stub_rpc *afb_stub_rpc_create(const char *apiname, struct afb_apiset *call_set)
+int afb_stub_rpc_create(struct afb_stub_rpc **pstub, const char *apiname, struct afb_apiset *call_set)
 {
 	struct afb_stub_rpc *stub;
 
 	/* allocation */
-	stub = calloc(1, sizeof *stub + (apiname == NULL ? 0 : 1 + strlen(apiname)));
-	if (stub) {
-		/* terminate initialization */
-		stub->refcount = 1;
-		if (apiname != NULL) {
-			char *name = (char*)(&stub[1]);
-			strcpy(name, apiname);
-			stub->apiname = name;
-		}
-		stub->call_set = afb_apiset_addref(call_set);
+	*pstub = stub = calloc(1, sizeof *stub + (apiname == NULL ? 0 : 1 + strlen(apiname)));
+	if (stub == NULL)
+		return X_ENOMEM;
+
+	/* terminate initialization */
+	stub->refcount = 1;
+	if (apiname != NULL) {
+		char *name = (char*)(&stub[1]);
+		strcpy(name, apiname);
+		stub->apiname = name;
 	}
-	return stub;
+	stub->call_set = afb_apiset_addref(call_set);
+	return 0;
 }
 
 /* return the api name */

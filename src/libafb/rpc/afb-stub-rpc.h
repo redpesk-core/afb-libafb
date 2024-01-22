@@ -29,7 +29,17 @@ struct afb_apiset;
 struct afb_api_item;
 struct afb_rpc;
 
-extern struct afb_stub_rpc *afb_stub_rpc_create(const char *apiname, struct afb_apiset *call_set);
+/**
+ * Creates a stub rpc object dispatching incoming requests
+ * to the given call set, for the given apiname by default
+ *
+ * @param stub pointer for storing the created stub
+ * @param apiname default apiname, NULL if none
+ * @param callset the apiset for serving requests
+ *
+ * @return 0 on success, a negative error code on failure
+ */
+extern int afb_stub_rpc_create(struct afb_stub_rpc **stub, const char *apiname, struct afb_apiset *callset);
 
 /**
  * Decrement the count of reference to the stub and drop its used resources

@@ -234,11 +234,10 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0) {
 		/* create the client stub */
 		fd = rc;
-		stub = afb_stub_rpc_create(api, call_set);
-		if (!stub) {
+		rc = afb_stub_rpc_create(&stub, api, call_set);
+		if (rc < 0) {
 			close(fd);
 			RP_ERROR("can't create client rpc service to %s", uri);
-			rc = X_ENOMEM;
 		} else {
 			if (uri == turi) {
 				rc = afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, stub, 0, 1);
@@ -313,8 +312,8 @@ static void server_accept(struct server *server, int fd)
 	} else {
 		rc = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
-		stub = afb_stub_rpc_create(&server->uri[server->offapi], server->apiset);
-		if (!stub) {
+		rc = afb_stub_rpc_create(&stub, &server->uri[server->offapi], server->apiset);
+		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
 		}
