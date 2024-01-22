@@ -24,7 +24,6 @@
 #pragma once
 
 #include "libafb-config.h"
-#include "apis/afb-api-dbus.h"
 #include "apis/afb-api-so.h"
 #include "apis/afb-api-so-v3.h"
 #include "apis/afb-api-so-v4.h"

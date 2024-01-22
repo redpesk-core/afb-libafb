@@ -43,7 +43,6 @@
 #cmakedefine01 WITH_SIG_MONITOR_TIMERS
 #cmakedefine01 WITH_AFB_HOOK
 #cmakedefine01 WITH_AFB_TRACE
-#cmakedefine01 WITH_DBUS_TRANSPARENCY
 #cmakedefine01 WITH_SUPERVISION
 #cmakedefine01 WITH_DYNAMIC_BINDING
 #cmakedefine01 WITH_REPLY_JOB
