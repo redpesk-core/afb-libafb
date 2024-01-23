@@ -1,10 +1,11 @@
-Version 5.0.11 (next)
+Version 5.0.11
 --------------
 
   features
-   - Upgrading to RPC v3
-   - Upgrading to RPC v3 / WebSocket
+   - Upgrading to RPC v3 (#6052)
+   - Upgrading to RPC v3 / WebSocket (#6052)
    - Rewrite of afb-api-rpc for using afb-wrap-rpc
+   - Add support of ev_timer_modify_period (#6108)
 
   fixes
    - Sequence events on their identity not globally (#6110)
@@ -18,6 +19,9 @@ Version 5.0.11 (next)
    - Websockets now daughters of upgrade
    - Removed function afb_hswitch_websocket_switch
      replaced by afb_hswitch_upgrade
+   - Removed DBUS transparency of API
+   - Removed support of RPCv2
+   - Manage timers in nanoseconds internally
 
   minor/details
    - Avoid a second call to sigsetjmp on signal
