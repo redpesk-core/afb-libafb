@@ -79,9 +79,6 @@ struct afb_api_v4
 	/* the common api */
 	struct afb_api_common comapi;
 
-	/* settings */
-	struct json_object *settings;
-
 	/* control function */
 	afb_api_callback_x4_t mainctl;
 
@@ -980,6 +977,13 @@ afb_api_v4_seal(
 	afb_api_common_api_seal(&apiv4->comapi);
 }
 
+struct json_object *
+afb_api_v4_settings(
+	struct afb_api_v4 *apiv4
+) {
+	return afb_api_common_settings(&apiv4->comapi);
+}
+
 const char *
 afb_api_v4_name(
 	struct afb_api_v4 *apiv4
@@ -1255,6 +1259,7 @@ preinit_new_api(
 	if (!scp->ctlproc)
 		return 0;
 	scp->apiv4 = apiv4;
+	((union afb_ctlarg*)scp->ctlarg)->pre_init.config = afb_api_v4_settings(apiv4);
 	return safe_ctlproc_call(scp);
 }
 

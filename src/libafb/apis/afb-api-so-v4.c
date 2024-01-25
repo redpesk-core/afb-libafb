@@ -32,6 +32,7 @@
 
 #include <json-c/json.h>
 #include <rp-utils/rp-verbose.h>
+#include <rp-utils/rp-jsonc.h>
 
 #include "core/afb-v4-itf.h"
 
@@ -59,6 +60,15 @@ struct iniv4
 	/** v4 dynlib data */
 	struct afb_v4_dynlib_info dlv4;
 };
+
+/**
+ * the configuration object updated
+ */
+static struct json_object *settings(struct afb_api_v4 *api, struct json_object *config)
+{
+	struct json_object *result = afb_api_v4_settings(api);
+	return rp_jsonc_object_merge(result, config, rp_jsonc_merge_option_join_or_keep);
+}
 
 /**
  * Initialisation of the binding when a description
@@ -89,7 +99,7 @@ static int init_for_desc(struct afb_api_v4 *api, void *closure)
 		memset(&ctlarg, 0, sizeof ctlarg);
 		ctlarg.pre_init.path = afb_api_v4_path(api);
 		ctlarg.pre_init.uid = iniv4->uid;
-		ctlarg.pre_init.config = iniv4->config;
+		ctlarg.pre_init.config = settings(api, iniv4->config);
 		rc = afb_api_v4_safe_ctlproc(api, iniv4->dlv4.mainctl, afb_ctlid_Pre_Init, &ctlarg);
 	}
 
@@ -118,7 +128,7 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
 	memset(&ctlarg, 0, sizeof ctlarg);
 	ctlarg.root_entry.path = afb_api_v4_path(api);
 	ctlarg.root_entry.uid = iniv4->uid;
-	ctlarg.root_entry.config = iniv4->config;
+	ctlarg.root_entry.config = settings(api, iniv4->config);
 
 	return afb_api_v4_safe_ctlproc(api, iniv4->dlv4.mainctl, afb_ctlid_Root_Entry, &ctlarg);
 }

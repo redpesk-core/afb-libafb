@@ -1,3 +1,9 @@
+Version 5.0.12 (next)
+--------------
+
+  features
+   - Provide merged configuration object to apis
+
 Version 5.0.11
 --------------
 

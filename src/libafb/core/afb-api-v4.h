@@ -170,6 +170,16 @@ afb_api_v4_name(
 );
 
 /**
+ * Get settings of the api
+ * @param apiv4 the api
+ * @return settings of the api
+ */
+struct json_object *
+afb_api_v4_settings(
+	struct afb_api_v4 *apiv4
+);
+
+/**
  * Get the info of the api
  * @param apiv4 the api
  * @return the info of the api
