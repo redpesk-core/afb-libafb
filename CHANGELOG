@@ -3,6 +3,7 @@ Version 5.0.12 (next)
 
   features
    - Provide merged configuration object to apis
+   - Fix autostart of required API when auto-api is used
 
 Version 5.0.11
 --------------

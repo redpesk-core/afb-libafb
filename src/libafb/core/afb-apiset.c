@@ -783,7 +783,7 @@ static int start_array_depends(struct api_array *array)
 
 	i = 0;
 	while (i < array->count) {
-		api = searchrec(array->depends[i]->callset, array->depends[i]->name);
+		api = lookup(array->depends[i]->callset, array->depends[i]->name, 1);
 		if (!api) {
 			RP_ERROR("required api %s not found", array->depends[i]->name);
 			if (rc == 0)
