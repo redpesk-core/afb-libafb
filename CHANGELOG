@@ -1,9 +1,12 @@
-Version 5.0.12 (next)
+Version 5.0.12
 --------------
 
   features
    - Provide merged configuration object to apis
+
+  fixes
    - Fix autostart of required API when auto-api is used
+   - Fix URL in pc files
 
 Version 5.0.11
 --------------

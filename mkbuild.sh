@@ -1,5 +1,7 @@
 #/bin/bash
 
+set -x
+
 h="$(dirname $0)"
 force=false
 : ${bd:=build}

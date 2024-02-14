@@ -25,7 +25,7 @@
 Name: libafbcli
 Description: Client library for communicating with afb framework
 Version: @PROJECT_VERSION@
-URL: @PROJECT_URL@
+URL: @PROJECT_HOMEPAGE_URL@
 
 Requires: json-c libsystemd
 Cflags: -I@CMAKE_INSTALL_FULL_INCLUDEDIR@
