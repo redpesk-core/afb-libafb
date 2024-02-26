@@ -317,7 +317,8 @@ static struct json_object *get_verbosity(struct json_object *spec)
 		it = json_object_iter_begin(spec);
 		end = json_object_iter_end(spec);
 		while (!json_object_iter_equal(&it, &end)) {
-			get_verbosity_of(resu, json_object_iter_peek_name(&it));
+			if (json_object_get_boolean(json_object_iter_peek_value(&it)))
+				get_verbosity_of(resu, json_object_iter_peek_name(&it));
 			json_object_iter_next(&it);
 		}
 	} else if (json_object_is_type(spec, json_type_array)) {
@@ -339,7 +340,6 @@ static struct json_object *get_verbosity(struct json_object *spec)
 
 struct namelist {
 	struct namelist *next;
-	json_object *data;
 	char name[];
 };
 
@@ -357,7 +357,7 @@ static struct namelist *reverse_namelist(struct namelist *head)
 	return previous;
 }
 
-static void add_one_name_to_namelist(struct namelist **head, const char *name, struct json_object *data)
+static void add_one_name_to_namelist(struct namelist **head, const char *name)
 {
 	size_t length = strlen(name) + 1;
 	struct namelist *item = malloc(length + sizeof *item);
@@ -365,7 +365,6 @@ static void add_one_name_to_namelist(struct namelist **head, const char *name, s
 		RP_ERROR("out of memory");
 	else {
 		item->next = *head;
-		item->data = data;
 		memcpy(item->name, name, length);
 		*head = item;
 	}
@@ -374,7 +373,7 @@ static void add_one_name_to_namelist(struct namelist **head, const char *name, s
 static void get_apis_namelist_of_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
 	struct namelist **head = closure;
-	add_one_name_to_namelist(head, name, NULL);
+	add_one_name_to_namelist(head, name);
 }
 
 /**
@@ -392,9 +391,8 @@ static struct namelist *get_apis_namelist(struct json_object *spec)
 		it = json_object_iter_begin(spec);
 		end = json_object_iter_end(spec);
 		while (!json_object_iter_equal(&it, &end)) {
-			add_one_name_to_namelist(&head,
-						 json_object_iter_peek_name(&it),
-						 json_object_iter_peek_value(&it));
+			if (json_object_get_boolean(json_object_iter_peek_value(&it)))
+				add_one_name_to_namelist(&head, json_object_iter_peek_name(&it));
 			json_object_iter_next(&it);
 		}
 	} else if (json_object_is_type(spec, json_type_array)) {
@@ -402,10 +400,9 @@ static struct namelist *get_apis_namelist(struct json_object *spec)
 		for (i = 0 ; i < n ; i++)
 			add_one_name_to_namelist(&head,
 						 json_object_get_string(
-							 json_object_array_get_idx(spec, (rp_jsonc_index_t)i)),
-						 NULL);
+							 json_object_array_get_idx(spec, (rp_jsonc_index_t)i)));
 	} else if (json_object_is_type(spec, json_type_string)) {
-		add_one_name_to_namelist(&head, json_object_get_string(spec), NULL);
+		add_one_name_to_namelist(&head, json_object_get_string(spec));
 	} else if (json_object_get_boolean(spec)) {
 		afb_apiset_enum(monitor_api->call_set, 1, get_apis_namelist_of_all_cb, &head);
 	}
