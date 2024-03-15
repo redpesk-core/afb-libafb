@@ -736,14 +736,15 @@ const char *afb_evt_name_hookable(struct afb_evt *evt)
 int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[])
 {
 	int result;
+	unsigned hookflags = evt->hookflags;
 
 	/* lease the parameters */
-	if (evt->hookflags & afb_hook_flag_evt_push_after) {
+	if (hookflags & afb_hook_flag_evt_push_after) {
 		afb_data_array_addref(nparams, params);
 	}
 
 	/* hook before push */
-	if (evt->hookflags & afb_hook_flag_evt_push_before) {
+	if (hookflags & afb_hook_flag_evt_push_before) {
 		afb_hook_evt_push_before(evt->fullname, evt->id, nparams, params);
 	}
 
@@ -751,7 +752,7 @@ int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data
 	result = afb_evt_push(evt, nparams, params);
 
 	/* hook after push */
-	if (evt->hookflags & afb_hook_flag_evt_push_after) {
+	if (hookflags & afb_hook_flag_evt_push_after) {
 		afb_hook_evt_push_after(evt->fullname, evt->id,  nparams, params, result);
 		afb_data_array_unref(nparams, params);
 	}
@@ -767,21 +768,22 @@ int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data
 int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[])
 {
 	int result;
+	unsigned hookflags = evt->hookflags;
 
 	/* lease the parameters if needed */
-	if (evt->hookflags & afb_hook_flag_evt_broadcast_after) {
+	if (hookflags & afb_hook_flag_evt_broadcast_after) {
 		afb_data_array_addref(nparams, params);
 	}
 
 	/* hook before broadcast */
-	if (evt->hookflags & afb_hook_flag_evt_broadcast_before)
+	if (hookflags & afb_hook_flag_evt_broadcast_before)
 		afb_hook_evt_broadcast_before(evt->fullname, evt->id, nparams, params);
 
 	/* broadcast */
 	result = afb_evt_broadcast(evt, nparams, params);
 
 	/* hook after broadcast */
-	if (evt->hookflags & afb_hook_flag_evt_broadcast_after) {
+	if (hookflags & afb_hook_flag_evt_broadcast_after) {
 		afb_hook_evt_broadcast_after(evt->fullname, evt->id, nparams, params, result);
 		afb_data_array_unref(nparams, params);
 	}
