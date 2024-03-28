@@ -182,7 +182,9 @@ static int open_unix(const char *spec, int server)
 static int open_tcp(const char *spec, int server, int reuseaddr)
 {
 	int rc, fd;
+	unsigned len;
 	const char *service, *host, *tail;
+	char *tmp;
 	struct addrinfo hint, *rai, *iai;
 
 	/* scan the uri */
@@ -190,8 +192,16 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 	service = strchr(spec, ':');
 	if (tail == NULL || service == NULL || tail < service)
 		return X_EINVAL;
-	host = strndupa(spec, (size_t)(service++ - spec));
-	service = strndupa(service, (size_t)(tail - service));
+        len = (unsigned)(service++ - spec);
+        tmp = alloca(len + 1);
+        memcpy(tmp, spec, len);
+        tmp[len] = 0;
+        host = tmp;
+        len = (unsigned)(tail - service);
+        tmp = alloca(len + 1);
+        memcpy(tmp, service, len);
+        tmp[len] = 0;
+        service = tmp;
 
 	/* get addr */
 	memset(&hint, 0, sizeof hint);
@@ -409,8 +419,13 @@ static int open_uri(const char *uri, int server, const char *scheme)
 	/* get the names */
 	uri += offset;
 	api = strstr(uri, as_api);
-	if (api)
-		uri = strndupa(uri, (size_t)(api - uri));
+	if (api) {
+		unsigned len = (unsigned)(api - uri);
+		char *tmp = alloca(len + 1);
+		memcpy(tmp, uri, len);
+		tmp[len] = 0;
+		uri = tmp;
+	}
 
 	/* open the socket */
 	switch (e->type) {

@@ -35,17 +35,17 @@
 
 int x_dynlib_open(const char *filename, x_dynlib_t *dynlib, int global, int lazy)
 {
-	int flags;
-	char *notdeep;
-
 	/* compute the dlopen flags */
-	flags = lazy ? RTLD_LAZY : RTLD_NOW;
-	flags |= global ? RTLD_GLOBAL : RTLD_LOCAL;
+	int flags = lazy ? RTLD_LAZY : RTLD_NOW;
 
+#if defined(RTLD_DEEPBIND)
 	/* For ASan mode, export AFB_NO_RTLD_DEEPBIND=1, to disable RTLD_DEEPBIND */
-	notdeep = secure_getenv("AFB_NO_RTLD_DEEPBIND");
+	char *notdeep = secure_getenv("AFB_NO_RTLD_DEEPBIND");
 	if (!notdeep || notdeep[0] != '1' || notdeep[1])
 		flags |= RTLD_DEEPBIND;
+#endif
+
+	flags |= global ? RTLD_GLOBAL : RTLD_LOCAL;
 
 	/* open the library now */
 	dynlib->handle = dlopen(filename, flags);

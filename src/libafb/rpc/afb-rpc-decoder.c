@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <endian.h>
 
 #include "afb-rpc-decoder.h"
 
