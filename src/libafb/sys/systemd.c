@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#include "sys/x-errno.h"
+
 #if WITH_SYSTEMD
 
 #include <unistd.h>
@@ -32,7 +34,6 @@
 #include <systemd/sd-daemon.h>
 
 #include "sys/systemd.h"
-#include "sys/x-errno.h"
 
 static int sdbusopen(struct sd_bus **p, int (*f)(struct sd_bus **))
 {
