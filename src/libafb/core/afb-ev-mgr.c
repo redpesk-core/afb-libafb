@@ -85,6 +85,14 @@ static int try_hold_evmgr(x_thread_t tid)
 	return holder == tid; /* x_thread_equal? */
 }
 
+int afb_ev_mgr_init()
+{
+	x_mutex_lock(&mutex);
+	int rc = evmgr ? 0 : ev_mgr_create(&evmgr);
+	x_mutex_unlock(&mutex);
+	return rc;
+}
+
 int afb_ev_mgr_release(x_thread_t tid)
 {
 	x_mutex_lock(&mutex);

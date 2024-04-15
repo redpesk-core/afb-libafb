@@ -499,6 +499,8 @@ int afb_sched_start(
 	assert(max_jobs_count > 0);
 	assert(start_count <= allowed_count);
 
+	afb_ev_mgr_init();
+
 	x_mutex_lock(&mutex);
 	pexiting = &exiting;
 

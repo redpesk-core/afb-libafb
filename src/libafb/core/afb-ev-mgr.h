@@ -27,6 +27,9 @@
 #include "../sys/ev-mgr.h"
 
 extern
+int afb_ev_mgr_init();
+
+extern
 int afb_ev_mgr_release(x_thread_t tid);
 
 extern

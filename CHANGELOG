@@ -1,3 +1,14 @@
+Version 5.0.13
+--------------
+
+  fixes
+   - compiling without systemd
+   - explicit initialisation of event loop
+
+  features
+   - adaptation to musl C library
+
+
 Version 5.0.12
 --------------
 
