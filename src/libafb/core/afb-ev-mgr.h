@@ -96,3 +96,12 @@ int afb_ev_mgr_add_timer(
 	void *closure,
 	int autounref
 );
+
+extern
+void afb_ev_mgr_prepare_wait_dispatch_release(int delayms);
+
+extern
+void afb_ev_mgr_try_recover(x_thread_t tid);
+
+extern
+void afb_ev_mgr_try_recover_for_me();

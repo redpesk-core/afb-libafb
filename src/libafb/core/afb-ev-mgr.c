@@ -53,6 +53,9 @@ struct waithold
 };
 static struct waithold *awaiters;
 
+/* holder is preparing */
+static int inprep;
+
 /**
  * Release the event manager if held currently
  */
@@ -173,11 +176,14 @@ int afb_ev_mgr_get_fd()
 
 int afb_ev_mgr_prepare()
 {
+	int result;
 	long delayms;
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
 	int njobs = afb_jobs_dequeue_multiple(0, 0, &delayms);
-	int result = ev_mgr_prepare_with_wakeup(mgr, njobs ? 0 : delayms > INT_MAX ? INT_MAX : (int)delayms);
+	inprep = 1;
+	result = ev_mgr_prepare_with_wakeup(mgr, njobs ? 0 : delayms > INT_MAX ? INT_MAX : (int)delayms);
+	inprep = 0;
 	afb_ev_mgr_release(me);
 	return result;
 }
@@ -230,7 +236,8 @@ int afb_ev_mgr_add_fd(
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
 	int rc = ev_mgr_add_fd(mgr, efd, fd, events, handler, closure, autounref, autoclose);
-	afb_ev_mgr_release(me);
+	if (!inprep)
+		afb_ev_mgr_release(me);
 	return rc;
 }
 
@@ -242,7 +249,8 @@ int afb_ev_mgr_add_prepare(
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
 	int rc = ev_mgr_add_prepare(mgr, prep, handler, closure);
-	afb_ev_mgr_release(me);
+	if (!inprep)
+		afb_ev_mgr_release(me);
 	return rc;
 }
 
@@ -261,6 +269,39 @@ int afb_ev_mgr_add_timer(
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
 	int rc = ev_mgr_add_timer(mgr, timer, absolute, start_sec, start_ms, count, period_ms, accuracy_ms, handler, closure, autounref);
-	afb_ev_mgr_release(me);
+	if (!inprep)
+		afb_ev_mgr_release(me);
 	return rc;
+}
+
+void afb_ev_mgr_prepare_wait_dispatch_release(int delayms)
+{
+	int rc;
+	int tempo = delayms < 0 ? -1 : delayms;
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	inprep = 1;
+	rc = ev_mgr_prepare(mgr);
+	inprep = 0;
+	if (rc >= 0) {
+		rc = ev_mgr_wait(mgr, tempo);
+		if (rc > 0)
+			ev_mgr_dispatch(mgr);
+	}
+	afb_ev_mgr_release(me);
+}
+
+void afb_ev_mgr_try_recover(x_thread_t tid)
+{
+	struct ev_mgr *mgr = afb_ev_mgr_try_get(tid);
+	if (mgr) {
+		ev_mgr_recover_run(mgr);
+		inprep = 0;
+		afb_ev_mgr_release(tid);
+	}
+}
+
+void afb_ev_mgr_try_recover_for_me()
+{
+	afb_ev_mgr_try_recover(x_thread_self());
 }
