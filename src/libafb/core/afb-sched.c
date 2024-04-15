@@ -162,6 +162,12 @@ static void adapt(enum afb_sched_mode mode)
 		start_one_thread(mode);
 }
 
+/* an event manager has no thread */
+void afb_sched_ev_mgr_unheld()
+{
+	adapt(Afb_Sched_Mode_Normal);
+}
+
 /**
  * Queues the job as described by parameters and takes the
  * actions to adapt thread pool to treat it.

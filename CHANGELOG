@@ -6,12 +6,15 @@ Version 5.0.13
    - explicit initialisation of event loop
    - releasing of the event loop as soon as possible
    - improve holding the event loop by threads
+   - eventually start a thread for holding the event loop
+     (but limited by the count of threads)
 
   features
    - adaptation to musl C library
 
   change
    - minor improvement of the signature of callback afb_threads_job_getter_t
+   - management of event loop moved from afb-sched to afb-ev-mgr
 
 Version 5.0.12
 --------------

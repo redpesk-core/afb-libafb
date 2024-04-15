@@ -262,7 +262,8 @@ void purge_events()
     fprintf(stderr, "--- Purging events ---\n");
     for(;;) {
         afb_ev_mgr_prepare();
-        if (afb_ev_mgr_wait(0) <= 0)
+        int sts = afb_ev_mgr_wait(0);
+        if (sts <= 0 && sts != X_EINTR)
             break;
         afb_ev_mgr_dispatch();
     }

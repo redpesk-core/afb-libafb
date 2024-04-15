@@ -30,7 +30,9 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-jobs.h"
 #include "core/afb-ev-mgr.h"
-#include "core/afb-threads.h"
+#if !WITH_JOB_NOT_MONITORED
+#include "core/afb-sched.h"
+#endif
 
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
@@ -58,43 +60,6 @@ static int inprep;
 
 #define SAME_TID(x,y) ((x) == (y))  /* x_thread_equal? */
 
-/**
- * Release the event manager if held currently
- */
-static void unhold_evmgr()
-{
-	holder = INVALID_THREAD_ID;
-	if (awaiters)
-		x_cond_signal(&awaiters->cond);
-#if !WITH_JOB_NOT_MONITORED
-	else
-		afb_threads_wakeup(AFB_THREAD_ANY_CLASS, 1);
-#endif
-}
-
-/**
- * Release the event manager if held currently
- */
-static int try_unhold_evmgr(x_thread_t tid)
-{
-	if (!evmgr || !SAME_TID(holder, tid))
-		return 0;
-	unhold_evmgr();
-	return 1;
-}
-
-/**
- * try to get the eventloop for the thread of tid
- */
-static int try_hold_evmgr(x_thread_t tid)
-{
-	if (!evmgr && ev_mgr_create(&evmgr) < 0)
-		return 0;
-	if (SAME_TID(holder, INVALID_THREAD_ID)) /* x_thread_equal? */
-		holder = tid;
-	return SAME_TID(holder, tid); /* x_thread_equal? */
-}
-
 int afb_ev_mgr_init()
 {
 	x_mutex_lock(&mutex);
@@ -105,41 +70,68 @@ int afb_ev_mgr_init()
 
 int afb_ev_mgr_release(x_thread_t tid)
 {
-	x_mutex_lock(&mutex);
-	int unheld = try_unhold_evmgr(tid);
-	x_mutex_unlock(&mutex);
+	int unheld = 0;
+	if (SAME_TID(holder, tid)) {
+		x_mutex_lock(&mutex);
+		holder = INVALID_THREAD_ID;
+		if (awaiters) {
+			x_cond_signal(&awaiters->cond);
+			x_mutex_unlock(&mutex);
+		}
+#if !WITH_JOB_NOT_MONITORED
+		else {
+			x_mutex_unlock(&mutex);
+			afb_sched_ev_mgr_unheld();
+		}
+#endif
+		unheld = 1;
+	}
 	return unheld;
 }
 
 struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid)
 {
-	x_mutex_lock(&mutex);
-	int gotit = !awaiters && try_hold_evmgr(tid);
-	x_mutex_unlock(&mutex);
-	return gotit ? evmgr : 0;
+	struct ev_mgr *mgr;
+	if (SAME_TID(holder, tid))
+		mgr = evmgr;
+	else {
+		x_mutex_lock(&mutex);
+		if ((!evmgr && ev_mgr_create(&evmgr) < 0)
+		 || !SAME_TID(holder, INVALID_THREAD_ID))
+			mgr = NULL;
+		else {
+			holder = tid;
+			mgr = evmgr;
+		}
+		x_mutex_unlock(&mutex);
+
+	}
+	return mgr;
 }
 
 struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
 {
-	/* lock */
-	x_mutex_lock(&mutex);
+	if (!SAME_TID(holder, tid)) {
 
-	/* try to hold the event loop under lock */
-	if (!SAME_TID(holder, tid) && (awaiters || !try_hold_evmgr(tid)) && evmgr) {
-		struct waithold wait = { 0, X_COND_INITIALIZER };
-		struct waithold **piw = &awaiters;
-		while (*piw) piw = &(*piw)->next;
-		*piw = &wait;
-		do {
-			ev_mgr_wakeup(evmgr);
-			x_cond_wait(&wait.cond, &mutex);
-		} while(!try_hold_evmgr(tid));
-		awaiters = wait.next;
+		/* lock */
+		x_mutex_lock(&mutex);
+
+		if (evmgr || ev_mgr_create(&evmgr) >= 0) {
+			if (!SAME_TID(holder, INVALID_THREAD_ID)) {
+				struct waithold wait = { 0, X_COND_INITIALIZER };
+				struct waithold **piw = &awaiters;
+				while (*piw) piw = &(*piw)->next;
+				*piw = &wait;
+				ev_mgr_wakeup(evmgr);
+				x_cond_wait(&wait.cond, &mutex);
+				awaiters = wait.next;
+			}
+			holder = tid;
+		}
+
+		/* unlock */
+		x_mutex_unlock(&mutex);
 	}
-
-	/* unlock */
-	x_mutex_unlock(&mutex);
-
 	return evmgr;
 }
 
@@ -149,10 +141,8 @@ struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
  */
 void afb_ev_mgr_wakeup()
 {
-	if (evmgr) {
+	if (evmgr)
 		ev_mgr_wakeup(evmgr);
-		afb_ev_mgr_release_for_me();
-	}
 }
 
 int afb_ev_mgr_release_for_me()
@@ -186,15 +176,14 @@ int afb_ev_mgr_prepare()
 	inprep = 1;
 	result = ev_mgr_prepare_with_wakeup(mgr, njobs ? 0 : delayms > INT_MAX ? INT_MAX : (int)delayms);
 	inprep = 0;
-	afb_ev_mgr_release(me);
 	return result;
 }
 
 int afb_ev_mgr_wait(int ms)
 {
 	x_thread_t me = x_thread_self();
-	int result = ev_mgr_wait(afb_ev_mgr_get(me), ms);
-	afb_ev_mgr_release(me);
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int result = ev_mgr_wait(mgr, ms);
 	return result;
 }
 
@@ -211,8 +200,8 @@ static void dispatch_mgr(struct ev_mgr *mgr, unsigned max_count_jobs)
 void afb_ev_mgr_dispatch()
 {
 	x_thread_t me = x_thread_self();
-	dispatch_mgr(afb_ev_mgr_get(me), 1);
-	afb_ev_mgr_release(me);
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	dispatch_mgr(mgr, 1);
 }
 
 int afb_ev_mgr_wait_and_dispatch(int ms)

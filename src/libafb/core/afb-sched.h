@@ -204,7 +204,6 @@ static inline void afb_sched_call_sync(
 	afb_sched_call(0, callback, arg, Afb_Sched_Mode_Normal);
 }
 
-
 /**
  * Wait that every running thread are in waiting state.
  * One of the thread can be in event loop, waiting for some
@@ -226,3 +225,9 @@ static inline void afb_sched_call_sync(
  * @return -1 if timeout or the count of pending jobs
  */
 extern int afb_sched_wait_idle(int wait_jobs, int timeout);
+
+/**
+ * Call this function to signal that an event manager is not
+ * held by any thread.
+ */
+extern void afb_sched_ev_mgr_unheld();
