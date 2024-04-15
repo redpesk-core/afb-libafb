@@ -102,8 +102,6 @@ static struct exiting *pexiting = 0;
 /* counts for threads */
 static int allowed_thread_count = 0;	/**< allowed count of threads */
 
-static struct ev_mgr *evmgr;
-
 /**
  * run the event loop
  */
@@ -111,60 +109,33 @@ static void evloop_sig_run(int signum, void *closure)
 {
 	if (signum) {
 		RP_ERROR("Signal %s catched in evloop", strsignal(signum));
-		ev_mgr_recover_run(evmgr);
+		afb_ev_mgr_try_recover_for_me();
 	}
 	else {
-		long delayms = (long)(intptr_t)closure;
-		int to = delayms < 0 ? -1 : delayms <= INT_MAX ? (int)delayms : INT_MAX;
-		int rc = ev_mgr_prepare(evmgr);
-		if (rc >= 0) {
-			rc = ev_mgr_wait(evmgr, to);
-			if (rc > 0)
-				ev_mgr_dispatch(evmgr);
-		}
+		int delayms = (int)(intptr_t)closure;
+		afb_ev_mgr_prepare_wait_dispatch_release(delayms);
 	}
-}
-
-static void run_event_loop(void *closure, x_thread_t tid)
-{
-	afb_sig_monitor_run(0, evloop_sig_run, closure);
-	afb_ev_mgr_release(tid);
-}
-
-static void run_job(void *closure, x_thread_t tid)
-{
-	afb_jobs_run((struct afb_job*)closure);
-	afb_ev_mgr_release(tid);
 }
 
 static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
 {
 	struct afb_job *job;
 	long delayms;
-	struct ev_mgr *em;
 	int classid = (int)(intptr_t)closure;
 	int rc = AFB_THREADS_IDLE;
 
-	x_mutex_lock(&mutex);
 	job = afb_jobs_dequeue(&delayms);
 	if (job) {
-		desc->run = run_job;
-		desc->job = job;
-		rc = AFB_THREADS_EXEC;
+		afb_jobs_run(job);
+		afb_ev_mgr_release(tid);
+		rc = AFB_THREADS_CONTINUE;
 	}
 	else if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
 		rc = AFB_THREADS_STOP;
-	else {
-		em = afb_ev_mgr_try_get(tid);
-		if (em) {
-			evmgr = em;
-			/* setup event loop */
-			desc->run = run_event_loop;
-			desc->job = (void*)(intptr_t)delayms;
-			rc = AFB_THREADS_EXEC;
-		}
+	else if (afb_ev_mgr_try_get(tid) != NULL) {
+		afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
+		rc = AFB_THREADS_CONTINUE;
 	}
-	x_mutex_unlock(&mutex);
 	return rc;
 }
 
