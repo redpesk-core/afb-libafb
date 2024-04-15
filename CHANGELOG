@@ -5,10 +5,10 @@ Version 5.0.13
    - compiling without systemd
    - explicit initialisation of event loop
    - releasing of the event loop as soon as possible
+   - improve holding the event loop by threads
 
   features
    - adaptation to musl C library
-
 
 Version 5.0.12
 --------------

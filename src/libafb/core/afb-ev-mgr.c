@@ -30,6 +30,7 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-jobs.h"
 #include "core/afb-ev-mgr.h"
+#include "core/afb-threads.h"
 
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
@@ -60,6 +61,10 @@ static void unhold_evmgr()
 	holder = INVALID_THREAD_ID;
 	if (awaiters)
 		x_cond_signal(&awaiters->cond);
+#if !WITH_JOB_NOT_MONITORED
+	else
+		afb_threads_wakeup(AFB_THREAD_ANY_CLASS, 1);
+#endif
 }
 
 /**
@@ -108,6 +113,7 @@ struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid)
 	x_mutex_unlock(&mutex);
 	return gotit ? evmgr : 0;
 }
+
 struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
 {
 	/* lock */
