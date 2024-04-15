@@ -56,6 +56,8 @@ static struct waithold *awaiters;
 /* holder is preparing */
 static int inprep;
 
+#define SAME_TID(x,y) ((x) == (y))  /* x_thread_equal? */
+
 /**
  * Release the event manager if held currently
  */
@@ -75,7 +77,7 @@ static void unhold_evmgr()
  */
 static int try_unhold_evmgr(x_thread_t tid)
 {
-	if (!evmgr || holder != tid) /* x_thread_equal? */
+	if (!evmgr || !SAME_TID(holder, tid))
 		return 0;
 	unhold_evmgr();
 	return 1;
@@ -88,9 +90,9 @@ static int try_hold_evmgr(x_thread_t tid)
 {
 	if (!evmgr && ev_mgr_create(&evmgr) < 0)
 		return 0;
-	if (holder == INVALID_THREAD_ID) /* x_thread_equal? */
+	if (SAME_TID(holder, INVALID_THREAD_ID)) /* x_thread_equal? */
 		holder = tid;
-	return holder == tid; /* x_thread_equal? */
+	return SAME_TID(holder, tid); /* x_thread_equal? */
 }
 
 int afb_ev_mgr_init()
@@ -123,7 +125,7 @@ struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
 	x_mutex_lock(&mutex);
 
 	/* try to hold the event loop under lock */
-	if (holder != tid && (awaiters || !try_hold_evmgr(tid)) && evmgr) {
+	if (!SAME_TID(holder, tid) && (awaiters || !try_hold_evmgr(tid)) && evmgr) {
 		struct waithold wait = { 0, X_COND_INITIALIZER };
 		struct waithold **piw = &awaiters;
 		while (*piw) piw = &(*piw)->next;
