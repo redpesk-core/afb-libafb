@@ -138,8 +138,10 @@ struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
  */
 void afb_ev_mgr_wakeup()
 {
-	if (evmgr)
+	if (evmgr) {
 		ev_mgr_wakeup(evmgr);
+		afb_ev_mgr_release_for_me();
+	}
 }
 
 int afb_ev_mgr_release_for_me()
@@ -219,8 +221,11 @@ int afb_ev_mgr_add_fd(
 	int autounref,
 	int autoclose
 ) {
-	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
-	return ev_mgr_add_fd(mgr, efd, fd, events, handler, closure, autounref, autoclose);
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int rc = ev_mgr_add_fd(mgr, efd, fd, events, handler, closure, autounref, autoclose);
+	afb_ev_mgr_release(me);
+	return rc;
 }
 
 int afb_ev_mgr_add_prepare(
@@ -228,8 +233,11 @@ int afb_ev_mgr_add_prepare(
 	ev_prepare_cb_t handler,
 	void *closure
 ) {
-	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
-	return ev_mgr_add_prepare(mgr, prep, handler, closure);
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int rc = ev_mgr_add_prepare(mgr, prep, handler, closure);
+	afb_ev_mgr_release(me);
+	return rc;
 }
 
 int afb_ev_mgr_add_timer(
@@ -244,6 +252,9 @@ int afb_ev_mgr_add_timer(
 	void *closure,
 	int autounref
 ) {
-	struct ev_mgr *mgr = afb_ev_mgr_get_for_me();
-	return ev_mgr_add_timer(mgr, timer, absolute, start_sec, start_ms, count, period_ms, accuracy_ms, handler, closure, autounref);
+	x_thread_t me = x_thread_self();
+	struct ev_mgr *mgr = afb_ev_mgr_get(me);
+	int rc = ev_mgr_add_timer(mgr, timer, absolute, start_sec, start_ms, count, period_ms, accuracy_ms, handler, closure, autounref);
+	afb_ev_mgr_release(me);
+	return rc;
 }
