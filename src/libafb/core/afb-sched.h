@@ -71,7 +71,7 @@ extern int afb_sched_leave(struct afb_sched_lock *lock);
  * If the execution flow is already unlocked, return NULL.
  *
  * @param lock indication of the execution flow
- * @return the argument 'arg' passed tot 'afb_sched_enter' or NULL
+ * @return the argument 'closure' passed to 'afb_sched_enter' or NULL
  */
 extern void *afb_sched_lock_arg(struct afb_sched_lock *lock);
 

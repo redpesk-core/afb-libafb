@@ -10,6 +10,9 @@ Version 5.0.13
   features
    - adaptation to musl C library
 
+  change
+   - minor improvement of the signature of callback afb_threads_job_getter_t
+
 Version 5.0.12
 --------------
 

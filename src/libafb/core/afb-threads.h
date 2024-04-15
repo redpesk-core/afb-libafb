@@ -30,12 +30,20 @@
  *
  *    while (running) {
  *       sts = getjob(closure, &jobdesc, threadid);
- *       if (sts > 0)
- *            jobdesc.run(jobdesc.job, threadid);
- *       else if (sts < 0)
+ *       switch (sts) {
+ *       default:
+ *       case AFB_THREADS_STOP:
  *            running = 0;
- *       else
+ *            break;
+ *       case AFB_THREADS_IDLE:
  *            sleep_until_awaken();
+ *            break;
+ *       case AFB_THREADS_EXEC:
+ *            jobdesc.run(jobdesc.job, threadid);
+ *            break;
+ *       case AFB_THREADS_CONTINUE:
+ *            break;
+ *       }
  *    }
  *
  * The function for getting the job is given at creation
@@ -51,7 +59,7 @@
 #define AFB_THREAD_ANY_CLASS (-1)
 
 /**
- * Structure for getting jobs.
+ * Structure for getting jobs to be executed.
  *
  * When getting a job, the structure must be filled with accurate values
  * if the getter returns a positive number.
@@ -66,9 +74,18 @@ struct afb_threads_job_desc
 };
 
 /**
- * Alias for the structure
+ * Alias for struct afb_threads_job_desc
  */
 typedef struct afb_threads_job_desc afb_threads_job_desc_t;
+
+/** stops running the thread loop */
+#define AFB_THREADS_STOP	-1
+/** pause running the thread loop */
+#define AFB_THREADS_IDLE	0
+/** run the job given in the description then continue */
+#define AFB_THREADS_EXEC	1
+/** continue the thread loop */
+#define AFB_THREADS_CONTINUE	2
 
 /**
  * The call back for getting the jobs.
@@ -79,7 +96,8 @@ typedef struct afb_threads_job_desc afb_threads_job_desc_t;
  *  @param tid         the thread id of the current thread
  *
  * It must return:
- *  - a positive value for running the job set in the desciption
+ *  - 1 (one) for running the job set in the desciption
+ *  - a positive value for continuing executing the loop
  *  - a negative value for stopping the thread
  *  - zero for waiting to be awaken
  */

@@ -137,22 +137,23 @@ static void run_job(void *closure, x_thread_t tid)
 	afb_ev_mgr_release(tid);
 }
 
-static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
+static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
 {
-	int rc = 0;
 	struct afb_job *job;
 	long delayms;
 	struct ev_mgr *em;
+	int classid = (int)(intptr_t)closure;
+	int rc = AFB_THREADS_IDLE;
 
 	x_mutex_lock(&mutex);
 	job = afb_jobs_dequeue(&delayms);
 	if (job) {
 		desc->run = run_job;
 		desc->job = job;
-		rc = 1;
+		rc = AFB_THREADS_EXEC;
 	}
 	else if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
-		rc = -1;
+		rc = AFB_THREADS_STOP;
 	else {
 		em = afb_ev_mgr_try_get(tid);
 		if (em) {
@@ -160,16 +161,11 @@ static int get_job(int classid, afb_threads_job_desc_t *desc, x_thread_t tid)
 			/* setup event loop */
 			desc->run = run_event_loop;
 			desc->job = (void*)(intptr_t)delayms;
-			rc = 1;
+			rc = AFB_THREADS_EXEC;
 		}
 	}
 	x_mutex_unlock(&mutex);
 	return rc;
-}
-
-static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
-{
-	return get_job((int)(intptr_t)closure, desc, tid);
 }
 
 static int start_one_thread(enum afb_sched_mode mode)
