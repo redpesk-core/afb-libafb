@@ -15,6 +15,7 @@ Version 5.0.13
   change
    - minor improvement of the signature of callback afb_threads_job_getter_t
    - management of event loop moved from afb-sched to afb-ev-mgr
+   - improvements of afb-ev-mgr
 
 Version 5.0.12
 --------------
