@@ -1359,7 +1359,10 @@ static int incall_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *
 {
 	struct incall *req = containerof(struct incall, comreq, comreq);
 	struct afb_stub_rpc *stub = req->stub;
-	int rc = send_event_unsubscribe(stub, req->callid, afb_evt_id(evt));
+	int rc = afb_evt_listener_unwatch_evt(stub->listener, evt);
+	int rc2 = send_event_unsubscribe(stub, req->callid, afb_evt_id(evt));
+	if (rc >= 0 && rc2 < 0)
+		rc = rc2;
 	if (rc < 0)
 		RP_ERROR("error while unsubscribing event");
 	emit(stub);

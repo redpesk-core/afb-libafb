@@ -2,7 +2,7 @@ next
 -------------
 
   fixes
-   - unsubscription of wsapi server side (the unsubscription had
+   - unsubscription of wsapi and rpcapi server side (the unsubscription had
      no effect)
 
   change
