@@ -1,6 +1,10 @@
 next
 -------------
 
+  fixes
+   - unsubscription of wsapi server side (the unsubscription had
+     no effect)
+
   change
    - remove references to json-locator
 

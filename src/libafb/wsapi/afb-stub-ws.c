@@ -185,10 +185,13 @@ static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_evt
 
 static int server_req_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
-	int rc;
+	int rc, rc2;
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
-	rc = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_id(event));
+	rc = afb_evt_listener_unwatch_evt(wreq->stubws->listener, event);
+	rc2 = afb_proto_ws_call_unsubscribe(wreq->call,  afb_evt_id(event));
+	if (rc >= 0 && rc2 < 0)
+		rc = rc2;
 	if (rc < 0)
 		RP_ERROR("error while unsubscribing event");
 	return rc;
