@@ -196,14 +196,6 @@ extern void afb_sched_call(
 		enum afb_sched_mode mode
 );
 
-/* obsolete */
-static inline void afb_sched_call_sync(
-		void (*callback)(int, void*),
-		void *arg
-) {
-	afb_sched_call(0, callback, arg, Afb_Sched_Mode_Normal);
-}
-
 /**
  * Wait that every running thread are in waiting state.
  * One of the thread can be in event loop, waiting for some
