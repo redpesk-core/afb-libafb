@@ -76,26 +76,6 @@ extern int afb_sched_leave(struct afb_sched_lock *lock);
 extern void *afb_sched_lock_arg(struct afb_sched_lock *lock);
 
 /**
- * Calls synchronously the job represented by 'callback' and 'arg1'
- * for the 'group' and the 'timeout' and waits for its completion.
- * @param group    The group of the job or NULL when no group.
- * @param timeout  The maximum execution time in seconds of the job
- *                 or 0 for unlimited time.
- * @param callback The function to execute for achieving the job.
- *                 Its first parameter is either 0 on normal flow
- *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg1'
- *                 given here.
- * @param arg      The second argument for 'callback'
- * @return 0 in case of success or -1 in case of error
- */
-extern int afb_sched_call_job_sync(
-		const void *group,
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg);
-
-/**
  * Enter the jobs processing loop.
  *
  * When entered, the job processing loop does not return until

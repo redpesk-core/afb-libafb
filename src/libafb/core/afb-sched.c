@@ -392,35 +392,6 @@ void *afb_sched_lock_arg(struct afb_sched_lock *lock)
 }
 
 
-struct call_job_sync {
-	void (*callback)(int, void*);
-	void *arg;
-};
-
-static void call_job_sync_cb(int signum, void *closure, struct afb_sched_lock *lock)
-{
-	struct call_job_sync *cjs = closure;
-	cjs->callback(signum, cjs->arg);
-	afb_sched_leave(lock);
-}
-
-/* call a job synchronousely */
-int afb_sched_call_job_sync(
-		const void *group,
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg)
-{
-	if (group == NULL) {
-		afb_sched_call(timeout, callback, arg, Afb_Sched_Mode_Start);
-		return 0;
-	}
-	else {
-		struct call_job_sync cjs = { callback, arg };
-		return afb_sched_enter(group, timeout, call_job_sync_cb, &cjs);
-	}
-}
-
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {

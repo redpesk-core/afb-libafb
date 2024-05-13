@@ -176,14 +176,11 @@ void test_job_sync(int sig, void* arg){
 
 void test_start_job_sync(int sig, void* arg){
 
-    int r;
-
     fprintf(stderr, "start_test_job_sync received sig %d with arg %d\n", sig, p2i(arg));
 
     if(sig == 0){
-        r = afb_sched_call_job_sync(NULL, 1, test_job_sync, arg);
+        afb_sched_call(1, test_job_sync, arg, Afb_Sched_Mode_Start);
         pthread_mutex_lock(&gval.mutex);
-        gval.killedJobs += r < 0;
         gval.val *= -1;
         gval.lastJob = FALSE;
         pthread_mutex_unlock(&gval.mutex);
