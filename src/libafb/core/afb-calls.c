@@ -322,7 +322,7 @@ process_sync(
 
 	ps.completed = 0;
 
-	rc = afb_sched_enter(NULL, 0, process_sync_enter_cb, &ps);
+	rc = afb_sched_sync(0, process_sync_enter_cb, &ps);
 	if (!ps.completed && rc >= 0)
 		rc = X_EINTR;
 	if (rc < 0) {

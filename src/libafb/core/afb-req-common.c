@@ -1380,7 +1380,7 @@ afb_req_common_has_permission_hookable(
 
 	hasp.permision = permission;
 	hasp.req = req;
-	rc = afb_sched_enter(NULL, 0, has_permission_job_cb, &hasp);
+	rc = afb_sched_sync(0, has_permission_job_cb, &hasp);
 	if (rc == 0)
 		rc = hasp.rc;
 #if WITH_AFB_HOOK

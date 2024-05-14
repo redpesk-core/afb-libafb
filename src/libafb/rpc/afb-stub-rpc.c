@@ -366,7 +366,7 @@ static int wait_version(struct afb_stub_rpc *stub)
 		awaiter.stub = stub;
 		awaiter.next = NULL;
 		awaiter.lock = NULL;
-		rc = afb_sched_enter(NULL, 0, wait_version_cb, &awaiter);
+		rc = afb_sched_sync(0, wait_version_cb, &awaiter);
 		if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
 			rc = X_EBUSY;
 	}

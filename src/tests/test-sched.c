@@ -267,11 +267,14 @@ void test_job_enter(int sig, void * arg, struct afb_sched_lock * sched_lock){
 }
 
 void test_job_enter_timeout(int sig, void * arg, struct afb_sched_lock * sched_lock){
-    int r;
+    int r = 0;
     fprintf(stderr, "entering test_job_enter_timeout sig=%d\n",sig);
-    sleep(2);
-    r = afb_sched_leave(sched_lock);
-    if(r)reachError++;
+    if (sig == 0) {
+        sleep(2);
+        fprintf(stderr, "unbroken test_job_enter_timeout!!\n");
+        r = afb_sched_leave(sched_lock);
+        if(r)reachError++;
+    }
     fprintf(stderr, "leaving test_job_enter_timeout %d\n", r);
 }
 
@@ -281,11 +284,11 @@ void test_start_sched_enter(int sig, void * arg){
 
     if (sig == 0){
         fprintf(stderr, "test_start_sched_enter before\n");
-        r = afb_sched_enter(NULL, 1, test_job_enter, arg);
+        r = afb_sched_sync(1, test_job_enter, arg);
 	    fprintf(stderr, "test_start_sched_enter after %d\n", r);
         if(r) reachError++;
         fprintf(stderr, "test_job_enter_timeout before\n");
-        r = afb_sched_enter(NULL, 1, test_job_enter_timeout, arg);
+        r = afb_sched_sync(1, test_job_enter_timeout, arg);
         fprintf(stderr, "test_job_enter_timeout after %d\n", r);
         if(r>=0) reachError++;
     }

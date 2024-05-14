@@ -7,6 +7,8 @@ next
 
   change
    - remove references to json-locator
+   - removed functions 'afb_sched_call_sync' and 'afb_sched_call_job_sync'
+   - deprecation of function 'afb_sched_enter' replaced by 'afb_sched_sync'
 
 Version 5.0.13
 --------------

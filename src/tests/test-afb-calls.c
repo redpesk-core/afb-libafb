@@ -48,16 +48,22 @@
 #include "core/afb-type-predefined.h"
 #include "core/afb-data-array.h"
 
-
+#include <pthread.h>
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;
+#define SYNC do{ \
+		pthread_mutex_lock(&mutex); \
+		pthread_cond_signal(&cond); \
+		pthread_mutex_unlock(&mutex); \
+		} while(0);
+#define WAITSYNC do{ \
+		pthread_mutex_lock(&mutex); \
+		pthread_cond_wait(&cond, &mutex); \
+		pthread_mutex_unlock(&mutex); \
+		} while(0);
 
 #define PATH_BUF_SIZE 200
 #define NBPARAMS 3
-
-#if WITH_REQ_PROCESS_ASYNC
-#define RUNJOB afb_sched_wait_idle(1,1);
-#else
-#define RUNJOB (void)0
-#endif
 
 #define i2p(x)  ((void*)((intptr_t)(x)))
 #define p2i(x)  ((int)((intptr_t)(x)))
@@ -150,25 +156,26 @@ void dataClosureCB(void *arg)
 }
 
 void testCB(void *closure1, void *closure2, void *closure3, int a, unsigned int b, struct afb_data *const * data){
-    unsigned int i;
+	unsigned int i;
 	fprintf(stderr, "testCB was called\n");
 	for (i=0; i<b; i++) {
 		verbDataGval += p2i(afb_data_ro_pointer(data[i]));
 	}
+	SYNC
 }
 
-START_TEST (test)
+void run_test(int signum, void* arg)
 {
 	struct afb_data * params[NBPARAMS];
 	struct afb_data * replies[NBPARAMS+1];
 	struct afb_type * type1;
-    struct afb_api_common comapi;
+	struct afb_api_common comapi;
 	struct afb_req_common req;
 	struct afb_apiset * declare_set;
-    struct afb_apiset * call_set;
-    char name[] = "hello";
-    char info[] = "Info";
-    char path[PATH_BUF_SIZE];
+	struct afb_apiset * call_set;
+	char name[] = "hello";
+	char info[] = "Info";
+	char path[PATH_BUF_SIZE];
 	unsigned int nreplies;
 	int status;
 
@@ -196,10 +203,10 @@ START_TEST (test)
 
 	// load a binding
 	getpath(path, "libhello.so", 0);
-    afb_api_so_add_binding(path, call_set, call_set);
+	afb_api_so_add_binding(path, call_set, call_set);
 
-    // inti it's api
-    afb_api_common_init(&comapi, declare_set, call_set, name, 0, info, 0, path, 0);
+	// inti it's api
+	afb_api_common_init(&comapi, declare_set, call_set, name, 0, info, 0, path, 0);
 
 	// inti a common req
 	afb_req_common_init(&req, &test_queryitf, "toto","patatate", 0, NULL);
@@ -212,7 +219,7 @@ START_TEST (test)
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL);
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -222,7 +229,7 @@ START_TEST (test)
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_subcall(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL, &req, 0);
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -231,8 +238,8 @@ START_TEST (test)
 	// Test req_calls_subscribe_cb
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
-    afb_calls_call(&comapi, name, "subscribe", NBPARAMS, params, testCB, NULL, NULL, NULL);
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	afb_calls_call(&comapi, name, "subscribe", NBPARAMS, params, testCB, NULL, NULL, NULL);
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -242,7 +249,7 @@ START_TEST (test)
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call(&comapi, name, "unsubscribe", NBPARAMS, params, testCB, NULL, NULL, NULL);
-    RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -252,7 +259,7 @@ START_TEST (test)
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_call_hooking(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL);
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -262,7 +269,7 @@ START_TEST (test)
 	verbDataGval = dataClosureGval = 0;
 	afb_data_array_addref(NBPARAMS, params); // increase params referensing to reuse it after
 	afb_calls_subcall_hooking(&comapi, name, "call", NBPARAMS, params, testCB, NULL, NULL, NULL, &req, 0);
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
+	WAITSYNC
 	fprintf(stderr, "dataClosureGval = %d\n", dataClosureGval);
 	fprintf(stderr, "verbDataGval = %d\n", verbDataGval);
 	ck_assert_int_eq(verbDataGval, checksum);
@@ -400,10 +407,15 @@ START_TEST (test)
 
 	afb_data_array_unref(NBPARAMS, params);
 
-	RUNJOB // if the system is not set to run jobs automaticaly run the jobs
-
 	ck_assert_int_eq(dataClosureGval, checksum);
 
+	afb_sched_exit(1, NULL, NULL, 0);
+}
+
+START_TEST (test)
+{
+	afb_sched_start(2, 1, 10, run_test, NULL);
+	afb_sched_wait_idle(1,0);
 }
 END_TEST
 

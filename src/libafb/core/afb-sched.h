@@ -37,24 +37,38 @@ enum afb_sched_mode
 
 /**
  * Enter a synchronisation point: activates the job given by 'callback'
- * and 'closure' using 'group' and 'timeout' to control sequencing and
- * execution time.
- * @param group the group for sequencing jobs
- * @param timeout the time in seconds allocated to wait the job the job
+ * and 'closure' using 'timeout' to control execution time.
+ *
+ * The given job callback receives 3 parameters:
+ *   - 'signum': 0 on start but if a signal is caugth, its signal number
+ *   - 'closure': closure data for the callback
+ *   - 'lock': the lock to pass to 'afb_sched_leave' to release the synchronisation
+ *
+ * @param timeout the time in seconds allocated to the job
  * @param callback the callback that will handle the job.
- *                 it receives 3 parameters: 'signum' that will be 0
- *                 on normal flow or the catched signal number in case
- *                 of interrupted flow, the context 'closure' as given and
- *                 a 'jobloop' reference that must be used when the job is
- *                 terminated to unlock the current execution flow.
  * @param closure the argument to the callback
+ *
  * @return 0 on success or -1 in case of error
+ */
+extern int afb_sched_sync(
+		int timeout,
+		void (*callback)(int signum, void *closure, struct afb_sched_lock *lock),
+		void *closure);
+
+#undef WITH_DEPRECATED_OLDER_THAN_5_1
+#define WITH_DEPRECATED_OLDER_THAN_5_1   1
+#if WITH_DEPRECATED_OLDER_THAN_5_1
+/**
+ * Deprecated function, use 'afb_sched_sync' instead.
+ * group must be NULL.
  */
 extern int afb_sched_enter(
 		const void *group,
 		int timeout,
 		void (*callback)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock),
-		void *closure);
+		void *closure)
+	__attribute__ ((deprecated("deprecated since 5.1.0, use afb_sched_sync as replacement")));
+#endif
 
 /**
  * Unlocks the execution flow locked by 'lock'.
