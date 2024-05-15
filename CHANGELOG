@@ -1,3 +1,9 @@
+Version next
+------------
+
+  change
+   - removed afb-wsapi files (from libafb and libafbcli)
+
 Version 5.1.0
 -------------
 

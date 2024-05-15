@@ -26,4 +26,3 @@
 #include "libafb-config.h"
 #include "wsapi/afb-proto-ws.h"
 #include "wsapi/afb-stub-ws.h"
-#include "wsapi/afb-wsapi.h"

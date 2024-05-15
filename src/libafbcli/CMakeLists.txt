@@ -38,7 +38,6 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/sys/systemd.c
 	${DIR}/utils/websock.c
 	${DIR}/wsapi/afb-proto-ws.c
-	${DIR}/wsapi/afb-wsapi.c
 	${DIR}/wsj1/afb-wsj1.c
 	${DIR}/tls/tls.c
 )
@@ -78,7 +77,6 @@ INSTALL(FILES
 		afb-ws-client.h
 		${DIR}/wsj1/afb-wsj1.h
 		${DIR}/wsapi/afb-proto-ws.h
-		${DIR}/wsapi/afb-wsapi.h
 	DESTINATION
 		${CMAKE_INSTALL_INCLUDEDIR}/libafbcli
 )

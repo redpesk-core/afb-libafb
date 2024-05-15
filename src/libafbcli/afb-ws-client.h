@@ -27,8 +27,6 @@ struct afb_wsj1;
 struct afb_wsj1_itf;
 struct afb_proto_ws;
 struct afb_proto_ws_client_itf;
-struct afb_wsapi;
-struct afb_wsapi_itf;
 struct sd_event;
 
 /**
@@ -48,15 +46,6 @@ extern struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const
  * Returns NULL in case of failure with errno set appropriately.
  */
 extern struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const char *uri, struct afb_proto_ws_client_itf *itf, void *closure);
-
-/**
- * Establish a websocket-like client connection to the API of 'uri' and if successful
- * instantiate a client afb_wsapi websocket for this API using 'itf' and 'closure'.
- * (see afb_wsapi_create).
- * The systemd event loop 'eloop' is used to handle the websocket.
- * Returns NULL in case of failure with errno set appropriately.
- */
-extern struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char *uri, struct afb_wsapi_itf *itf, void *closure);
 
 /**
  * Establish a socket server waiting client connections.

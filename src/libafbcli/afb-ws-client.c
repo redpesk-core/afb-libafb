@@ -43,7 +43,6 @@
 #include "misc/afb-socket.h"
 #include "core/afb-ev-mgr.h"
 #include "wsapi/afb-proto-ws.h"
-#include "wsapi/afb-wsapi.h"
 #include "wsj1/afb-wsj1.h"
 #include "tls/tls.h"
 #include "sys/ev-mgr.h"
@@ -587,32 +586,6 @@ struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const cha
 		if (pws) {
 			afb_ev_mgr_prepare();
 			return pws;
-		}
-	}
-	return NULL;
-}
-
-/*
- * Establish a websocket-like client connection to the API of 'uri' and if successful
- * instantiate a client afb_wsapi websocket for this API using 'itf' and 'closure'.
- * (see afb_wsapi_create).
- * The systemd event loop 'eloop' is used to handle the websocket.
- * Returns NULL in case of failure with errno set appropriately.
- */
-struct afb_wsapi *afb_ws_client_connect_wsapi(struct sd_event *eloop, const char *uri, struct afb_wsapi_itf *itf, void *closure)
-{
-	int rc, fd;
-	struct afb_wsapi *wsapi;
-
-	fd = sockopen(eloop, uri, 0);
-	if (fd >= 0) {
-		rc = afb_wsapi_create(&wsapi, fd, 1, itf, closure);
-		if (rc >= 0) {
-			afb_ev_mgr_prepare();
-			rc = afb_wsapi_initiate(wsapi);
-			if (rc >= 0)
-				return wsapi;
-			afb_wsapi_unref(wsapi);
 		}
 	}
 	return NULL;
