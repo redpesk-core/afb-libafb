@@ -101,7 +101,8 @@ extern void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cr
 /**
  * Set packing/unpacking
  * The stub is packing when it groups messages together before sending it.
- * Packing is required when sending over websockets (don't remember why)
+ * Packing is required when sending over websockets (don't remember why but
+ * it is linked to the length of messages that are encoded by websocket layer)
  *
  * @param stub the stub object
  * @param unpack if not zero then don't pack

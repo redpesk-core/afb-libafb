@@ -80,14 +80,16 @@ static const char *prefix_ws_remove(const char *uri)
 /***       C L I E N T                                                      ***/
 /******************************************************************************/
 
-#if 0 /* TODO manage reopening */
+#if 0
 static void client_on_hangup(struct afb_wrap_rpc *client)
 {
-	const char *apiname = afb_stub_rpc_apiname(client);
+	const char *apiname = afb_wrap_rpc_apiname(client);
 	RP_WARNING("Disconnected of API %s", apiname);
 	afb_monitor_api_disconnected(apiname);
 }
+#endif
 
+#if 0 /* TODO manage reopening */
 static int reopen_client(void *closure)
 {
 	const char *uri = closure;
@@ -147,12 +149,12 @@ int afb_api_rpc_add_client_weak(const char *uri, struct afb_apiset *declare_set,
 /***       S E R V E R                                                      ***/
 /******************************************************************************/
 
-#if JUNK
+#if 0
 static void server_on_hangup(struct afb_wrap_rpc *server)
 {
-	const char *apiname = afb_stub_rpc_apiname(server);
-	RP_INFO("Disconnection of client of API %s", apiname);
-	afb_stub_rpc_unref(server);
+	const char *apiname = afb_wrap_rpc_apiname(server);
+	RP_INFO("Disconnection of client of API %s", apiname ?: "*");
+	afb_wrap_rpc_unref(server);
 }
 #endif
 
@@ -195,14 +197,23 @@ static void server_accept(struct server *server, int fd)
 	}
 }
 
+static void server_disconnect(struct server *server);
 static int server_connect(struct server *server);
+
+static int server_hangup(struct server *server)
+{
+	RP_ERROR("disconnection of server %s", server->uri);
+	server_disconnect(server);
+	RP_NOTICE("reconnection of server %s", server->uri);
+	return server_connect(server);
+}
 
 static void server_listen_callback(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct server *server = closure;
 
 	if ((revents & EPOLLHUP) != 0)
-		server_connect(server);
+		server_hangup(server);
 	else if ((revents & EPOLLIN) != 0)
 		server_accept(server, fd);
 }
@@ -216,9 +227,6 @@ static void server_disconnect(struct server *server)
 static int server_connect(struct server *server)
 {
 	int fd, rc;
-
-	/* ensure disconnected */
-	server_disconnect(server);
 
 	/* request the service object name */
 	rc = afb_socket_open(prefix_ws_remove(server->uri), 1);

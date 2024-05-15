@@ -44,7 +44,6 @@
 #define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
 #define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
 
-
 /*
 */
 struct afb_wrap_rpc
@@ -204,29 +203,43 @@ static struct afb_ws_itf wsitf =
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
-static int init(struct afb_wrap_rpc *wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset)
-{
-	int rc;
-
-	rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+/**
+* Initialize the wrapper
+*/
+static int init(
+		struct afb_wrap_rpc *wrap,
+		int fd,
+		int autoclose,
+		int websock,
+		const char *apiname,
+		struct afb_apiset *callset
+) {
+	/* create the stub */
+	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
 	if (rc < 0) {
-		close(fd);
+		if (autoclose)
+			close(fd);
 	} else {
 		if (websock) {
+			/* websocket initialisation */
 			wrap->efd = NULL;
-			wrap->ws = afb_ws_create(fd, 1, &wsitf, wrap);
+			wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
 			if (wrap->ws == NULL)
 				rc = X_ENOMEM;
 			else {
+				/* unpacking is required for websockets */
 				afb_stub_rpc_set_unpack(wrap->stub, 1);
+				/* callback for emission */
 				afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
 				rc = 0;
 			}
 		}
 		else {
+			/* direct initialisation */
 			wrap->ws = NULL;
-			rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent, wrap, 0, 1);
+			rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent, wrap, 0, autoclose);
 			if (rc >= 0)
+				/* callback for emission */
 				afb_stub_rpc_emit_set_notify(wrap->stub, notify, wrap);
 		}
 		if (rc >= 0) {
@@ -238,8 +251,15 @@ static int init(struct afb_wrap_rpc *wrap, int fd, int autoclose, int websock, c
 	return rc;
 }
 
-int afb_wrap_rpc_create(struct afb_wrap_rpc **wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset)
-{
+/* creation of the wrapper */
+int afb_wrap_rpc_create(
+		struct afb_wrap_rpc **wrap,
+		int fd,
+		int autoclose,
+		int websock,
+		const char *apiname,
+		struct afb_apiset *callset
+) {
 	int rc;
 	*wrap = malloc(sizeof **wrap);
 	if (*wrap == NULL) {
@@ -257,6 +277,7 @@ int afb_wrap_rpc_create(struct afb_wrap_rpc **wrap, int fd, int autoclose, int w
 	return rc;
 }
 
+/* use the wrapper as client API */
 int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set)
 {
 	int rc = afb_stub_rpc_client_add(wrap->stub, declare_set);
@@ -265,6 +286,7 @@ int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *decl
 	return rc;
 }
 
+/* HTTP upgrade of the connection 'fd' to RPC/WS */
 int afb_wrap_rpc_upgrade(
 		void *closure,
 		int fd,
@@ -285,7 +307,14 @@ int afb_wrap_rpc_upgrade(
 	return rc;
 }
 
+/* get apiname or NULL */
+const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap)
+{
+	return afb_stub_rpc_apiname(wrap->stub);
+}
+
 #if WITH_CRED
+/* attach credentials to the wrapper */
 void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred)
 {
 	afb_stub_rpc_set_cred(wrap->stub, cred);

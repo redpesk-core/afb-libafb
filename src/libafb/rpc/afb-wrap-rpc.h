@@ -30,19 +30,52 @@ struct afb_token;
 struct afb_wrap_rpc;
 
 /**
+ * Creates an RPC wrapper for the socket 'fd'.
+ * The wrapper links to event loop and dispatches incoming messages.
  *
+ * @param wrap      pointer receiving the created wrapper
+ * @param fd        file descriptor of the socket
+ * @param autoclose if not zero, the socket is closed at end
+ * @param websock   if not zero, initiate a websocket upgrading process
+ * @param apiname   the default API name, can be NULL except for clients
+ * @param callset   the call set for received calls
+ *
+ * @returns 0 on success or a negative error code
  */
-extern int afb_wrap_rpc_create(struct afb_wrap_rpc **wrap, int fd, int autoclose, int websock, const char *apiname, struct afb_apiset *callset);
+extern
+int afb_wrap_rpc_create(
+		struct afb_wrap_rpc **wrap,
+		int fd,
+		int autoclose,
+		int websock,
+		const char *apiname,
+		struct afb_apiset *callset);
 
 /**
+ * Declare the wrapper as serving a remote api
  *
+ * @param wrap the wrapper
+ * @param declare_set the set where api is exported
+ *
+ * @return 0 on success, X_EINVAL when apiname wasn't set,
+ *         X_EEXIST when already registered to a set
  */
-extern int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set);
+extern
+int afb_wrap_rpc_start_client(
+		struct afb_wrap_rpc *wrap,
+		struct afb_apiset *declare_set);
 
 /**
- * Function for implementing upgrade from HTTP or Websocket over HTTP.
+ * Get the apiname as set at creation
  */
-extern int afb_wrap_rpc_upgrade(
+extern
+const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap);
+
+/**
+ * Function for implementing upgrade from HTTP to RPC on Websocket over HTTP.
+ */
+extern
+int afb_wrap_rpc_upgrade(
 		void *closure,
 		int fd,
 		int autoclose,
@@ -55,5 +88,15 @@ extern int afb_wrap_rpc_upgrade(
 
 #if WITH_CRED
 struct afb_cred;
-extern void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred);
+
+/**
+ * Attach the credentials to the wrapped connection
+ *
+ * @param wrap the connection wrapper
+ * @param cred credentials to attach
+ */
+extern
+void afb_wrap_rpc_set_cred(
+		struct afb_wrap_rpc *wrap,
+		struct afb_cred *cred);
 #endif
