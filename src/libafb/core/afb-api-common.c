@@ -692,7 +692,7 @@ static int ensure_listener(struct afb_api_common *comapi)
 {
 	int rc = 0;
 	if (comapi->listener == NULL) {
-		comapi->listener = afb_evt_listener_create(&evt_itf, comapi);
+		comapi->listener = afb_evt_listener_create(&evt_itf, comapi, comapi->group);
 		if (comapi->listener == NULL)
 			rc = X_ENOMEM;
 	}

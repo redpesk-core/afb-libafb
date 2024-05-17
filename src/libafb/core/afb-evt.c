@@ -67,6 +67,9 @@ struct afb_evt_listener {
 	/* closure for the callback */
 	void *closure;
 
+	/* group of the listener */
+	void *group;
+
 	/* head of the list of events listened */
 	struct afb_evt_watch *watchs;
 
@@ -799,7 +802,7 @@ int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb
  * and the 'closure'.
  * Returns NULL in case of memory depletion.
  */
-struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, void *closure)
+struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, void *closure, void *group)
 {
 	struct afb_evt_listener *listener;
 
@@ -820,6 +823,7 @@ struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, 
 		/* init */
 		listener->itf = itf;
 		listener->closure = closure;
+		listener->group = group;
 		listener->watchs = NULL;
 		listener->refcount = 1;
 		x_rwlock_init(&listener->rwlock);

@@ -150,7 +150,7 @@ START_TEST (test_init)
     afb_evt_unref_hookable(evt);
 
     fprintf(stderr, "\n## afb_evt_listener_create...\n");
-	ev_listener = afb_evt_listener_create(&ev_itf, NULL);
+	ev_listener = afb_evt_listener_create(&ev_itf, NULL, NULL);
 	fprintf(stderr, "-> ev_listener = %p\n", ev_listener);
 	ck_assert_ptr_ne(ev_listener, NULL);
 
@@ -207,7 +207,7 @@ START_TEST (test_functional)
 
     for (i=0; i<NB_LISTENER; i++) {
         cb_closure[i] = 0;
-        ev_listener[i] = afb_evt_listener_create(&ev_itf, &cb_closure[i]);
+        ev_listener[i] = afb_evt_listener_create(&ev_itf, &cb_closure[i], NULL);
         ck_assert_ptr_ne(ev_listener[i], NULL);
 
         rc = afb_evt_listener_watch_evt(ev_listener[i], evt);
@@ -329,7 +329,7 @@ START_TEST (test_afb_event_x2)
     ck_assert_ptr_ne(evt, NULL);
 
     cb_closure = 0;
-    ev_listener = afb_evt_listener_create(&ev_itf, &cb_closure);
+    ev_listener = afb_evt_listener_create(&ev_itf, &cb_closure, NULL);
     ck_assert_ptr_ne(ev_listener, NULL);
 
     rc = afb_evt_listener_watch_evt(ev_listener, evt);

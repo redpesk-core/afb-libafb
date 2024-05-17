@@ -70,7 +70,7 @@ struct afb_evt_itf
 	void (*remove)(void *closure, const char *event, uint16_t evtid);
 };
 
-extern struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, void *closure);
+extern struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, void *closure, void *group);
 extern struct afb_evt_listener *afb_evt_listener_addref(struct afb_evt_listener *listener);
 extern void afb_evt_listener_unref(struct afb_evt_listener *listener);
 

@@ -147,7 +147,7 @@ afb_ws_json1_create(
 	if (result->wsj1 == NULL)
 		goto error3;
 
-	result->listener = afb_evt_listener_create(&evt_itf, result);
+	result->listener = afb_evt_listener_create(&evt_itf, result, result);
 	if (result->listener == NULL)
 		goto error4;
 

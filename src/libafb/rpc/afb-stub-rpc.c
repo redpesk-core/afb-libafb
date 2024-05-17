@@ -1308,7 +1308,7 @@ static const struct afb_evt_itf server_event_itf = {
 static int ensure_listener(struct afb_stub_rpc *stub)
 {
 	if (stub->listener == NULL) {
-		stub->listener = afb_evt_listener_create(&server_event_itf, stub);
+		stub->listener = afb_evt_listener_create(&server_event_itf, stub, stub);
 		if (stub->listener == NULL)
 			return X_ENOMEM;
 	}

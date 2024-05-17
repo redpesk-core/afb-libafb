@@ -818,7 +818,7 @@ struct afb_stub_ws *afb_stub_ws_create_server(int fd, int autoclose, const char 
 		afb_cred_create_for_socket(&stubws->cred, fd);
 #endif
 		/* add event listener for propagating events */
-		stubws->listener = afb_evt_listener_create(&server_event_itf, stubws);
+		stubws->listener = afb_evt_listener_create(&server_event_itf, stubws, stubws);
 		if (stubws->listener != NULL)
 			return stubws; /* success! */
 		afb_stub_ws_unref(stubws);
