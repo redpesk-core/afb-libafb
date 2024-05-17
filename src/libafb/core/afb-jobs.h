@@ -41,7 +41,7 @@ struct afb_job;
  * @param callback The function to execute for achieving the job.
  *                 Its first parameter is either 0 on normal flow
  *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg1'
+ *                 The remaining parameter is the parameter 'arg'
  *                 given here.
  * @param arg      The second argument for 'callback'
  *
@@ -54,6 +54,38 @@ extern int afb_jobs_post(
 		int timeout,
 		void (*callback)(int, void*),
 		void *arg);
+
+/**
+ * Queues a new asynchronous job represented by 'callback' and 'arg'
+ * for the 'group' and the 'timeout'.
+ * Jobs are queued in a FIFO (first in first out) structure.
+ * They are dequeued by arrival order.
+ * The group if not NULL is used to group jobs of that same group
+ * sequentially. This is of importance if jobs are executed in
+ * parallel concurrently.
+ *
+ * @param group    The group of the job or NULL when no group.
+ * @param delayms  Minimal delay in ms before starting the job
+ * @param timeout  The maximum execution time in seconds of the job
+ *                 or 0 for unlimited time.
+ * @param callback The function to execute for achieving the job.
+ *                 Its first parameter is either 0 on normal flow
+ *                 or the signal number that broke the normal flow.
+ *                 The remaining parameters are the parameters 'arg1'
+ *                 and 'arg2' given here.
+ * @param arg1     The second argument for 'callback'
+ * @param arg2     The third argument for 'callback'
+ *
+ * @return the id of the job, greater than zero, or in case
+ *         of error a negative number in -errno like form
+ */
+extern int afb_jobs_post2(
+		const void *group,
+		long delayms,
+		int timeout,
+		void (*callback)(int, void*, void*),
+		void *arg1,
+		void *arg2);
 
 /**
  * Get the next job to process or NULL if none, i.e.

@@ -48,8 +48,9 @@ struct afb_job
 {
 	struct afb_job *next;    /**< link to the next job enqueued */
 	const void *group;   /**< group of the request */
-	void (*callback)(int,void*);   /**< processing callback */
-	void *arg;           /**< argument */
+	void (*callback)(int,void*,void*);   /**< processing callback */
+	void *arg1;           /**< arguments */
+	void *arg2;           /**< arguments */
 	long delayms;
 #if WITH_SIG_MONITOR_TIMERS
 	int timeout;         /**< timeout in second for processing the request */
@@ -99,8 +100,9 @@ static int job_add(
 		const void *group,
 		long delayms,
 		int timeout,
-		void (*callback)(int,void*),
-		void *arg,
+		void (*callback)(int, void*, void*),
+		void *arg1,
+		void *arg2,
 		struct afb_job **result)
 {
 	int rc;
@@ -140,7 +142,8 @@ static int job_add(
 	job->group = group;
 	job->delayms = delayms;
 	job->callback = callback;
-	job->arg = arg;
+	job->arg1 = arg1;
+	job->arg2 = arg2;
 #if WITH_SIG_MONITOR_TIMERS
 	job->timeout = timeout;
 #endif
@@ -176,13 +179,14 @@ end:
 }
 
 /* enqueue the job */
-int afb_jobs_post(
+int afb_jobs_post2(
 		const void *group,
 		long delayms,
 		int timeout,
-		void (*callback)(int, void*),
-		void *arg)
-{
+		void (*callback)(int, void*, void*),
+		void *arg1,
+		void *arg2
+) {
 	struct afb_job *job;
 	int rc;
 
@@ -195,7 +199,7 @@ int afb_jobs_post(
 		rc = X_EBUSY;
 	} else {
 		/* add the job */
-		rc = job_add(group, delayms, timeout, callback, arg, &job);
+		rc = job_add(group, delayms, timeout, callback, arg1, arg2, &job);
 		if (rc >= 0)
 			rc = (int)job->id;
 	}
@@ -204,6 +208,17 @@ int afb_jobs_post(
 	x_mutex_unlock(&mutex);
 
 	return rc;
+}
+
+/* enqueue the job */
+int afb_jobs_post(
+		const void *group,
+		long delayms,
+		int timeout,
+		void (*callback)(int, void*),
+		void *arg)
+{
+	return afb_jobs_post2(group, delayms, timeout, (void*)callback, arg, NULL);
 }
 
 /**
@@ -345,7 +360,7 @@ int afb_jobs_dequeue_multiple(struct afb_job **jobs, int njobs, long *delayms)
 /* cancel the given job */
 void afb_jobs_cancel(struct afb_job *job)
 {
-	job->callback(SIGABRT, job->arg);
+	job->callback(SIGABRT, job->arg1, job->arg2);
 	job_release(job);
 }
 
@@ -374,22 +389,30 @@ int afb_jobs_abort(int jobid)
 	x_mutex_unlock(&mutex);
 
 	if (rc == 0) {
-		job->callback(SIGABRT, job->arg);
+		job->callback(SIGABRT, job->arg1, job->arg2);
 		job_release(job);
 	}
 
 	return rc;
 }
 
+#if !WITH_JOB_NOT_MONITORED
+static void runjob(int sig, void *closure)
+{
+	struct afb_job *job = closure;
+	job->callback(sig, job->arg1, job->arg2);
+}
+#endif
+
 /* Run the given job */
 void afb_jobs_run(struct afb_job *job)
 {
 #if WITH_JOB_NOT_MONITORED
-	job->callback(0, job->arg);
+	job->callback(0, job->arg1, job->arg2);
 #elif WITH_SIG_MONITOR_TIMERS
-	afb_sig_monitor_run(job->timeout, job->callback, job->arg);
+	afb_sig_monitor_run(job->timeout, runjob, job);
 #else
-	afb_sig_monitor_run(0, job->callback, job->arg);
+	afb_sig_monitor_run(0, runjob, job);
 #endif
 	/* release the run job */
 	job_release(job);
