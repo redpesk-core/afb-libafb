@@ -1,6 +1,9 @@
 Version next
 ------------
 
+  fixes
+   - fix memory crash when broadcasting many events
+
   change
    - removed afb-wsapi files (from libafb and libafbcli)
 

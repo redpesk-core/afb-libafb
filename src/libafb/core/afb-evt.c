@@ -50,6 +50,12 @@
 #define AFB_EVT_NPARAMS_MAX	255
 #endif
 
+#if !defined(EVENT_BROADCAST_HOP_MAX)
+#  define EVENT_BROADCAST_HOP_MAX  10
+#endif
+#if !defined(EVENT_BROADCAST_MEMORY_COUNT)
+#  define EVENT_BROADCAST_MEMORY_COUNT  8
+#endif
 
 struct afb_evt_watch;
 
@@ -146,29 +152,10 @@ static uint16_t event_count = 0;
 /* job groups for events push/broadcast */
 #define BROADCAST_JOB_GROUP  (&afb_evt_event_x2_itf)
 
-/* head of uniqueness of events */
-#if !defined(EVENT_BROADCAST_HOP_MAX)
-#  define EVENT_BROADCAST_HOP_MAX  10
-#endif
-#if !defined(EVENT_BROADCAST_MEMORY_COUNT)
-#  define EVENT_BROADCAST_MEMORY_COUNT  8
-#endif
 
-#if EVENT_BROADCAST_MEMORY_COUNT
-static struct {
-	x_mutex_t mutex;
-	uint8_t base;
-	uint8_t count;
-	rp_uuid_binary_t uuids[EVENT_BROADCAST_MEMORY_COUNT];
-} uniqueness = {
-	.mutex = X_MUTEX_INITIALIZER,
-	.base = 0,
-	.count = 0
-};
-#endif
 
 /*
- * Create structure for job of broadcasting string 'event' with 'object'
+ * Create structure for job of broadcasting string 'event' with 'params'
  * Returns the created structure or NULL if out of memory
  */
 static
@@ -213,7 +200,7 @@ destroy_evt_broadcasted(
 }
 
 /*
- * Create structure for job of broadcasting or pushing 'evt' with 'object'
+ * Create structure for job of pushing 'evt' with 'params'
  * Returns the created structure or NULL if out of memory
  */
 static
@@ -250,6 +237,8 @@ destroy_evt_pushed(
 	afb_data_array_unref(je->data.nparams, je->data.params);
 	free(je);
 }
+
+
 
 /*
  * Broadcasts the 'event' of 'id' with its 'object'
@@ -290,8 +279,21 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	rp_uuid_binary_t local_uuid;
 	struct afb_evt_broadcasted *jb;
 	int rc;
-#if EVENT_BROADCAST_MEMORY_COUNT
-	int iter, count;
+
+#if EVENT_BROADCAST_MEMORY_COUNT > 0
+	/* head of uniqueness of events */
+	static struct {
+		x_mutex_t mutex;
+		uint8_t base;
+		uint8_t count;
+		rp_uuid_binary_t uuids[EVENT_BROADCAST_MEMORY_COUNT];
+	} uniqueness = {
+		.mutex = X_MUTEX_INITIALIZER,
+		.base = 0,
+		.count = 0
+	};
+
+	uint8_t iter, count;
 #endif
 
 	/* check if lately sent */
@@ -303,10 +305,12 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 		x_mutex_lock(&uniqueness.mutex);
 	} else {
 		x_mutex_lock(&uniqueness.mutex);
-		iter = (int)uniqueness.base;
-		count = (int)uniqueness.count;
+		/* search for recorded broadcasted event */
+		iter = uniqueness.base;
+		count = uniqueness.count;
 		while (count) {
-			if (0 == memcmp(uuid, uniqueness.uuids[iter], sizeof(rp_uuid_binary_t))) {
+			if (0 == memcmp(uuid, uniqueness.uuids[iter], sizeof uniqueness.uuids[iter])) {
+				/* found, dont broadcast it again */
 				x_mutex_unlock(&uniqueness.mutex);
 				return 0;
 			}
@@ -315,9 +319,11 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 			count--;
 		}
 	}
-	iter = (int)uniqueness.base;
+	iter = uniqueness.base + uniqueness.count;
+	if (iter > EVENT_BROADCAST_MEMORY_COUNT)
+		iter -= EVENT_BROADCAST_MEMORY_COUNT;
 	if (uniqueness.count < EVENT_BROADCAST_MEMORY_COUNT)
-		iter += (int)(uniqueness.count++);
+		uniqueness.count++;
 	else if (++uniqueness.base == EVENT_BROADCAST_MEMORY_COUNT)
 		uniqueness.base = 0;
 	memcpy(uniqueness.uuids[iter], uuid, sizeof(rp_uuid_binary_t));
