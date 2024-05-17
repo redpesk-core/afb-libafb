@@ -1582,7 +1582,7 @@ static int receive_call_request(
 	/* initialise */
 	incall->inblock = inblock_addref(stub->receive.current_inblock);
 	incall->callid = callid;
-	afb_req_common_init(&incall->comreq, &incall_common_itf, api, verb, ndata, data);
+	afb_req_common_init(&incall->comreq, &incall_common_itf, api, verb, ndata, data, stub);
 	afb_req_common_set_session(&incall->comreq, session);
 	afb_req_common_set_token(&incall->comreq, token);
 #if WITH_CRED

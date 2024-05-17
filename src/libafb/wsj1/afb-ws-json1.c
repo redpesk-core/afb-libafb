@@ -255,7 +255,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	}
 
 	/* init the context */
-	afb_req_common_init(&wsreq->comreq, &afb_ws_json1_req_common_itf, api, verb, 1, &arg);
+	afb_req_common_init(&wsreq->comreq, &afb_ws_json1_req_common_itf, api, verb, 1, &arg, ws);
 	afb_req_common_set_session(&wsreq->comreq, ws->session);
 	afb_req_common_set_token(&wsreq->comreq, ws->token);
 #if WITH_CRED

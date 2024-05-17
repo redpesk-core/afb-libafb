@@ -588,7 +588,7 @@ server_on_call_cb(
 	/* initialise */
 	wreq->stubws = stubws;
 	wreq->call = call;
-	afb_req_common_init(&wreq->comreq, &server_req_req_common_itf, stubws->apiname, wreq->strings, 1, &arg);
+	afb_req_common_init(&wreq->comreq, &server_req_req_common_itf, stubws->apiname, wreq->strings, 1, &arg, stubws);
 	afb_req_common_set_session(&wreq->comreq, session);
 	afb_req_common_set_token(&wreq->comreq, token);
 #if WITH_CRED

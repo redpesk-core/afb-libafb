@@ -263,11 +263,13 @@ afb_req_common_init(
 	const char *apiname,
 	const char *verbname,
 	unsigned nparams,
-	struct afb_data * const params[]
+	struct afb_data * const params[],
+	void *group
 ) {
 	memset(req, 0, sizeof *req);
 	req->refcount = 1;
 	req->queryitf = queryitf;
+	req->group = group;
 	req->apiname = apiname;
 	req->verbname = verbname;
 	set_args(nparams, params, &req->params);

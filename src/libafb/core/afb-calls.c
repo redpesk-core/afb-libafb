@@ -218,7 +218,7 @@ process(
 	req->flags = flags;
 
 	/* initialise the common request */
-	afb_req_common_init(&req->comreq, itf, apiname, verbname, nparams, params);
+	afb_req_common_init(&req->comreq, itf, apiname, verbname, nparams, params, comapi->group);
 
 	/* set the session of the request */
 	session = (flags & afb_req_subcall_api_session)

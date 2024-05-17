@@ -245,7 +245,7 @@ START_TEST (test)
 
 	struct afb_req_common req;
 
-	afb_req_common_init(&req, &test_queryitf, "api", "verb", 0, NULL);
+	afb_req_common_init(&req, &test_queryitf, "api", "verb", 0, NULL, NULL);
 
 	// test with no credantial set
 	fprintf(stderr, "\n****** test with no credantial set ******\n");
@@ -308,7 +308,7 @@ void test_rec_common_perm(struct afb_req_common * req, struct afb_auth * auth, c
 	gid_t gid = 1;
 	pid_t pid = 1;
 
-	afb_req_common_init(req, &test_queryitf, "api", "verb", 0, NULL);
+	afb_req_common_init(req, &test_queryitf, "api", "verb", 0, NULL, NULL);
 	afb_req_common_set_session_string(req, session);
 	if(token) afb_req_common_set_token_string(req, token);
 

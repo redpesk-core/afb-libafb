@@ -151,6 +151,9 @@ struct afb_req_common
 	/** interface of req implementation functions */
 	const struct afb_req_common_query_itf *queryitf;
 
+	/** job group of query itf */
+	void *group;
+
 	/** the parameters (arguments) of the request */
 	struct afb_req_common_arg params;
 
@@ -193,7 +196,8 @@ afb_req_common_init(
 	const char *apiname,
 	const char *verbname,
 	unsigned nparams,
-	struct afb_data * const params[]
+	struct afb_data * const params[],
+	void *group
 );
 
 extern

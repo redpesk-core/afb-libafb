@@ -1119,7 +1119,7 @@ struct afb_hreq *afb_hreq_create()
 	struct afb_hreq *hreq = calloc(1, sizeof *hreq);
 	if (hreq) {
 		/* init the request */
-		afb_req_common_init(&hreq->comreq, &afb_hreq_req_common_query_itf, NULL, NULL, 0, NULL);
+		afb_req_common_init(&hreq->comreq, &afb_hreq_req_common_query_itf, NULL, NULL, 0, NULL, NULL);
 		hreq->reqid = ++global_reqids;
 	}
 	return hreq;

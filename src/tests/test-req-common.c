@@ -184,7 +184,7 @@ START_TEST (test)
 {
 	struct afb_req_common *req = &comreq;
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	ck_assert_ptr_eq(req->queryitf, &test_queryitf);
 	ck_assert_ptr_eq(req->apiname, apiname);
 	ck_assert_ptr_eq(req->verbname, verbname);
@@ -216,7 +216,7 @@ START_TEST (session)
 	struct afb_session *sess;
 	int r;
 
-	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
+	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL, NULL);
 
 	// test on session
 	r = afb_session_create(&sess, 0);
@@ -256,7 +256,7 @@ START_TEST (prepare_forwarding)
 	int rc, i, j;
 	int dataChecksum;
 
-	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
+	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL, NULL);
 
 	// show_req(req);
 	fprintf(stderr, "\n### Prepare forwarding...\n");
@@ -370,7 +370,7 @@ START_TEST (process)
 		dataChecksum += i;
 	}
 
-	afb_req_common_init(req, &test_queryitf, "", "", NB_DATA, data);
+	afb_req_common_init(req, &test_queryitf, "", "", NB_DATA, data, NULL);
 
 	test_apiset = afb_apiset_create("toto", 1);
 	afb_apiset_add(test_apiset, req->apiname, api_item);
@@ -414,7 +414,7 @@ START_TEST(process_on_behalf)
 
 	fprintf(stderr, "\n### Processing Request on behalf...\n");
 
-	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
+	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL, NULL);
 
 	type1 = afb_type_get("type1");
 	if(!type1){
@@ -430,7 +430,7 @@ START_TEST(process_on_behalf)
 		dataChecksum += i;
 	}
 
-	afb_req_common_init(req, &test_queryitf, "", "", NB_DATA, data);
+	afb_req_common_init(req, &test_queryitf, "", "", NB_DATA, data, NULL);
 
 	test_apiset = afb_apiset_create("toto", 1);
 	afb_apiset_add(test_apiset, req->apiname, api_item);
@@ -491,42 +491,42 @@ START_TEST(errors)
 
 	fprintf(stderr, "\n### Errors\n");
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_out_of_memory_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_out_of_memory_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r, AFB_ERRNO_OUT_OF_MEMORY);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_internal_error_hookable(req, -1);
 	fprintf(stderr, "afb_req_common_reply_internal_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_INTERNAL_ERROR);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_unavailable_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_unavailable_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_NOT_AVAILABLE);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_api_unknown_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_api_unknown_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_UNKNOWN_API);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_api_bad_state_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_api_bad_state_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_BAD_API_STATE);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_verb_unknown_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_verb_unknown_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_UNKNOWN_VERB);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_invalid_token_error_hookable(req);
 	fprintf(stderr, "afb_req_common_reply_invalid_token_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_INVALID_TOKEN);
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 	r = afb_req_common_reply_insufficient_scope_error_hookable(req, "scop");
 	fprintf(stderr, "afb_req_common_reply_insufficient_scope_error_hookable returned %d\n", r);
 	ck_assert_int_eq(r,AFB_ERRNO_INSUFFICIENT_SCOPE);
@@ -541,7 +541,7 @@ START_TEST (subscribe)
 
 	fprintf(stderr, "\n### Subscribe\n");
 
-	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL);
+	afb_req_common_init(req, &test_queryitf, apiname, verbname, 0, NULL, NULL);
 
 	ck_assert_int_eq(afb_evt_create(&ev, "test_event"),0);
 
@@ -620,7 +620,7 @@ START_TEST(check_perm)
 
 	fprintf(stderr, "\n### Check Perm\n");
 
-	afb_req_common_init(&req, &test_queryitf, "api", "verb", 0, NULL);
+	afb_req_common_init(&req, &test_queryitf, "api", "verb", 0, NULL, NULL);
 
 	afb_req_common_check_permission_hookable(&req, "perm", checkPermClosure, i2p(1), i2p(2), i2p(3));
 
@@ -646,7 +646,7 @@ START_TEST(replay)
 
 	fprintf(stderr, "\n### reply\n");
 
-	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL);
+	afb_req_common_init(req, &test_queryitf, "", "", 0, NULL, NULL);
 
 	type1 = afb_type_get("type1");
 	if(!type1){
