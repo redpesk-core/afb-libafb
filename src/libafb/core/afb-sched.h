@@ -155,6 +155,39 @@ extern int afb_sched_post_job(
 		enum afb_sched_mode mode);
 
 /**
+ * Schedule a new asynchronous job represented by 'callback' and 'arg'
+ * for the 'group' and the 'timeout'.
+ *
+ * Jobs are queued FIFO and are possibly executed in parallel
+ * concurrently except for job of the same group that are
+ * executed sequentially in FIFO order.
+ *
+ * @param group    The group of the job or NULL when no group.
+ * @param delayms  minimal time in ms to wait before starting the job
+ * @param timeout  The maximum execution time in seconds of the job
+ *                 or 0 for unlimited time.
+ * @param callback The function to execute for achieving the job.
+ *                 Its first parameter is either 0 on normal flow
+ *                 or the signal number that broke the normal flow.
+ *                 The remaining parameters are the parameters 'arg1'
+ *                 and 'arg2' given here.
+ * @param arg1     The second argument for 'callback'
+ * @param arg2     The third argument for 'callback'
+ * @param mode     The mode
+ *
+ * @return the job id on success (greater than 0) or
+ *         in case of error a negative number in -errno like form
+ */
+extern int afb_sched_post_job2(
+		const void *group,
+		long delayms,
+		int timeout,
+		void (*callback)(int, void*, void*),
+		void *arg1,
+		void *arg2,
+		enum afb_sched_mode mode);
+
+/**
  * Aborts the job of given id, if not started, the job receives SIGABORT
  *
  * @param jobid the jobid to abort

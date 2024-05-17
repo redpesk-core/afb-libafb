@@ -162,31 +162,6 @@ void afb_sched_ev_mgr_unheld()
 	adapt(Afb_Sched_Mode_Normal);
 }
 
-/**
- * Queues the job as described by parameters and takes the
- * actions to adapt thread pool to treat it.
- */
-static int post_job(
-	const void *group,
-	long delayms,
-	int timeout,
-	void (*callback)(int, void*),
-	void *arg,
-	enum afb_sched_mode mode
-) {
-	int rc;
-
-	x_mutex_lock(&mutex);
-	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc >= 0) {
-		adapt(mode); //delayms > 0);
-		afb_ev_mgr_wakeup();
-	}
-	x_mutex_unlock(&mutex);
-
-	return rc;
-}
-
 /* Schedule the given job */
 int afb_sched_post_job(
 	const void *group,
@@ -197,8 +172,34 @@ int afb_sched_post_job(
 	enum afb_sched_mode mode
 ) {
 	int rc;
+	x_mutex_lock(&mutex);
+	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
+	if (rc >= 0) {
+		adapt(mode); //delayms > 0);
+		afb_ev_mgr_wakeup();
+	}
+	x_mutex_unlock(&mutex);
+	return rc;
+}
 
-	rc = post_job(group, delayms, timeout, callback, arg, mode);
+/* Schedule the given job */
+int afb_sched_post_job2(
+	const void *group,
+	long delayms,
+	int timeout,
+	void (*callback)(int, void*, void*),
+	void *arg1,
+	void *arg2,
+	enum afb_sched_mode mode
+) {
+	int rc;
+	x_mutex_lock(&mutex);
+	rc = afb_jobs_post2(group, delayms, timeout, callback, arg1, arg2);
+	if (rc >= 0) {
+		adapt(mode); //delayms > 0);
+		afb_ev_mgr_wakeup();
+	}
+	x_mutex_unlock(&mutex);
 	return rc;
 }
 
