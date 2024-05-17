@@ -109,7 +109,7 @@ int afb_monitor_init(struct afb_apiset *declare_set, struct afb_apiset *call_set
 			rc = X_ENOMEM;
 		}
 		else {
-			afb_api_common_init(monitor_api, declare_set, call_set, _monitor_, 0, NULL, 0, NULL, 0);
+			afb_api_common_init(monitor_api, declare_set, call_set, _monitor_, 0, NULL, 0, NULL, 0, NULL);
 			item.closure = NULL;
 			item.group = NULL;
 			item.itf = &monitor_itf;

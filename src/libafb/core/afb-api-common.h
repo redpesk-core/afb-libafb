@@ -100,6 +100,9 @@ struct afb_api_common
 	/* path if any */
 	const char *path;
 
+	/* job group */
+	void *group;
+
 	/* apiset the API is declared in */
 	struct afb_apiset *declare_set;
 
@@ -153,7 +156,8 @@ afb_api_common_init(
 	const char *info,
 	int free_info,
 	const char *path,
-	int free_path
+	int free_path,
+	void *group
 );
 
 /**

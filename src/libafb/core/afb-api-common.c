@@ -788,7 +788,8 @@ afb_api_common_init(
 	const char *info,
 	int free_info,
 	const char *path,
-	int free_path
+	int free_path,
+	void *group
 ) {
 	/* name */
 	comapi->name = name;
@@ -801,6 +802,9 @@ afb_api_common_init(
 	/* path */
 	comapi->path = path;
 	comapi->free_path = free_path ? 1 : 0;
+
+	/* group */
+	comapi->group = group;
 
 	/* apiset the API is declared in */
 	comapi->declare_set = afb_apiset_addref(declare_set);

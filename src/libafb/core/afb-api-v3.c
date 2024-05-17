@@ -1375,7 +1375,8 @@ afb_api_v3_create(
 		declare_set, call_set,
 		name, mode_name == Afb_String_Free,
 		info, mode_info == Afb_String_Free,
-		path, mode_path == Afb_String_Free
+		path, mode_path == Afb_String_Free,
+		noconcurrency ? apiv3 : NULL
 	);
 	apiv3->comapi.onevent = handle_events;
 
@@ -1388,7 +1389,7 @@ afb_api_v3_create(
 	if (decl) {
 		afb_api.closure = apiv3;
 		afb_api.itf = &export_api_itf;
-		afb_api.group = noconcurrency ? apiv3 : NULL;
+		afb_api.group = apiv3->comapi.group;
 		rc = afb_apiset_add(apiv3->comapi.declare_set, apiv3->comapi.name, afb_api);
 		if (rc < 0) {
 			goto error2;

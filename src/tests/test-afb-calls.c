@@ -206,7 +206,7 @@ void run_test(int signum, void* arg)
 	afb_api_so_add_binding(path, call_set, call_set);
 
 	// inti it's api
-	afb_api_common_init(&comapi, declare_set, call_set, name, 0, info, 0, path, 0);
+	afb_api_common_init(&comapi, declare_set, call_set, name, 0, info, 0, path, 0, NULL);
 
 	// inti a common req
 	afb_req_common_init(&req, &test_queryitf, "toto","patatate", 0, NULL);

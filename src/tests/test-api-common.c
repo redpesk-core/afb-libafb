@@ -97,7 +97,8 @@ START_TEST (test_init)
 			info,
 			0,
 			path,
-			0
+			0,
+			NULL
 		);
 
 	/* test refcount */
@@ -246,7 +247,8 @@ START_TEST (test_functional)
 			info,
 			0,
 			path,
-			0
+			0,
+			NULL
 		);
 
 #if WITH_AFB_HOOK
@@ -457,7 +459,8 @@ START_TEST (test_listeners)
 			info,
 			0,
 			path,
-			0
+			0,
+			NULL
 		);
 	comapi->onevent = onevent_comapi_test_cb;
 

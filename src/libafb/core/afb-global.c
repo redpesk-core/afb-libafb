@@ -54,7 +54,8 @@ afb_global_api_init(struct afb_apiset *callset)
 			callset,
 			"#GLOBAL#", 0,
 			"Single Global API with no verbs", 0,
-			"", 0
+			"", 0,
+			NULL
 		);
 	}
 }
