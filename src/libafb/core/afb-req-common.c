@@ -964,16 +964,12 @@ do_reply(
  * @param replies   the data of the reply (can be NULL if nreplies is zero)
  */
 void
-afb_req_common_reply_hookable(
+afb_req_common_reply(
 	struct afb_req_common *req,
 	int status,
 	unsigned nreplies,
 	struct afb_data * const replies[]
 ) {
-#if WITH_AFB_HOOK
-	if (req->hookflags & afb_hook_flag_req_reply)
-		afb_hook_req_reply(req, status, nreplies, replies);
-#endif
 	if (req->replied) {
 		/* it is an error to reply more than one time */
 		RP_ERROR("reply called more than one time!!");
@@ -984,6 +980,28 @@ afb_req_common_reply_hookable(
 		req->replied = 1;
 		do_reply(req, status, nreplies, replies);
 	}
+}
+
+/**
+ * Emits the reply to the request
+ *
+ * @param req       the common request to be replied
+ * @param status    the integer status of the reply
+ * @param nreplies  the count of data in the array replies
+ * @param replies   the data of the reply (can be NULL if nreplies is zero)
+ */
+void
+afb_req_common_reply_hookable(
+	struct afb_req_common *req,
+	int status,
+	unsigned nreplies,
+	struct afb_data * const replies[]
+) {
+#if WITH_AFB_HOOK
+	if (req->hookflags & afb_hook_flag_req_reply)
+		afb_hook_req_reply(req, status, nreplies, replies);
+#endif
+	afb_req_common_reply(req, status, nreplies, replies);
 }
 
 /******************************************************************************/

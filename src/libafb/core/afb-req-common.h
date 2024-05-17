@@ -336,6 +336,15 @@ afb_req_common_unref(
 );
 
 extern
+void
+afb_req_common_reply(
+	struct afb_req_common *req,
+	int status,
+	unsigned nparams,
+	struct afb_data * const params[]
+);
+
+extern
 int
 afb_req_common_subscribe(
 	struct afb_req_common *req,
