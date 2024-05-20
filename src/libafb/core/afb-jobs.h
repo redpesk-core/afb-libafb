@@ -176,3 +176,14 @@ extern void afb_jobs_set_max_count(int count);
  * @return the count of active jobs
  */
 extern int afb_jobs_get_active_count(void);
+
+#if WITH_TRACK_JOB_CALL
+/**
+ * Check if the group if pending in the job stack of the thread
+ *
+ * @param group the group to be checked
+ *
+ * @return 1 if the group is in the stack of jobs of the thread
+ */
+extern int afb_jobs_check_group(void *group);
+#endif

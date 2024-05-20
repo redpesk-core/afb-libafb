@@ -74,6 +74,7 @@ option(WITH_EXTENSION             "Activate ability to load extensions"    ON)
 option(WITH_GNUTLS                "Activate TLS ability with gnutls"       OFF)
 option(WITH_RPC_V1                "Activate RPC protocol version 1"        ON)
 option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
+option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
 # tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)

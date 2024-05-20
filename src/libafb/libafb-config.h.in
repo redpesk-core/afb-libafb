@@ -80,6 +80,7 @@
 #cmakedefine01 WITH_GNUTLS
 #cmakedefine01 WITH_RPC_V1
 #cmakedefine01 WITH_RPC_V3
+#cmakedefine01 WITH_TRACK_JOB_CALL
 
 #if WITH_LIBMICROHTTPD
 /* Always add INFER_EXTENSION (more details in afb-hreq.c) */

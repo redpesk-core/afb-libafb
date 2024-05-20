@@ -43,6 +43,11 @@
 #    error "AFB_JOBS_DEFAULT_MAX_COUNT too big"
 #endif
 
+#if WITH_TRACK_JOB_CALL
+#include "sys/x-thread.h"
+X_TLS(struct afb_job, current_job)
+#endif
+
 /** Description of a pending job */
 struct afb_job
 {
@@ -51,6 +56,9 @@ struct afb_job
 	void (*callback)(int,void*,void*);   /**< processing callback */
 	void *arg1;           /**< arguments */
 	void *arg2;           /**< arguments */
+#if WITH_TRACK_JOB_CALL
+	struct afb_job *caller;
+#endif
 	long delayms;
 #if WITH_SIG_MONITOR_TIMERS
 	int timeout;         /**< timeout in second for processing the request */
@@ -144,6 +152,9 @@ static int job_add(
 	job->callback = callback;
 	job->arg1 = arg1;
 	job->arg2 = arg2;
+#if WITH_TRACK_JOB_CALL
+	job->caller = NULL;
+#endif
 #if WITH_SIG_MONITOR_TIMERS
 	job->timeout = timeout;
 #endif
@@ -407,12 +418,21 @@ static void runjob(int sig, void *closure)
 /* Run the given job */
 void afb_jobs_run(struct afb_job *job)
 {
+#if WITH_TRACK_JOB_CALL
+	job->caller = x_tls_get_current_job();
+	x_tls_set_current_job(job);
+
+#endif
 #if WITH_JOB_NOT_MONITORED
 	job->callback(0, job->arg1, job->arg2);
 #elif WITH_SIG_MONITOR_TIMERS
 	afb_sig_monitor_run(job->timeout, runjob, job);
 #else
 	afb_sig_monitor_run(0, runjob, job);
+#endif
+#if WITH_TRACK_JOB_CALL
+	x_tls_set_current_job(job->caller);
+	job->caller = NULL;
 #endif
 	/* release the run job */
 	job_release(job);
@@ -455,3 +475,15 @@ int afb_jobs_get_active_count(void)
 
 	return count;
 }
+
+#if WITH_TRACK_JOB_CALL
+/* Check if the group if pending in the job stack of the thread */
+int afb_jobs_check_group(void *group)
+{
+	struct afb_job *job = x_tls_get_current_job();
+	while (job != NULL && job->group != group)
+		job = job->caller;
+	return job != NULL;
+}
+
+#endif
