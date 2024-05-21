@@ -57,6 +57,7 @@ if(check_FOUND)
 	addtest(afb-evt)
 	addtest(afb-rpc-coder)
 	addtest(afb-rpc-decoder)
+	addtest(afb-rpc-v3)
 
 	add_subdirectory(test-bindings)
 	addtest(api-so-v4)
