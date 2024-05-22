@@ -284,7 +284,10 @@ struct afb_stub_rpc
 	/** waiters for version */
 	struct version_waiter *version_waiters;
 
+	/** frames decoder */
 	afb_rpc_decoder_t decoder;
+
+	/** frames encoder */
 	afb_rpc_coder_t coder;
 
 	/** group of receive */
@@ -1731,9 +1734,15 @@ static int receive_event_subscription(struct afb_stub_rpc *stub, uint16_t callid
 	else {
 		rc = u16id2ptr_get(stub->event_proxies, eventid, (void**)&event);
 		if (rc < 0 || !event)
-			RP_ERROR("can't %s, no event of id %d", _unsubscribe_+sub, (int)callid);
-		else if (afb_req_common_subscribe_hookable(outcall->item.comreq, event) < 0)
-			RP_ERROR("can't  %s: %m", _unsubscribe_+sub);
+			RP_ERROR("can't %s, no event of id %d", _unsubscribe_+sub, (int)eventid);
+		else {
+			if (sub)
+				rc = afb_req_common_subscribe_hookable(outcall->item.comreq, event);
+			else
+				rc = afb_req_common_unsubscribe_hookable(outcall->item.comreq, event);
+			if (rc < 0)
+				RP_ERROR("can't  %s: %m", _unsubscribe_+sub);
+		}
 	}
 	return rc;
 }
@@ -2487,6 +2496,7 @@ int afb_stub_rpc_create(struct afb_stub_rpc **pstub, const char *apiname, struct
 	*pstub = stub = calloc(1, sizeof *stub + (apiname == NULL ? 0 : 1 + strlen(apiname)));
 	if (stub == NULL)
 		return X_ENOMEM;
+	afb_rpc_coder_init(&stub->coder);
 
 	/* terminate initialization */
 	stub->refcount = 1;
