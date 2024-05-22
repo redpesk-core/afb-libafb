@@ -133,12 +133,11 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	}
 }
 
-static void notify(void *closure, struct afb_stub_rpc *stub)
+static void notify(void *closure, struct afb_rpc_coder *coder)
 {
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 	struct afb_wrap_rpc *wrap = closure;
-	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
 	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
 	if (rc > 0) {
 		int fd = ev_fd_fd(wrap->efd);
@@ -170,11 +169,10 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
-static void notify_ws(void *closure, struct afb_stub_rpc *stub)
+static void notify_ws(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
-	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
 	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
 	if (rc > 0) {
 		afb_ws_binary_v(wrap->ws, iovs, rc);

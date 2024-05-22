@@ -306,7 +306,7 @@ struct afb_stub_rpc
 	/** group for emiter */
 	struct {
 		/** notify callback */
-		void (*notify)(void*, struct afb_stub_rpc*);
+		void (*notify)(void*, struct afb_rpc_coder*);
 
 		/** closure of the notify callback */
 		void *closure;
@@ -585,7 +585,7 @@ static int incall_get(struct afb_stub_rpc *stub, struct incall **ocall)
 static void emit(struct afb_stub_rpc *stub)
 {
 	if (stub->emit.notify)
-		stub->emit.notify(stub->emit.closure, stub);
+		stub->emit.notify(stub->emit.closure, &stub->coder);
 }
 
 #if WITH_RPC_V1
@@ -2461,7 +2461,7 @@ afb_rpc_coder_t *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub)
 	return &stub->coder;
 }
 
-void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_stub_rpc*), void *closure)
+void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_rpc_coder*), void *closure)
 {
 	stub->emit.notify = notify;
 	stub->emit.closure = closure;

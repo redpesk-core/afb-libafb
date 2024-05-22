@@ -179,7 +179,7 @@ extern struct afb_rpc_coder *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub);
  * @param closure closure to the notify function
  */
 
-extern void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_stub_rpc*), void *closure);
+extern void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_rpc_coder*), void *closure);
 
 /**
  * Sends version offering.
