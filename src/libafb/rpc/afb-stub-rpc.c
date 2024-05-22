@@ -88,6 +88,9 @@ json_object_to_json_string_length(
 # include "rpc/afb-rpc-v3.h"
 #endif
 
+#if !defined(RPC_DEBUG)
+# define RPC_DEBUG 0
+#endif
 #define USE_ALIAS 1
 
 /**************************************************************************
@@ -1016,6 +1019,9 @@ static int send_describe_reply_v3(struct afb_stub_rpc *stub, uint16_t callid, co
 
 static int send_session_create(struct afb_stub_rpc *stub, uint16_t id, const char *value)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_session_create(%p, %d, %s)", stub, (int)id, value);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1034,6 +1040,9 @@ static int send_session_create(struct afb_stub_rpc *stub, uint16_t id, const cha
 
 static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char *value)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_token_create(%p, %d, %s)", stub, (int)id, value);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1052,6 +1061,9 @@ static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 
 static int send_event_create(struct afb_stub_rpc *stub, uint16_t eventid, const char *value)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_create(%p, %d, %s)", stub, (int)eventid, value);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1070,6 +1082,9 @@ static int send_event_create(struct afb_stub_rpc *stub, uint16_t eventid, const 
 
 static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_destroy(%p, %d)", stub, (int)eventid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1088,6 +1103,9 @@ static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 
 static int send_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_unexpected(%p, %d)", stub, (int)eventid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1106,6 +1124,9 @@ static int send_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 
 static int send_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsigned nparams, struct afb_data * const params[])
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_push(%p, %d, %d, ...)", stub, (int)eventid, (int)nparams);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1126,6 +1147,9 @@ static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname
 			unsigned nparams, struct afb_data * const params[],
 			const unsigned char uuid[16], uint8_t hop)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_broadcast(%p, %s, %d, ..., %s, %d)", stub, eventname, (int)nparams, uuid, (int)hop);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1144,6 +1168,9 @@ static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname
 
 static int send_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_subscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1162,6 +1189,9 @@ static int send_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint
 
 static int send_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_event_unsubscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1180,6 +1210,9 @@ static int send_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, ui
 
 static int send_call_reply(struct afb_stub_rpc *stub, int status, unsigned nreplies, struct afb_data * const replies[], uint16_t callid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_call_reply(%p, %d, %d, ..., %d)", stub, (int)status, (int)nreplies, (int)callid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1206,6 +1239,9 @@ static int send_call_request(
 	unsigned nparams,
 	struct afb_data * const params[])
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_call_request(%p, %d, %d, %d, %s, %s, %d, ...)", stub, (int)callid, (int)sessionid, (int)tokenid, verbname, usrcreds, (int)nparams);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1224,6 +1260,9 @@ static int send_call_request(
 
 static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_describe_request(%p, %d)", stub, (int)callid);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1242,6 +1281,9 @@ static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 
 static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC send_describe_reply(%p, %d, %-30s)", stub, (int)callid, description);
+#endif
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
@@ -1546,6 +1588,10 @@ static int receive_call_request(
 	int rc;
 	int err;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_call_request(%p, %d, %s, %s, %d, ..., %d, %d, %s)", stub, (int)callid, api, verb, (int)ndata, (int)sessionid, (int)tokenid, user_creds);
+#endif
+
 	afb_stub_rpc_addref(stub);
 
 	/* get api */
@@ -1618,6 +1664,10 @@ static int receive_call_reply(
 	int rc;
 	struct outcall *outcall = outcall_at(stub, callid);
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_call_reply(%p, %d, %d, %d, ...)", stub, (int)callid, (int)status, (int)ndata);
+#endif
+
 	if (!outcall) {
 		/* unexpected reply */
 		RP_ERROR("no call of id %d for the reply", (int)callid);
@@ -1641,6 +1691,9 @@ static int receive_call_reply(
 
 static int receive_session_create(struct afb_stub_rpc *stub, uint16_t sessionid, const char *sessionstr)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_session_create(%p, %d, %s)", stub, (int)sessionid, sessionstr);
+#endif
 	return add_session(stub, sessionid, sessionstr, NULL);
 }
 
@@ -1649,6 +1702,9 @@ static int receive_session_destroy(struct afb_stub_rpc *stub, uint16_t sessionid
 	struct afb_session *session;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_session_destroy(%p, %d)", stub, (int)sessionid);
+#endif
 	rc = u16id2ptr_drop(&stub->session_proxies, sessionid, (void**)&session);
 	if (rc == 0 && session)
 		afb_session_unref(session);
@@ -1660,6 +1716,9 @@ static int receive_token_create(struct afb_stub_rpc *stub, uint16_t tokenid, con
 	struct afb_token *token;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_token_create(%p, %d, %s)", stub, (int)tokenid, tokenstr);
+#endif
 	rc = afb_token_get(&token, tokenstr);
 	if (rc < 0)
 		RP_ERROR("can't create token %s, out of memory", tokenstr);
@@ -1678,6 +1737,9 @@ static int receive_token_destroy(struct afb_stub_rpc *stub, uint16_t tokenid)
 	struct afb_token *token;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_token_destroy(%p, %d)", stub, (int)tokenid);
+#endif
 	rc = u16id2ptr_drop(&stub->token_proxies, tokenid, (void**)&token);
 	if (rc == 0 && token)
 		afb_token_unref(token);
@@ -1689,6 +1751,9 @@ static int receive_event_create(struct afb_stub_rpc *stub, uint16_t eventid, con
 	struct afb_evt *event;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_create(%p, %d, %s)", stub, (int)eventid, event_name);
+#endif
 	/* check conflicts */
 	rc = afb_evt_create(&event, event_name);
 	if (rc < 0)
@@ -1708,6 +1773,9 @@ static int receive_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 	struct afb_evt *event;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_destroy(%p, %d)", stub, (int)eventid);
+#endif
 	rc = u16id2ptr_drop(&stub->event_proxies, eventid, (void**)&event);
 	if (rc == 0 && event)
 		afb_evt_unref(event);
@@ -1716,6 +1784,9 @@ static int receive_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 
 static int receive_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_unexpected(%p, %d)", stub, (int)eventid);
+#endif
 	return stub->listener ? afb_evt_listener_unwatch_id(stub->listener, eventid) : 0;
 }
 
@@ -1749,11 +1820,17 @@ static int receive_event_subscription(struct afb_stub_rpc *stub, uint16_t callid
 
 static int receive_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_subscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
+#endif
 	return receive_event_subscription(stub, callid, eventid, 2/*used for logging*/);
 }
 
 static int receive_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
 {
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_unsubscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
+#endif
 	return receive_event_subscription(stub, callid, eventid, 0);
 }
 
@@ -1764,6 +1841,9 @@ static int receive_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsig
 	struct afb_evt *evt;
 	int rc;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_push(%p, %d, %d, ...)", stub, (int)eventid, (int)ndata);
+#endif
 	rc = u16id2ptr_get(stub->event_proxies, eventid, (void**)&evt);
 	if (rc >= 0 && evt)
 		rc = afb_evt_push_hookable(evt, ndata, data);
@@ -1782,6 +1862,9 @@ static int receive_event_broadcast(
 		const rp_uuid_binary_t uuid,
 		uint8_t hop
 ) {
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_event_broadcast(%p, %s, %d, ..., %s, %d)", stub, event_name, (int)ndata, uuid, (int)hop);
+#endif
 	return afb_evt_rebroadcast_name_hookable(event_name, ndata, data, uuid, hop);
 }
 
@@ -1801,6 +1884,9 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 {
 	int rc;
 	struct outcall *outcall = outcall_at(stub, callid);
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_describe_reply(%p, %-30s, %d)", stub, description, (int)callid);
+#endif
 	if (outcall == NULL) {
 		RP_ERROR("no describe of id %d", (int)callid);
 		rc = X_EPROTO;
@@ -1852,6 +1938,9 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	int rc;
 	struct indesc *indesc = indesc_get(stub, callid);
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_describe_request(%p, %d)", stub, (int)callid);
+#endif
 	if (indesc == NULL) {
 		RP_ERROR("can't reply describe request %d", (int)callid);
 		reply_description(stub, NULL, callid);
@@ -2410,9 +2499,15 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 	if (inblock->size > UINT32_MAX)
 		return X_E2BIG;
 
+#if RPC_DEBUG
+	RP_DEBUG("RPC decode_block(%p, %u)", stub, (unsigned)inblock->size);
+#endif
 	stub->receive.current_inblock = inblock;
 	afb_rpc_decoder_init(&stub->decoder, inblock->data, (uint32_t)inblock->size);
 	while (rc >= 0 && afb_rpc_decoder_remaining_size(&stub->decoder)) {
+#if RPC_DEBUG
+		RP_DEBUG("RPC decode_block before(%p, %u/%u)", stub, stub->decoder.offset, stub->decoder.size);
+#endif
 		switch(stub->version) {
 		case AFBRPC_PROTO_VERSION_UNSET:
 			rc = decode_v0(stub);
@@ -2431,6 +2526,9 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 			rc = X_EINVAL;
 			break;
 		}
+#if RPC_DEBUG
+		RP_DEBUG("RPC decode_block after(%p, %u/%u)", stub, stub->decoder.offset, stub->decoder.size);
+#endif
 	}
 	stub->receive.current_inblock = NULL;
 	return rc;
