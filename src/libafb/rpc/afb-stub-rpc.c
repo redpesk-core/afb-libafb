@@ -1047,37 +1047,37 @@ static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 	}
 }
 
-static int send_event_create(struct afb_stub_rpc *stub, uint16_t id, const char *value)
+static int send_event_create(struct afb_stub_rpc *stub, uint16_t eventid, const char *value)
 {
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
-		return send_event_create_v1(stub, id, value);
+		return send_event_create_v1(stub, eventid, value);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
-		return send_event_create_v3(stub, id, value);
+		return send_event_create_v3(stub, eventid, value);
 #endif
 	case AFBRPC_PROTO_VERSION_UNSET:
-		return wait_version(stub) ?: send_event_create(stub, id, value);
+		return wait_version(stub) ?: send_event_create(stub, eventid, value);
 	default:
 		return X_ENOTSUP;
 	}
 }
 
-static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t id)
+static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 {
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
-		return send_event_destroy_v1(stub, id);
+		return send_event_destroy_v1(stub, eventid);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
-		return send_event_destroy_v3(stub, id);
+		return send_event_destroy_v3(stub, eventid);
 #endif
 	case AFBRPC_PROTO_VERSION_UNSET:
-		return wait_version(stub) ?: send_event_destroy(stub, id);
+		return wait_version(stub) ?: send_event_destroy(stub, eventid);
 	default:
 		return X_ENOTSUP;
 	}
@@ -1119,7 +1119,9 @@ static int send_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsigned
 	}
 }
 
-static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname, unsigned nparams, struct afb_data * const params[], const unsigned char uuid[16], uint8_t hop)
+static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname,
+			unsigned nparams, struct afb_data * const params[],
+			const unsigned char uuid[16], uint8_t hop)
 {
 	switch (stub->version) {
 #if WITH_RPC_V1
@@ -2421,7 +2423,7 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 			break;
 		}
 	}
-	stub->receive.current_inblock = 0;
+	stub->receive.current_inblock = NULL;
 	return rc;
 }
 
