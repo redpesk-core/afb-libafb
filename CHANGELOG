@@ -9,6 +9,7 @@ Version next
 
   change
    - removed afb-wsapi files (from libafb and libafbcli)
+   - use request group for reply's jobs
 
   features
    - added jobs with 2 arguments

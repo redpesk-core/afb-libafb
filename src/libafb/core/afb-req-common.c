@@ -937,7 +937,7 @@ do_reply(
 	set_args(nreplies, replies, &req->replies);
 
 	afb_req_common_addref(req);
-	if (afb_sched_post_job(NULL, 0, 0, reply_job, req, Afb_Sched_Mode_Normal) < 0)
+	if (afb_sched_post_job(req->group, 0, 0, reply_job, req, Afb_Sched_Mode_Normal) < 0)
 		reply_job(0, req);
 }
 
