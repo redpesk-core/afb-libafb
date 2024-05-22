@@ -74,6 +74,8 @@ extern struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf
 extern struct afb_evt_listener *afb_evt_listener_addref(struct afb_evt_listener *listener);
 extern void afb_evt_listener_unref(struct afb_evt_listener *listener);
 
+extern int afb_evt_listener_add(struct afb_evt_listener *listener, struct afb_evt *evt, int notify);
+extern int afb_evt_listener_remove(struct afb_evt_listener *listener, struct afb_evt *evt, uint16_t eventid, int notify);
 extern int afb_evt_listener_watch_evt(struct afb_evt_listener *listener, struct afb_evt *evt);
 extern int afb_evt_listener_unwatch_evt(struct afb_evt_listener *listener, struct afb_evt *evt);
 extern int afb_evt_listener_unwatch_id(struct afb_evt_listener *listener, uint16_t eventid);

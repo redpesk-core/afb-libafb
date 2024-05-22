@@ -8,6 +8,9 @@ Version next
    - enforce chunk size of RPC v3 to be multiple of 8 (padding)
 
   change
+   - MAJOR change in event manager:
+     - create on job per event listener instead of one job iterating on listeners
+     - use listener's group for jobs
    - removed afb-wsapi files (from libafb and libafbcli)
    - use request group for reply's jobs
 

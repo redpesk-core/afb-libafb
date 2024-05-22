@@ -42,6 +42,10 @@
 #include "sys/x-errno.h"
 #include "core/containerof.h"
 
+#if WITH_TRACK_JOB_CALL
+#include "core/afb-jobs.h"
+#endif
+
 #if !defined(AFB_EVT_NPARAMS_MAX)
 #define AFB_EVT_NPARAMS_MAX	8
 #endif
@@ -82,8 +86,11 @@ struct afb_evt_listener {
 	/* rwlock of the listener */
 	x_rwlock_t rwlock;
 
-	/* count of reference to the listener */
-	uint16_t refcount;
+	/* external count of reference to the listener */
+	uint16_t extcount;
+
+	/* internal count of reference to the listener */
+	uint16_t intcount;
 };
 
 /*
@@ -149,18 +156,94 @@ static struct afb_evt *evt_list_head = NULL;
 static uint16_t event_genid = 0;
 static uint16_t event_count = 0;
 
-/* job groups for events push/broadcast */
-#define BROADCAST_JOB_GROUP  (&afb_evt_event_x2_itf)
+/**************************************************************************/
+/** MANAGE LISTENERS INTERNALY                                           **/
+/**************************************************************************/
 
+/*
+ * Increases the internal reference count of 'listener'
+ */
+static void listener_internal_addref(struct afb_evt_listener *listener)
+{
+	__atomic_add_fetch(&listener->intcount, 1, __ATOMIC_RELAXED);
+}
 
+/*
+ * Decreases the internal reference count of the 'listener' and destroys it
+ * when no more used.
+ */
+static void listener_internal_unref(struct afb_evt_listener *listener)
+{
+	struct afb_evt_listener **prv, *olis;
+
+	if (__atomic_sub_fetch(&listener->intcount, 1, __ATOMIC_RELAXED))
+		return;
+
+	/* unlink the listener */
+	x_rwlock_wrlock(&listeners_rwlock);
+	prv = &listeners;
+	for(;;) {
+		olis = *prv;
+		if (olis == listener) {
+			*prv = listener->next;
+			x_rwlock_unlock(&listeners_rwlock);
+
+			/* free the listener */
+			x_rwlock_destroy(&listener->rwlock);
+			free(listener);
+			return;
+		}
+		if (!olis) {
+			RP_ERROR("unexpected listener");
+			x_rwlock_unlock(&listeners_rwlock);
+			return;
+		}
+		prv = &olis->next;
+	}
+}
+
+static void listener_internal_unref_job(int signum, void *closure1, void *closure2)
+{
+	struct afb_evt_listener *listener = closure1;
+	struct afb_sched_lock *lock = closure2;
+	listener_internal_unref(listener);
+	afb_sched_leave(lock);
+}
+
+static void listener_internal_unref_sync(int signum, void *closure, struct afb_sched_lock *lock)
+{
+	struct afb_evt_listener *listener = closure;
+#if WITH_TRACK_JOB_CALL
+	if (afb_jobs_check_group(listener->group)) {
+		listener_internal_unref(listener);
+		afb_sched_leave(lock);
+	}
+	else
+#endif
+	afb_sched_post_job2(listener->group, 0, 0, listener_internal_unref_job, listener, lock, Afb_Sched_Mode_Start);
+}
+
+/**************************************************************************/
+/** BROADCASTING EVENTS                                                  **/
+/**************************************************************************/
+
+/*
+ * for event broadcast jobs
+ */
+struct job_evt_broadcast {
+	/** use count for releasing it at end */
+	unsigned refcount;
+	/** the broadcasted event */
+	struct afb_evt_broadcasted ev;
+};
 
 /*
  * Create structure for job of broadcasting string 'event' with 'params'
  * Returns the created structure or NULL if out of memory
  */
 static
-struct afb_evt_broadcasted *
-make_evt_broadcasted(
+struct job_evt_broadcast *
+job_evt_broadcast_create(
 	const char *event,
 	unsigned nparams,
 	struct afb_data * const params[],
@@ -168,19 +251,20 @@ make_evt_broadcasted(
 	uint8_t hop
 ) {
 	size_t sz;
-	struct afb_evt_broadcasted *jb;
+	struct job_evt_broadcast *jb;
 	char *name;
 
 	sz = 1 + strlen(event);
-	jb = malloc(sizeof *jb + nparams * sizeof jb->data.params[0] + sz);
+	jb = malloc(sizeof *jb + nparams * sizeof jb->ev.data.params[0] + sz);
 	if (jb) {
-		jb->data.nparams = (uint16_t)nparams;
-		afb_data_array_copy(nparams, params, jb->data.params);
-		jb->hop = hop;
-		memcpy(jb->uuid, uuid, sizeof jb->uuid);
-		jb->data.name = name = (char*)&jb->data.params[nparams];
+		jb->refcount = 1;
+		jb->ev.data.nparams = (uint16_t)nparams;
+		afb_data_array_copy(nparams, params, jb->ev.data.params);
+		jb->ev.hop = hop;
+		memcpy(jb->ev.uuid, uuid, sizeof jb->ev.uuid);
+		jb->ev.data.name = name = (char*)&jb->ev.data.params[nparams];
 		memcpy(name, event, sz);
-		jb->data.eventid = 0;
+		jb->ev.data.eventid = 0;
 		return jb;
 	}
 	afb_data_array_unref(nparams, params);
@@ -188,87 +272,75 @@ make_evt_broadcasted(
 }
 
 /*
- * Destroy structure 'jb' for job of broadcasting string events
+ * Increment use count of jb
  */
 static
 void
-destroy_evt_broadcasted(
-	struct afb_evt_broadcasted *jb
-) {
-	afb_data_array_unref(jb->data.nparams, jb->data.params);
-	free(jb);
-}
-
-/*
- * Create structure for job of pushing 'evt' with 'params'
- * Returns the created structure or NULL if out of memory
- */
-static
-struct afb_evt_pushed *
-make_evt_pushed(
-	struct afb_evt *evt,
-	unsigned nparams,
-	struct afb_data * const params[]
-) {
-	struct afb_evt_pushed *je;
-
-	je = malloc(sizeof *je + nparams * sizeof je->data.params[0]);
-	if (je) {
-		je->evt = afb_evt_addref(evt);
-		je->data.nparams = (uint16_t)nparams;
-		afb_data_array_copy(nparams, params, je->data.params);
-		je->data.name = evt->fullname;
-		je->data.eventid = evt->id;
-		return je;
-	}
-	afb_data_array_unref(nparams, params);
-	return 0;
-}
-
-/*
- * Destroy structure for job of broadcasting or pushing evt
- */
-static
-void
-destroy_evt_pushed(
-	struct afb_evt_pushed *je
-) {
-	afb_evt_unref(je->evt);
-	afb_data_array_unref(je->data.nparams, je->data.params);
-	free(je);
-}
-
-
-
-/*
- * Broadcasts the 'event' of 'id' with its 'object'
- */
-static void broadcast(struct afb_evt_broadcasted *jb, struct afb_evt_listener *listener)
+job_evt_broadcast_addref(struct job_evt_broadcast *jb)
 {
-	while (listener && listener->itf->broadcast == NULL)
-		listener = listener->next;
-	if (!listener)
-		x_rwlock_unlock(&listeners_rwlock);
+	__atomic_add_fetch(&jb->refcount, 1, __ATOMIC_RELAXED);
+}
+
+/*
+ * Decrement use count of jb and free it if falling to zero
+ */
+static
+void
+job_evt_broadcast_unref(struct job_evt_broadcast *jb)
+{
+	if (!__atomic_sub_fetch(&jb->refcount, 1, __ATOMIC_RELAXED)) {
+		afb_data_array_unref(jb->ev.data.nparams, jb->ev.data.params);
+		free(jb);
+	}
+}
+
+/*
+ * Jobs callback for pushing evt asynchronously
+ */
+static void broadcast_job(int signum, void *closure1, void *closure2)
+{
+	struct job_evt_broadcast *jb = closure1;
+	struct afb_evt_listener *listener = closure2;
+	if (signum == 0)
+		listener->itf->broadcast(listener->closure, &jb->ev);
+	listener_internal_unref(listener);
+	job_evt_broadcast_unref(jb);
+}
+
+/*
+ * Broadcasts the string 'event' with its 'object'
+ */
+static int broadcast(const char *event, unsigned nparams, struct afb_data * const params[], const rp_uuid_binary_t uuid, uint8_t hop)
+{
+	struct afb_evt_listener *listener;
+	struct job_evt_broadcast *jb;
+	int rc, rc2;
+
+	x_rwlock_rdlock(&listeners_rwlock);
+	listener = listeners;
+	if (listener == NULL) {
+		afb_data_array_unref(nparams, params);
+		rc = 0;
+	}
 	else {
-		void *closure = listener->closure;
-		void (*callback)(void*, const struct afb_evt_broadcasted*) = listener->itf->broadcast;
-		broadcast(jb, listener->next);
-		callback(closure, jb);
+		jb = job_evt_broadcast_create(event, nparams, params, uuid, hop);
+		if (jb == NULL) {
+			RP_ERROR("Can't create broadcast string job item for %s", event);
+			rc = X_ENOMEM;
+		}
+		else {
+			for (rc = 0; listener != NULL; listener = listener->next) {
+				job_evt_broadcast_addref(jb);
+				listener_internal_addref(listener);
+				rc2 = afb_sched_post_job2(listener->group, 0, 0, broadcast_job, jb, listener, Afb_Sched_Mode_Normal);
+				if (rc2 < 0)
+					RP_ERROR("Can't queue push a broadcast job for %s", event);
+			}
+			job_evt_broadcast_unref(jb);
+		}
 	}
-}
-
-/*
- * Jobs callback for broadcasting string asynchronously
- */
-static void broadcast_job(int signum, void *closure)
-{
-	struct afb_evt_broadcasted *jb = closure;
-
-	if (signum == 0) {
-		x_rwlock_rdlock(&listeners_rwlock);
-		broadcast(jb, listeners);
-	}
-	destroy_evt_broadcasted(jb);
+	x_rwlock_unlock(&listeners_rwlock);
+	return rc;
 }
 
 /*
@@ -277,8 +349,6 @@ static void broadcast_job(int signum, void *closure)
 static int broadcast_name(const char *event, unsigned nparams, struct afb_data * const params[], const rp_uuid_binary_t uuid, uint8_t hop)
 {
 	rp_uuid_binary_t local_uuid;
-	struct afb_evt_broadcasted *jb;
-	int rc;
 
 #if EVENT_BROADCAST_MEMORY_COUNT > 0
 	/* head of uniqueness of events */
@@ -332,22 +402,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 	}
 #endif
 
-	/* create the structure for the job */
-	jb = make_evt_broadcasted(event, nparams, params, uuid, hop);
-	if (jb == NULL) {
-		RP_ERROR("Can't create broadcast string job item for %s", event);
-		return X_ENOMEM;
-	}
-
-	/* queue the job */
-	rc = afb_sched_post_job(BROADCAST_JOB_GROUP, 0, 0, broadcast_job, jb, Afb_Sched_Mode_Normal);
-	if (rc >= 0)
-		rc = 0;
-	else {
-		RP_ERROR("Can't queue broadcast string job item for %s", event);
-		destroy_evt_broadcasted(jb);
-	}
-	return rc;
+	return broadcast(event, nparams, params, uuid, hop);
 }
 
 /*
@@ -394,35 +449,83 @@ int afb_evt_broadcast_name_hookable(const char *event, unsigned nparams, struct 
 	return afb_evt_rebroadcast_name_hookable(event, nparams, params, NULL, 0);
 }
 
+/**************************************************************************/
+/** PUSHING EVENTS                                                       **/
+/**************************************************************************/
+
 /*
- * Pushes the event 'evt' with 'obj' to its listeners
- * Returns the count of listener that received the event.
+ * for event push jobs
  */
-static void push_evt(struct afb_evt_watch *watch, struct afb_evt_pushed *je)
-{
-	if (!watch)
-		x_rwlock_unlock(&je->evt->rwlock);
+struct job_evt_push {
+	/** use count for releasing it at end */
+	unsigned refcount;
+	/** the pushed event */
+	struct afb_evt_pushed ev;
+};
+
+/*
+ * Create structure for job of pushing 'evt' with 'params'
+ * Returns the created structure or NULL if out of memory
+ */
+static
+struct job_evt_push *
+job_evt_push_create(
+	struct afb_evt *evt,
+	unsigned nparams,
+	struct afb_data * const params[]
+) {
+	struct job_evt_push *je;
+
+	je = malloc(sizeof *je + nparams * sizeof je->ev.data.params[0]);
+	if (je == NULL)
+		afb_data_array_unref(nparams, params);
 	else {
-		void *closure = watch->listener->closure;
-		void (*callback)(void*, const struct afb_evt_pushed*) = watch->listener->itf->push;
-		assert(callback != NULL);
-		push_evt(watch->next_by_evt, je);
-		callback(closure, je);
+		je->refcount = 1;
+		je->ev.evt = afb_evt_addref(evt);
+		je->ev.data.nparams = (uint16_t)nparams;
+		afb_data_array_copy(nparams, params, je->ev.data.params);
+		je->ev.data.name = evt->fullname;
+		je->ev.data.eventid = evt->id;
+		return je;
+	}
+	return je;
+}
+
+/*
+ * Increment use count of je
+ */
+static
+void
+job_evt_push_addref(struct job_evt_push *je)
+{
+	__atomic_add_fetch(&je->refcount, 1, __ATOMIC_RELAXED);
+}
+
+/*
+ * Decrement use count of je and free it if falling to zero
+ */
+static
+void
+job_evt_push_unref(struct job_evt_push *je)
+{
+	if (!__atomic_sub_fetch(&je->refcount, 1, __ATOMIC_RELAXED)) {
+		afb_evt_unref(je->ev.evt);
+		afb_data_array_unref(je->ev.data.nparams, je->ev.data.params);
+		free(je);
 	}
 }
 
 /*
  * Jobs callback for pushing evt asynchronously
  */
-static void push_afb_evt_pushed(int signum, void *closure)
+static void push_job(int signum, void *closure1, void *closure2)
 {
-	struct afb_evt_pushed *je = closure;
-
-	if (signum == 0) {
-		x_rwlock_rdlock(&je->evt->rwlock);
-		push_evt(je->evt->watchs, je);
-	}
-	destroy_evt_pushed(je);
+	struct job_evt_push *je = closure1;
+	struct afb_evt_listener *listener = closure2;
+	if (signum == 0)
+		listener->itf->push(listener->closure, &je->ev);
+	listener_internal_unref(listener);
+	job_evt_push_unref(je);
 }
 
 /*
@@ -433,44 +536,87 @@ static void push_afb_evt_pushed(int signum, void *closure)
  */
 int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[])
 {
-	struct afb_evt_pushed *je;
-	int rc;
+	struct afb_evt_watch *watch;
+	struct job_evt_push *je;
+	int rc, rc2;
 
-	if (!evt->watchs) {
+	x_rwlock_rdlock(&evt->rwlock);
+	watch = evt->watchs;
+	if (watch == NULL) {
 		afb_data_array_unref(nparams, params);
-		return 0;
+		rc = 0;
 	}
-
-	je = make_evt_pushed(evt, nparams, params);
-	if (je == NULL) {
-		RP_ERROR("Can't create push evt job item for %s", evt->fullname);
-		return X_ENOMEM;
-	}
-
-	rc = afb_sched_post_job(evt, 0, 0, push_afb_evt_pushed, je, Afb_Sched_Mode_Normal);
-	if (rc >= 0)
-		rc = 1;
 	else {
-		RP_ERROR("Can't queue push evt job item for %s", evt->fullname);
-		destroy_evt_pushed(je);
+		je = job_evt_push_create(evt, nparams, params);
+		if (je == NULL) {
+			RP_ERROR("Can't create push evt job item for %s", evt->fullname);
+			rc = X_ENOMEM;
+		}
+		else {
+			for (rc = 0; watch != NULL; watch = watch->next_by_evt) {
+				rc++;
+				job_evt_push_addref(je);
+				listener_internal_addref(watch->listener);
+				rc2 = afb_sched_post_job2(watch->listener->group, 0, 0, push_job, je, watch->listener, Afb_Sched_Mode_Normal);
+				if (rc2 < 0)
+					RP_ERROR("Can't queue push an evt job for %s", evt->fullname);
+			}
+			job_evt_push_unref(je);
+		}
 	}
-
+	x_rwlock_unlock(&evt->rwlock);
 	return rc;
 }
 
-static void unwatch(struct afb_evt_listener *listener, struct afb_evt *evt, int remove)
+/**************************************************************************/
+/** MANAGE SUBSCRIPTIONS WATCH/UNWATCH                                   **/
+/**************************************************************************/
+
+static void watch_job(int signum, void *closure1, void *closure2)
 {
-	/* notify listener if needed */
-	if (remove && listener->itf->remove != NULL)
-		listener->itf->remove(listener->closure, evt->fullname, evt->id);
+	struct afb_evt_listener *listener = closure1;
+	struct afb_evt *evt = closure2;
+
+	if (signum == 0)
+		listener->itf->add(listener->closure, evt->fullname, evt->id);
+	afb_evt_unref(evt);
+	listener_internal_unref(listener);
 }
 
-static void evt_unwatch(struct afb_evt *evt, struct afb_evt_listener *listener, struct afb_evt_watch *watch, int remove)
+static void do_watch(struct afb_evt_listener *listener, struct afb_evt *evt)
+{
+	/* notify listener if needed */
+	if (listener->itf->add != NULL) {
+		afb_evt_addref(evt);
+		listener_internal_addref(listener);
+		afb_sched_post_job2(listener->group, 0, 0, watch_job, listener, evt, Afb_Sched_Mode_Normal);
+	}
+}
+
+static void unwatch_job(int signum, void *closure1, void *closure2)
+{
+	struct afb_evt_listener *listener = closure1;
+	struct afb_evt *evt = closure2;
+
+	if (signum == 0)
+		listener->itf->remove(listener->closure, evt->fullname, evt->id);
+	afb_evt_unref(evt);
+	listener_internal_unref(listener);
+}
+
+static void do_unwatch(struct afb_evt_listener *listener, struct afb_evt *evt)
+{
+	/* notify listener if needed */
+	if (listener->itf->remove != NULL) {
+		afb_evt_addref(evt);
+		listener_internal_addref(listener);
+		afb_sched_post_job2(listener->group, 0, 0, unwatch_job, listener, evt, Afb_Sched_Mode_Normal);
+	}
+}
+
+static void evt_unwatch(struct afb_evt *evt, struct afb_evt_listener *listener, struct afb_evt_watch *watch, int notify)
 {
 	struct afb_evt_watch **prv;
-
-	/* notify listener if needed */
-	unwatch(listener, evt, remove);
 
 	/* unlink the watch for its event */
 	x_rwlock_wrlock(&listener->rwlock);
@@ -486,14 +632,15 @@ static void evt_unwatch(struct afb_evt *evt, struct afb_evt_listener *listener, 
 
 	/* recycle memory */
 	free(watch);
-}
-
-static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *evt, struct afb_evt_watch *watch, int remove)
-{
-	struct afb_evt_watch **prv;
 
 	/* notify listener if needed */
-	unwatch(listener, evt, remove);
+	if (notify)
+		do_unwatch(listener, evt);
+}
+
+static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *evt, struct afb_evt_watch *watch, int notify)
+{
+	struct afb_evt_watch **prv;
 
 	/* unlink the watch for its event */
 	x_rwlock_wrlock(&evt->rwlock);
@@ -509,7 +656,15 @@ static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *
 
 	/* recycle memory */
 	free(watch);
+
+	/* notify listener if needed */
+	if (notify)
+		do_unwatch(listener, evt);
 }
+
+/**************************************************************************/
+/** MANAGE EVENTS                                                        **/
+/**************************************************************************/
 
 /*
  * Creates an event of name 'fullname'
@@ -697,7 +852,6 @@ int afb_evt_push_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data
 int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb_data * const params[])
 	__attribute__((alias("afb_evt_broadcast")));
 
-
 /****************************************************************/
 #else
 /****************************************************************/
@@ -801,7 +955,9 @@ int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb
 }
 /****************************************************************/
 #endif
-/****************************************************************/
+/**************************************************************************/
+/** MANAGE LISTENERS                                                     **/
+/**************************************************************************/
 
 /*
  * Returns an instance of the listener defined by the 'send' callback
@@ -831,7 +987,8 @@ struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, 
 		listener->closure = closure;
 		listener->group = group;
 		listener->watchs = NULL;
-		listener->refcount = 1;
+		listener->extcount = 1;
+		listener->intcount = 1;
 		x_rwlock_init(&listener->rwlock);
 		listener->next = listeners;
 		listeners = listener;
@@ -846,7 +1003,7 @@ struct afb_evt_listener *afb_evt_listener_create(const struct afb_evt_itf *itf, 
  */
 struct afb_evt_listener *afb_evt_listener_addref(struct afb_evt_listener *listener)
 {
-	__atomic_add_fetch(&listener->refcount, 1, __ATOMIC_RELAXED);
+	__atomic_add_fetch(&listener->extcount, 1, __ATOMIC_RELAXED);
 	return listener;
 }
 
@@ -856,41 +1013,18 @@ struct afb_evt_listener *afb_evt_listener_addref(struct afb_evt_listener *listen
  */
 void afb_evt_listener_unref(struct afb_evt_listener *listener)
 {
-	struct afb_evt_listener **prv, *olis;
-
-	if (listener && !__atomic_sub_fetch(&listener->refcount, 1, __ATOMIC_RELAXED)) {
-
-		/* unlink the listener */
-		x_rwlock_wrlock(&listeners_rwlock);
-		prv = &listeners;
-		for(;;) {
-			olis = *prv;
-			if (olis == listener)
-				break;
-			if (!olis) {
-				RP_ERROR("unexpected listener");
-				x_rwlock_unlock(&listeners_rwlock);
-				return;
-			}
-			prv = &olis->next;
-		}
-		*prv = listener->next;
-		x_rwlock_unlock(&listeners_rwlock);
-
-		/* remove the watchers */
+	if (listener && !__atomic_sub_fetch(&listener->extcount, 1, __ATOMIC_RELAXED)) {
 		afb_evt_listener_unwatch_all(listener, 0);
-
-		/* free the listener */
-		x_rwlock_destroy(&listener->rwlock);
-		free(listener);
+		afb_sched_sync(0, listener_internal_unref_sync, listener);
 	}
 }
 
 /*
  * Makes the 'listener' watching 'evt'
- * Returns 0 in case of success or else -1.
+ * Dont call the listener 'add' callback if 'notify' == 0.
+ * Returns 0 if already existing, 1 if added or else X_ENOMEM.
  */
-int afb_evt_listener_watch_evt(struct afb_evt_listener *listener, struct afb_evt *evt)
+int afb_evt_listener_add(struct afb_evt_listener *listener, struct afb_evt *evt, int notify)
 {
 	struct afb_evt_watch *watch;
 
@@ -902,8 +1036,10 @@ int afb_evt_listener_watch_evt(struct afb_evt_listener *listener, struct afb_evt
 	x_rwlock_wrlock(&listener->rwlock);
 	watch = listener->watchs;
 	while(watch != NULL) {
-		if (watch->evt == evt)
-			goto end;
+		if (watch->evt == evt) {
+			x_rwlock_unlock(&listener->rwlock);
+			return 0;
+		}
 		watch = watch->next_by_listener;
 	}
 
@@ -923,13 +1059,50 @@ int afb_evt_listener_watch_evt(struct afb_evt_listener *listener, struct afb_evt
 	watch->next_by_evt = evt->watchs;
 	evt->watchs = watch;
 	x_rwlock_unlock(&evt->rwlock);
-
-	if (listener->itf->add != NULL)
-		listener->itf->add(listener->closure, evt->fullname, evt->id);
-end:
 	x_rwlock_unlock(&listener->rwlock);
 
-	return 0;
+	if (notify)
+		do_watch(listener, evt);
+	return 1;
+}
+
+/*
+ * Makes the 'listener' watching 'evt'
+ * Returns 0 in case of success or else X_ENOMEM.
+ */
+int afb_evt_listener_watch_evt(struct afb_evt_listener *listener, struct afb_evt *evt)
+{
+	int rc = afb_evt_listener_add(listener, evt, 1);
+	return rc < 0 ? rc : 0;
+}
+
+/*
+ * Avoids the 'listener' to watch 'evt' (or eventid if evt == NULL)
+ * Returns 0 if already removed or 1 if removed.
+ */
+int afb_evt_listener_remove(struct afb_evt_listener *listener, struct afb_evt *evt, uint16_t eventid, int notify)
+{
+	struct afb_evt_watch *watch, **pwatch;
+	struct afb_evt *wev;
+
+	/* search the existing watch */
+	x_rwlock_wrlock(&listener->rwlock);
+	pwatch = &listener->watchs;
+	for (;;) {
+		watch = *pwatch;
+		if (!watch) {
+			x_rwlock_unlock(&listener->rwlock);
+			return X_ENOENT;
+		}
+		wev = watch->evt;
+		if (evt != NULL ? (evt == wev) : (wev->id == eventid)) {
+			*pwatch = watch->next_by_listener;
+			x_rwlock_unlock(&listener->rwlock);
+			listener_unwatch(listener, wev, watch, notify);
+			return 0;
+		}
+		pwatch = &watch->next_by_listener;
+	}
 }
 
 /*
@@ -938,25 +1111,8 @@ end:
  */
 int afb_evt_listener_unwatch_evt(struct afb_evt_listener *listener, struct afb_evt *evt)
 {
-	struct afb_evt_watch *watch, **pwatch;
-
-	/* search the existing watch */
-	x_rwlock_wrlock(&listener->rwlock);
-	pwatch = &listener->watchs;
-	for (;;) {
-		watch = *pwatch;
-		if (!watch) {
-			x_rwlock_unlock(&listener->rwlock);
-			return X_ENOENT;
-		}
-		if (evt == watch->evt) {
-			*pwatch = watch->next_by_listener;
-			x_rwlock_unlock(&listener->rwlock);
-			listener_unwatch(listener, evt, watch, 1);
-			return 0;
-		}
-		pwatch = &watch->next_by_listener;
-	}
+	int rc = afb_evt_listener_remove(listener, evt, 0, 1);
+	return rc < 0 ? rc : 0;
 }
 
 /*
@@ -965,34 +1121,15 @@ int afb_evt_listener_unwatch_evt(struct afb_evt_listener *listener, struct afb_e
  */
 int afb_evt_listener_unwatch_id(struct afb_evt_listener *listener, uint16_t eventid)
 {
-	struct afb_evt_watch *watch, **pwatch;
-	struct afb_evt *evt;
-
-	/* search the existing watch */
-	x_rwlock_wrlock(&listener->rwlock);
-	pwatch = &listener->watchs;
-	for (;;) {
-		watch = *pwatch;
-		if (!watch) {
-			x_rwlock_unlock(&listener->rwlock);
-			return X_ENOENT;
-		}
-		evt = watch->evt;
-		if (evt->id == eventid) {
-			*pwatch = watch->next_by_listener;
-			x_rwlock_unlock(&listener->rwlock);
-			listener_unwatch(listener, evt, watch, 1);
-			return 0;
-		}
-		pwatch = &watch->next_by_listener;
-	}
+	int rc = afb_evt_listener_remove(listener, NULL, eventid, 1);
+	return rc < 0 ? rc : 0;
 }
 
 /*
  * Avoids the 'listener' to watch any event, calling the callback
  * 'remove' of the interface if 'remove' is not zero.
  */
-void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int remove)
+void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int notify)
 {
 	struct afb_evt_watch *watch, *nwatch;
 
@@ -1003,7 +1140,7 @@ void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int remove)
 	x_rwlock_unlock(&listener->rwlock);
 	while(watch) {
 		nwatch = watch->next_by_listener;
-		listener_unwatch(listener, watch->evt, watch, remove);
+		listener_unwatch(listener, watch->evt, watch, notify);
 		watch = nwatch;
 	}
 }

@@ -38,6 +38,7 @@
 
 #include "core/afb-hook.h"
 #include "core/afb-evt.h"
+#include "core/afb-jobs.h"
 #include "core/afb-sched.h"
 #include "sys/x-errno.h"
 #include <afb/afb-event-x2.h>
@@ -53,6 +54,15 @@
 #define remove_mask 0x08
 
 #define TEST_EVT_MAX_COUNT 0
+
+/**************** waiting job completion ****************/
+
+void wait_job_completion(int timeout)
+{
+    fprintf(stderr, "waiting before: %d+%d\n", afb_jobs_get_active_count(), afb_jobs_get_pending_count());
+    afb_sched_wait_idle(1, timeout);
+    fprintf(stderr, "waiting after: %d+%d\n", afb_jobs_get_active_count(), afb_jobs_get_pending_count());
+}
 
 /**************** test callbasks ****************/
 
@@ -202,6 +212,7 @@ START_TEST (test_functional)
 	rc = afb_evt_push_hookable(evt, 0, NULL);
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(rc, 0);
+        wait_job_completion(1);
 
     fprintf(stderr, "\n## afb_evt_listener_create...\n");
 
@@ -214,7 +225,7 @@ START_TEST (test_functional)
         fprintf(stderr, "-> rc = %d\n", rc);
         ck_assert_int_eq(rc, 0);
 
-        afb_sched_wait_idle(1,1);
+        wait_job_completion(1);
         fprintf(stderr, "-> cb_closure[%d] = %d\n", i, cb_closure[i]);
         ck_assert_int_eq(cb_closure[i], add_mask);
         cb_closure[i] = 0;
@@ -223,22 +234,22 @@ START_TEST (test_functional)
     fprintf(stderr, "\n## afb_evt_push...\n");
 	rc = afb_evt_push_hookable(evt, 0, NULL);
 	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 1);
-    afb_sched_wait_idle(1,1);
+	ck_assert_int_ge(rc, 1);
+    wait_job_completion(1);
     check_mask(cb_closure, push_mask);
 
     fprintf(stderr, "\n## afb_evt_broadcast...\n");
 	rc = afb_evt_broadcast_hookable(evt, 0, NULL);
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(rc, 0);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     check_mask(cb_closure, broadcast_mask);
 
     fprintf(stderr, "\n## afb_evt_listener_unwatch_evt...\n");
     rc = afb_evt_listener_unwatch_evt(ev_listener[0], evt);
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(rc, 0);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     ck_assert_int_eq(cb_closure[0], remove_mask);
     cb_closure[0] = 0;
 
@@ -246,14 +257,14 @@ START_TEST (test_functional)
     rc = afb_evt_listener_unwatch_id(ev_listener[1], afb_evt_id(evt));
 	fprintf(stderr, "-> rc = %d\n", rc);
 	ck_assert_int_eq(rc, 0);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     ck_assert_int_eq(cb_closure[1], remove_mask);
     cb_closure[1] = 0;
 
     fprintf(stderr, "\n## afb_evt_listener_unwatch_all...\n");
     afb_evt_listener_unwatch_all(ev_listener[2], 1);
 	fprintf(stderr, "-> rc = %d\n", rc);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     ck_assert_int_eq(cb_closure[2], remove_mask);
     cb_closure[2] = 0;
 
@@ -262,21 +273,28 @@ START_TEST (test_functional)
     rc = afb_evt_listener_unwatch_evt(ev_listener[0], evt);
     fprintf(stderr, "evt -> rc = %d\n", rc);
     ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(cb_closure[0], 0);
 
     rc = afb_evt_listener_unwatch_id(ev_listener[1], afb_evt_id(evt));
     fprintf(stderr, "id -> rc = %d\n", rc);
     ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(cb_closure[1], 0);
 
     rc = afb_evt_listener_unwatch_evt(ev_listener[2], evt);
     fprintf(stderr, "evt -> rc = %d\n", rc);
     ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(cb_closure[2], 0);
 
     fprintf(stderr, "\n## check that listeners get removed when event are deleted...\n");
+    cb_closure[0] = 0;
 	rc = afb_evt_listener_watch_evt(ev_listener[0], evt);
+    wait_job_completion(1);
     ck_assert_int_eq(rc, 0);
+        ck_assert_int_eq(cb_closure[0], add_mask);
+
     cb_closure[0] = 0;
     afb_evt_unref(evt);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     fprintf(stderr, "-> cb_closure = %d\n", cb_closure[0]);
     ck_assert_int_eq(cb_closure[0], remove_mask);
 
@@ -314,6 +332,7 @@ START_TEST (test_afb_event_x2)
     fprintf(stderr, "\n## afb_evt_create...\n");
 	rc = afb_evt_create(&evt, NAME);
 	fprintf(stderr, "-> rc = %d\n", rc);
+	fprintf(stderr, "-> evt = %p\n", evt);
 	ck_assert_int_eq(rc, 0);
 
 #if WITH_AFB_HOOK
@@ -328,15 +347,19 @@ START_TEST (test_afb_event_x2)
     fprintf(stderr, "-> evt = %p\n", evt_x2);
     ck_assert_ptr_ne(evt, NULL);
 
+    fprintf(stderr, "\n## afb_evt_listener_create...\n");
     cb_closure = 0;
     ev_listener = afb_evt_listener_create(&ev_itf, &cb_closure, NULL);
+    fprintf(stderr, "-> ev_listener = %p\n", ev_listener);
     ck_assert_ptr_ne(ev_listener, NULL);
 
+    fprintf(stderr, "\n## afb_evt_listener_watch_evt...\n");
     rc = afb_evt_listener_watch_evt(ev_listener, evt);
     fprintf(stderr, "-> rc = %d\n", rc);
     ck_assert_int_eq(rc, 0);
 
-    afb_sched_wait_idle(1,1);
+    fprintf(stderr, "\n## wait for idle...\n");
+    wait_job_completion(1);
     fprintf(stderr, "-> cb_closure = %d\n", cb_closure);
     ck_assert_int_eq(cb_closure, add_mask);
     cb_closure = 0;
@@ -345,7 +368,7 @@ START_TEST (test_afb_event_x2)
     rc = afb_event_x2_broadcast(evt_x2, NULL);
     fprintf(stderr, "-> rc = %d\n", rc);
     ck_assert_int_eq(rc, 0);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     fprintf(stderr, "-> cb_closure = %d\n", cb_closure);
     ck_assert_int_eq(cb_closure, broadcast_mask);
     cb_closure = 0;
@@ -354,7 +377,7 @@ START_TEST (test_afb_event_x2)
     rc = afb_event_x2_push(evt_x2, NULL);
     fprintf(stderr, "-> rc = %d\n", rc);
     ck_assert_int_eq(rc, 1);
-    afb_sched_wait_idle(1,1);
+    wait_job_completion(1);
     fprintf(stderr, "-> cb_closure = %d\n", cb_closure);
     ck_assert_int_eq(cb_closure, push_mask);
     cb_closure = 0;
