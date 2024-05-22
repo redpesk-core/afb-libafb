@@ -4,6 +4,7 @@ Version next
   fixes
    - fix memory crash when broadcasting many events
    - fix unsubscribing with RPC transport
+   - fix aligning in RPC encoder
 
   change
    - removed afb-wsapi files (from libafb and libafbcli)
