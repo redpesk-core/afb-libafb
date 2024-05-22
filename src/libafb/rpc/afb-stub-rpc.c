@@ -1301,31 +1301,50 @@ static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const
 }
 
 /**************************************************************************
+* PART - MANAGE EVENTS
+**************************************************************************/
+
+static int add_event(struct afb_stub_rpc *stub, const char *event, uint16_t eventid)
+{
+	int rc = u16id2bool_set(&stub->event_flags, eventid, 1);
+	if (rc > 0)
+		rc = 0;
+	else if (rc == 0) {
+		rc = send_event_create(stub, eventid, event);
+		if (rc < 0)
+			u16id2bool_set(&stub->event_flags, eventid, 0);
+		else
+			rc = 1;
+	}
+	return rc;
+}
+
+static int remove_event(struct afb_stub_rpc *stub, const char *event, uint16_t eventid)
+{
+	int rc = u16id2bool_set(&stub->event_flags, eventid, 0);
+	if (rc > 0)
+		send_event_destroy(stub, eventid);
+	return rc;
+}
+
+/**************************************************************************
 * PART - EVENT LISTENER
 **************************************************************************/
 
 static void on_listener_event_add_cb(void *closure, const char *event, uint16_t eventid)
 {
 	struct afb_stub_rpc *stub = closure;
-	int rc;
-
-	rc = u16id2bool_set(&stub->event_flags, eventid, 1);
-	if (rc == 0) {
-		rc = send_event_create(stub, eventid, event);
-		if (rc < 0)
-			u16id2bool_set(&stub->event_flags, eventid, 0);
+	int rc = add_event(stub, event, eventid);
+	if (rc > 0)
 		emit(stub);
-	}
 }
 
 static void on_listener_event_remove_cb(void *closure, const char *event, uint16_t eventid)
 {
 	struct afb_stub_rpc *stub = closure;
-
-	if (u16id2bool_set(&stub->event_flags, eventid, 0)) {
-		send_event_destroy(stub, eventid);
+	int rc = remove_event(stub, event, eventid);
+	if (rc > 0)
 		emit(stub);
-	}
 }
 
 static void on_listener_event_push_cb(void *closure, const struct afb_evt_pushed *event)
@@ -1393,7 +1412,9 @@ static int incall_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *ev
 	struct afb_stub_rpc *stub = req->stub;
 	int rc = ensure_listener(stub);
 	if (rc >= 0)
-		rc = afb_evt_listener_watch_evt(stub->listener, evt);
+		rc = afb_evt_listener_add(stub->listener, evt, 0);
+	if (rc > 0)
+		rc = add_event(stub, afb_evt_fullname(evt), afb_evt_id(evt));
 	if (rc >= 0)
 		rc = send_event_subscribe(stub, req->callid, afb_evt_id(evt));
 	if (rc < 0)
@@ -1406,8 +1427,11 @@ static int incall_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *
 {
 	struct incall *req = containerof(struct incall, comreq, comreq);
 	struct afb_stub_rpc *stub = req->stub;
-	int rc = afb_evt_listener_unwatch_evt(stub->listener, evt);
-	int rc2 = send_event_unsubscribe(stub, req->callid, afb_evt_id(evt));
+	int rc, rc2;
+	rc = send_event_unsubscribe(stub, req->callid, afb_evt_id(evt));
+	rc2 = afb_evt_listener_remove(stub->listener, evt, 0, 0);
+	if (rc2 > 0)
+		rc2 = remove_event(stub, afb_evt_fullname(evt), afb_evt_id(evt));
 	if (rc >= 0 && rc2 < 0)
 		rc = rc2;
 	if (rc < 0)
