@@ -66,12 +66,14 @@ struct param
 
 static int code_packet_begin(afb_rpc_coder_t *coder, uint16_t operation, uint32_t *offsetsize)
 {
-	static uint16_t seqno = 0;
 	int rc = afb_rpc_coder_write_align_at(coder, 8, 0);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_uint16le(coder, operation);
-	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint16le(coder, seqno = seqno + 1 ? seqno + 1 : seqno + 2);
+	if (rc >= 0) {
+		static uint16_t seqno = 0;
+		seqno = seqno + 1 ? seqno + 1 : seqno + 2;
+		rc = afb_rpc_coder_write_uint16le(coder, seqno);
+	}
 	if (rc >= 0) {
 		*offsetsize = afb_rpc_coder_get_position(coder);
 		rc = afb_rpc_coder_write_uint32le(coder, 0);
@@ -87,6 +89,8 @@ static int code_packet_end(afb_rpc_coder_t *coder, uint32_t offsetsize)
 		rc = afb_rpc_coder_write_uint32le(coder, position - offsetsize + 4);
 	if (rc >= 0)
 		rc = afb_rpc_coder_set_position(coder, position);
+	if (rc >= 0)
+		rc = afb_rpc_coder_write_align_at(coder, 8, 0);
 	return rc;
 }
 
@@ -753,5 +757,7 @@ int afb_rpc_v3_decode_packet(afb_rpc_decoder_t *decoder, afb_rpc_v3_pckt_t *pckt
 		rc = afb_rpc_decoder_read_uint32le(decoder, &pckt->length);
 	if (rc >= 0)
 		rc = afb_rpc_decoder_read_pointer(decoder, &pckt->payload, pckt->length -= 8);
+	if (rc >= 0)
+		afb_rpc_decoder_skip(decoder, 7 & (8 - decoder->offset));
 	return rc;
 }

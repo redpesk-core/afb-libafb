@@ -5,6 +5,7 @@ Version next
    - fix memory crash when broadcasting many events
    - fix unsubscribing with RPC transport
    - fix aligning in RPC encoder
+   - enforce chunk size of RPC v3 to be multiple of 8 (padding)
 
   change
    - removed afb-wsapi files (from libafb and libafbcli)
