@@ -44,6 +44,9 @@
 #define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
 #define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
 
+#if USE_SND_RCV
+# include <sys/socket.h>
+#endif
 /*
 */
 struct afb_wrap_rpc
@@ -91,7 +94,7 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	struct afb_wrap_rpc *wrap = closure;
 	void *buffer;
 	size_t esz;
-	ssize_t sz;
+	ssize_t ssz;
 	int rc, avail;
 
 	if (revents & EPOLLHUP) {
@@ -107,17 +110,17 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 		buffer = malloc(esz);
 		if (buffer != NULL) {
 #if USE_SND_RCV
-			sz = recv(fd, buffer, esz, MSG_DONTWAIT);
+			ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
 #else
-			sz = read(fd, buffer, esz);
+			ssz = read(fd, buffer, esz);
 #endif
-			if (sz >= 0) {
-				if (esz > (size_t)sz) {
-					void *newbuffer = realloc(buffer, (size_t)sz);
+			if (ssz >= 0) {
+				if (esz > (size_t)ssz) {
+					void *newbuffer = realloc(buffer, (size_t)ssz);
 					if (newbuffer != NULL)
 						buffer = newbuffer;
 				}
-				afb_stub_rpc_receive(wrap->stub, buffer, (size_t)sz);
+				afb_stub_rpc_receive(wrap->stub, buffer, (size_t)ssz);
 			}
 			else {
 				free(buffer);
@@ -132,6 +135,7 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 
 static void notify(void *closure, struct afb_stub_rpc *stub)
 {
+	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 	struct afb_wrap_rpc *wrap = closure;
 	afb_rpc_coder_t *coder = afb_stub_rpc_emit_coder(stub);
@@ -148,10 +152,11 @@ static void notify(void *closure, struct afb_stub_rpc *stub)
 			.msg_controllen = 0,
 			.msg_flags      = 0
 		};
-		sendmsg(fd, &msg, 0);
+		ssz = sendmsg(fd, &msg, 0);
 #else
-		writev(fd, iovs, rc);
+		ssz = writev(fd, iovs, rc);
 #endif
+		(void)ssz; /* TODO: hold the write error !!! */
 		afb_rpc_coder_output_dispose(coder);
 	}
 }
