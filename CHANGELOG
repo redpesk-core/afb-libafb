@@ -8,6 +8,11 @@ Version next
   change
    - removed afb-wsapi files (from libafb and libafbcli)
 
+  features
+   - added jobs with 2 arguments
+   - management of group of request for replying job
+   - management of group of listener for event jobs
+
 Version 5.1.0
 -------------
 
