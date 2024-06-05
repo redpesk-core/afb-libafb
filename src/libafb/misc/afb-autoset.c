@@ -71,7 +71,7 @@ static int add(const char *path, struct afb_apiset *declare_set, struct afb_apis
 	struct afb_apiset *ownset;
 
 	/* create a sub-apiset */
-	ownset = afb_apiset_create_subset_last(declare_set, path, 3600);
+	ownset = afb_apiset_create_subset_first(declare_set, path, 3600);
 	if (!ownset) {
 		RP_ERROR("Can't create apiset autoset-ws %s", path);
 		return X_ENOMEM;
