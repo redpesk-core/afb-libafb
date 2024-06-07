@@ -94,13 +94,16 @@ static int try_get(x_thread_t tid)
 {
 	if (!SAME_TID(holder, tid)) {
 		x_mutex_lock(&mutex);
-		if ((!evmgr && ev_mgr_create(&evmgr) < 0)
-		 || !SAME_TID(holder, INVALID_THREAD_ID)) {
+		if (!SAME_TID(holder, INVALID_THREAD_ID)) {
 			x_mutex_unlock(&mutex);
 			return 0;
 		}
 		holder = tid;
 		x_mutex_unlock(&mutex);
+		if (!evmgr && ev_mgr_create(&evmgr) < 0) {
+			afb_ev_mgr_release(tid);
+			return 0;
+		}
 	}
 	return 1;
 }
@@ -121,22 +124,23 @@ static int get(x_thread_t tid)
 
 	/* lock */
 	x_mutex_lock(&mutex);
-
-	if (evmgr || ev_mgr_create(&evmgr) >= 0) {
-		if (!SAME_TID(holder, INVALID_THREAD_ID)) {
-			struct waithold wait = { 0, X_COND_INITIALIZER };
-			struct waithold **piw = &awaiters;
-			while (*piw) piw = &(*piw)->next;
-			*piw = &wait;
-			ev_mgr_wakeup(evmgr);
-			x_cond_wait(&wait.cond, &mutex);
-			awaiters = wait.next;
-		}
-		holder = tid;
+	if (!SAME_TID(holder, INVALID_THREAD_ID)) {
+		struct waithold wait = { 0, X_COND_INITIALIZER };
+		struct waithold **piw = &awaiters;
+		while (*piw) piw = &(*piw)->next;
+		*piw = &wait;
+		ev_mgr_wakeup(evmgr);
+		x_cond_wait(&wait.cond, &mutex);
+		awaiters = wait.next;
 	}
+	holder = tid;
 
 	/* unlock */
 	x_mutex_unlock(&mutex);
+	if (!evmgr && ev_mgr_create(&evmgr) < 0) {
+		afb_ev_mgr_release(tid);
+		return 0;
+	}
 	return 1;
 }
 
