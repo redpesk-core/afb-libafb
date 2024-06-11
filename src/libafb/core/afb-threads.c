@@ -34,6 +34,7 @@
 
 #include "core/afb-sig-monitor.h"
 #include "core/afb-threads.h"
+#include "core/afb-ev-mgr.h"
 
 #define DEBUGGING 0
 #if DEBUGGING
@@ -193,10 +194,15 @@ PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
 			}
 		}
 	}
+	x_mutex_unlock(&mutex);
+	afb_ev_mgr_try_recover_for_me();
+
 	/* terminate */
 	afb_sig_monitor_clean_timeouts();
 
 PRINT("++++++++++++ STOP %p classid=%d\n",me,me->classid);
+
+	x_mutex_lock(&mutex);
 }
 
 static void *thread_starter(void *arg)
