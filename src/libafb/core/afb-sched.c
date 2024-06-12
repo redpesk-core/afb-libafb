@@ -133,6 +133,11 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	return rc;
 }
 
+static int start_thread(int classid)
+{
+	return afb_threads_start(classid, get_job_cb, (void*)(intptr_t)classid);
+}
+
 static int start_one_thread(enum afb_sched_mode mode)
 {
 	int classid;
@@ -144,7 +149,7 @@ static int start_one_thread(enum afb_sched_mode mode)
 		afb_ev_mgr_wakeup();
 		return 0;
 	}
-	return afb_threads_start(classid, get_job_cb, (void*)(intptr_t)classid);
+	return start_thread(classid);
 }
 
 /**
@@ -463,7 +468,7 @@ int afb_sched_start(
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
-		exiting.code = start_one_thread(Afb_Sched_Mode_Start);
+		exiting.code = start_thread(CLASSID_OTHERS);
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
