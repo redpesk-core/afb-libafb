@@ -1,6 +1,8 @@
 Version 5.2.0
 ------------
 
+  major versions of libafb and libafbcli is now 6 because of broken API
+
   fixes
    - fix memory crash when broadcasting many events
    - fix unsubscribing with RPC transport

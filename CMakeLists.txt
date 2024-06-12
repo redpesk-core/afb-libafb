@@ -34,8 +34,8 @@ project(afb-libafb
 set(LIBAFB_VERSION "6.0")
 set(LIBAFB_SOVERSION "6")
 
-set(LIBAFBCLI_VERSION "5.0")
-set(LIBAFBCLI_SOVERSION "5")
+set(LIBAFBCLI_VERSION "6.0")
+set(LIBAFBCLI_SOVERSION "6")
 
 include(FindPkgConfig)
 include(CheckIncludeFiles)
