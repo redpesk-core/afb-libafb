@@ -7,6 +7,8 @@ Version 5.2.0
    - fix aligning in RPC encoder
    - enforce chunk size of RPC v3 to be multiple of 8 (padding)
    - subset order of apiset for auto apis
+   - force release of evmgr at thread end
+   - fix potential deadlock when WITH_JOB_NOT_MONITORED not null
 
   change
    - MAJOR change in event manager:

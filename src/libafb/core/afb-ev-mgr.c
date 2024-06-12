@@ -75,12 +75,12 @@ int afb_ev_mgr_release(x_thread_t tid)
 			x_cond_signal(&awaiters->cond);
 			x_mutex_unlock(&mutex);
 		}
-#if !WITH_JOB_NOT_MONITORED
 		else {
 			x_mutex_unlock(&mutex);
+#if !WITH_JOB_NOT_MONITORED
 			afb_sched_ev_mgr_unheld();
-		}
 #endif
+		}
 		unheld = 1;
 	}
 	return unheld;
