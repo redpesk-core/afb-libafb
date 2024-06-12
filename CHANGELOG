@@ -11,6 +11,7 @@ Version 5.2.0
    - subset order of apiset for auto apis
    - force release of evmgr at thread end
    - fix potential deadlock when WITH_JOB_NOT_MONITORED not null
+   - fix 100% CPU when 1 thread only required
 
   change
    - MAJOR change in event manager:

@@ -145,10 +145,8 @@ static int start_one_thread(enum afb_sched_mode mode)
 		classid = CLASSID_OTHERS;
 	else if (mode == Afb_Sched_Mode_Start)
 		classid = CLASSID_EXTRA;
-	else {
-		afb_ev_mgr_wakeup();
+	else
 		return 0;
-	}
 	return start_thread(classid);
 }
 
