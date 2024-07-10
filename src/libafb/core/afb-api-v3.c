@@ -29,7 +29,9 @@
 
 #define AFB_BINDING_VERSION 0
 #include <afb/afb-binding.h>
+#if !WITHOUT_JSON_C
 #include <rp-utils/rp-jsonc.h>
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #include "containerof.h"
@@ -1001,6 +1003,14 @@ afb_api_v3_process_call(
 	afb_req_common_reply_verb_unknown_error_hookable(req);
 }
 
+#if WITHOUT_JSON_C
+struct json_object *
+afb_api_v3_make_description_openAPIv3(
+	struct afb_api_v3 *api
+) {
+	return NULL;
+}
+#else
 static
 struct json_object *
 describe_verb_v3(
@@ -1102,7 +1112,7 @@ afb_api_v3_make_description_openAPIv3(
 	json_tokener_free(tok);
 	return r;
 }
-
+#endif
 
 struct afb_api_v3 *
 afb_api_v3_addref(

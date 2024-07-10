@@ -25,9 +25,12 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #define AFB_BINDING_VERSION 0
@@ -37,7 +40,9 @@
 #include "core/afb-api-common.h"
 #include "core/afb-evt.h"
 #include "core/afb-req-common.h"
+#if WITH_AFB_TRACE
 #include "misc/afb-trace.h"
+#endif
 #include "core/afb-session.h"
 #include "core/afb-error-text.h"
 #include "core/afb-json-legacy.h"
@@ -63,10 +68,6 @@
 #define verbosity_get()      verbosity_from_mask(rp_logmask)
 
 
-
-
-
-static const char _apis_[] = "apis";
 static const char _disconnected_[] = "disconnected";
 static const char _get_[] = "get";
 static const char _monitor_[] = "monitor";
@@ -75,6 +76,10 @@ static const char _set_[] = "set";
 static const char _subscribe_[] = "subscribe";
 static const char _trace_[] = "trace";
 static const char _unsubscribe_[] = "unsubscribe";
+
+#if !WITHOUT_JSON_C
+
+static const char _apis_[] = "apis";
 static const char _verbosity_[] = "verbosity";
 
 static const char _debug_[] = "debug";
@@ -82,6 +87,8 @@ static const char _info_[] = "info";
 static const char _notice_[] = "notice";
 static const char _warning_[] = "warning";
 static const char _error_[] = "error";
+
+#endif
 
 static struct afb_api_common *monitor_api;
 static struct afb_evt *evt_disconnected;
@@ -133,6 +140,8 @@ void afb_monitor_api_disconnected(const char *apiname)
 /******************************************************************************
 **** Monitoring events
 ******************************************************************************/
+
+#if !WITHOUT_JSON_C
 
 /**
  * Subscribe or unsubscribe events
@@ -573,6 +582,56 @@ static void f_unsubscribe(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_unsubscribe_cb, req);
 }
 
+static void f_session(struct afb_req_common *req)
+{
+	struct json_object *r = NULL;
+
+	/* make the result */
+	rp_jsonc_pack(&r, "{s:s,s:i,s:i}",
+			"uuid", afb_session_uuid(req->session),
+			"timeout", afb_session_timeout(req->session),
+			"remain", afb_session_what_remains(req->session));
+	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
+}
+#else
+static void f_set(struct afb_req_common *req)
+{
+	afb_req_common_reply_unavailable_error_hookable(req);
+}
+static void f_get(struct afb_req_common *req)
+{
+	afb_req_common_reply_unavailable_error_hookable(req);
+}
+static void f_session(struct afb_req_common *req)
+{
+	char *buffer;
+	int rc = asprintf(&buffer, "{\"uuid\":\"%s\",\"timeout\":%d,\"remain\":%d}",
+			afb_session_uuid(req->session),
+			afb_session_timeout(req->session),
+			afb_session_what_remains(req->session));
+	if (rc < 0)
+		afb_req_common_reply_out_of_memory_error_hookable(req);
+	else {
+		struct afb_data *data;
+		rc = afb_data_create_raw(&data, &afb_type_predefined_json, buffer, 1 + (size_t)rc, free, buffer);
+		if (rc < 0)
+			afb_req_common_reply_internal_error_hookable(req, rc);
+		else
+			afb_req_common_reply_hookable(req, 0, 1, &data);
+	}
+}
+static void f_subscribe(struct afb_req_common *req)
+{
+	afb_req_common_subscribe_hookable(req, evt_disconnected);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
+}
+static void f_unsubscribe(struct afb_req_common *req)
+{
+	afb_req_common_unsubscribe_hookable(req, evt_disconnected);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
+}
+#endif
+
 #if WITH_AFB_TRACE
 static void context_destroy(void *pointer)
 {
@@ -627,21 +686,9 @@ static void f_trace(struct afb_req_common *req)
 #else
 static void f_trace(struct afb_req_common *req)
 {
-	afb_json_legacy_req_reply_hookable(req, NULL, "unavailable", NULL);
+	afb_req_common_reply_unavailable_error_hookable(req);
 }
 #endif
-
-static void f_session(struct afb_req_common *req)
-{
-	struct json_object *r = NULL;
-
-	/* make the result */
-	rp_jsonc_pack(&r, "{s:s,s:i,s:i}",
-			"uuid", afb_session_uuid(req->session),
-			"timeout", afb_session_timeout(req->session),
-			"remain", afb_session_what_remains(req->session));
-	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
-}
 
 void checkcb(void *closure, int status)
 {

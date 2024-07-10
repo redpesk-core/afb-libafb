@@ -48,7 +48,8 @@ include(CTest)
 option(WITH_SYSTEMD               "Require use of libsystemd"              ON)
 option(WITHOUT_CYNAGORA           "Forbids use of cynagora"                OFF)
 option(WITHOUT_TESTS              "Avoid compiling tests"                  OFF)
-option(ARCH32                     "set arch32"                             OFF)
+option(ARCH32                     "Set arch32"                             OFF)
+option(WITH_RPUTILS_STATIC        "Link statically with librp-utils"       OFF)
 
 ############################################################################
 # design options
@@ -75,6 +76,7 @@ option(WITH_GNUTLS                "Activate TLS ability with gnutls"       OFF)
 option(WITH_RPC_V1                "Activate RPC protocol version 1"        ON)
 option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
 option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
+option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
 # tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)
@@ -99,6 +101,10 @@ option(WITH_UNIX_SOCKET           "Allow use of Unix Domain Sockets"       ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
 
+###########################################################################
+if(WITHOUT_JSON_C)
+	set(WITH_AFB_HOOK OFF)
+endif()
 ###########################################################################
 
 link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
@@ -139,7 +145,11 @@ find_package(Threads)
 
 PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
 PKG_CHECK_MODULES(json-c REQUIRED json-c)
-PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils>=0.0.3)
+if(WITH_RPUTILS_STATIC)
+	PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils-static>=0.0.3)
+else()
+	PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils>=0.0.3)
+endif()
 
 if(WITH_LIBMICROHTTPD)
 	PKG_CHECK_MODULES(libmicrohttpd REQUIRED libmicrohttpd>=0.9.60)

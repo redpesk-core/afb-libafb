@@ -29,7 +29,9 @@
 #include <string.h>
 #include <ctype.h>
 
+#if !WITHOUT_JSON_C
 #include <rp-utils/rp-jsonc.h>
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #define ISSPACE(x) (isspace((int)(unsigned char)(x)))
@@ -81,6 +83,18 @@ static inline struct afb_api_common *from_api_x3(struct afb_api_x3 *api)
  ******************************************************************************
  ******************************************************************************/
 
+#if WITHOUT_JSON_C
+void afb_api_common_set_config(struct json_object *config)
+{
+}
+
+struct json_object *
+afb_api_common_settings(
+	const struct afb_api_common *comapi
+) {
+	return NULL;
+}
+#else
 static struct json_object *configuration;
 
 void afb_api_common_set_config(struct json_object *config)
@@ -112,6 +126,17 @@ static struct json_object *make_settings(struct afb_api_common *comapi)
 	comapi->settings = result;
 	return result;
 }
+
+struct json_object *
+afb_api_common_settings(
+	const struct afb_api_common *comapi
+) {
+	struct json_object *result = comapi->settings;
+	if (!result)
+		result = make_settings((struct afb_api_common *)comapi);
+	return result;
+}
+#endif
 
 /******************************************************************************
  ******************************************************************************
@@ -416,16 +441,6 @@ afb_api_common_class_require(
 		*end = save;
 		iter = end;
 	}
-}
-
-struct json_object *
-afb_api_common_settings(
-	const struct afb_api_common *comapi
-) {
-	struct json_object *result = comapi->settings;
-	if (!result)
-		result = make_settings((struct afb_api_common *)comapi);
-	return result;
 }
 
 /**********************************************
@@ -839,9 +854,10 @@ afb_api_common_init(
 	/* hooking flags */
 	comapi->hookflags = afb_hook_flags_api(comapi->name);
 #endif
-
+#if !WITHOUT_JSON_C
 	/* settings */
 	comapi->settings = NULL;
+#endif
 }
 
 void
@@ -854,7 +870,9 @@ afb_api_common_cleanup(
 		afb_evt_listener_unref(comapi->listener);
 	afb_apiset_unref(comapi->declare_set);
 	afb_apiset_unref(comapi->call_set);
+#if !WITHOUT_JSON_C
 	json_object_put(comapi->settings);
+#endif
 	session_cleanup(comapi);
 	if (comapi->free_name)
 		free((void*)comapi->name);

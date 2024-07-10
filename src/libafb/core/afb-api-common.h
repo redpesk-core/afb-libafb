@@ -118,8 +118,10 @@ struct afb_api_common
 	/* handler of events */
 	void (*onevent)(void *callback, void *closure, const struct afb_evt_data *event, struct afb_api_common *comapi);
 
+#if !WITHOUT_JSON_C
 	/* settings */
 	struct json_object *settings;
+#endif
 
 	/* session for service */
 	struct afb_session *session;

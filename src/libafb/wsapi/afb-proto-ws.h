@@ -45,7 +45,7 @@ typedef unsigned char afb_proto_ws_uuid_t[16];
 
 struct afb_proto_ws_client_itf
 {
-	/* can't be NULL */
+	/* one of it can't be NULL */
 	void (*on_reply)(void *closure, void *request, struct json_object *obj, const char *error, const char *info);
 
 	/* can be NULL */

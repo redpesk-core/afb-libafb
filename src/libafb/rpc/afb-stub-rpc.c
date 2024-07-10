@@ -29,8 +29,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <json-c/json.h>
 #include <rp-utils/rp-verbose.h>
+
+#if WITHOUT_JSON_C
+#undef WITH_RPC_V1
+#define WITH_RPC_V1 0
+#else
+#include <json-c/json.h>
 
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
@@ -46,6 +51,7 @@ json_object_to_json_string_length(
 		*length = jsonstr ? strlen(jsonstr) : 0;
 	return jsonstr;
 }
+#endif
 #endif
 
 #include <afb/afb-event-x2.h>
@@ -397,6 +403,7 @@ static void wait_version_done(struct afb_stub_rpc *stub)
 
 /******************* memory *****************/
 
+#if WITH_RPC_V1
 /**
  * callback for releasing (put) a json objet
  */
@@ -404,6 +411,7 @@ static void json_put_cb(void *closure)
 {
 	json_object_put((struct json_object *)closure);
 }
+#endif
 
 /******************* inblocks *****************/
 
@@ -810,10 +818,12 @@ static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], a
 		case Afb_Typeid_Predefined_Stringz:
 			typenum = AFB_RPC_V3_ID_TYPE_STRINGZ;
 			break;
+#if !WITHOUT_JSON_C
 		case Afb_Typeid_Predefined_Json_C:
 			cptr = (void*)json_object_to_json_string_length((json_object*)cptr, 0, &size);
 			size++;
 			/*@fallthrough@*/
+#endif
 		case Afb_Typeid_Predefined_Json:
 			typenum = AFB_RPC_V3_ID_TYPE_JSON;
 			break;
@@ -1043,7 +1053,6 @@ static int send_describe_request_v3(struct afb_stub_rpc *stub, uint16_t callid)
 
 static int send_describe_reply_v3(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
 {
-	return afb_rpc_v1_code_description(&stub->coder, callid, description);
 	afb_rpc_v3_value_t value;
 	afb_rpc_v3_value_array_t valarr = { .count = 1, .values = &value };;
 	afb_rpc_v3_msg_call_reply_t reply;
@@ -1938,7 +1947,11 @@ static int receive_event_broadcast(
 
 static void describe_reply(struct outcall *outcall, const char *description)
 {
+#if WITHOUT_JSON_C
+	struct json_object *desc = NULL;
+#else
 	struct json_object *desc = description ? json_tokener_parse(description) : NULL;
+#endif
 	outcall->item.describe.callback(outcall->item.describe.closure, desc);
 }
 
@@ -1948,6 +1961,7 @@ static void describe_reply_data(struct outcall *outcall, unsigned ndata, struct 
 	describe_reply(outcall, desc);
 }
 
+#if WITH_RPC_V1
 static int receive_describe_reply(struct afb_stub_rpc *stub, const char *description, uint16_t callid)
 {
 	int rc;
@@ -1972,11 +1986,16 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 	}
 	return rc;
 }
+#endif
 
 static int reply_description(struct afb_stub_rpc *stub, struct json_object *object, uint16_t callid)
 {
+#if WITHOUT_JSON_C
+	return send_describe_reply(stub, callid, NULL);
+#else
 	afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object);
 	return send_describe_reply(stub, callid, json_object_to_json_string(object));
+#endif
 }
 
 static int indesc_reply_description(struct indesc *indesc, struct json_object *object)
