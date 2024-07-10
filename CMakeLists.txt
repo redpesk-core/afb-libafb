@@ -48,10 +48,11 @@ include(CTest)
 option(WITH_SYSTEMD               "Require use of libsystemd"              ON)
 option(WITHOUT_CYNAGORA           "Forbids use of cynagora"                OFF)
 option(WITHOUT_TESTS              "Avoid compiling tests"                  OFF)
-option(ARCH32                     "set arch32"                             OFF)
-
-############################################################################
-# design options
+option(ARCH32                     "Set arch32"                             OFF)
+option(WITH_RPUTILS_STATIC        "Link statically with librp-utils"       OFF)
+#
+#############################################################################
+## design options
 option(WITH_AFB_HOOK              "Include hooking"                        ON)
 option(WITH_SIG_MONITOR_SIGNALS   "Activate handling of signals"           ON)
 option(WITH_SIG_MONITOR_FOR_CALL  "Activate monitoring of calls"           ON)
@@ -72,10 +73,14 @@ option(WITH_REQ_PROCESS_ASYNC     "Enforce asynchronous processing of requests" 
 option(WITH_CASE_FOLDING          "Fold case for API, VERB, EVENT names"   OFF)
 option(WITH_EXTENSION             "Activate ability to load extensions"    ON)
 option(WITH_GNUTLS                "Activate TLS ability with gnutls"       OFF)
+option(WITH_BINDINGS_V3           "Support legacy bindings version 3"      ON)
+option(WITH_WSJ1                  "Activate WSJ1 protocol"                 ON)
+option(WITH_WSAPI                 "Activate WSAPI protocol"                ON)
 option(WITH_RPC_V1                "Activate RPC protocol version 1"        ON)
 option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
 option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
-# tune options
+option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
+## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)
 option(WITH_FDEV_EPOLL            "Use epoll implementation of fdev"       OFF)
@@ -84,7 +89,7 @@ option(WITH_FDEV_SYSTEMD          "Use systemd implementation of fdev"     ON)
 option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
 option(WITH_LOCALE_SEARCH_NODE    "Use folder in searchs in locale-root"   ON) # TODO: set to OFF
 option(WITH_WSCLIENT_URI_COPY     "Copy URI of ws-client specification"    OFF)
-# system adaptation
+## system adaptation
 option(WITH_FNMATCH               "Use fnmatch where possible"             ON)
 option(WITH_LIBUUID               "Activates use of lib uuid"              ON)
 option(WITH_EPOLL                 "Allow use of epoll"                     ON)
@@ -98,7 +103,15 @@ option(WITH_REALPATH              "Use realpath function"                  ON)
 option(WITH_UNIX_SOCKET           "Allow use of Unix Domain Sockets"       ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
-
+#
+###########################################################################
+if(WITHOUT_JSON_C)
+	set(WITH_AFB_HOOK OFF)
+	set(WITH_BINDINGS_V3 OFF)
+	set(WITH_WSJ1 OFF)
+	set(WITH_WSAPI OFF)
+	set(WITH_RPC_V1 OFF)
+endif()
 ###########################################################################
 
 link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
@@ -138,9 +151,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 include(FindThreads)
 find_package(Threads)
 
-PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
-PKG_CHECK_MODULES(json-c REQUIRED json-c)
-PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils>=0.0.3)
+if (NOT WITH_ZEPHYR)
+	PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
+	
+	if (NOT WITHOUT_JSON_C)
+		PKG_CHECK_MODULES(json-c REQUIRED json-c)
+	endif()
+
+	if(WITH_RPUTILS_STATIC)
+		PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils-static>=0.0.3)
+	else()
+		PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils>=0.0.3)
+	endif()
+endif()
 
 if(WITH_LIBMICROHTTPD)
 	PKG_CHECK_MODULES(libmicrohttpd REQUIRED libmicrohttpd>=0.9.60)

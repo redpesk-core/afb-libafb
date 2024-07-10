@@ -23,6 +23,8 @@
 
 #pragma once
 
+#if WITH_WSJ1
+
 struct afb_ws_json1;
 struct afb_session;
 struct afb_token;
@@ -44,3 +46,4 @@ afb_ws_json1_create(
 extern struct afb_ws_json1 *afb_ws_json1_addref(struct afb_ws_json1 *ws);
 extern void afb_ws_json1_unref(struct afb_ws_json1 *ws);
 
+#endif

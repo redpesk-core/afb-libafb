@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_WSAPI
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -261,3 +263,5 @@ int afb_api_ws_add_server(const char *uri, struct afb_apiset *declare_set, struc
 error:
 	return rc;
 }
+
+#endif

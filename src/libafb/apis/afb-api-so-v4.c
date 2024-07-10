@@ -30,9 +30,11 @@
 #include <assert.h>
 #include <stdarg.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
-#include <rp-utils/rp-verbose.h>
 #include <rp-utils/rp-jsonc.h>
+#endif
+#include <rp-utils/rp-verbose.h>
 
 #include "core/afb-v4-itf.h"
 
@@ -66,8 +68,12 @@ struct iniv4
  */
 static struct json_object *settings(struct afb_api_v4 *api, struct json_object *config)
 {
+#if WITHOUT_JSON_C
+	return NULL;
+#else
 	struct json_object *result = afb_api_v4_settings(api);
 	return rp_jsonc_object_merge(result, config, rp_jsonc_merge_option_join_or_keep);
+#endif
 }
 
 /**
@@ -157,7 +163,6 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	struct iniv4 iniv4;
 	struct afb_api_v4 *api;
 	char rpath[PATH_MAX];
-	struct json_object *obj;
 
 	/* retrieves important exported symbols */
 	afb_v4_connect_dynlib(dynlib, &iniv4.dlv4, 0);
@@ -230,11 +235,15 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 	/* interpret configuration */
 	iniv4.uid = NULL;
 	iniv4.config = config;
-	if (json_object_object_get_ex(config, "uid", &obj))
-		iniv4.uid = json_object_get_string(obj);
-	if (json_object_object_get_ex(config, "config", &obj))
-		iniv4.config = obj;
-
+#if !WITHOUT_JSON_C
+	{
+		struct json_object *obj;
+		if (json_object_object_get_ex(config, "uid", &obj))
+			iniv4.uid = json_object_get_string(obj);
+		if (json_object_object_get_ex(config, "config", &obj))
+			iniv4.config = obj;
+	}
+#endif
 	/* extract the real path of the binding and start the api */
 	realpath(path, rpath);
 	if (iniv4.dlv4.desc)

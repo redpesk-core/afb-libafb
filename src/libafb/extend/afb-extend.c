@@ -25,11 +25,14 @@
 
 #if WITH_EXTENSION
 
+#include <stdlib.h>
 #include <string.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
-#include <rp-utils/rp-verbose.h>
 #include <rp-utils/rp-jsonc.h>
+#endif
+#include <rp-utils/rp-verbose.h>
 
 #include "afb-extension.h"
 #include "afb-extend.h"
@@ -158,7 +161,11 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 					ext->next = 0;
 					ext->handle = handle;
 					ext->manifest = manifest;
+#if WITHOUT_JSON_C
+					ext->config = NULL;
+#else
 					ext->config = config ? json_object_get(config) : NULL;
+#endif
 					ext->data = 0;
 					memcpy(ext->path, path, pathlen);
 					if (uid == NULL)
@@ -188,6 +195,7 @@ static int load_extension(const char *path, int failstops, const char *uid, stru
 	return rc;
 }
 
+#if !WITHOUT_JSON_C
 static void load_extension_cb(void *closure, struct json_object *value)
 {
 	int rc, *ret = closure;
@@ -219,6 +227,7 @@ static void load_extension_cb(void *closure, struct json_object *value)
 	if (rc < 0 && *ret >= 0)
 		*ret = rc;
 }
+#endif
 
 #if WITH_DIRENT
 /**
@@ -302,20 +311,28 @@ int afb_extend_load_extpath(const char *extpath)
 /* load extensions */
 int afb_extend_load_set_of_extensions(struct json_object *set)
 {
+#if WITHOUT_JSON_C
+	return X_ENOTSUP;
+#else
 	int rc = 1;
 	rp_jsonc_optarray_for_all(set, load_extension_cb, &rc);
 	return rc;
+#endif
 }
 
 /* load extensions by path */
 int afb_extend_load_set_of_extpaths(struct json_object *set)
 {
+#if WITHOUT_JSON_C
+	return X_ENOTSUP;
+#else
 	int rc = 1;
 #if WITH_DIRENT
 	/* search extensions */
 	rp_jsonc_optarray_for_all(set, load_extpath_cb, &rc);
 #endif
 	return rc;
+#endif
 }
 
 /* get command line option description */
@@ -369,6 +386,9 @@ int afb_extend_get_options(const struct argp_option ***options_array_result, con
 /* configure the extensions */
 int afb_extend_configure(struct json_object *config)
 {
+#if WITHOUT_JSON_C
+	return X_ENOTSUP;
+#else
 	int rc, s;
 	struct extension *ext;
 	int (*config_v1)(void **data, struct json_object *config, const char *uid);
@@ -401,6 +421,7 @@ int afb_extend_configure(struct json_object *config)
 		}
 	}
 	return rc;
+#endif
 }
 
 /* declare apis */

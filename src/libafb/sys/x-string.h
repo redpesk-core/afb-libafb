@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2024 IoT.bzh Company
+ * Copyright (C) 2015-2022 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,34 +23,54 @@
 
 #pragma once
 
-#if WITH_BINDINGS_V3
+#if HAVENT_strcasecmp
+#include <ctype.h>
+static inline int strcasecmp(const char *s1, const char *s2)
+{
+	char c1 = *s1;
+	char c2 = *s2;
+	int r = toupper(c1) - toupper(c2);
+	while(c1 && c2 && r == 0) {
+		c1 = *++s1;
+		c2 = *++s2;
+		r = toupper(c1) - toupper(c2);
+	}
+	return r;
+}
+#endif
 
-struct afb_req_common;
-struct afb_api_v3;
-struct afb_api_x3;
-struct afb_verb_v3;
-struct afb_req_v3;
+#if HAVENT_stpcpy
+static inline char *stpcpy(char *dest, const char *src)
+{
+	while((*dest = *src))
+		dest++, src++;
+	return dest;
+}
+#endif
 
-extern
-void
-afb_req_v3_process(
-	struct afb_req_common *comreq,
-	struct afb_api_v3 *api,
-	struct afb_api_x3 *apix3,
-	const struct afb_verb_v3 *verbv3
-);
+#if HAVENT_strchrnul
+static inline char *strchrnul(const char *s, int c)
+{
+	while (*s && *s != (char)c)
+		s++;
+	return (char*)s;
+}
+#endif
 
-/**
- * Get the common request linked to reqv3
- *
- * @param reqv3 the req to query
- *
- * @return the common request attached to the request
- */
-extern
-struct afb_req_common *
-afb_req_v3_get_common(
-	struct afb_req_v3 *reqv3
-);
+#if HAVENT_strdup
+static inline char *strdup(const char *s)
+{
+	size_t l = strlen(s) + 1;
+	char *r = malloc(l);
+	return r ? memcpy(r, s, l) : r;
+}
+#endif
 
+#if HAVENT_strndupa
+#include <alloca.h>
+#define strndup(s,n) strncpy(alloca((n)+1), (s), (n))
+#endif
+
+#if HAVENT_strdupa
+#define strdupa(s) strcpy(alloca(strlen(s)+1), (s))
 #endif

@@ -24,6 +24,8 @@
 
 #pragma once
 
+#if WITH_WSAPI
+
 #include <stdint.h>
 
 /*
@@ -45,7 +47,7 @@ typedef unsigned char afb_proto_ws_uuid_t[16];
 
 struct afb_proto_ws_client_itf
 {
-	/* can't be NULL */
+	/* one of it can't be NULL */
 	void (*on_reply)(void *closure, void *request, struct json_object *obj, const char *error, const char *info);
 
 	/* can be NULL */
@@ -105,3 +107,5 @@ extern int afb_proto_ws_call_subscribe(struct afb_proto_ws_call *call, uint16_t 
 extern int afb_proto_ws_call_unsubscribe(struct afb_proto_ws_call *call, uint16_t event_id);
 
 extern int afb_proto_ws_describe_put(struct afb_proto_ws_describe *describe, struct json_object *description);
+
+#endif

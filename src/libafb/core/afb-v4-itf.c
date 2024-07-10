@@ -61,13 +61,17 @@ afb_v4_itf_setup_shared_object(
 	afb_api_x4_t root,
 	void *handle
 ) {
+#if WITH_DYNAMIC_BINDING
 	struct afb_v4_dynlib_info info;
 	x_dynlib_t dynlib;
 
 	dynlib.handle = handle;
 	afb_v4_connect_dynlib(&dynlib, &info, root);
+#endif
 	return 0;
 }
+
+#if WITH_DYNAMIC_BINDING
 
 /***********************************************************
  * interface
@@ -249,8 +253,6 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 #endif
 /*-- END -----------------------------------*/
 };
-
-#if WITH_DYNAMIC_BINDING
 
 #include "sys/x-dynlib.h"
 

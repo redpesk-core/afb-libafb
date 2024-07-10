@@ -84,6 +84,7 @@ static int add(const char *path, struct afb_apiset *declare_set, struct afb_apis
 
 /*******************************************************************/
 
+#if WITH_WSAPI
 static int create_ws(const char *path, struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
 	return afb_api_ws_add_client(path, declare_set, call_set, 0) >= 0;
@@ -98,6 +99,7 @@ int afb_autoset_add_ws(const char *path, struct afb_apiset *declare_set, struct 
 {
 	return add(path, declare_set, call_set, onlack_ws);
 }
+#endif
 
 /*******************************************************************/
 
@@ -124,7 +126,6 @@ static int create_any(const char *path, struct afb_apiset *declare_set, struct a
 {
 	int rc;
 	struct stat st;
-	char sockname[PATH_MAX + 7];
 
 	rc = stat(path, &st);
 	if (!rc) {
@@ -134,10 +135,14 @@ static int create_any(const char *path, struct afb_apiset *declare_set, struct a
 			rc = afb_api_so_add_binding(path, declare_set, call_set);
 			break;
 #endif
-		case S_IFSOCK:
+#if WITH_WSAPI
+		case S_IFSOCK: {
+			char sockname[PATH_MAX + 7];
 			snprintf(sockname, sizeof sockname, "unix:%s", path);
 			rc = afb_api_ws_add_client(sockname, declare_set, call_set, 0);
 			break;
+		}
+#endif
 		default:
 			RP_NOTICE("Unexpected autoset entry: %s", path);
 			rc = -errno;

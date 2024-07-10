@@ -27,8 +27,10 @@
 #include <string.h>
 #include <stdint.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #include "core/afb-v4-itf.h"
@@ -626,6 +628,14 @@ afb_api_v4_process_call(
 		afb_req_common_reply_verb_unknown_error_hookable(req);
 }
 
+#if WITHOUT_JSON_C
+struct json_object *
+afb_api_v4_make_description_openAPIv3(
+	struct afb_api_v4 *api
+) {
+	return NULL;
+}
+#else
 static
 struct json_object *
 describe_verb_v4(
@@ -727,6 +737,7 @@ afb_api_v4_make_description_openAPIv3(
 	json_tokener_free(tok);
 	return r;
 }
+#endif
 
 
 /******************************************************************************

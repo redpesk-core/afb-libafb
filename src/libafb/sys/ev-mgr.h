@@ -23,6 +23,9 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <time.h>
+
 #include "x-epoll.h"
 
 /******************************************************************************/

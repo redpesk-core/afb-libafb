@@ -28,7 +28,6 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <afb/afb-event-x2-itf.h>
 #include <rp-utils/rp-uuid.h>
 #include <rp-utils/rp-verbose.h>
 
@@ -41,6 +40,10 @@
 #include "sys/x-rwlock.h"
 #include "sys/x-errno.h"
 #include "core/containerof.h"
+
+#if WITH_BINDINGS_V3
+#include <afb/afb-event-x2-itf.h>
+#endif
 
 #if WITH_TRACK_JOB_CALL
 #include "core/afb-jobs.h"
@@ -98,8 +101,10 @@ struct afb_evt_listener {
  */
 struct afb_evt {
 
-	/* interface */
+#if WITH_BINDINGS_V3
+	/* interface, MUST be first */
 	struct afb_event_x2 x2;
+#endif
 
 	/* next event */
 	struct afb_evt *next;
@@ -143,8 +148,10 @@ struct afb_evt_watch {
 	struct afb_evt_watch *next_by_listener;
 };
 
+#if WITH_BINDINGS_V3
 /* the interface for events */
 static struct afb_event_x2_itf afb_evt_event_x2_itf;
+#endif
 
 /* head of the list of listeners */
 static x_rwlock_t listeners_rwlock = X_RWLOCK_INITIALIZER;
@@ -684,7 +691,9 @@ static int create_evt(struct afb_evt **evt, const char *fullname, size_t len)
 	memcpy(nevt->fullname, fullname, len + 1);
 	nevt->refcount = 1;
 	nevt->watchs = NULL;
+#if WITH_BINDINGS_V3
 	nevt->x2.itf = NULL;
+#endif
 #if WITH_AFB_HOOK
 	nevt->hookflags = afb_hook_flags_evt(nevt->fullname);
 #endif
@@ -955,6 +964,7 @@ int afb_evt_broadcast_hookable(struct afb_evt *evt, unsigned nparams, struct afb
 }
 /****************************************************************/
 #endif
+
 /**************************************************************************/
 /** MANAGE LISTENERS                                                     **/
 /**************************************************************************/
@@ -1145,6 +1155,8 @@ void afb_evt_listener_unwatch_all(struct afb_evt_listener *listener, int notify)
 	}
 }
 
+#if WITH_BINDINGS_V3
+
 /**************************************************************************/
 /**************************************************************************/
 /*************    X2                                    *******************/
@@ -1185,7 +1197,6 @@ static int x2_event_push(struct afb_event_x2 *evtx2, struct json_object *obj)
 	return afb_json_legacy_event_push_hookable(afb_evt_of_x2(evtx2), obj);
 }
 
-
 static int x2_event_broadcast(struct afb_event_x2 *evtx2, struct json_object *obj)
 {
 	return afb_json_legacy_event_broadcast_hookable(afb_evt_of_x2(evtx2), obj);
@@ -1205,6 +1216,7 @@ inline struct afb_event_x2 *afb_evt_make_x2(struct afb_evt *evt)
 	evt->x2.itf = &afb_evt_event_x2_itf;
 	return &evt->x2;
 }
+#endif
 
 /**************************************************************************/
 

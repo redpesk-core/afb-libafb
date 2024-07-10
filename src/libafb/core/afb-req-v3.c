@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_BINDINGS_V3
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -579,3 +581,5 @@ void afb_req_v3_process(
 			verb->auth, verb->session,
 			call_checked_v3, req);
 }
+
+#endif

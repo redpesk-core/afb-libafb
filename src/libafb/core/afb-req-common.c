@@ -28,7 +28,10 @@
 #include <string.h>
 #include <stdarg.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
+#endif
+
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
 #define JSON_C_TO_STRING_NOSLASHESCAPE 0
 #endif
@@ -1255,6 +1258,9 @@ struct json_object *
 afb_req_common_get_client_info_hookable(
 	struct afb_req_common *req
 ) {
+#if WITHOUT_JSON_C
+	return NULL;
+#else
 	struct json_object *r = json_object_new_object();
 #if WITH_CRED
 	struct afb_cred *cred = req->credentials;
@@ -1276,6 +1282,7 @@ afb_req_common_get_client_info_hookable(
 		r = afb_hook_req_get_client_info(req, r);
 #endif
 	return r;
+#endif
 }
 
 static

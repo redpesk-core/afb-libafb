@@ -24,6 +24,8 @@
 
 #pragma once
 
+#if WITH_WSAPI
+
 struct afb_stub_ws;
 struct afb_apiset;
 struct afb_api_item;
@@ -65,3 +67,4 @@ extern int afb_stub_ws_client_add(struct afb_stub_ws *stubws, struct afb_apiset 
 
 extern void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, int (*reopen)(void*), void *closure, void (*release)(void*));
 
+#endif

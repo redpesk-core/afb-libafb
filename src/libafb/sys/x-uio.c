@@ -49,7 +49,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 			} while (rc < 0 && errno == EINTR);
 			if (rc <= 0)
 				return result ? result : rc;
-			result += (size_t)rc;
+			result += rc;
 			size -= (size_t)rc;
 			base = ((char*)base) + (size_t)rc;
 		}
@@ -75,7 +75,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 			} while (rc < 0 && errno == EINTR);
 			if (rc <= 0)
 				return result ? result : rc;
-			result += (size_t)rc;
+			result += rc;
 			size -= (size_t)rc;
 			base = ((char*)base) + (size_t)rc;
 		}

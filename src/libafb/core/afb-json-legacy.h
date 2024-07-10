@@ -23,6 +23,8 @@
 
 #pragma once
 
+#if WITH_BINDINGS_V3
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -380,3 +382,4 @@ afb_json_legacy_make_msg_string_event(
 	struct afb_data * const params[]
 );
 
+#endif

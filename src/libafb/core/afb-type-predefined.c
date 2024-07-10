@@ -29,6 +29,7 @@
  * to avoid modifying such read only data.
  */
 
+#include "../libafb-config.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -46,9 +47,11 @@
 
 #include "sys/x-errno.h"
 
-#include <json-c/json.h>
-#if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
-#define JSON_C_TO_STRING_NOSLASHESCAPE 0
+#if !WITHOUT_JSON_C
+# include <json-c/json.h>
+# if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
+#  define JSON_C_TO_STRING_NOSLASHESCAPE 0
+# endif
 #endif
 
 #if 0
@@ -310,6 +313,7 @@ static const char *get_json(struct afb_data *data) {
 /*****************************************************************************/
 /*****************************************************************************/
 
+#if !WITHOUT_JSON_C
 UNUSED_POLICY
 static int make_json_c(struct afb_data **result, struct json_object *value) {
 	return value ? afb_data_create_raw(result, &PREDEF(json_c), value, 0,
@@ -320,6 +324,7 @@ UNUSED_POLICY
 static struct json_object *get_json_c(struct afb_data *data) {
 	return (struct json_object*)afb_data_ro_pointer(data);
 }
+#endif
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -355,6 +360,7 @@ CONVERT(opaque,json)
 	return rc;
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(opaque,json_c)
 {
 	int rc;
@@ -365,12 +371,15 @@ CONVERT(opaque,json_c)
 		rc = make_json_c(out, json_object_new_string(buffer));
 	return rc;
 }
+#endif
 
 PREDEFINED_OPERATION(opaque)
 	{
 		CONVERT_TO(opaque, stringz),
 		CONVERT_TO(opaque, json),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(opaque, json_c)
+#endif
 	};
 
 PREDEFINED_TYPE(opaque, Afb_Typeid_Predefined_Opaque, FLAG_IS_OPAQUE, 0, 0);
@@ -448,6 +457,7 @@ CONVERT(stringz,bytearray)
 	return rc;
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(stringz,json_c)
 {
 	int rc;
@@ -466,12 +476,15 @@ CONVERT(stringz,json_c)
 	rc = make_json_c(out, json);
 	return rc;
 }
+#endif
 
 PREDEFINED_OPERATION(stringz)
 	{
 		CONVERT_TO(stringz, opaque),
 		CONVERT_TO(stringz, bytearray),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(stringz, json_c),
+#endif
 		CONVERT_TO(stringz, json)
 	};
 
@@ -480,6 +493,7 @@ PREDEFINED_TYPE(stringz, Afb_Typeid_Predefined_Stringz, FLAG_IS_STREAMABLE, 0, &
 /*****************************************************************************/
 /* PREDEFINED JSON */
 
+#if !WITHOUT_JSON_C
 CONVERT(json,json_c)
 {
 	int rc;
@@ -495,6 +509,7 @@ CONVERT(json,json_c)
 		rc = make_json_c(out, json);
 	return rc;
 }
+#endif
 
 CONVERT(json,opaque)
 {
@@ -512,7 +527,9 @@ CONVERT(json,opaque)
 PREDEFINED_OPERATION(json)
 	{
 		CONVERT_TO(json, opaque),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(json, json_c)
+#endif
 	};
 
 PREDEFINED_TYPE(json, Afb_Typeid_Predefined_Json, FLAG_IS_STREAMABLE, &PREDEF(stringz), &PREDEF(stringz));
@@ -520,6 +537,7 @@ PREDEFINED_TYPE(json, Afb_Typeid_Predefined_Json, FLAG_IS_STREAMABLE, &PREDEF(st
 /*****************************************************************************/
 /* PREDEFINED JSON-C */
 
+#if !WITHOUT_JSON_C
 CONVERT(json_c,json)
 {
 	struct json_object *object;
@@ -558,11 +576,14 @@ CONVERT(json_c,opaque)
 	}
 	return rc;
 }
+#endif
 
 PREDEFINED_OPERATION(json_c)
 	{
+#if !WITHOUT_JSON_C
 		CONVERT_TO(json_c, opaque),
 		CONVERT_TO(json_c, json)
+#endif
 	};
 
 PREDEFINED_TYPE(json_c, Afb_Typeid_Predefined_Json_C, 0, 0, &PREDEF(json));
@@ -700,6 +721,7 @@ CONVERT(bool,json)
 	return make_stringz_static(out, value ? "true" : "false");
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(bool,json_c)
 {
 	return make_json_c(out, json_object_new_boolean(get_bool(in)));
@@ -713,6 +735,7 @@ EXTRACT(json_c,struct json_object*,bool,uint8_t)
 	return 0;
 }
 TRANSFORM_EXTRACT(json_c,struct json_object*,bool,uint8_t)
+#endif
 
 EXTRACT(json,const char*,bool,uint8_t)
 {
@@ -730,8 +753,10 @@ PREDEFINED_OPERATION(bool)
 	{
 		CONVERT_TO(bool, json),
 		TRANSFORM_FROM(json, bool),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(bool, json_c),
 		TRANSFORM_FROM(json_c, bool),
+#endif
 		TRANSFORM_TO(bool, i32),
 		TRANSFORM_TO(bool, u32),
 		TRANSFORM_TO(bool, i64),
@@ -756,6 +781,7 @@ CONVERT(i32,json)
 	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(i32,json_c)
 {
 	return make_json_c(out, json_object_new_int(get_i32(in)));
@@ -773,6 +799,7 @@ EXTRACT(json_c,struct json_object*,i32,int32_t)
 	return 0;
 }
 TRANSFORM_EXTRACT(json_c,struct json_object*,i32,int32_t)
+#endif
 
 EXTRACT(json,const char*,i32,int32_t)
 {
@@ -789,8 +816,10 @@ PREDEFINED_OPERATION(i32)
 	{
 		CONVERT_TO(i32, json),
 		TRANSFORM_FROM(json, i32),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(i32, json_c),
 		TRANSFORM_FROM(json_c, i32),
+#endif
 		TRANSFORM_TO(i32, i64),
 		TRANSFORM_TO(i32, double)
 	};
@@ -813,6 +842,7 @@ CONVERT(u32,json)
 	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(u32,json_c)
 {
 	return make_json_c(out, json_object_new_int64((int64_t)get_u32(in)));
@@ -830,6 +860,7 @@ EXTRACT(json_c,struct json_object*,u32,uint32_t)
 	return 0;
 }
 TRANSFORM_EXTRACT(json_c,struct json_object*,u32,uint32_t)
+#endif
 
 EXTRACT(json,const char*,u32,uint32_t)
 {
@@ -846,8 +877,10 @@ PREDEFINED_OPERATION(u32)
 	{
 		CONVERT_TO(u32, json),
 		TRANSFORM_FROM(json, u32),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(u32, json_c),
 		TRANSFORM_FROM(json_c, u32),
+#endif
 		TRANSFORM_TO(u32, i64),
 		TRANSFORM_TO(u32, u64),
 		TRANSFORM_TO(u32, double)
@@ -869,6 +902,7 @@ CONVERT(i64,json)
 	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(i64,json_c)
 {
 	return make_json_c(out, json_object_new_int64(get_i64(in)));
@@ -886,6 +920,7 @@ EXTRACT(json_c,struct json_object*,i64,int64_t)
 	return 0;
 }
 TRANSFORM_EXTRACT(json_c,struct json_object*,i64,int64_t)
+#endif
 
 EXTRACT(json,const char*,i64,int64_t)
 {
@@ -902,8 +937,10 @@ PREDEFINED_OPERATION(i64)
 	{
 		CONVERT_TO(i64, json),
 		TRANSFORM_FROM(json, i64),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(i64, json_c),
 		TRANSFORM_FROM(json_c, i64),
+#endif
 		TRANSFORM_TO(i64, double)
 	};
 
@@ -955,6 +992,7 @@ CONVERT(double,json)
 	return make_stringz_copy_length(out, buffer, (size_t)len);
 }
 
+#if !WITHOUT_JSON_C
 CONVERT(double,json_c)
 {
 	return make_json_c(out, json_object_new_double(get_double(in)));
@@ -971,6 +1009,7 @@ EXTRACT(json_c,struct json_object*,double,double)
 	return 0;
 }
 TRANSFORM_EXTRACT(json_c,struct json_object*,double,double)
+#endif
 
 EXTRACT(json,const char*,double,double)
 {
@@ -987,8 +1026,10 @@ PREDEFINED_OPERATION(double)
 	{
 		CONVERT_TO(double, json),
 		TRANSFORM_FROM(json, double),
+#if !WITHOUT_JSON_C
 		CONVERT_TO(double, json_c),
 		TRANSFORM_FROM(json_c, double)
+#endif
 	};
 
 PREDEFINED_TYPE(double, Afb_Typeid_Predefined_Double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));

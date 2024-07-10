@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_BINDINGS_V3
+
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -984,3 +986,5 @@ afb_json_legacy_make_msg_string_event(
 	*length = mm.length;
 	return mm.rc;
 }
+
+#endif

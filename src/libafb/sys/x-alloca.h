@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2024 IoT.bzh Company
+ * Copyright (C) 2015-2022 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,34 +23,14 @@
 
 #pragma once
 
-#if WITH_BINDINGS_V3
+#if HAVENT_alloca_h
 
-struct afb_req_common;
-struct afb_api_v3;
-struct afb_api_x3;
-struct afb_verb_v3;
-struct afb_req_v3;
+#undef alloca
 
-extern
-void
-afb_req_v3_process(
-	struct afb_req_common *comreq,
-	struct afb_api_v3 *api,
-	struct afb_api_x3 *apix3,
-	const struct afb_verb_v3 *verbv3
-);
-
-/**
- * Get the common request linked to reqv3
- *
- * @param reqv3 the req to query
- *
- * @return the common request attached to the request
- */
-extern
-struct afb_req_common *
-afb_req_v3_get_common(
-	struct afb_req_v3 *reqv3
-);
+#ifdef __GNUC__
+#define alloca(size) __builtin_alloca(size)
+#else
+#error "no alloca is provided"
+#endif
 
 #endif

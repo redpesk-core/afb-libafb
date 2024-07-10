@@ -22,6 +22,10 @@
  */
 
 
+#include "../libafb-config.h"
+
+#if WITH_WSAPI
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -1325,3 +1329,5 @@ void afb_proto_ws_set_queuing(struct afb_proto_ws *protows, int (*queuing)(struc
 {
 	protows->queuing = queuing;
 }
+
+#endif

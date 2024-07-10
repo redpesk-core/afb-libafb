@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_WSAPI
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -901,3 +903,5 @@ void afb_stub_ws_client_robustify(struct afb_stub_ws *stubws, int (*reopen)(void
 	stubws->robust.closure = closure;
 	stubws->robust.release = release;
 }
+
+#endif

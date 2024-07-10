@@ -24,6 +24,8 @@
 
 #pragma once
 
+#if WITH_BINDINGS_V3
+
 #include "afb-api-common.h"
 #include "afb-string-mode.h"
 
@@ -172,3 +174,6 @@ struct json_object *
 afb_api_v3_make_description_openAPIv3(
 	struct afb_api_v3 *api
 );
+
+#endif
+

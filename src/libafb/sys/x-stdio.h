@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2024 IoT.bzh Company
+ * Copyright (C) 2015-2022 IoT.bzh Company
  * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
@@ -23,34 +23,36 @@
 
 #pragma once
 
-#if WITH_BINDINGS_V3
+#if HAVENT_vasprintf
+#include <stdio.h>
+#include <stdarg.h>
+static inline int vasprintf(char **strp, const char *fmt, va_list ap)
+{
+	int l;
+	char *buffer;
+	va_list ap2;
+	va_copy(ap2, ap);
+	l = vsnprintf((char*)&l, 0, fmt, ap);
+	if (l >= 0) {
+		*strp = buffer = malloc(1 + (size_t)l);
+		if (buffer)
+			l = vsnprintf(buffer, 1 + (size_t)l, fmt, ap2);
+		else
+			l = -1;
+	}
+	return l;
+}
+#endif
 
-struct afb_req_common;
-struct afb_api_v3;
-struct afb_api_x3;
-struct afb_verb_v3;
-struct afb_req_v3;
-
-extern
-void
-afb_req_v3_process(
-	struct afb_req_common *comreq,
-	struct afb_api_v3 *api,
-	struct afb_api_x3 *apix3,
-	const struct afb_verb_v3 *verbv3
-);
-
-/**
- * Get the common request linked to reqv3
- *
- * @param reqv3 the req to query
- *
- * @return the common request attached to the request
- */
-extern
-struct afb_req_common *
-afb_req_v3_get_common(
-	struct afb_req_v3 *reqv3
-);
-
+#if HAVENT_asprintf
+#include <stdarg.h>
+static inline int asprintf(char **strp, const char *fmt, ...)
+{
+	int l;
+	va_list ap;
+	va_start(ap, fmt);
+	l = vasprintf(strp, fmt, ap);
+	va_end(ap);
+	return l;
+}
 #endif

@@ -21,6 +21,9 @@
  * $RP_END_LICENSE$
  */
 
+#include "../libafb-config.h"
+
+#if !WITHOUT_JSON_C
 
 #include <stdlib.h>
 
@@ -115,3 +118,5 @@ struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t sessi
 
 	return result;
 }
+
+#endif

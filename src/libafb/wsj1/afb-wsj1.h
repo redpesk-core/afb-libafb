@@ -23,6 +23,8 @@
 
 #pragma once
 
+#if WITH_WSJ1
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -263,3 +265,4 @@ extern const char *afb_wsj1_msg_object_s(struct afb_wsj1_msg *msg, size_t *size)
  */
 extern struct json_object *afb_wsj1_msg_object_j(struct afb_wsj1_msg *msg);
 
+#endif

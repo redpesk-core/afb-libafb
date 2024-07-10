@@ -23,6 +23,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_WSJ1
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -345,3 +347,4 @@ static int wsreq_unsubscribe(struct afb_req_common *comreq, struct afb_evt *even
 	return afb_evt_listener_unwatch_evt(wsreq->aws->listener, event);
 }
 
+#endif

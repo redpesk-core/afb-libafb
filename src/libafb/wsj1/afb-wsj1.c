@@ -23,6 +23,10 @@
 
 #define _GNU_SOURCE
 
+#include "../libafb-config.h"
+
+#if WITH_WSJ1
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
@@ -701,3 +705,4 @@ int afb_wsj1_reply_s(struct afb_wsj1_msg *msg, const char *object, const char *t
 	return wsj1_send_isot(msg->wsj1, iserror ? RETERR : RETOK, msg->id, object, token);
 }
 
+#endif

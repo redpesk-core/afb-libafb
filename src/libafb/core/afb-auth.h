@@ -23,6 +23,8 @@
 
 #pragma once
 
+#if !WITHOUT_JSON_C
+
 #include <stdint.h>
 
 struct afb_auth;
@@ -30,3 +32,4 @@ struct json_object;
 
 extern struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t session);
 
+#endif
