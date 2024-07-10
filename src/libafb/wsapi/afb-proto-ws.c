@@ -32,7 +32,9 @@
 #include <assert.h>
 #include <fcntl.h>
 
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #include "misc/afb-ws.h"

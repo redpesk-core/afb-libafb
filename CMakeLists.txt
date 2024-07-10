@@ -118,6 +118,10 @@ if(WITH_GNUTLS)
 	add_definitions(-DWITH_TLS)
 endif()
 ###########################################################################
+if(WITHOUT_JSON_C)
+	set(WITH_AFB_HOOK OFF)
+endif()
+###########################################################################
 
 link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
 
