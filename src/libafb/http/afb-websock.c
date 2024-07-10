@@ -37,6 +37,7 @@
 #include "http/afb-hsrv.h"
 #include "http/afb-websock.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 #include "wsj1/afb-ws-json1.h"
 #include "http/afb-upgd-rpc.h"

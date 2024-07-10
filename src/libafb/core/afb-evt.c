@@ -39,6 +39,7 @@
 #include "sys/x-mutex.h"
 #include "sys/x-rwlock.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 #include "core/containerof.h"
 
 #if WITH_BINDINGS_V3

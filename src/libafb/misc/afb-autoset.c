@@ -40,6 +40,7 @@
 #include "core/afb-apiset.h"
 #include "misc/afb-autoset.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 static void cleanup(void *closure)
 {

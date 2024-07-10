@@ -55,6 +55,7 @@
 #include "core/afb-sig-monitor.h"
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 /*************************************************************************
  * internal types

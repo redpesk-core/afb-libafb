@@ -38,6 +38,7 @@
 
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 /******************************************************************************/
 #define BACKLOG  5

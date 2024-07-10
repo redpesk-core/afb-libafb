@@ -67,8 +67,8 @@ static inline char *strdup(const char *s)
 #endif
 
 #if HAVENT_strndupa
-#include <alloca.h>
-#define strndup(s,n) strncpy(alloca((n)+1), (s), (n))
+#include "sys/x-alloca.h"
+#define strndupa(s,n) strncpy(alloca((n)+1), (s), (n))
 #endif
 
 #if HAVENT_strdupa

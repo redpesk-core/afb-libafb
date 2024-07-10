@@ -30,6 +30,7 @@
 
 #include <microhttpd.h>
 
+#include "sys/x-alloca.h"
 #include "core/afb-apiset.h"
 #include "core/afb-session.h"
 #include "http/afb-hreq.h"

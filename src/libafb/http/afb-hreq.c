@@ -59,6 +59,7 @@
 #include "http/afb-hsrv.h"
 #include "sys/x-errno.h"
 #include "utils/namecmp.h"
+#include "sys/x-alloca.h"
 
 #define SIZE_RESPONSE_BUFFER   8192
 #define SIZE_COOKIE_BUFFER     250

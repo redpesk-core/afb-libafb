@@ -44,6 +44,7 @@
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 #include "sys/x-uio.h"
+#include "sys/x-alloca.h"
 
 #define CALL 2
 #define RETOK 3

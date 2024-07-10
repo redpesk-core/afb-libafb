@@ -38,6 +38,7 @@
 #include "core/afb-ev-mgr.h"
 #include "sys/x-uio.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 /*
  * declaration of the websock interface for afb-ws

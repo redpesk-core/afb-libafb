@@ -27,8 +27,6 @@
 
 #if HAVENT_qsort
 
-#include <alloca.h>
-
 static inline void _swap_(void *x, void *y, size_t size)
 {
 #define _SWAP_(type) \
