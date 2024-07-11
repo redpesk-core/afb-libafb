@@ -443,7 +443,7 @@ void afb_api_common_vverbose_hookable(
 ) {
 #if WITH_AFB_HOOK
 	va_list ap;
-	if (comapi->hookflags & afb_hook_flag_api_event_make) {
+	if (comapi->hookflags & afb_hook_flag_api_vverbose) {
 		va_copy(ap, args);
 		afb_api_common_vverbose(comapi, level, file, line, function, fmt, args);
 		afb_hook_api_vverbose(comapi, level, file, line, function, fmt, ap);
