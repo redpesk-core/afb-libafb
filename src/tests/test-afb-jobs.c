@@ -179,7 +179,7 @@ END_TEST
 static uint64_t getnow()
 {
 	struct timespec ts;
-	ck_assert_int_eq(clock_gettime(CLOCK_MONOTONIC, &ts),0);
+	ck_assert_int_eq(clock_gettime(CLOCK_REALTIME, &ts),0);
 	/* X.10^-6 = X.(2^-6 * 5^-6) = X.(2^-6 / 15625) = (X >> 6) / 15625 */
 	return (uint64_t)(ts.tv_sec * 1000) + (uint64_t)((ts.tv_nsec >> 6) / 15625);
 }

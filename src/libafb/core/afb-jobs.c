@@ -90,7 +90,7 @@ static uint64_t delayed_base;
 static uint64_t getnow()
 {
 	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
+	clock_gettime(CLOCK_REALTIME, &ts);
 	/* X.10^-6 = X.(2^-6 * 5^-6) = X.(2^-6 / 15625) = (X >> 6) / 15625 */
 	return (uint64_t)(ts.tv_sec * 1000) + (uint64_t)((ts.tv_nsec >> 6) / 15625);
 }

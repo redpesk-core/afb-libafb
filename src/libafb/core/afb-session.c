@@ -120,7 +120,7 @@ static inline time_t time_now()
 {
 #if WITH_CLOCK_GETTIME
 	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+	clock_gettime(CLOCK_REALTIME, &ts);
 	return ts.tv_sec;
 #else
 	return time(NULL);

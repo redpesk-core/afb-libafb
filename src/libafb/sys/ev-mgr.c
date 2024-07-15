@@ -138,7 +138,7 @@ typedef uint64_t time_ns_t;
 #define TIME_NS_MAX INT64_MAX
 
 /** what clock to use for timers */
-#define CLOCK CLOCK_MONOTONIC
+#define CLOCK CLOCK_REALTIME
 
 /** minimal period value (milliseconds)  */
 #define PERIOD_MIN_MS 1
