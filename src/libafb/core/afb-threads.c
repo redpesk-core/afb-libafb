@@ -255,38 +255,6 @@ static int start_thread(struct thread *thr)
 	return rc;
 }
 
-static int enter_thread(struct thread *thr)
-{
-	thr->tid = x_thread_self();
-	x_mutex_lock(&mutex);
-	link_thread(thr);
-	thread_run(thr);
-	unlink_thread(thr);
-	x_mutex_unlock(&mutex);
-	free(thr);
-	return 0;
-}
-
-static int start(int classid, afb_threads_job_getter_t jobget, void * closure, int (*run)(struct thread *thr))
-{
-	int rc;
-	struct thread *thr = malloc(sizeof *thr);
-	if (!thr)
-		rc = -ENOMEM;
-	else {
-		thr->next = 0;
-		thr->tid = 0;
-		thr->active = 1;
-		thr->asleep = 0;
-		thr->cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
-		thr->classid = classid;
-		thr->getjob = jobget;
-		thr->getjobcls = closure;
-		rc = run(thr);
-	}
-	return rc;
-}
-
 int afb_threads_active_count(int classid)
 {
 	struct thread *ithr;
@@ -319,34 +287,62 @@ int afb_threads_asleep_count(int classid)
 
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
 {
-#if WITH_THREADS_RESERVE
 	struct thread *thr;
+
+#if WITH_THREADS_RESERVE
 	x_mutex_lock(&mutex);
 	thr = reserve_head;
-	if (!thr) {
+	if (thr != NULL) {
+
+		reserve_head = thr->next;
+		reserve_decount++;
+		thr->next = 0;
+		thr->active = 1;
+		thr->asleep = 0;
+		thr->classid = classid;
+		thr->getjob = jobget;
+		thr->getjobcls = closure;
+		link_thread(thr);
+		x_cond_signal(&thr->cond);
 		x_mutex_unlock(&mutex);
-		return start(classid, jobget, closure, start_thread);
+		return 0;
 	}
-	reserve_head = thr->next;
-	reserve_decount++;
+	x_mutex_unlock(&mutex);
+#endif
+	thr = malloc(sizeof *thr);
+	if (thr == NULL)
+		return X_ENOMEM;
+
 	thr->next = 0;
 	thr->active = 1;
 	thr->asleep = 0;
+	thr->cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
 	thr->classid = classid;
 	thr->getjob = jobget;
 	thr->getjobcls = closure;
-	link_thread(thr);
-	x_cond_signal(&thr->cond);
-	x_mutex_unlock(&mutex);
-	return 0;
-#else
-	return start(classid, jobget, closure, start_thread);
-#endif
+	return start_thread(thr);
 }
 
 int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closure)
 {
-	return start(classid, jobget, closure, enter_thread);
+	struct thread me;
+
+	me.next = 0;
+	me.tid = x_thread_self();
+	me.active = 1;
+	me.asleep = 0;
+	me.cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
+	me.classid = classid;
+	me.getjob = jobget;
+	me.getjobcls = closure;
+
+	x_mutex_lock(&mutex);
+	link_thread(&me);
+	thread_run(&me);
+	unlink_thread(&me);
+	x_mutex_unlock(&mutex);
+
+	return 0;
 }
 
 int afb_threads_wakeup(int classid, int count)
