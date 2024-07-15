@@ -70,7 +70,6 @@ struct thread
 
 	/** synchronisation with the thread */
 	x_cond_t  cond;
-
 };
 
 /* synchronisation of threads (TODO: try to use lock-free technics) */
@@ -84,11 +83,22 @@ static struct thread *threads = 0;
 static int active_count = 0;
 static int asleep_count = 0;
 
-#ifndef AFB_THREADS_RESERVE_COUNT
-#define AFB_THREADS_RESERVE_COUNT 16
+#ifndef WITH_THREADS_RESERVE
+#define  WITH_THREADS_RESERVE 1
 #endif
-static int reserve_count = AFB_THREADS_RESERVE_COUNT;
-static struct thread *reserve = 0;
+#if WITH_THREADS_RESERVE
+/*
+* Reserve is a reserved already started threads but not
+* active. These thread structures are stored in the list
+* headed by `reserve_head`. The value `reserve_decount` is the
+* remaining count of threads allowed to enter the reserve.
+*/
+#ifndef AFB_THREADS_RESERVE_COUNT
+#define AFB_THREADS_RESERVE_COUNT 4
+#endif
+static int reserve_decount = AFB_THREADS_RESERVE_COUNT;
+static struct thread *reserve_head = 0;
+#endif
 
 static inline int match_any_class(int classid)
 {
@@ -208,16 +218,21 @@ static void *thread_starter(void *arg)
 {
 	struct thread *thr = arg;
 	x_mutex_lock(&mutex);
+#if WITH_THREADS_RESERVE
 	for (;;) {
 		thread_run(thr);
 		unlink_thread(thr);
-		if (reserve_count <= 0)
+		if (reserve_decount <= 0)
 			break;
-		thr->next = reserve;
-		reserve = thr;
-		reserve_count--;
+		thr->next = reserve_head;
+		reserve_head = thr;
+		reserve_decount--;
 		x_cond_wait(&thr->cond, &mutex);
 	}
+#else
+	thread_run(thr);
+	unlink_thread(thr);
+#endif
 	x_mutex_unlock(&mutex);
 	free(thr);
 	return 0;
@@ -304,15 +319,16 @@ int afb_threads_asleep_count(int classid)
 
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
 {
+#if WITH_THREADS_RESERVE
 	struct thread *thr;
 	x_mutex_lock(&mutex);
-	thr = reserve;
+	thr = reserve_head;
 	if (!thr) {
 		x_mutex_unlock(&mutex);
 		return start(classid, jobget, closure, start_thread);
 	}
-	reserve = thr->next;
-	reserve_count++;
+	reserve_head = thr->next;
+	reserve_decount++;
 	thr->next = 0;
 	thr->active = 1;
 	thr->asleep = 0;
@@ -323,6 +339,9 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	x_cond_signal(&thr->cond);
 	x_mutex_unlock(&mutex);
 	return 0;
+#else
+	return start(classid, jobget, closure, start_thread);
+#endif
 }
 
 int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closure)
@@ -440,14 +459,19 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 	return resu;
 }
 
+#if WITH_THREADS_RESERVE
 void afb_threads_set_reserve_count(int count)
 {
-	int curco;
+	int curco = 0;
 	struct thread *ithr;
 	x_mutex_lock(&mutex);
-	curco = reserve_count;
-	for (ithr = reserve ; ithr ; ithr = ithr->next)
+	for (ithr = reserve_head ; ithr ; ithr = ithr->next)
 		curco++;
-	reserve_count += count - curco;
+	if (count >= curco)
+		reserve_decount = count - curco;
+	else {
+
+	}
 	x_mutex_unlock(&mutex);
 }
+#endif
