@@ -107,7 +107,7 @@ static void evloop_sig_run(int signum, void *closure)
 	}
 	else {
 		int delayms = (int)(intptr_t)closure;
-		afb_ev_mgr_prepare_wait_dispatch_release(delayms);
+		afb_ev_mgr_prepare_wait_dispatch(delayms, 0);
 	}
 }
 
@@ -130,6 +130,8 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 		afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
 		rc = AFB_THREADS_CONTINUE;
 	}
+	else
+		afb_ev_mgr_release(tid);
 	return rc;
 }
 

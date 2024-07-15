@@ -69,10 +69,12 @@ int afb_ev_mgr_release(x_thread_t tid)
 {
 	int unheld = 0;
 	if (SAME_TID(holder, tid)) {
+		struct waithold *waiter;
 		x_mutex_lock(&mutex);
 		holder = INVALID_THREAD_ID;
-		if (awaiters) {
-			x_cond_signal(&awaiters->cond);
+		waiter = awaiters;
+		if (waiter != NULL) {
+			x_cond_signal(&waiter->cond);
 			x_mutex_unlock(&mutex);
 		}
 		else {
@@ -92,6 +94,8 @@ int afb_ev_mgr_release(x_thread_t tid)
  */
 static int try_get(x_thread_t tid)
 {
+	if (awaiters != NULL)
+		return 0;
 	if (!SAME_TID(holder, tid)) {
 		x_mutex_lock(&mutex);
 		if (!SAME_TID(holder, INVALID_THREAD_ID)) {
@@ -278,7 +282,7 @@ int afb_ev_mgr_add_timer(
 	return rc;
 }
 
-void afb_ev_mgr_prepare_wait_dispatch_release(int delayms)
+void afb_ev_mgr_prepare_wait_dispatch(int delayms, int release)
 {
 	int rc;
 	int tempo = delayms < 0 ? -1 : delayms;
@@ -290,7 +294,13 @@ void afb_ev_mgr_prepare_wait_dispatch_release(int delayms)
 		if (rc > 0)
 			ev_mgr_dispatch(mgr);
 	}
-	afb_ev_mgr_release(me);
+	if (release)
+		afb_ev_mgr_release(me);
+}
+
+void afb_ev_mgr_prepare_wait_dispatch_release(int delayms)
+{
+	afb_ev_mgr_prepare_wait_dispatch(delayms, 1);
 }
 
 void afb_ev_mgr_try_recover(x_thread_t tid)

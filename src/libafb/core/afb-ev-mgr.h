@@ -98,6 +98,9 @@ int afb_ev_mgr_add_timer(
 );
 
 extern
+void afb_ev_mgr_prepare_wait_dispatch(int delayms, int release);
+
+extern
 void afb_ev_mgr_prepare_wait_dispatch_release(int delayms);
 
 extern
