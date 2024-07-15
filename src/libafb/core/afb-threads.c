@@ -158,7 +158,6 @@ static void thread_run(struct thread *me)
 {
 	int status;
 	afb_threads_job_desc_t jobdesc;
-	x_thread_t tid = me->tid;
 
 PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 	/* initiate thread tempo */
@@ -167,12 +166,12 @@ PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 	while (me->active) {
 		/* get a job */
 		x_mutex_unlock(&mutex);
-		status = me->getjob(me->getjobcls, &jobdesc, tid);
+		status = me->getjob(me->getjobcls, &jobdesc, me->tid);
 		if (status > 0) {
 			/* run the job */
 			if (status == AFB_THREADS_EXEC) {
 PRINT("++++++++++++ TR run B%p classid=%d\n",me,me->classid);
-				jobdesc.run(jobdesc.job, tid);
+				jobdesc.run(jobdesc.job, me->tid);
 			}
 			x_mutex_lock(&mutex);
 		}

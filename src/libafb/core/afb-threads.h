@@ -84,7 +84,7 @@ typedef struct afb_threads_job_desc afb_threads_job_desc_t;
 #define AFB_THREADS_IDLE	0
 /** run the job given in the description then continue */
 #define AFB_THREADS_EXEC	1
-/** continue the thread loop */
+/** continue the thread loop without job */
 #define AFB_THREADS_CONTINUE	2
 
 /**
