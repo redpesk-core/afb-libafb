@@ -112,6 +112,10 @@ if(WITHOUT_JSON_C)
 	set(WITH_WSAPI OFF)
 	set(WITH_RPC_V1 OFF)
 endif()
+
+if(WITH_GNUTLS)
+	add_definitions(-DWITH_TLS)
+endif()
 ###########################################################################
 
 link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)

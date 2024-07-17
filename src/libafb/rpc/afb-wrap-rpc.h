@@ -24,6 +24,22 @@
 
 #pragma once
 
+/**
+ * RPC wrap connection mode, TLS and WebSocket are mutually exclusive
+ */
+enum afb_wrap_rpc_mode {
+	/* direct */
+	Wrap_Rpc_Mode_Raw,
+#if WITH_TLS
+	/* TLS (client) */
+	Wrap_Rpc_Mode_Tls_Client,
+	/* TLS (server) */
+	Wrap_Rpc_Mode_Tls_Server,
+#endif
+	/* WebSocket */
+	Wrap_Rpc_Mode_Websocket
+};
+
 struct afb_apiset;
 struct afb_session;
 struct afb_token;
@@ -47,7 +63,7 @@ int afb_wrap_rpc_create(
 		struct afb_wrap_rpc **wrap,
 		int fd,
 		int autoclose,
-		int websock,
+		enum afb_wrap_rpc_mode mode,
 		const char *apiname,
 		struct afb_apiset *callset);
 

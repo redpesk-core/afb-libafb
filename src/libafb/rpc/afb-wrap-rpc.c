@@ -213,7 +213,7 @@ static int init(
 		struct afb_wrap_rpc *wrap,
 		int fd,
 		int autoclose,
-		int websock,
+		enum afb_wrap_rpc_mode mode,
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
@@ -223,7 +223,7 @@ static int init(
 		if (autoclose)
 			close(fd);
 	} else {
-		if (websock) {
+		if (mode == Wrap_Rpc_Mode_Websocket) {
 			/* websocket initialisation */
 			wrap->efd = NULL;
 			wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
@@ -238,6 +238,13 @@ static int init(
 			}
 		}
 		else {
+#if WITH_TLS
+			/* TLS */
+			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
+				RP_CRITICAL("TLS not implemented yet"); /* TODO */
+			}
+#endif
+
 			/* direct initialisation */
 			wrap->ws = NULL;
 			rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent, wrap, 0, autoclose);
@@ -259,7 +266,7 @@ int afb_wrap_rpc_create(
 		struct afb_wrap_rpc **wrap,
 		int fd,
 		int autoclose,
-		int websock,
+		enum afb_wrap_rpc_mode mode,
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
@@ -271,7 +278,7 @@ int afb_wrap_rpc_create(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc =  init(*wrap, fd, autoclose, websock, apiname, callset);
+		rc =  init(*wrap, fd, autoclose, mode, apiname, callset);
 		if (rc < 0) {
 			free(*wrap);
 			*wrap = NULL;
@@ -302,7 +309,8 @@ int afb_wrap_rpc_upgrade(
 		int websock
 ) {
 	struct afb_wrap_rpc *wrap;
-	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, websock, NULL, callset);
+	enum afb_wrap_rpc_mode mode = websock ? Wrap_Rpc_Mode_Websocket : Wrap_Rpc_Mode_Raw;
+	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, mode, NULL, callset);
 	if (rc >= 0) {
 		afb_stub_rpc_set_session(wrap->stub, session);
 		afb_stub_rpc_set_token(wrap->stub, token);
