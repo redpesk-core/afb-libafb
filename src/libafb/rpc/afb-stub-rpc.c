@@ -821,24 +821,68 @@ static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], a
 			typenum = AFB_RPC_V3_ID_TYPE_BOOL;
 			break;
 		case Afb_Typeid_Predefined_I8:
-			typenum = AFB_RPC_V3_ID_TYPE_I8; /* TODO not a predefined type */
+			typenum = AFB_RPC_V3_ID_TYPE_I8;
 			break;
 		case Afb_Typeid_Predefined_U8:
-			typenum = AFB_RPC_V3_ID_TYPE_U8; /* TODO not a predefined type */
+			typenum = AFB_RPC_V3_ID_TYPE_U8;
 			break;
+#if BYTE_ORDER == LITTLE_ENDIAN
 		case Afb_Typeid_Predefined_I16:
+			typenum = AFB_RPC_V3_ID_TYPE_I16;
+			break;
 		case Afb_Typeid_Predefined_U16:
+			typenum = AFB_RPC_V3_ID_TYPE_U16;
+			break;
 		case Afb_Typeid_Predefined_I32:
+			typenum = AFB_RPC_V3_ID_TYPE_I32;
+			break;
 		case Afb_Typeid_Predefined_U32:
+			typenum = AFB_RPC_V3_ID_TYPE_U32;
+			break;
 		case Afb_Typeid_Predefined_I64:
+			typenum = AFB_RPC_V3_ID_TYPE_I64;
+			break;
 		case Afb_Typeid_Predefined_U64:
+			typenum = AFB_RPC_V3_ID_TYPE_U64;
+			break;
 		case Afb_Typeid_Predefined_Float:
+			typenum = AFB_RPC_V3_ID_TYPE_FLOAT;
+			break;
 		case Afb_Typeid_Predefined_Double:
+			typenum = AFB_RPC_V3_ID_TYPE_DOUBLE;
+			break;
+#else
+		case Afb_Typeid_Predefined_I16:
+			typenum = AFB_RPC_V3_ID_TYPE_I16_BE;
+			break;
+		case Afb_Typeid_Predefined_U16:
+			typenum = AFB_RPC_V3_ID_TYPE_U16_BE;
+			break;
+		case Afb_Typeid_Predefined_I32:
+			typenum = AFB_RPC_V3_ID_TYPE_I32_BE;
+			break;
+		case Afb_Typeid_Predefined_U32:
+			typenum = AFB_RPC_V3_ID_TYPE_U32_BE;
+			break;
+		case Afb_Typeid_Predefined_I64:
+			typenum = AFB_RPC_V3_ID_TYPE_I64_BE;
+			break;
+		case Afb_Typeid_Predefined_U64:
+			typenum = AFB_RPC_V3_ID_TYPE_U64_BE;
+			break;
+		case Afb_Typeid_Predefined_Float:
+			typenum = AFB_RPC_V3_ID_TYPE_FLOAT_BE;
+			break;
+		case Afb_Typeid_Predefined_Double:
+			typenum = AFB_RPC_V3_ID_TYPE_DOUBLE_BE;
+			break;
+#endif
 		default:
 			typenum = 0; /* TODO */
 		}
 		if (size > UINT16_MAX - 8)
 			return X_EOVERFLOW;
+
 		values[i].id = typenum;
 		values[i].data = cptr ? cptr : &values[i].data;
 		values[i].length = (uint16_t)size;
@@ -2178,6 +2222,7 @@ static int typed_value_to_data_v3(struct afb_stub_rpc *stub, uint16_t typenum, u
 	int rc;
 	struct afb_type *type1 = 0, *type2 = 0;
 	uint8_t size;
+	char buffer[8];
 
 	switch (typenum) {
 	case AFB_RPC_V3_ID_TYPE_OPAQUE:
@@ -2193,32 +2238,142 @@ static int typed_value_to_data_v3(struct afb_stub_rpc *stub, uint16_t typenum, u
 		type1 = &afb_type_predefined_json;
 		break;
 	case AFB_RPC_V3_ID_TYPE_BOOL:
-		size = 1;
-		type2 = &afb_type_predefined_bool;
+		if (length == 1) {
+			*(char*)buffer = *(char*)value ? 1 : 0;
+			type2 = &afb_type_predefined_bool;
+			size = 1;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_I8:
+		if (length == 1) {
+			*(int32_t*)buffer = (int32_t)*(int8_t*)value;
+			type2 = &afb_type_predefined_i32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_U8:
+		if (length == 1) {
+			*(uint32_t*)buffer = (uint32_t)*(uint8_t*)value;
+			type2 = &afb_type_predefined_u32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_I16:
+		if (length == 2) {
+			*(int32_t*)buffer = (int32_t)(int16_t)le16toh(*(uint16_t*)value);
+			type2 = &afb_type_predefined_i32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_U16:
+		if (length == 2) {
+			*(uint32_t*)buffer = (uint32_t)(uint16_t)le16toh(*(uint16_t*)value);
+			type2 = &afb_type_predefined_u32;
+			size = 4;
+		}
 		break;
 	case AFB_RPC_V3_ID_TYPE_I32:
-		size = 4;
-		type2 = &afb_type_predefined_i32;
+		if (length == 4) {
+			*(int32_t*)buffer = (int32_t)le32toh(*(uint32_t*)value);
+			type2 = &afb_type_predefined_i32;
+			size = 4;
+		}
 		break;
 	case AFB_RPC_V3_ID_TYPE_U32:
-		size = 4;
-		type2 = &afb_type_predefined_u32;
+		if (length == 4) {
+			*(uint32_t*)buffer = (uint32_t)le32toh(*(uint32_t*)value);
+			type2 = &afb_type_predefined_u32;
+			size = 4;
+		}
 		break;
 	case AFB_RPC_V3_ID_TYPE_I64:
-		size = 8;
-		type2 = &afb_type_predefined_i64;
+		if (length == 8) {
+			*(int64_t*)buffer = (int64_t)le64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_i64;
+			size = 8;
+		}
 		break;
 	case AFB_RPC_V3_ID_TYPE_U64:
-		size = 8;
-		type2 = &afb_type_predefined_u64;
+		if (length == 8) {
+			*(uint64_t*)buffer = (uint64_t)le64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_u64;
+			size = 8;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_FLOAT:
+		if (length == 4) {
+			*(uint32_t*)buffer = (uint32_t)le32toh(*(uint32_t*)value);
+			*(double*)buffer = (double)*(float*)buffer;
+			type2 = &afb_type_predefined_double;
+			size = 8;
+		}
 		break;
 	case AFB_RPC_V3_ID_TYPE_DOUBLE:
-		size = 8;
-		type2 = &afb_type_predefined_double;
+		if (length == 8) {
+			*(uint64_t*)buffer = (uint64_t)le64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_double;
+			size = 8;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_I16_BE:
+		if (length == 2) {
+			*(int32_t*)buffer = (int32_t)(int16_t)be16toh(*(uint16_t*)value);
+			type2 = &afb_type_predefined_i32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_U16_BE:
+		if (length == 2) {
+			*(uint32_t*)buffer = (uint32_t)(uint16_t)be16toh(*(uint16_t*)value);
+			type2 = &afb_type_predefined_u32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_I32_BE:
+		if (length == 4) {
+			*(int32_t*)buffer = (int32_t)be32toh(*(uint32_t*)value);
+			type2 = &afb_type_predefined_i32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_U32_BE:
+		if (length == 4) {
+			*(uint32_t*)buffer = (uint32_t)be32toh(*(uint32_t*)value);
+			type2 = &afb_type_predefined_u32;
+			size = 4;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_I64_BE:
+		if (length == 8) {
+			*(int64_t*)buffer = (int64_t)be64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_i64;
+			size = 8;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_U64_BE:
+		if (length == 8) {
+			*(uint64_t*)buffer = (uint64_t)be64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_u64;
+			size = 8;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_FLOAT_BE:
+		if (length == 4) {
+			*(uint32_t*)buffer = (uint32_t)be32toh(*(uint32_t*)value);
+			*(double*)buffer = (double)*(float*)buffer;
+			type2 = &afb_type_predefined_double;
+			size = 8;
+		}
+		break;
+	case AFB_RPC_V3_ID_TYPE_DOUBLE_BE:
+		if (length == 8) {
+			*(uint64_t*)buffer = (uint64_t)be64toh(*(uint64_t*)value);
+			type2 = &afb_type_predefined_double;
+			size = 8;
+		}
 		break;
 	default:
-		rc = X_ENOTSUP; /* TODO */
-		break;
+		return X_ENOTSUP; /* TODO */
 	}
 	if (type1) {
 		if (length)
@@ -2228,19 +2383,10 @@ static int typed_value_to_data_v3(struct afb_stub_rpc *stub, uint16_t typenum, u
 			rc = afb_data_create_raw(data, type1, NULL, 0, 0, 0);
 	}
 	else if (type2) {
-		if (size != length)
-			rc = X_EPROTO;
-		else {
-#if BYTE_ORDER == LITTLE_ENDIAN
-			rc = afb_data_create_copy(data, type2, value, length);
-#else
-			char buffer[8];
-			uint32_t idx;
-			for (idx = 0 ; idx < size ; idx++)
-				buffer[idx] = ((const char*)value)[size - (idx + 1)];
-			rc = afb_data_create_copy(data, type2, buffer, length);
-#endif
-		}
+		rc = afb_data_create_copy(data, type2, value, size);
+	}
+	else {
+		rc = X_EPROTO;
 	}
 
 	return rc;

@@ -85,6 +85,14 @@ struct afb_rpc_decoder;
 #define AFB_RPC_V3_ID_TYPE_U64               0xfff3
 #define AFB_RPC_V3_ID_TYPE_FLOAT             0xfff2
 #define AFB_RPC_V3_ID_TYPE_DOUBLE            0xfff1
+#define AFB_RPC_V3_ID_TYPE_I16_BE            0xfff0
+#define AFB_RPC_V3_ID_TYPE_U16_BE            0xffef
+#define AFB_RPC_V3_ID_TYPE_I32_BE            0xffee
+#define AFB_RPC_V3_ID_TYPE_U32_BE            0xffed
+#define AFB_RPC_V3_ID_TYPE_I64_BE            0xffec
+#define AFB_RPC_V3_ID_TYPE_U64_BE            0xffeb
+#define AFB_RPC_V3_ID_TYPE_FLOAT_BE          0xffea
+#define AFB_RPC_V3_ID_TYPE_DOUBLE_BE         0xffe9
 
 /* type of id for resources */
 typedef uint16_t afb_rpc_v3_id_t;
