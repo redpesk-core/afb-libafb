@@ -170,12 +170,28 @@ static void server_req_reply_cb(struct afb_req_common *comreq, int status, unsig
 		RP_ERROR("error while sending reply");
 }
 
+static int server_event_add(struct afb_stub_ws *stubws, const char *event, uint16_t eventid)
+{
+	int rc = 0;
+	if (stubws->proto != NULL) {
+		rc = u16id2bool_set(&stubws->event_flags, eventid, 1);
+		if (rc == 0) {
+			rc = afb_proto_ws_server_event_create(stubws->proto, eventid, event);
+			if (rc < 0)
+				u16id2bool_set(&stubws->event_flags, eventid, 0);
+		}
+	}
+	return rc;
+}
+
 static int server_req_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *event)
 {
 	int rc;
 	struct server_req *wreq = containerof(struct server_req, comreq, comreq);
 
 	rc = afb_evt_listener_watch_evt(wreq->stubws->listener, event);
+	if (rc >= 0)
+		server_event_add(wreq->stubws, afb_evt_fullname(event), afb_evt_id(event));
 	if (rc >= 0)
 		rc = afb_proto_ws_call_subscribe(wreq->call,  afb_evt_id(event));
 	if (rc < 0)
@@ -318,17 +334,9 @@ static void client_api_describe_cb(void * closure, void (*describecb)(void *, st
 
 static void server_event_add_cb(void *closure, const char *event, uint16_t eventid)
 {
-	int rc;
 	struct afb_stub_ws *stubws = closure;
 
-	if (stubws->proto != NULL) {
-		rc = u16id2bool_set(&stubws->event_flags, eventid, 1);
-		if (rc == 0) {
-			rc = afb_proto_ws_server_event_create(stubws->proto, eventid, event);
-			if (rc < 0)
-				u16id2bool_set(&stubws->event_flags, eventid, 0);
-		}
-	}
+	server_event_add(stubws, event, eventid);
 }
 
 static void server_event_remove_cb(void *closure, const char *event, uint16_t eventid)
