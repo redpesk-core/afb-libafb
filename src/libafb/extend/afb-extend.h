@@ -152,7 +152,7 @@ extern int afb_extend_exit(struct afb_apiset *declare_set);
 
 /* DEPRECATED */
 #undef WITH_DEPRECATED_OLDER_THAN_4_1
-#define WITH_DEPRECATED_OLDER_THAN_4_1   1
+#define WITH_DEPRECATED_OLDER_THAN_4_1   0
 #if WITH_DEPRECATED_OLDER_THAN_4_1
 /**
  * Load the extensions listed in the given config.
