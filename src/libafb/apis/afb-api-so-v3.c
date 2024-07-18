@@ -25,12 +25,12 @@
 
 #if WITH_DYNAMIC_BINDING
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <stdarg.h>
 
-#include <json-c/json.h>
 #include <afb/afb-binding-v3.h>
 #include <rp-utils/rp-verbose.h>
 
