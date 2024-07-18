@@ -92,7 +92,7 @@ START_TEST (test)
 	ck_assert_ptr_eq(out_v4, out_api);
 
 	/* creates 10000 verbs */
-	n = 30000;
+	n = 10000;
 	for (i = 0 ; i < n ; i++) {
 		snprintf(buffer,sizeof buffer,"proc%d",i+1);
 		rc = afb_api_v4_add_verb(out_v4, buffer, NULL, cbvt, (void*)(intptr_t)i, NULL, 0, 0);
