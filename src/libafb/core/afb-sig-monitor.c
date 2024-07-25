@@ -300,6 +300,19 @@ static inline void monitor_do(void (*function)(int sig, void*), void *arg)
 		recovery->undoers = undo.previous;
 	}
 }
+
+static inline void monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg)
+{
+	struct recovery *recovery = x_tls_get_error_handler();
+	if (recovery == NULL)
+		monitor_run(timeout, function, arg);
+	else {
+		struct undoer undo = { function, arg, recovery->undoers };
+		recovery->undoers = &undo;
+		function(0, arg);
+		recovery->undoers = undo.previous;
+	}
+}
 #endif
 /******************************************************************************/
 #if !WITH_SIG_MONITOR_SIGNALS
@@ -494,6 +507,16 @@ void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg)
 #if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 	if (enabled)
 		monitor_do(function, arg);
+	else
+#endif
+		function(0, arg);
+}
+
+void afb_sig_monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg)
+{
+#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
+	if (enabled)
+		monitor_do_run(timeout, function, arg);
 	else
 #endif
 		function(0, arg);

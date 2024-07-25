@@ -57,9 +57,7 @@ extern int afb_sig_monitor_init_timeouts();
  * called with signal == 0.
  *
  * @param timeout   timeout for the job in secondes (<= 0 for no timeout)
- *
  * @param function  the job to run as void callback function
- *
  * @param arg       the arguments to pass to the job
  */
 extern void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *arg);
@@ -74,10 +72,19 @@ extern void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), v
  * with afb_sig_monitor_run)
  *
  * @param function  the job to run as void callback function
- *
  * @param arg       the arguments to pass to the job
  */
 extern void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg);
+
+/**
+ * If the monitoring is active this function calls afb_sig_monitor_do
+ * otherwise it calls afb_sig_monitor_run woth no timeout.
+ *
+ * @param timeout   timeout for the job in secondes (<= 0 for no timeout)
+ * @param function  the job to run as void callback function
+ * @param arg       the arguments to pass to the job
+ */
+extern void afb_sig_monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg);
 
 /**
  * Dumps the current stack
