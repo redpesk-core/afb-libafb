@@ -363,12 +363,14 @@ void test_start_sched_adapt(int sig, void * arg){
             nsleep(250000);
         }
 
+        fprintf(stderr, "All jobs ended\n");
         pthread_mutex_lock(&gval.mutex);
         gval.val *= -1;
         gval.lastJob = FALSE;
         pthread_mutex_unlock(&gval.mutex);
     }
 
+    fprintf(stderr, "before exiting sched\n");
     afb_sched_exit(1, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_sched_adapt\n");
 }

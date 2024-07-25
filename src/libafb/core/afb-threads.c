@@ -161,10 +161,12 @@ PRINT("++++++++++++ WUsA%p\n",thr);
 
 static void stop(struct thread *thr)
 {
+	unsigned char pstate = thr->tstate;
 	active_count--;
 	thr->tstate = TSTATE_STOP;
 	wakeup_asleep_waiter(0);
-	wakeup(thr);
+	if (pstate == TSTATE_ASLEPT)
+		x_cond_signal(&thr->cond);
 }
 
 static void thread_run(struct thread *me)
