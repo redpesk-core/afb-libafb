@@ -159,8 +159,8 @@ const struct afb_req_common_query_itf req_call_itf = {
 /******************************************************************************/
 
 static
-void
-process(
+struct req_calls *
+make_call_req(
 	struct afb_api_common *comapi,
 	const char *apiname,
 	const char *verbname,
@@ -198,7 +198,7 @@ process(
 		afb_data_array_unref(nparams, params);
 		RP_ERROR("out of memory");
 		callback(closure1, closure2, closure3, X_ENOMEM, 0, NULL);
-		return;
+		return NULL;
 	}
 
 	/* success of allocation */
@@ -241,8 +241,32 @@ process(
 	afb_req_common_set_cred(&req->comreq, cred);
 #endif
 
-	/* process the request now */
-	afb_req_common_process(&req->comreq, afb_api_common_call_set(comapi));
+	/* return the made request now */
+	return req;
+}
+
+static
+void
+process(
+	struct afb_api_common *comapi,
+	const char *apiname,
+	const char *verbname,
+	unsigned nparams,
+	struct afb_data * const params[],
+	void (*callback)(void*, void*, void*, int, unsigned, struct afb_data * const[]),
+	void *closure1,
+	void *closure2,
+	void *closure3,
+	struct afb_req_common *caller,
+	int flags,
+	const struct afb_req_common_query_itf *itf,
+	int copynames
+) {
+	struct req_calls *req = make_call_req(comapi, apiname, verbname, nparams, params,
+	                                      callback, closure1, closure2, closure3,
+	                                      caller, flags, itf, copynames);
+	if (req != NULL)
+		afb_req_common_process(&req->comreq, afb_api_common_call_set(req->comapi));
 }
 
 #if WITH_AFB_CALL_SYNC
@@ -285,7 +309,7 @@ static void call_sync_leave(void *closure1, void *closure2, void *closure3, int 
 static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lock *lock)
 {
 	struct psync *ps = closure;
-	if (!signum) {
+	if (signum == 0) {
 		process(ps->comapi, ps->apiname, ps->verbname, ps->nparams, ps->params,
 			call_sync_leave, lock, 0, 0,
 			ps->caller, ps->flags, &req_call_itf, 0);
