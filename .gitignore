@@ -1,5 +1,6 @@
 docs/
 build/
+build-*/
 doxygen-output/
 .vscode/*.json
 *.swp
