@@ -63,8 +63,8 @@ struct sync_job
 	/** status */
 	int status;
 
-	/** timeout */
-	int timeout;
+	/** state */
+	int state;
 
 	/** synchronize mutex */
 	x_mutex_t mutex;
@@ -250,7 +250,6 @@ static struct sync_job *get_sync_job(uintptr_t id)
  */
 static void sync_cb(int signum, void *closure)
 {
-	int rc;
 	struct sync_job *ps, *sync = closure;
 
 	/* normal case */
@@ -266,18 +265,13 @@ static void sync_cb(int signum, void *closure)
 		x_mutex_unlock(&sync_jobs_mutex);
 
 		/* enter */
+		sync->state = 0;
 		sync->enter(0, sync->arg, (struct afb_sched_lock*)sync->id);
 
 		/* wait */
 		x_mutex_lock(&sync->mutex);
-		if (sync->timeout <= 0)
-			rc = x_cond_wait(&sync->condsync, &sync->mutex);
-		else {
-			struct timespec ts;
-			clock_gettime(CLOCK_REALTIME, &ts);
-			ts.tv_sec += sync->timeout;
-			rc = x_cond_timedwait(&sync->condsync, &sync->mutex, &ts);
-		}
+		if (sync->state == 0)
+			sync->status = x_cond_wait(&sync->condsync, &sync->mutex);
 		x_mutex_unlock(&sync->mutex);
 	}
 
@@ -296,11 +290,9 @@ static void sync_cb(int signum, void *closure)
 	/*  */
 	if (signum != 0) {
 		sync->enter(signum, sync->arg, NULL);
-		rc = X_EINTR;
+		sync->status = X_EINTR;
 	}
 
-	if (rc < 0 && sync->status >= 0)
-		sync->status = -errno;
 	x_cond_destroy(&sync->condsync);
 	x_mutex_destroy(&sync->mutex);
 }
@@ -328,13 +320,12 @@ int afb_sched_sync(
 	struct sync_job sync;
 
 	/* init the structure */
-	sync.timeout = timeout;
 	sync.enter = callback;
 	sync.arg = closure;
 	sync.status = 0;
 
 	/* call the function */
-	afb_sched_call(0, sync_cb, &sync, Afb_Sched_Mode_Start);
+	afb_sched_call(timeout, sync_cb, &sync, Afb_Sched_Mode_Start);
 	return sync.status;
 }
 
@@ -354,10 +345,10 @@ int afb_sched_leave(struct afb_sched_lock *lock)
 		rc = X_ENOENT;
 	else {
 		x_mutex_lock(&sync->mutex);
-		if (sync->status != 0)
+		if (sync->state != 0)
 			rc = X_EINVAL;
 		else {
-			sync->status = 1;
+			sync->state = 1;
 			rc = x_cond_signal(&sync->condsync);
 			if (rc < 0)
 				rc = -errno;
