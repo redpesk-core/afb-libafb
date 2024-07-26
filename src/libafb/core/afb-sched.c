@@ -63,6 +63,9 @@ struct sync_job
 	/** status */
 	int status;
 
+	/** timeout */
+	int timeout;
+
 	/** synchronize mutex */
 	x_mutex_t mutex;
 
@@ -247,16 +250,59 @@ static struct sync_job *get_sync_job(uintptr_t id)
  */
 static void sync_cb(int signum, void *closure)
 {
-	struct sync_job *sync = closure;
-	sync->enter(signum, sync->arg, (struct afb_sched_lock*)sync->id);
-	if (signum != 0) {
+	int rc;
+	struct sync_job *ps, *sync = closure;
+
+	/* normal case */
+	if (signum == 0) {
+		x_mutex_init(&sync->mutex);
+		x_cond_init(&sync->condsync);
+
+		/* link the structure */
+		x_mutex_lock(&sync_jobs_mutex);
+		sync->id = ++sync_jobs_cptr;
+		sync->next = sync_jobs_head;
+		sync_jobs_head = sync;
+		x_mutex_unlock(&sync_jobs_mutex);
+
+		/* enter */
+		sync->enter(0, sync->arg, (struct afb_sched_lock*)sync->id);
+
+		/* wait */
 		x_mutex_lock(&sync->mutex);
-		if (sync->status == 0) {
-			sync->status = signum == SIGVTALRM ? X_ETIMEDOUT : X_EINTR;
-			x_cond_signal(&sync->condsync);
+		if (sync->timeout <= 0)
+			rc = x_cond_wait(&sync->condsync, &sync->mutex);
+		else {
+			struct timespec ts;
+			clock_gettime(CLOCK_REALTIME, &ts);
+			ts.tv_sec += sync->timeout;
+			rc = x_cond_timedwait(&sync->condsync, &sync->mutex, &ts);
 		}
 		x_mutex_unlock(&sync->mutex);
 	}
+
+	/* unlink the structure */
+	x_mutex_lock(&sync_jobs_mutex);
+	ps = sync_jobs_head;
+	if (ps == sync)
+		sync_jobs_head = sync->next;
+	else {
+		while (ps->next != sync)
+			ps = ps->next;
+		ps->next = sync->next;
+	}
+	x_mutex_unlock(&sync_jobs_mutex);
+
+	/*  */
+	if (signum != 0) {
+		sync->enter(signum, sync->arg, NULL);
+		rc = X_EINTR;
+	}
+
+	if (rc < 0 && sync->status >= 0)
+		sync->status = -errno;
+	x_cond_destroy(&sync->condsync);
+	x_mutex_destroy(&sync->mutex);
 }
 
 /**
@@ -279,62 +325,17 @@ int afb_sched_sync(
 		void (*callback)(int signum, void *closure, struct afb_sched_lock *lock),
 		void *closure
 ) {
-	int rc;
-	struct sync_job sync, *ps;
-	struct timespec ts, *pts;
+	struct sync_job sync;
 
 	/* init the structure */
+	sync.timeout = timeout;
 	sync.enter = callback;
 	sync.arg = closure;
 	sync.status = 0;
-	x_mutex_init(&sync.mutex);
-	x_cond_init(&sync.condsync);
-
-	/* link the structure */
-	x_mutex_lock(&sync_jobs_mutex);
-	sync.id = ++sync_jobs_cptr;
-	sync.next = sync_jobs_head;
-	sync_jobs_head = &sync;
-	x_mutex_unlock(&sync_jobs_mutex);
-
-	/* prepare timeout */
-	if (!timeout)
-		pts = NULL;
-	else {
-		clock_gettime(CLOCK_REALTIME, &ts);
-		ts.tv_sec += timeout;
-		pts = &ts;
-	}
 
 	/* call the function */
-	afb_sched_call(timeout, sync_cb, &sync, Afb_Sched_Mode_Start);
-
-	/* wait unlock */
-	x_mutex_lock(&sync.mutex);
-	if (sync.status != 0)
-		rc = sync.status < 0 ? sync.status : 0;
-	else {
-		if (pts == NULL)
-			rc = x_cond_wait(&sync.condsync, &sync.mutex);
-		else
-			rc = x_cond_timedwait(&sync.condsync, &sync.mutex, pts);
-		rc = rc < 0 ? -errno : sync.status == 0 ? X_ETIMEDOUT : 0;
-	}
-	x_mutex_unlock(&sync.mutex);
-
-	/* unlink the structure */
-	x_mutex_lock(&sync_jobs_mutex);
-	ps = sync_jobs_head;
-	if (ps == &sync)
-		sync_jobs_head = sync.next;
-	else {
-		while (ps->next != &sync)
-			ps = ps->next;
-		ps->next = sync.next;
-	}
-	x_mutex_unlock(&sync_jobs_mutex);
-
-	return rc;
+	afb_sched_call(0, sync_cb, &sync, Afb_Sched_Mode_Start);
+	return sync.status;
 }
 
 /**
