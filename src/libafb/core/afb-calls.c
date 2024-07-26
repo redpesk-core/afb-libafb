@@ -283,26 +283,25 @@ struct psync
 	struct afb_req_common *caller;
 	int flags;
 	int completed;
+	struct req_calls *callreq;
 };
 
 static void call_sync_leave(void *closure1, void *closure2, void *closure3, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct afb_sched_lock *lock = closure1;
-	struct psync *ps = afb_sched_lock_arg(lock);
+	struct psync *ps = closure2;
 
-	if (ps != NULL) {
-		if (ps->nreplies) {
-			if (ps->replies) {
-				if (nreplies > *ps->nreplies)
-					nreplies = *ps->nreplies;
-				afb_data_array_copy_addref(nreplies, replies, ps->replies);
-			}
-			*ps->nreplies = nreplies;
+	if (ps->nreplies) {
+		if (ps->replies) {
+			if (nreplies > *ps->nreplies)
+				nreplies = *ps->nreplies;
+			afb_data_array_copy_addref(nreplies, replies, ps->replies);
 		}
-		if (ps->status)
-			*ps->status = status;
-		ps->completed = 1;
+		*ps->nreplies = nreplies;
 	}
+	if (ps->status)
+		*ps->status = status;
+	ps->completed = 1;
 	afb_sched_leave(lock);
 }
 
@@ -310,9 +309,25 @@ static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lo
 {
 	struct psync *ps = closure;
 	if (signum == 0) {
-		process(ps->comapi, ps->apiname, ps->verbname, ps->nparams, ps->params,
-			call_sync_leave, lock, 0, 0,
-			ps->caller, ps->flags, &req_call_itf, 0);
+		ps->callreq = make_call_req(ps->comapi, ps->apiname, ps->verbname, ps->nparams, ps->params,
+		                            call_sync_leave, lock, ps, 0,
+		                            ps->caller, ps->flags, &req_call_itf, 1);
+		if (ps->callreq == NULL)
+			ps->completed = 1;
+		else {
+			afb_req_common_addref(&ps->callreq->comreq);
+			afb_req_common_process(&ps->callreq->comreq, afb_api_common_call_set(ps->comapi));
+		}
+	}
+	else if (ps->callreq != NULL) {
+		ps->callreq->callback = NULL;
+		if (!ps->completed) {
+			if (ps->nreplies)
+				*ps->nreplies = 0;
+			if (ps->status)
+				*ps->status = X_EINTR;
+			ps->completed = 1;
+		}
 	}
 }
 
@@ -343,10 +358,15 @@ process_sync(
 	ps.replies = replies;
 	ps.caller = caller;
 	ps.flags = flags;
+	ps.callreq = NULL;
 
 	ps.completed = 0;
 
 	rc = afb_sched_sync(0, process_sync_enter_cb, &ps);
+	if (ps.callreq != NULL) {
+		ps.callreq->callback = NULL;
+		afb_req_common_unref(&ps.callreq->comreq);
+	}
 	if (!ps.completed && rc >= 0)
 		rc = X_EINTR;
 	if (rc < 0) {
