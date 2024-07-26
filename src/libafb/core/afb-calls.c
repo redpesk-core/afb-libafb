@@ -30,6 +30,7 @@
 
 #include <rp-utils/rp-verbose.h>
 #include <afb/afb-req-subcall-flags.h>
+#include <afb/afb-errno.h>
 
 #include "core/afb-data.h"
 #include "core/afb-calls.h"
@@ -286,22 +287,29 @@ struct psync
 	struct req_calls *callreq;
 };
 
+static void call_sync_reply(struct psync *ps, int status, unsigned nreplies, struct afb_data * const replies[])
+{
+	if (!ps->completed) {
+		if (ps->nreplies) {
+			if (ps->replies) {
+				if (nreplies > *ps->nreplies)
+					nreplies = *ps->nreplies;
+				afb_data_array_copy_addref(nreplies, replies, ps->replies);
+			}
+			*ps->nreplies = nreplies;
+		}
+		if (ps->status)
+			*ps->status = status;
+		ps->completed = 1;
+	}
+}
+
 static void call_sync_leave(void *closure1, void *closure2, void *closure3, int status, unsigned nreplies, struct afb_data * const replies[])
 {
 	struct afb_sched_lock *lock = closure1;
 	struct psync *ps = closure2;
 
-	if (ps->nreplies) {
-		if (ps->replies) {
-			if (nreplies > *ps->nreplies)
-				nreplies = *ps->nreplies;
-			afb_data_array_copy_addref(nreplies, replies, ps->replies);
-		}
-		*ps->nreplies = nreplies;
-	}
-	if (ps->status)
-		*ps->status = status;
-	ps->completed = 1;
+	call_sync_reply(ps, status, nreplies, replies);
 	afb_sched_leave(lock);
 }
 
@@ -319,16 +327,8 @@ static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lo
 			afb_req_common_process(&ps->callreq->comreq, afb_api_common_call_set(ps->comapi));
 		}
 	}
-	else if (ps->callreq != NULL) {
+	else if (ps->callreq != NULL)
 		ps->callreq->callback = NULL;
-		if (!ps->completed) {
-			if (ps->nreplies)
-				*ps->nreplies = 0;
-			if (ps->status)
-				*ps->status = X_EINTR;
-			ps->completed = 1;
-		}
-	}
 }
 
 static
@@ -367,14 +367,7 @@ process_sync(
 		ps.callreq->callback = NULL;
 		afb_req_common_unref(&ps.callreq->comreq);
 	}
-	if (!ps.completed && rc >= 0)
-		rc = X_EINTR;
-	if (rc < 0) {
-		if (nreplies)
-			*nreplies = 0;
-		if (status)
-			*status = rc;
-	}
+	call_sync_reply(&ps, AFB_ERRNO_NO_REPLY, 0, NULL);
 	return rc;
 }
 #else
