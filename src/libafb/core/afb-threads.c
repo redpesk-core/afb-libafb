@@ -40,7 +40,9 @@
 #if DEBUGGING
 #include <stdio.h>
 #define PRINT(...) fprintf(stderr,__VA_ARGS__)
+#define IFDBG(...) __VA_ARGS__
 #else
+#define IFDBG(...)
 #define PRINT(...)
 #endif
 
@@ -70,6 +72,8 @@ struct thread
 
 	/** synchronisation with the thread */
 	x_cond_t  cond;
+
+IFDBG(unsigned id;)
 };
 
 /* synchronisation of threads (TODO: try to use lock-free technics) */
@@ -151,10 +155,10 @@ static int wakeup(struct thread *thr)
 	if (thr->stopped || !thr->aslept)
 		return 0;
 
-PRINT("++++++++++++ WUsB%p\n",thr);
+PRINT("++++++++++++ WUsB[%u]%p\n",thr->id,thr);
 	thr->aslept = 0;
 	x_cond_signal(&thr->cond);
-PRINT("++++++++++++ WUsA%p\n",thr);
+PRINT("++++++++++++ WUsA[%u]%p\n",thr->id,thr);
 	return 1;
 }
 
@@ -174,9 +178,11 @@ static void thread_run(struct thread *me)
 	int status;
 	afb_threads_job_desc_t jobdesc;
 
+IFDBG(static unsigned id = 0; me->id = ++id;)
+
 	x_mutex_unlock(&mutex);
 
-PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 	/* initiate thread tempo */
 	afb_sig_monitor_init_timeouts();
 
@@ -190,24 +196,24 @@ PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 
 		case AFB_THREADS_EXEC:
 			/* execute the retrieved job */
-PRINT("++++++++++++ TR run B%p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
 			jobdesc.run(jobdesc.job, me->tid);
 			break;
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
-PRINT("++++++++++++ TRwB%p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
 			x_mutex_lock(&mutex);
 			me->aslept = 1;
 			wakeup_asleep_waiter(0);
 			x_cond_wait(&me->cond, &mutex);
 			x_mutex_unlock(&mutex);
-PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ TRwA[%u]%p classid=%d\n",me->id,me,me->classid);
 			break;
 
 		default:
 			/* stop current thread */
-PRINT("++++++++++++ TR stop B%p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
 			x_mutex_lock(&mutex);
 			stop(me);
 			x_mutex_unlock(&mutex);
@@ -224,7 +230,7 @@ PRINT("++++++++++++ TR stop B%p classid=%d\n",me,me->classid);
 	/* terminate */
 	afb_sig_monitor_clean_timeouts();
 
-PRINT("++++++++++++ STOP %p classid=%d\n",me,me->classid);
+PRINT("++++++++++++ STOP[%u] %p classid=%d\n",me->id,me,me->classid);
 
 }
 
@@ -353,11 +359,13 @@ int afb_threads_wakeup(int classid, int count)
 {
 	int decount = 0;
 	struct thread *ithr;
+PRINT("++++++++++++ B-TWU %d\n",count);
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
 		if (ithr->aslept && match_class(ithr, classid))
 			decount += wakeup(ithr);
 	x_mutex_unlock(&mutex);
+PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
 	return decount;
 }
 
