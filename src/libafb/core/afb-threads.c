@@ -174,6 +174,7 @@ static void thread_run(struct thread *me)
 	int status;
 	afb_threads_job_desc_t jobdesc;
 
+	x_mutex_unlock(&mutex);
 
 PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 	/* initiate thread tempo */
@@ -181,34 +182,40 @@ PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 
 	while (!me->stopped) {
 		/* get a job */
-		x_mutex_unlock(&mutex);
 		status = me->getjob(me->getjobcls, &jobdesc, me->tid);
-		if (status > 0) {
-			/* run the job */
-			if (status == AFB_THREADS_EXEC) {
+		switch (status) {
+		case AFB_THREADS_CONTINUE:
+			/* continue the loop */
+			break;
+
+		case AFB_THREADS_EXEC:
+			/* execute the retrieved job */
 PRINT("++++++++++++ TR run B%p classid=%d\n",me,me->classid);
-				jobdesc.run(jobdesc.job, me->tid);
-			}
-			x_mutex_lock(&mutex);
-		}
-		else {
-PRINT("++++++++++++ TR ??? B%p classid=%d\n",me,me->classid);
-			x_mutex_lock(&mutex);
-			if (!me->stopped) {
-				if (status != AFB_THREADS_IDLE)
-					stop(me);
-				else {
-					/* no job, wait */
-					me->aslept = 1;
+			jobdesc.run(jobdesc.job, me->tid);
+			break;
+
+		case AFB_THREADS_IDLE:
+			/* enter idle */
 PRINT("++++++++++++ TRwB%p classid=%d\n",me,me->classid);
-					wakeup_asleep_waiter(0);
-					x_cond_wait(&me->cond, &mutex);
+			x_mutex_lock(&mutex);
+			me->aslept = 1;
+			wakeup_asleep_waiter(0);
+			x_cond_wait(&me->cond, &mutex);
+			x_mutex_unlock(&mutex);
 PRINT("++++++++++++ TRwA%p classid=%d\n",me,me->classid);
-				}
-			}
+			break;
+
+		default:
+			/* stop current thread */
+PRINT("++++++++++++ TR stop B%p classid=%d\n",me,me->classid);
+			x_mutex_lock(&mutex);
+			stop(me);
+			x_mutex_unlock(&mutex);
+			break;
 		}
 	}
 
+	x_mutex_lock(&mutex);
 	unlink_thread(me);
 	x_mutex_unlock(&mutex);
 
