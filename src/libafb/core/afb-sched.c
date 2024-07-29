@@ -44,10 +44,11 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
 
-#define CLASSID_MAIN   1
-#define CLASSID_OTHERS 2
-#define CLASSID_EXTRA  4
-#define ANY_CLASSID    AFB_THREAD_ANY_CLASS
+#define CLASSID_MAIN    1
+#define CLASSID_OTHERS  2
+#define CLASSID_EXTRA   4
+#define CLASSID_REGULAR (CLASSID_MAIN | CLASSID_OTHERS)
+#define ANY_CLASSID     AFB_THREAD_ANY_CLASS
 
 /**
  * Description of synchronous jobs
@@ -119,23 +120,29 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	struct afb_job *job;
 	long delayms;
 	int classid = (int)(intptr_t)closure;
-	int rc = AFB_THREADS_IDLE;
 
+	/* priority is to execute jobs */
 	job = afb_jobs_dequeue(&delayms);
 	if (job) {
+		afb_ev_mgr_release(tid);
 		afb_jobs_run(job);
-		afb_ev_mgr_release(tid);
-		rc = AFB_THREADS_CONTINUE;
+		return AFB_THREADS_CONTINUE;
 	}
-	else if (classid == CLASSID_EXTRA || allowed_thread_count == 0)
-		rc = AFB_THREADS_STOP;
-	else if (afb_ev_mgr_try_get(tid) != NULL) {
+	/* stop on requirement */
+	if (classid == CLASSID_EXTRA || allowed_thread_count == 0) {
+		afb_ev_mgr_release(tid);
+		afb_threads_wakeup(CLASSID_REGULAR, 1);
+		return AFB_THREADS_STOP;
+	}
+	/* should handle the event loop? */
+	if (afb_ev_mgr_try_get(tid) != NULL) {
+		/* yes, handle the event loop */
 		afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
-		rc = AFB_THREADS_CONTINUE;
+		return AFB_THREADS_CONTINUE;
 	}
-	else
-		afb_ev_mgr_release(tid);
-	return rc;
+	/* nothing to do, idle */
+	afb_ev_mgr_release(tid);
+	return AFB_THREADS_IDLE;
 }
 
 static int start_thread(int classid)
