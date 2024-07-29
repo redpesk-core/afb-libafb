@@ -44,10 +44,6 @@
 #define PRINT(...)
 #endif
 
-#define TSTATE_STOP    0
-#define TSTATE_RUN     1
-#define TSTATE_ASLEPT  3
-
 /** Description of threads */
 struct thread
 {
@@ -57,8 +53,11 @@ struct thread
 	/** thread id */
 	x_thread_t tid;
 
-	/** current state */
-	volatile unsigned char tstate;
+	/** sleeping status */
+	unsigned char aslept;
+
+	/** stop request */
+	unsigned char stopped;
 
 	/** class of the thread */
 	int classid;
@@ -149,11 +148,11 @@ static inline void cancel_asleep_waiter(x_cond_t *ifcond)
 
 static int wakeup(struct thread *thr)
 {
-	if (thr->tstate != TSTATE_ASLEPT)
+	if (thr->stopped || !thr->aslept)
 		return 0;
 
 PRINT("++++++++++++ WUsB%p\n",thr);
-	thr->tstate = TSTATE_RUN;
+	thr->aslept = 0;
 	x_cond_signal(&thr->cond);
 PRINT("++++++++++++ WUsA%p\n",thr);
 	return 1;
@@ -161,12 +160,13 @@ PRINT("++++++++++++ WUsA%p\n",thr);
 
 static void stop(struct thread *thr)
 {
-	unsigned char pstate = thr->tstate;
 	active_count--;
-	thr->tstate = TSTATE_STOP;
+	thr->stopped = 1;
 	wakeup_asleep_waiter(0);
-	if (pstate == TSTATE_ASLEPT)
+	if (thr->aslept) {
+		thr->aslept = 0;
 		x_cond_signal(&thr->cond);
+	}
 }
 
 static void thread_run(struct thread *me)
@@ -174,11 +174,12 @@ static void thread_run(struct thread *me)
 	int status;
 	afb_threads_job_desc_t jobdesc;
 
+
 PRINT("++++++++++++ START %p classid=%d\n",me,me->classid);
 	/* initiate thread tempo */
 	afb_sig_monitor_init_timeouts();
 
-	while (me->tstate == TSTATE_RUN) {
+	while (!me->stopped) {
 		/* get a job */
 		x_mutex_unlock(&mutex);
 		status = me->getjob(me->getjobcls, &jobdesc, me->tid);
@@ -193,12 +194,12 @@ PRINT("++++++++++++ TR run B%p classid=%d\n",me,me->classid);
 		else {
 PRINT("++++++++++++ TR ??? B%p classid=%d\n",me,me->classid);
 			x_mutex_lock(&mutex);
-			if (me->tstate == TSTATE_RUN) {
+			if (!me->stopped) {
 				if (status != AFB_THREADS_IDLE)
 					stop(me);
 				else {
 					/* no job, wait */
-					me->tstate = TSTATE_ASLEPT;
+					me->aslept = 1;
 PRINT("++++++++++++ TRwB%p classid=%d\n",me,me->classid);
 					wakeup_asleep_waiter(0);
 					x_cond_wait(&me->cond, &mutex);
@@ -254,7 +255,7 @@ int afb_threads_active_count(int classid)
 		count = active_count;
 	else {
 		for (count = 0, ithr = threads ; ithr ; ithr = ithr->next)
-			count += (ithr->tstate != TSTATE_STOP && match_class(ithr, classid));
+			count += (!ithr->stopped && match_class(ithr, classid));
 	}
 	x_mutex_unlock(&mutex);
 	return count;
@@ -266,7 +267,7 @@ int afb_threads_asleep_count(int classid)
 	int count;
 	x_mutex_lock(&mutex);
 	for (count = 0, ithr = threads ; ithr ; ithr = ithr->next)
-		count += (ithr->tstate == TSTATE_ASLEPT && match_class(ithr, classid));
+		count += (ithr->aslept && match_class(ithr, classid));
 	x_mutex_unlock(&mutex);
 	return count;
 }
@@ -283,7 +284,8 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 
 		reserve_head = thr->next;
 		reserve_decount++;
-		thr->tstate = TSTATE_RUN;
+		thr->aslept = 0;
+		thr->stopped = 0;
 		thr->classid = classid;
 		thr->getjob = jobget;
 		thr->getjobcls = closure;
@@ -300,7 +302,8 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		return X_ENOMEM;
 
 	thr->next = 0;
-	thr->tstate = TSTATE_RUN;
+	thr->aslept = 0;
+	thr->stopped = 0;
 	thr->cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
 	thr->classid = classid;
 	thr->getjob = jobget;
@@ -326,7 +329,8 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 
 	me.next = 0;
 	me.tid = x_thread_self();
-	me.tstate = TSTATE_RUN;
+	me.aslept = 0;
+	me.stopped = 0;
 	me.cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
 	me.classid = classid;
 	me.getjob = jobget;
@@ -344,7 +348,7 @@ int afb_threads_wakeup(int classid, int count)
 	struct thread *ithr;
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
-		if (ithr->tstate == TSTATE_ASLEPT && match_class(ithr, classid))
+		if (ithr->aslept && match_class(ithr, classid))
 			decount += wakeup(ithr);
 	x_mutex_unlock(&mutex);
 	return decount;
@@ -356,7 +360,7 @@ int afb_threads_stop(int classid, int count)
 	struct thread *ithr;
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
-		if (ithr->tstate != TSTATE_STOP && match_class(ithr, classid)) {
+		if (!ithr->stopped && match_class(ithr, classid)) {
 			stop(ithr);
 			decount++;
 		}
@@ -388,7 +392,7 @@ int afb_threads_stop_thread(x_thread_t tid)
 	struct thread *thr;
 	x_mutex_lock(&mutex);
 	thr = get_thread(tid);
-	if ((resu = (thr != NULL && thr->tstate != TSTATE_STOP)))
+	if ((resu = (thr != NULL && !thr->stopped)))
 		stop(thr);
 	x_mutex_unlock(&mutex);
 	return resu;
@@ -422,8 +426,9 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr ; ) {
 		if (!x_thread_equal(ithr->tid, tid) /* not me */
+		 && !ithr->stopped
 		 && match_class(ithr, classid) /* match the given class */
-		 && ithr->tstate == TSTATE_RUN /* active but not asleep */) {
+		 && !ithr->aslept /* active but not asleep */) {
 			x_cond_t cond = PTHREAD_COND_INITIALIZER;
 			wakeup_asleep_waiter(&cond);
 			if (timeoutms <= 0)
