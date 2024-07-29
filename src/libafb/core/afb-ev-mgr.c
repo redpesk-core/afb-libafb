@@ -55,6 +55,7 @@ struct waithold
 	x_cond_t  cond;
 };
 static struct waithold *awaiters;
+static unsigned char awaiterscnt = 0;
 
 #define SAME_TID(x,y) ((x) == (y))  /* x_thread_equal? */
 
@@ -66,27 +67,28 @@ int afb_ev_mgr_init()
 	return rc;
 }
 
+static void release()
+{
+	holder = INVALID_THREAD_ID;
+	if (awaiterscnt == 0) {
+#if !WITH_JOB_NOT_MONITORED
+		afb_sched_ev_mgr_unheld();
+#endif
+	}
+	else {
+		x_mutex_lock(&mutex);
+		if (awaiters != NULL)
+			x_cond_signal(&awaiters->cond);
+		x_mutex_unlock(&mutex);
+	}
+}
+
 int afb_ev_mgr_release(x_thread_t tid)
 {
-	int unheld = 0;
-	if (SAME_TID(holder, tid)) {
-		struct waithold *waiter;
-		x_mutex_lock(&mutex);
-		holder = INVALID_THREAD_ID;
-		waiter = awaiters;
-		if (waiter != NULL) {
-			x_cond_signal(&waiter->cond);
-			x_mutex_unlock(&mutex);
-		}
-		else {
-			x_mutex_unlock(&mutex);
-#if !WITH_JOB_NOT_MONITORED
-			afb_sched_ev_mgr_unheld();
-#endif
-		}
-		unheld = 1;
-	}
-	return unheld;
+	if (!SAME_TID(holder, tid))
+		return 0;
+	release();
+	return 1;
 }
 
 /**
@@ -97,22 +99,21 @@ static int try_get(x_thread_t tid)
 {
 	/* fast track gotten or release */
 	if (SAME_TID(holder, tid)) {
-		if (awaiters == NULL)
+		if (awaiterscnt == 0)
 			return 1;
-		x_mutex_lock(&mutex);
-		holder = INVALID_THREAD_ID;
-		x_cond_signal(&awaiters->cond);
-		x_mutex_unlock(&mutex);
+		release();
 		return 0;
 	}
 
 	/* fast track can't hold */
-	if (!SAME_TID(holder, INVALID_THREAD_ID))
+	if (!SAME_TID(holder, INVALID_THREAD_ID)
+	 || awaiterscnt != 0)
 		return 0;
 
 	/* slow try getting it */
 	x_mutex_lock(&mutex);
-	if (!SAME_TID(holder, INVALID_THREAD_ID)) {
+	if (!SAME_TID(holder, INVALID_THREAD_ID)
+	 || awaiters != NULL) {
 		x_mutex_unlock(&mutex);
 		return 0;
 	}
@@ -140,6 +141,7 @@ static int get(x_thread_t tid)
 		return 0;
 
 	/* lock */
+	__atomic_add_fetch(&awaiterscnt, 1, __ATOMIC_RELAXED);
 	x_mutex_lock(&mutex);
 	if (!SAME_TID(holder, INVALID_THREAD_ID)) {
 		struct waithold wait = { 0, X_COND_INITIALIZER };
@@ -152,11 +154,11 @@ static int get(x_thread_t tid)
 		awaiters = wait.next;
 	}
 	holder = tid;
-
-	/* unlock */
 	x_mutex_unlock(&mutex);
+	__atomic_sub_fetch(&awaiterscnt, 1, __ATOMIC_RELAXED);
+
 	if (!evmgr && ev_mgr_create(&evmgr) < 0) {
-		afb_ev_mgr_release(tid);
+		release();
 		return 0;
 	}
 	return 1;
