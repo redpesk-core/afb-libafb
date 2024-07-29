@@ -95,20 +95,32 @@ int afb_ev_mgr_release(x_thread_t tid)
  */
 static int try_get(x_thread_t tid)
 {
-	if (awaiters != NULL)
-		return 0;
-	if (!SAME_TID(holder, tid)) {
+	/* fast track gotten or release */
+	if (SAME_TID(holder, tid)) {
+		if (awaiters == NULL)
+			return 1;
 		x_mutex_lock(&mutex);
-		if (!SAME_TID(holder, INVALID_THREAD_ID)) {
-			x_mutex_unlock(&mutex);
-			return 0;
-		}
-		holder = tid;
+		holder = INVALID_THREAD_ID;
+		x_cond_signal(&awaiters->cond);
 		x_mutex_unlock(&mutex);
-		if (!evmgr && ev_mgr_create(&evmgr) < 0) {
-			afb_ev_mgr_release(tid);
-			return 0;
-		}
+		return 0;
+	}
+
+	/* fast track can't hold */
+	if (!SAME_TID(holder, INVALID_THREAD_ID))
+		return 0;
+
+	/* slow try getting it */
+	x_mutex_lock(&mutex);
+	if (!SAME_TID(holder, INVALID_THREAD_ID)) {
+		x_mutex_unlock(&mutex);
+		return 0;
+	}
+	holder = tid;
+	x_mutex_unlock(&mutex);
+	if (!evmgr && ev_mgr_create(&evmgr) < 0) {
+		holder = INVALID_THREAD_ID;
+		return 0;
 	}
 	return 1;
 }
