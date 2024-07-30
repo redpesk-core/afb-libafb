@@ -414,7 +414,7 @@ void run_test(int signum, void* arg)
 
 START_TEST (test)
 {
-	afb_sched_start(2, 1, 10, run_test, NULL);
+	afb_sched_start(3, 1, 10, run_test, NULL);
 	afb_sched_wait_idle(1,0);
 }
 END_TEST
