@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <time.h>
 
 #include <check.h>
 
@@ -48,17 +50,34 @@
 #include "core/afb-type-predefined.h"
 #include "core/afb-data-array.h"
 
-#include <pthread.h>
+/*********************************************************************/
+
+void nsleep(long usec) /* like nsleep */
+{
+	struct timespec ts = { .tv_sec = (usec / 1000000), .tv_nsec = (usec % 1000000) * 1000 };
+	nanosleep(&ts, NULL);
+}
+
+/*********************************************************************/
+
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;
+char syncready = 0;
 #define SYNC do{ \
 		pthread_mutex_lock(&mutex); \
+		while(!syncready) { \
+			pthread_mutex_unlock(&mutex); \
+			nsleep(10000); \
+			pthread_mutex_lock(&mutex); \
+		} \
 		pthread_cond_signal(&cond); \
 		pthread_mutex_unlock(&mutex); \
 		} while(0);
 #define WAITSYNC do{ \
 		pthread_mutex_lock(&mutex); \
+		syncready = 1; \
 		pthread_cond_wait(&cond, &mutex); \
+		syncready = 0; \
 		pthread_mutex_unlock(&mutex); \
 		} while(0);
 
