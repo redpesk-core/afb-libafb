@@ -31,6 +31,7 @@
 #include <check.h>
 #include <pthread.h>
 #include <signal.h>
+#include <time.h>
 
 #include <rp-utils/rp-verbose.h>
 
@@ -76,12 +77,10 @@ int reachError;
 
 void test_job(int sig, void* arg){
 
-    int i;
-
-    fprintf(stderr, "test_job received sig %d with arg %d\n", sig, p2i(arg));
 
     if(sig == 0){
         pthread_mutex_lock(&gval.mutex);
+        fprintf(stderr, "test_job received sig %d with arg %d\n", sig, p2i(arg));
         gval.runingJobs++;
         gval.val++;
 
@@ -89,12 +88,12 @@ void test_job(int sig, void* arg){
         if(gval.runingJobs < NBJOBS){
             while(!gval.lastJob){
                 pthread_mutex_unlock(&gval.mutex);
-                for(i=0; i<__INT_MAX__; i++);
+                nsleep(10000);
                 pthread_mutex_lock(&gval.mutex);
             }
         }
         // if this job is the last one relese the other jobs
-        else{
+        else {
             fprintf(stderr, "***** Release waiting jobs ! *****\n");
             gval.lastJob = TRUE;
         }
@@ -107,13 +106,13 @@ void test_job(int sig, void* arg){
         // unlock mutex in case the job have been killed while mutex was locked
         pthread_mutex_unlock(&gval.mutex);
         pthread_mutex_lock(&gval.mutex);
+        fprintf(stderr, "test_job killed sig %d with arg %d\n", sig, p2i(arg));
         gval.killedJobs++;
     }
 
+    fprintf(stderr, "test_job with arg %d terminates !\n", p2i(arg));
     gval.runingJobs--;
     pthread_mutex_unlock(&gval.mutex);
-
-    fprintf(stderr, "test_job with arg %d terminates !\n", p2i(arg));
 }
 
 void exit_handler(void *data){
@@ -123,23 +122,32 @@ void exit_handler(void *data){
 
 void test_start_job(int sig, void* arg){
 
-    int i;
-
-    fprintf(stderr, "start_test_job received sig %d with arg %d\n", sig, p2i(arg));
-
     if(sig == 0){
+        pthread_mutex_lock(&gval.mutex);
+        fprintf(stderr, "start_test_job received sig %d with arg %d\n", sig, p2i(arg));
 
         // wait for jobs to end
-        pthread_mutex_lock(&gval.mutex);
         while(gval.runingJobs > 0 || !gval.lastJob) {
             pthread_mutex_unlock(&gval.mutex);
-            for(i=0; i<__INT_MAX__; i++);
+            nsleep(10000);
             pthread_mutex_lock(&gval.mutex);
         }
         gval.val *= -1;
         gval.lastJob = FALSE;
-        pthread_mutex_unlock(&gval.mutex);
     }
+    else if(sig == SIGALRM ||
+            sig == SIGTERM ||
+            sig == SIGKILL)
+    {
+        // unlock mutex in case the job have been killed while mutex was locked
+        pthread_mutex_unlock(&gval.mutex);
+        pthread_mutex_lock(&gval.mutex);
+        fprintf(stderr, "start_test_job killed sig %d with arg %d\n", sig, p2i(arg));
+        gval.killedJobs++;
+    }
+
+    fprintf(stderr, "querying exit\n");
+    pthread_mutex_unlock(&gval.mutex);
 
     afb_sched_exit(1, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_job\n");
