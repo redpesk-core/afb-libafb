@@ -426,7 +426,7 @@ void run_test(int signum, void* arg)
 
 	afb_data_array_unref(NBPARAMS, params);
 
-	afb_sched_exit(1, NULL, NULL, 0);
+	afb_sched_exit(0, NULL, NULL, 0);
 
 	ck_assert_int_eq(dataClosureGval, checksum);
 }

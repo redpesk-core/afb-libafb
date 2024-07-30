@@ -125,22 +125,20 @@ const char verbname[] = "hello";
 /*********************************************************************/
 /* job scheduling */
 
-static void sched_jobs_cb(int sig, void * arg)
-{
-	if (afb_jobs_get_pending_count() > 0 || afb_jobs_get_active_count() > 1)
-		afb_sched_post_job(NULL, 100, 0, sched_jobs_cb, NULL, Afb_Sched_Mode_Normal);
-	else
-		afb_sched_exit(0, NULL, NULL, 0);
-}
-
 static void sched_jobs_start(int sig, void * arg)
 {
-	sched_jobs_cb(sig, arg);
+	const char *msg = arg;
+	fprintf(stderr, "before exiting from %s\n", msg);
+	nsleep(100);
+	afb_sched_exit(0, NULL, NULL, 0);
+	fprintf(stderr, "after exiting from %s\n", msg);
 }
 
-static void sched_jobs()
+static void sched_jobs(const char *msg)
 {
-	ck_assert_int_eq(0, afb_sched_start(1, 1, 100, sched_jobs_start, NULL));
+	fprintf(stderr, "before starting from %s\n", msg);
+	ck_assert_int_eq(0, afb_sched_start(1, 1, 100, sched_jobs_start, (void*)msg));
+	fprintf(stderr, "after starting from %s\n", msg);
 }
 
 /*********************************************************************/
@@ -380,12 +378,12 @@ START_TEST (process)
 
 	afb_req_common_process(req, test_apiset);
 
-	sched_jobs();
+	sched_jobs("PROCESS");
+
+	afb_req_common_unref(req);
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
-
-	afb_req_common_unref(req);
 }
 END_TEST
 
@@ -460,11 +458,11 @@ START_TEST(process_on_behalf)
 		1
 	);
 
-	sched_jobs();
+	sched_jobs("PROCESS ON BEHALF 1");
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
-	afb_req_common_unref(req);
+//	afb_req_common_unref(req);
 
 	i =0;
 	gval = 0;
@@ -475,7 +473,7 @@ START_TEST(process_on_behalf)
 	afb_req_common_process_on_behalf(req, test_apiset, NULL);
 	ck_assert_ptr_null(req->credentials);
 
-	sched_jobs();
+	sched_jobs("PROCESS ON BEHALF 2");
 
 	ck_assert_int_eq(gApiVal, 255); // check that api callback was call
 	//ck_assert_int_eq(gval, dataChecksum); // check that data closure CB was call
@@ -636,7 +634,7 @@ START_TEST(check_perm)
 }
 END_TEST
 
-START_TEST(replay)
+START_TEST(reply)
 {
 	struct afb_req_common *req = &comreq;
 	struct afb_type *type1;
@@ -655,7 +653,7 @@ START_TEST(replay)
 		ck_assert_int_eq(rc, 0);
 	}
 
-	fprintf(stderr, "------\ntest that memory get allocated when replay require more than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NDATA_DEF);
+	fprintf(stderr, "------\ntest that memory get allocated when reply requires more than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NDATA_DEF);
 
 	for (i=1; i<=REQ_COMMON_NDATA_DEF + NB_DATA; i++){
 		fprintf(stderr, "creating data with closure = %d\n", i);
@@ -672,11 +670,11 @@ START_TEST(replay)
 
 	gval = 0;
 
-	sched_jobs();
+	sched_jobs("REPLY 1");
 
 	ck_assert_int_eq(gval, dataChecksum);
 
-	fprintf(stderr, "------\ntest that the static buffer is used when replay require les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NDATA_DEF);
+	fprintf(stderr, "------\ntest that the static buffer is used when reply requires les than REQ_COMMON_NREPLIES_MAX=%d data\n", REQ_COMMON_NDATA_DEF);
 
 	req->replied = 0;
 	dataChecksum = 0;
@@ -696,7 +694,7 @@ START_TEST(replay)
 
 	gval = 0;
 
-	sched_jobs();
+	sched_jobs("REPLY 2");
 
 	ck_assert_int_eq(gval, dataChecksum);
 
@@ -733,6 +731,6 @@ int main(int ac, char **av)
 			addtest(errors);
 			addtest(subscribe);
 			addtest(check_perm);
-			addtest(replay);
+			addtest(reply);
 	return !!srun();
 }

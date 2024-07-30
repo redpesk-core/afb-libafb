@@ -149,7 +149,7 @@ void test_start_job(int sig, void* arg){
     fprintf(stderr, "querying exit\n");
     pthread_mutex_unlock(&gval.mutex);
 
-    afb_sched_exit(1, exit_handler, NULL, 0);
+    afb_sched_exit(0, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_job\n");
 }
 
@@ -194,7 +194,7 @@ void test_start_job_sync(int sig, void* arg){
         pthread_mutex_unlock(&gval.mutex);
     }
 
-    afb_sched_exit(1, NULL, NULL, 0);
+    afb_sched_exit(0, NULL, NULL, 0);
 
     fprintf(stderr, "leaving test_start_job_sync\n");
     fflush(stderr);
@@ -301,7 +301,7 @@ void test_start_sched_enter(int sig, void * arg){
         if(r>=0) reachError++;
     }
     fprintf(stderr, "test_start_sched_enter exiting\n");
-    afb_sched_exit(1, NULL, NULL, 0);
+    afb_sched_exit(0, NULL, NULL, 0);
 
     fprintf(stderr, "leaving test_start_sched_enter\n");
     fflush(stderr);
@@ -344,8 +344,9 @@ void test_start_sched_adapt(int sig, void * arg){
 
         // queue N jobs
         for(i=0; i<NBJOBS; i++){
-            afb_sched_post_job(NULL, 0, 0, test_job, i2p(i+1), Afb_Sched_Mode_Start);
-            fprintf(stderr, "job %d queued : pending jobs = %d\n", i+1, afb_jobs_get_pending_count());
+            r = afb_sched_post_job(NULL, 0, 0, test_job, i2p(i+1), Afb_Sched_Mode_Start);
+            ck_assert_int_gt(r, 0);
+            fprintf(stderr, "job %d queued with id %d: pending jobs = %d\n", i+1, r, afb_jobs_get_pending_count());
         }
 
         r=0;
@@ -379,7 +380,7 @@ void test_start_sched_adapt(int sig, void * arg){
     }
 
     fprintf(stderr, "before exiting sched\n");
-    afb_sched_exit(1, exit_handler, NULL, 0);
+    afb_sched_exit(0, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_sched_adapt\n");
 }
 
@@ -415,6 +416,7 @@ END_TEST
 
 int evmgr_gotten;
 int evmgr_expected;
+pthread_mutex_t evmgr_mutex;
 
 void getevmgr(int num)
 {
@@ -430,7 +432,9 @@ void getevmgr(int num)
     ev2 = afb_ev_mgr_get_for_me();
     ck_assert(ev2 == ev1);
     fprintf(stderr, "%sAFTER %d\n", prefix, num);
+    pthread_mutex_lock(&evmgr_mutex);
     evmgr_gotten++;
+    pthread_mutex_unlock(&evmgr_mutex);
 }
 
 void jobgetevmgr(int signum, void *arg)
@@ -444,6 +448,7 @@ void do_test_evmgr(int signum, void *arg)
     int i, s;
 
     fprintf(stderr, "-- MAIN ENTRY --\n");
+    pthread_mutex_init(&evmgr_mutex, NULL);
     getevmgr(0);
     evmgr_gotten = 0;
     evmgr_expected = 20;
