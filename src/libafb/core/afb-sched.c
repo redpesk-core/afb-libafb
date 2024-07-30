@@ -171,12 +171,6 @@ static void adapt(enum afb_sched_mode mode)
 		start_one_thread(mode);
 }
 
-/* an event manager has no thread */
-void afb_sched_ev_mgr_unheld()
-{
-	adapt(Afb_Sched_Mode_Normal);
-}
-
 /* Schedule the given job */
 int afb_sched_post_job(
 	const void *group,

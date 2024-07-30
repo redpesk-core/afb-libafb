@@ -30,9 +30,6 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-jobs.h"
 #include "core/afb-ev-mgr.h"
-#if !WITH_JOB_NOT_MONITORED
-#include "core/afb-sched.h"
-#endif
 
 #include "sys/x-mutex.h"
 #include "sys/x-cond.h"
@@ -70,12 +67,7 @@ int afb_ev_mgr_init()
 static void release()
 {
 	holder = INVALID_THREAD_ID;
-	if (awaiterscnt == 0) {
-#if !WITH_JOB_NOT_MONITORED
-		afb_sched_ev_mgr_unheld();
-#endif
-	}
-	else {
+	if (awaiterscnt != 0) {
 		x_mutex_lock(&mutex);
 		if (awaiters != NULL)
 			x_cond_signal(&awaiters->cond);
