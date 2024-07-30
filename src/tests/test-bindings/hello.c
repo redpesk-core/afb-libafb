@@ -91,27 +91,27 @@ static const struct afb_verb_v4 verbs[]= {
 static int mainctl(afb_api_x4_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata){
   switch(ctlid){
     case afb_ctlid_Root_Entry :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Root_Entry\n", afb_ctlid_Root_Entry);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Root_Entry\n", afb_ctlid_Root_Entry);
     break;
 
     case afb_ctlid_Pre_Init :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Pre_Init\n", afb_ctlid_Pre_Init);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Pre_Init\n", afb_ctlid_Pre_Init);
     break;
 
     case afb_ctlid_Init :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Init\n", afb_ctlid_Init);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Init\n", afb_ctlid_Init);
     break;
 
     case afb_ctlid_Class_Ready :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Class_Ready\n", afb_ctlid_Class_Ready);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Class_Ready\n", afb_ctlid_Class_Ready);
     break;
 
     case afb_ctlid_Orphan_Event :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Orphan_Event\n", afb_ctlid_Orphan_Event);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Orphan_Event\n", afb_ctlid_Orphan_Event);
     break;
 
     case afb_ctlid_Exiting :
-      fprintf(stderr, "Binding hello receved control signal %d : afb_ctlid_Exiting\n", afb_ctlid_Exiting);
+      fprintf(stderr, "Binding hello received control signal %d : afb_ctlid_Exiting\n", afb_ctlid_Exiting);
     break;
   }
 
