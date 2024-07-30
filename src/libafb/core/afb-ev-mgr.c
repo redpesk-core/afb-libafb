@@ -41,7 +41,6 @@ static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 
 /* event manager */
 static struct ev_mgr *evmgr = 0;
-static char inwait = 0;
 
 /* holding the event manager */
 #define INVALID_THREAD_ID 0                       /**< assume 0 is not a valid thread id */
@@ -140,8 +139,7 @@ static int get(x_thread_t tid)
 		struct waithold **piw = &awaiters;
 		while (*piw) piw = &(*piw)->next;
 		*piw = &wait;
-		if (inwait)
-			ev_mgr_wakeup(evmgr);
+		ev_mgr_wakeup(evmgr);
 		x_cond_wait(&wait.cond, &mutex);
 		awaiters = wait.next;
 	}
@@ -166,10 +164,9 @@ struct ev_mgr *afb_ev_mgr_get(x_thread_t tid)
  * wakeup the event loop if needed by sending
  * an event.
  */
-void afb_ev_mgr_wakeup()
+int afb_ev_mgr_wakeup()
 {
-	if (evmgr && inwait)
-		ev_mgr_wakeup(evmgr);
+	return evmgr && ev_mgr_wakeup(evmgr);
 }
 
 int afb_ev_mgr_release_for_me()
@@ -209,9 +206,7 @@ int afb_ev_mgr_wait(int ms)
 	int result;
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
-	inwait = 1;
 	result = ev_mgr_wait(mgr, ms);
-	inwait = 0;
 	return result;
 }
 
@@ -237,9 +232,7 @@ int afb_ev_mgr_wait_and_dispatch(int ms)
 	int rc;
 	x_thread_t me = x_thread_self();
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
-	inwait = 1;
 	rc = ev_mgr_wait(mgr, ms);
-	inwait = 0;
 	if (rc >= 0)
 		dispatch_mgr(mgr, 1);
 	afb_ev_mgr_release(me);
@@ -304,9 +297,7 @@ void afb_ev_mgr_prepare_wait_dispatch(int delayms, int release)
 	struct ev_mgr *mgr = afb_ev_mgr_get(me);
 	rc = ev_mgr_prepare(mgr);
 	if (rc >= 0) {
-		inwait = 1;
 		rc = ev_mgr_wait(mgr, tempo);
-		inwait = 0;
 		if (rc > 0)
 			ev_mgr_dispatch(mgr);
 	}

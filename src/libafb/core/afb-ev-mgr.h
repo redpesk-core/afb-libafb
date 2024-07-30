@@ -39,7 +39,7 @@ extern
 struct ev_mgr *afb_ev_mgr_get(x_thread_t tid);
 
 extern
-void afb_ev_mgr_wakeup();
+int afb_ev_mgr_wakeup();
 
 extern
 int afb_ev_mgr_release_for_me();
