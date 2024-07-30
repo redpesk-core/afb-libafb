@@ -896,8 +896,8 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 		rc = epoll_wait(mgr->epollfd, &mgr->event, 1,
 					timeout_ms < 0 ? -1 : timeout_ms);
 		if (rc < 1) {
-			mgr->event.events = 0;
 			mgr->state = Idle;
+			mgr->event.events = 0;
 			rc = rc ? -errno : rc;
 		}
 		else {
@@ -949,19 +949,28 @@ static void do_dispatch(struct ev_mgr *mgr)
  * wakeup the event loop if needed by sending
  * an event.
  */
-void ev_mgr_wakeup(struct ev_mgr *mgr)
+int ev_mgr_wakeup(struct ev_mgr *mgr)
 {
+	switch(mgr->state) {
+	case Preparing:
+	case Ready:
+	case Waiting: {
 #if WAKEUP_TGKILL
-	tgkill(getpid(), mgr->tid, SIGURG);
+		tgkill(getpid(), mgr->tid, SIGURG);
 #elif WAKEUP_THREAD_KILL
-	x_thread_kill(mgr->tid, SIGURG);
+		x_thread_kill(mgr->tid, SIGURG);
 #elif WAKEUP_EVENTFD
-	uint64_t x = 1;
-	write(mgr->eventfd, &x, sizeof x);
+		uint64_t x = 1;
+		write(mgr->eventfd, &x, sizeof x);
 #elif WAKEUP_PIPE
-	char x = 1;
-	write(mgr->pipefds[1], &x, sizeof x);
+		char x = 1;
+		write(mgr->pipefds[1], &x, sizeof x);
 #endif
+		return 1;
+	}
+	default:
+		return 0;
+	}
 }
 
 /**

@@ -113,8 +113,10 @@ extern void ev_mgr_recover_run(struct ev_mgr *mgr);
  * wake up the event loop if needed
  *
  * @param mgr  the event manager
+ *
+ * @return 0 if nothing was done or 1 if wakeup was sent
  */
-extern void ev_mgr_wakeup(struct ev_mgr *mgr);
+extern int ev_mgr_wakeup(struct ev_mgr *mgr);
 
 /**
  * Try to change the holder
