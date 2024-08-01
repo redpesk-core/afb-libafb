@@ -394,17 +394,17 @@ int afb_jobs_abort(int jobid)
 		rc = 0;
 		job->blocked = 1; /* mark job as blocked */
 		job->active = 1; /* mark job as active */
+		pending_count--;
 	}
 
 	/* leave critical */
 	x_mutex_unlock(&mutex);
 
-	if (rc == 0) {
-		job->callback(SIGABRT, job->arg1, job->arg2);
-		job_release(job);
-	}
+	if (rc != 0)
+		return rc;
 
-	return rc;
+	afb_jobs_cancel(job);
+	return 0;
 }
 
 #if !WITH_JOB_NOT_MONITORED
