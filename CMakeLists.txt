@@ -124,7 +124,7 @@ if(ARCH32)
 endif()
 
 set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
-#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=leak -fsanitize=address -lasan")
+#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
 set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
 set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
 set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
