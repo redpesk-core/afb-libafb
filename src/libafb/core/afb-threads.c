@@ -56,7 +56,7 @@ struct thread
 	x_thread_t tid;
 
 	/** sleeping status */
-	unsigned char aslept;
+	unsigned char asleep;
 
 	/** stop request */
 	unsigned char stopped;
@@ -136,27 +136,30 @@ static void unlink_thread(struct thread *thr)
 	}
 }
 
-static inline void wakeup_asleep_waiter(x_cond_t *newcond)
-{
-	x_cond_t *oldcond = asleep_waiter_cond;
-	asleep_waiter_cond = newcond;
-	if (oldcond)
-		x_cond_signal(oldcond);
-}
 
-static inline void cancel_asleep_waiter(x_cond_t *ifcond)
+static inline int wait_new_asleep(struct timespec *expire)
 {
-	if (asleep_waiter_cond == ifcond)
-		asleep_waiter_cond = 0;
+	int resu = 0;
+	x_cond_t cond = X_COND_INITIALIZER;
+	x_cond_t *oldcond = asleep_waiter_cond;
+	asleep_waiter_cond = &cond;
+	if (expire == NULL)
+		x_cond_wait(&cond, &mutex);
+	else {
+		if (x_cond_timedwait(&cond, &mutex, expire))
+			resu = 1;
+	}
+	asleep_waiter_cond = oldcond;
+	return resu;
 }
 
 static int wakeup(struct thread *thr)
 {
-	if (thr->stopped || !thr->aslept)
+	if (thr->stopped || !thr->asleep)
 		return 0;
 
 PRINT("++++++++++++ WUsB[%u]%p\n",thr->id,thr);
-	thr->aslept = 0;
+	thr->asleep = 0;
 	x_cond_signal(&thr->cond);
 PRINT("++++++++++++ WUsA[%u]%p\n",thr->id,thr);
 	return 1;
@@ -166,9 +169,8 @@ static void stop(struct thread *thr)
 {
 	active_count--;
 	thr->stopped = 1;
-	wakeup_asleep_waiter(0);
-	if (thr->aslept) {
-		thr->aslept = 0;
+	if (thr->asleep) {
+		thr->asleep = 0;
 		x_cond_signal(&thr->cond);
 	}
 }
@@ -179,8 +181,6 @@ static void thread_run(struct thread *me)
 	afb_threads_job_desc_t jobdesc;
 
 IFDBG(static unsigned id = 0; me->id = ++id;)
-
-	x_mutex_unlock(&mutex);
 
 PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 	/* initiate thread tempo */
@@ -197,32 +197,36 @@ PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 		case AFB_THREADS_EXEC:
 			/* execute the retrieved job */
 PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
+			x_mutex_unlock(&mutex);
 			jobdesc.run(jobdesc.job, me->tid);
+			x_mutex_lock(&mutex);
 			break;
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
 PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
-			x_mutex_lock(&mutex);
-			me->aslept = 1;
-			wakeup_asleep_waiter(0);
+			me->asleep = 1;
+			if (asleep_waiter_cond != NULL) {
+				x_cond_signal(asleep_waiter_cond);
+				asleep_waiter_cond = NULL;
+			}
 			x_cond_wait(&me->cond, &mutex);
-			x_mutex_unlock(&mutex);
 PRINT("++++++++++++ TRwA[%u]%p classid=%d\n",me->id,me,me->classid);
 			break;
 
 		default:
 			/* stop current thread */
 PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
-			x_mutex_lock(&mutex);
 			stop(me);
-			x_mutex_unlock(&mutex);
 			break;
 		}
 	}
 
-	x_mutex_lock(&mutex);
 	unlink_thread(me);
+	if (asleep_waiter_cond != NULL) {
+		x_cond_signal(asleep_waiter_cond);
+		asleep_waiter_cond = NULL;
+	}
 	x_mutex_unlock(&mutex);
 
 	afb_ev_mgr_try_recover_for_me();
@@ -231,7 +235,6 @@ PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
 	afb_sig_monitor_clean_timeouts();
 
 PRINT("++++++++++++ STOP[%u] %p classid=%d\n",me->id,me,me->classid);
-
 }
 
 static void *thread_main(void *arg)
@@ -280,7 +283,7 @@ int afb_threads_asleep_count(int classid)
 	int count;
 	x_mutex_lock(&mutex);
 	for (count = 0, ithr = threads ; ithr ; ithr = ithr->next)
-		count += (ithr->aslept && match_class(ithr, classid));
+		count += (ithr->asleep && match_class(ithr, classid));
 	x_mutex_unlock(&mutex);
 	return count;
 }
@@ -297,7 +300,7 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 
 		reserve_head = thr->next;
 		reserve_decount++;
-		thr->aslept = 0;
+		thr->asleep = 0;
 		thr->stopped = 0;
 		thr->classid = classid;
 		thr->getjob = jobget;
@@ -315,9 +318,9 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		return X_ENOMEM;
 
 	thr->next = 0;
-	thr->aslept = 0;
+	thr->asleep = 0;
 	thr->stopped = 0;
-	thr->cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
+	thr->cond = (x_cond_t)X_COND_INITIALIZER;
 	thr->classid = classid;
 	thr->getjob = jobget;
 	thr->getjobcls = closure;
@@ -342,9 +345,9 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 
 	me.next = 0;
 	me.tid = x_thread_self();
-	me.aslept = 0;
+	me.asleep = 0;
 	me.stopped = 0;
-	me.cond = (x_cond_t)PTHREAD_COND_INITIALIZER;
+	me.cond = (x_cond_t)X_COND_INITIALIZER;
 	me.classid = classid;
 	me.getjob = jobget;
 	me.getjobcls = closure;
@@ -362,7 +365,7 @@ int afb_threads_wakeup(int classid, int count)
 PRINT("++++++++++++ B-TWU %d\n",count);
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
-		if (ithr->aslept && match_class(ithr, classid))
+		if (match_class(ithr, classid))
 			decount += wakeup(ithr);
 	x_mutex_unlock(&mutex);
 PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
@@ -426,39 +429,33 @@ int afb_threads_stop_me()
 int afb_threads_wait_idle(int classid, int timeoutms)
 {
 	x_thread_t tid = x_thread_self();
-	int rc, resu = 0;
-	struct timespec expire;
+	int resu = 0;
+	struct timespec expire, *pexp;
 	struct thread *ithr;
-	if (timeoutms > 0) {
+	if (timeoutms <= 0)
+		pexp = NULL;
+	else {
 		clock_gettime(CLOCK_REALTIME, &expire);
 		expire.tv_sec += timeoutms / 1000;
 		expire.tv_nsec = (timeoutms % 1000) * 1000000;
-		if (expire.tv_nsec >= 1000000000) {
+		while (expire.tv_nsec >= 1000000000) {
 			expire.tv_nsec -= 1000000000;
 			expire.tv_sec++;
 		}
+		pexp = &expire;
 	}
 	x_mutex_lock(&mutex);
 	for (ithr = threads ; ithr ; ) {
 		if (!x_thread_equal(ithr->tid, tid) /* not me */
-		 && !ithr->stopped
 		 && match_class(ithr, classid) /* match the given class */
-		 && !ithr->aslept /* active but not asleep */) {
-			x_cond_t cond = PTHREAD_COND_INITIALIZER;
-			wakeup_asleep_waiter(&cond);
-			if (timeoutms <= 0)
-				x_cond_wait(&cond, &mutex);
-			else {
-				rc = x_cond_timedwait(&cond, &mutex, &expire);
-				if (rc) {
-					if (errno == ETIMEDOUT) {
-						cancel_asleep_waiter(&cond);
-						resu = X_ETIMEDOUT;
-						break;
-					}
-				}
+		 && !ithr->stopped
+		 && !ithr->asleep /* active but not asleep */) {
+			/* an active thread is found, wait any new asleep one */
+			if (wait_new_asleep(pexp)) {
+				resu = X_ETIMEDOUT;
+				break;
 			}
-			cancel_asleep_waiter(&cond);
+			/* restart search loop */
 			ithr = threads;
 		}
 		else
