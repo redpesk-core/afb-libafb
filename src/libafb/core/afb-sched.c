@@ -115,6 +115,18 @@ static void evloop_sig_run(int signum, void *closure)
 	}
 }
 
+static void run_one_job(void *arg, x_thread_t tid)
+{
+	struct afb_job *job = arg;
+	afb_jobs_run(job);
+	afb_ev_mgr_release(tid);
+}
+
+static void run_ev_loop(void *arg, x_thread_t tid)
+{
+	afb_sig_monitor_run(0, evloop_sig_run, arg);
+}
+
 static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
 {
 	struct afb_job *job;
@@ -125,21 +137,25 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	job = afb_jobs_dequeue(&delayms);
 	if (job) {
 		afb_ev_mgr_release(tid);
-		afb_jobs_run(job);
-		return AFB_THREADS_CONTINUE;
+		desc->run = run_one_job;
+		desc->job = job;
+		return AFB_THREADS_EXEC;
 	}
+
 	/* stop on requirement */
 	if (classid == CLASSID_EXTRA || allowed_thread_count == 0) {
 		afb_ev_mgr_release(tid);
-		afb_threads_wakeup(CLASSID_REGULAR, 1);
 		return AFB_THREADS_STOP;
 	}
+
 	/* should handle the event loop? */
 	if (afb_ev_mgr_try_get(tid) != NULL) {
 		/* yes, handle the event loop */
-		afb_sig_monitor_run(0, evloop_sig_run, (void*)(intptr_t)delayms);
-		return AFB_THREADS_CONTINUE;
+		desc->run = run_ev_loop;
+		desc->job = (void*)(intptr_t)delayms;
+		return AFB_THREADS_EXEC;
 	}
+
 	/* nothing to do, idle */
 	afb_ev_mgr_release(tid);
 	return AFB_THREADS_IDLE;
@@ -181,13 +197,9 @@ int afb_sched_post_job(
 	enum afb_sched_mode mode
 ) {
 	int rc;
-	x_mutex_lock(&mutex);
 	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc >= 0) {
-		adapt(mode); //delayms > 0);
-		afb_ev_mgr_wakeup();
-	}
-	x_mutex_unlock(&mutex);
+	if (rc >= 0)
+		adapt(mode);
 	return rc;
 }
 
@@ -202,13 +214,9 @@ int afb_sched_post_job2(
 	enum afb_sched_mode mode
 ) {
 	int rc;
-	x_mutex_lock(&mutex);
 	rc = afb_jobs_post2(group, delayms, timeout, callback, arg1, arg2);
-	if (rc >= 0) {
-		adapt(mode); //delayms > 0);
-		afb_ev_mgr_wakeup();
-	}
-	x_mutex_unlock(&mutex);
+	if (rc >= 0)
+		adapt(mode);
 	return rc;
 }
 
@@ -225,8 +233,7 @@ void afb_sched_call(
 		void *arg,
 		enum afb_sched_mode mode
 ) {
-	if (afb_ev_mgr_release_for_me())
-		adapt(mode);
+	adapt(mode);
 	afb_sig_monitor_run(timeout, callback, arg);
 }
 
@@ -405,8 +412,10 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 /* Exit threads and call handler if not NULL. */
 void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitcode)
 {
-	x_mutex_lock(&mutex);
+	/* acquire evmgr */
+	afb_ev_mgr_get_for_me();
 
+	x_mutex_lock(&mutex);
 	if (pexiting) {
 	        /* record handler and exit code */
 		pexiting->handler = handler;
@@ -414,20 +423,19 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 		pexiting->code = exitcode;
 		pexiting = 0;
 	}
-
 	/* disallow start */
 	allowed_thread_count = 0;
-	x_mutex_unlock(&mutex);
-
-	/* release the evloop */
-	afb_ev_mgr_release_for_me();
-	afb_ev_mgr_wakeup();
 
 	/* stop */
-	if (!force)
-		afb_sched_wait_idle(1,1);
+	if (!force) {
+		afb_ev_mgr_release_for_me();
+		while (afb_jobs_get_pending_count() || afb_sched_wait_idle(1, 1) < 0)
+			afb_ev_mgr_wakeup();
+	}
 	afb_threads_stop(ANY_CLASSID, INT_MAX);
+	afb_ev_mgr_release_for_me();
 	afb_ev_mgr_wakeup();
+	x_mutex_unlock(&mutex);
 }
 
 /* Enter the jobs processing loop */
@@ -473,13 +481,14 @@ int afb_sched_start(
 	}
 
 	/* queue the start job */
-	exiting.code = afb_jobs_post(NULL, 0, 0, start, arg);
+	exiting.code = afb_sched_post_job(NULL, 0, 0, start, arg, Afb_Sched_Mode_Start);
 	if (exiting.code < 0)
 		goto error;
 
 	/* run until end */
 	x_mutex_unlock(&mutex);
 	afb_threads_enter(CLASSID_MAIN, get_job_cb, (void*)(intptr_t)CLASSID_MAIN);
+	afb_ev_mgr_release_for_me();
 	x_mutex_lock(&mutex);
 error:
 	pexiting = 0;
