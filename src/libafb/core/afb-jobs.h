@@ -23,6 +23,9 @@
 
 #pragma once
 
+#define AFB_JOBS_MAX_COUNT_MIN  4
+#define AFB_JOBS_MAX_COUNT_MAX  65000
+
 struct afb_job;
 
 /**

@@ -48,7 +48,7 @@ void nsleep(long usec) /* like nsleep */
 
 /*********************************************************************/
 
-#define NB_TEST_JOBS 3 // must be >= 3
+#define NB_TEST_JOBS AFB_JOBS_MAX_COUNT_MIN
 
 #define i2p(x)  ((void*)((intptr_t)(x)))
 #define p2i(x)  ((int)((intptr_t)(x)))
@@ -118,17 +118,16 @@ START_TEST (max_count)
 
 	int r, i;
 	struct afb_job *job;
-	afb_jobs_set_max_count(NB_TEST_JOBS-2);
-	ck_assert_int_eq(afb_jobs_get_max_count(), NB_TEST_JOBS-2);
-	for(i=0; i<NB_TEST_JOBS; i++){
+	afb_jobs_set_max_count(NB_TEST_JOBS);
+	for(i=0; i<NB_TEST_JOBS + 2; i++){
 		r = afb_jobs_post(NULL, 0, 1, test_job, i2p(i+1));
-		if(i<NB_TEST_JOBS-2) ck_assert_int_gt(r, 0);
+		if(i<NB_TEST_JOBS) ck_assert_int_gt(r, 0);
 		else ck_assert_int_ne(r, 0);
 	}
 	gval = 0;
-	for(i=0; i<NB_TEST_JOBS; i++){
+	for(i=0; i<NB_TEST_JOBS + 2; i++){
 		job = afb_jobs_dequeue(0);
-		if(i<NB_TEST_JOBS-2) ck_assert(job != NULL);
+		if(i<NB_TEST_JOBS) ck_assert(job != NULL);
 		else ck_assert(job == NULL);
 		ck_assert_int_eq(gval, 0);
 	}
@@ -145,7 +144,7 @@ START_TEST(job_aborting)
 	struct afb_job *job;
 
 	if(afb_jobs_get_max_count() < NB_TEST_JOBS)
-		afb_jobs_set_max_count(3);
+		afb_jobs_set_max_count(NB_TEST_JOBS);
 	r = afb_sig_monitor_init(1);
 	ck_assert_int_eq(r, 0);
 

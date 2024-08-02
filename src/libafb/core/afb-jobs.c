@@ -36,11 +36,9 @@
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
 
-#define MAX_JOB_COUNT_MIN  4
-#define MAX_JOB_COUNT_MAX  65000
 #if !defined(AFB_JOBS_DEFAULT_MAX_COUNT)
 #    define AFB_JOBS_DEFAULT_MAX_COUNT    64
-#elif AFB_JOBS_DEFAULT_MAX_COUNT > MAX_JOB_COUNT_MAX
+#elif AFB_JOBS_DEFAULT_MAX_COUNT > AFB_JOBS_MAX_COUNT_MAX
 #    error "AFB_JOBS_DEFAULT_MAX_COUNT too big"
 #endif
 
@@ -454,10 +452,10 @@ int afb_jobs_get_max_count(void)
 /* set maximum pending count */
 void afb_jobs_set_max_count(int count)
 {
-	if (count < MAX_JOB_COUNT_MIN)
-		max_pending_count = MAX_JOB_COUNT_MIN;
-	else if (count > MAX_JOB_COUNT_MAX)
-		max_pending_count = MAX_JOB_COUNT_MAX;
+	if (count < AFB_JOBS_MAX_COUNT_MIN)
+		max_pending_count = AFB_JOBS_MAX_COUNT_MIN;
+	else if (count > AFB_JOBS_MAX_COUNT_MAX)
+		max_pending_count = AFB_JOBS_MAX_COUNT_MAX;
 	else
 		max_pending_count = count;
 }
