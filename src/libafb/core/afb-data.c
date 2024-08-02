@@ -907,13 +907,15 @@ afb_data_convert(
 		r = 0;
 		rc = X_EINVAL;
 	}
-	else if (!type) {
+	else if (!type || data->type == type) {
 		/* trivial case: the data is of the expected type */
 		data_addref(data);
 		r = data;
 		rc = 0;
 	}
 	else {
+		afb_data_lock_write(data);
+
 		/* search for a cached conversion */
 		r = data_cvt_search(data, type);
 		if (r) {
@@ -931,6 +933,7 @@ afb_data_convert(
 				rc = 0;
 			}
 		}
+		afb_data_unlock(data);
 	}
 	*result = r;
 	return rc;
