@@ -547,6 +547,7 @@ afb_data_assign(
 	struct afb_data **data,
 	struct afb_data *value
 ) {
-	afb_data_unref(*data);
+	struct afb_data *oldval = *data;
 	*data = value;
+	afb_data_unref(oldval);
 }
