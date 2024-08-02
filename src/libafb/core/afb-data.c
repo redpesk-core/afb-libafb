@@ -77,7 +77,7 @@ struct afb_data
 	/** closure of the dispose */
 	void *closure;
 
-	/** next conversion */
+	/** ring of conversion */
 	struct afb_data *cvt;
 
 	/** dependencies to other data */

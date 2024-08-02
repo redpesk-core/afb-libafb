@@ -235,8 +235,9 @@ afb_data_size(
 /**
  * Convert to an other data (possibly return a cached conversion)
  *
- * @param data the data
- * @param other the other data to convert from
+ * @param data the data to be converted
+ * @param type the expected type
+ * @param result the converted data of given type
  *
  * @return 0 in case of success, a negative code on error
  */
