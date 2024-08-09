@@ -39,6 +39,7 @@
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-wrap-rpc.h"
 
+#include "tls/tls-gnu.h"
 
 #define RECEIVE_BLOCK_LENGTH 4080
 #define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
@@ -54,6 +55,10 @@ struct afb_wrap_rpc
 	struct afb_stub_rpc *stub;
 	struct afb_ws *ws;
 	struct ev_fd *efd;
+#if WITH_GNUTLS
+	gnutls_certificate_credentials_t gnutls_creds;
+	gnutls_session_t gnutls_session;
+#endif
 };
 
 /******************************************************************************/
@@ -238,10 +243,12 @@ static int init(
 			}
 		}
 		else {
-#if WITH_TLS
+#if WITH_GNUTLS
 			/* TLS */
 			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
-				RP_CRITICAL("TLS not implemented yet"); /* TODO */
+				rc = tls_gnu_creds_init(&wrap->gnutls_creds);
+				if (rc >= 0)
+					rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
 			}
 #endif
 

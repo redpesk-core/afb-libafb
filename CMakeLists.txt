@@ -212,7 +212,7 @@ if(WITH_LIBUUID)
 endif()
 
 if(WITH_GNUTLS)
-	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.3)
+	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.6.5)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")

@@ -324,7 +324,7 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 		goto error;
 	}
 
-	/* check api name */
+	/* check api existence */
 	rc = afb_apiset_get_api(call_set, api, 1, 0, NULL);
 	if (rc < 0) {
 		RP_ERROR("Can't provide rpc-server for URI %s API %s", uri, api);
