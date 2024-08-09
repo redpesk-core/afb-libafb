@@ -278,7 +278,7 @@ int afb_wrap_rpc_create(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc =  init(*wrap, fd, autoclose, mode, apiname, callset);
+		rc = init(*wrap, fd, autoclose, mode, apiname, callset);
 		if (rc < 0) {
 			free(*wrap);
 			*wrap = NULL;

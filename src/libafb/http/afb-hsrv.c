@@ -582,7 +582,7 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 	key_or_end = MHD_OPTION_END;
 	if (cert || key) {
 		if (!cert || !key) {
-			RP_ERROR("hsrv start, invalid invalid tls arguments");
+			RP_ERROR("hsrv start, invalid tls arguments");
 			return 0;
 		}
 		flags |= MHD_USE_TLS;
