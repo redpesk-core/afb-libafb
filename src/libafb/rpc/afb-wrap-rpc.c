@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 
 #include <rp-utils/rp-verbose.h>
 
@@ -114,11 +115,18 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 #endif
 		buffer = malloc(esz);
 		if (buffer != NULL) {
-#if USE_SND_RCV
-			ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
-#else
-			ssz = read(fd, buffer, esz);
+#if WITH_GNUTLS
+			if (wrap->gnutls_session)
+				ssz = gnutls_record_recv(wrap->gnutls_session, buffer, esz);
+			else
 #endif
+			{
+#if USE_SND_RCV
+				ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
+#else
+				ssz = read(fd, buffer, esz);
+#endif
+			}
 			if (ssz >= 0) {
 				if (esz > (size_t)ssz) {
 					void *newbuffer = realloc(buffer, (size_t)ssz);
@@ -169,6 +177,38 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 {
 	free(buffer);
 }
+
+/******************************************************************************/
+/***       T L S                                                            ***/
+/******************************************************************************/
+
+#if WITH_GNUTLS
+
+static void notify_tls(void *closure, struct afb_rpc_coder *coder)
+{
+	ssize_t rc;
+	uint32_t sz;
+	struct afb_wrap_rpc *wrap = closure;
+	size_t maxsz = gnutls_record_get_max_size(wrap->gnutls_session);
+
+	/* check size of data to send */
+	afb_rpc_coder_output_sizes(coder, &sz);
+	if (sz > maxsz) {
+		RP_ERROR("there's more data (%u) than the maximum TLS record size (%lu), packet won't be sent", sz, maxsz);
+	}
+	else {
+		/* send */
+		char buffer[sz];
+		afb_rpc_coder_output_get_buffer(coder, buffer, sz);
+		do {
+			rc = gnutls_record_send(wrap->gnutls_session, buffer, sz);
+		} while (rc == GNUTLS_E_AGAIN || rc == GNUTLS_E_INTERRUPTED);
+	}
+
+	afb_rpc_coder_output_dispose(coder);
+}
+
+#endif
 
 /******************************************************************************/
 /***       W E B S O C K E T                                                ***/
@@ -222,6 +262,9 @@ static int init(
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
+	ev_fd_cb_t onevent_cb = onevent;
+	void (*notify_cb)(void*, struct afb_rpc_coder*) = notify;
+
 	/* create the stub */
 	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
 	if (rc < 0) {
@@ -243,21 +286,26 @@ static int init(
 			}
 		}
 		else {
+			wrap->ws = NULL;
+
 #if WITH_GNUTLS
-			/* TLS */
+			wrap->gnutls_session = NULL;
 			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
 				rc = tls_gnu_creds_init(&wrap->gnutls_creds);
-				if (rc >= 0)
+				if (rc >= 0) {
+					notify_cb = notify_tls;
 					rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
+				}
 			}
 #endif
 
 			/* direct initialisation */
-			wrap->ws = NULL;
-			rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent, wrap, 0, autoclose);
-			if (rc >= 0)
-				/* callback for emission */
-				afb_stub_rpc_emit_set_notify(wrap->stub, notify, wrap);
+			if (rc >= 0) {
+				rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent_cb, wrap, 0, autoclose);
+				if (rc >= 0)
+					/* callback for emission */
+					afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+			}
 		}
 		if (rc >= 0) {
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
