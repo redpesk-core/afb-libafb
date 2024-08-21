@@ -418,7 +418,7 @@ static int open_uri(const char *uri, int server, const char *scheme)
 
 	/* get the names */
 	uri += offset;
-	api = strstr(uri, as_api);
+	api = strchr(uri, '?');
 	if (api) {
 		unsigned len = (unsigned)(api - uri);
 		char *tmp = alloca(len + 1);
@@ -494,6 +494,8 @@ int afb_socket_open_scheme(const char *uri, int server, const char *scheme)
 
 /**
  * Get the api name of the uri
+ *
+ * @deprecated only works when API name is the very last part of the URI
  *
  * @param uri the specification of the socket
  *
