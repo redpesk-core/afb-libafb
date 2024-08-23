@@ -41,6 +41,12 @@ set(ldflags
 	${librp-utils_LDFLAGS}
 )
 
+set(libdirs
+	${json-c_LIBRARY_DIRS}
+	${afb-binding_LIBRARY_DIRS}
+	${librp-utils_LIBRARY_DIRS}
+)
+
 set(deps
 	json-c
 	librp-utils
@@ -88,6 +94,8 @@ if(WITH_SIG_MONITOR_TIMERS)
 endif()
 
 include_directories(AFTER SYSTEM ${incdirs})
+link_directories(BEFORE ${libdirs})
+message(STATUS "libdirs ${libdirs}")
 
 ############################################################################
 
