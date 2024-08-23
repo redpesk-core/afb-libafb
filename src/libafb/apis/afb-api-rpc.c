@@ -40,6 +40,7 @@
 #include "apis/afb-api-rpc.h"
 #include "core/afb-cred.h"
 #include "misc/afb-socket.h"
+#include "misc/afb-uri.h"
 #include "misc/afb-ws.h"
 #include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
@@ -103,10 +104,11 @@ static void client_on_hangup(struct afb_wrap_rpc *client)
 static int reopen_client(void *closure)
 {
 	const char *uri = closure;
-	const char *apiname = afb_socket_api(uri);
+	const char *apiname = afb_uri_api_name(uri);
 	int fd = afb_socket_open(uri, 0);
 	if (fd >= 0)
 		RP_INFO("Reconnected to API %s", apiname);
+	free(apiname);
 	return fd;
 }
 #endif
@@ -114,7 +116,8 @@ static int reopen_client(void *closure)
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
 	struct afb_wrap_rpc *wrap;
-	const char *apiname, *turi, *uri_no_tls;
+	const char *turi, *uri_no_tls;
+	char *apiname;
 	int rc, fd, websock;
 #if WITH_TLS
 	int tls;
@@ -132,8 +135,8 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 #endif
 	turi = prefix_ws_remove(uri_no_tls);
 	websock = turi != uri_no_tls;
-	apiname = afb_socket_api(turi);
-	if (apiname == NULL || !afb_apiname_is_valid(apiname)) {
+	apiname = afb_uri_api_name(turi);
+	if (apiname == NULL) {
 		RP_ERROR("invalid (too long) rpc client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
@@ -167,6 +170,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 			RP_ERROR("can't create client rpc service to %s", uri);
 	}
 error:
+	free(apiname);
 	return strong ? rc : 0;
 }
 
@@ -290,10 +294,11 @@ static int server_connect(struct server *server)
 int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
 	int rc;
-	const char *api, *uri_no_tls, *uri_no_ws;
+	const char *uri_no_tls, *uri_no_ws;
 	struct server *server;
 	size_t luri, lapi, extra;
 	ptrdiff_t l_before_api;
+	char *api = NULL;
 
 	/* check the size */
 	luri = strlen(uri);
@@ -317,8 +322,8 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 #endif
 
 	/* check the api name */
-	api = afb_socket_api(uri_no_ws);
-	if (api == NULL || !afb_apiname_is_valid(api)) {
+	api = afb_uri_api_name(uri_no_ws);
+	if (api == NULL) {
 		RP_ERROR("invalid api name in rpc uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
@@ -359,11 +364,14 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 
 	/* connect for serving */
 	rc = server_connect(server);
-	if (rc >= 0)
+	if (rc >= 0) {
+		free(api);
 		return 0;
+	}
 
 	afb_apiset_unref(server->apiset);
 	free(server);
 error:
+	free(api);
 	return rc;
 }

@@ -77,7 +77,7 @@ static void client_on_hangup(struct afb_stub_rpc *client)
 static int reopen_client(void *closure)
 {
 	const char *uri = closure;
-	const char *apiname = afb_socket_api(uri);
+	const char *apiname = afb_uri_api_name(uri);
 	int fd = afb_socket_open(uri, 0);
 	if (fd >= 0)
 		RP_INFO("Reconnected to API %s", apiname);
