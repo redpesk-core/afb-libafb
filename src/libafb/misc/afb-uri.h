@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2015-2024 IoT.bzh Company
- * Author: José Bollo <jose.bollo@iot.bzh>
+ * Author: Louis-Baptiste Sobolewski <lb.sobolewski@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
  * Commercial License Usage
@@ -21,45 +21,13 @@
  * $RP_END_LICENSE$
  */
 
-
-#include "core/afb-apiname.h"
+#pragma once
 
 /**
- * Checks wether 'name' is a valid API name.
- * @return 1 if valid, 0 otherwise
+ * Get API name from a sockspec URI
+ *
+ * @param uri sockspec URI
+ *
+ * @returns API name (must be freed by the user), NULL if not found, invalid name or error
  */
-int afb_apiname_is_valid(const char *apiname)
-{
-	unsigned char c;
-
-	c = (unsigned char)*apiname;
-	if (c == 0)
-		/* empty names aren't valid */
-		return 0;
-
-	do {
-		if (c < (unsigned char)'\x80') {
-			switch(c) {
-			default:
-				if (c > ' ')
-					break;
-				/*@fallthrough@*/
-			case '"':
-			case '#':
-			case '%':
-			case '&':
-			case '\'':
-			case '/':
-			case '?':
-			case '`':
-			case '@':
-			case '\\':
-			case '\x7f':
-				return 0;
-			}
-		}
-		c = (unsigned char)*++apiname;
-	} while(c != 0);
-	return 1;
-}
-
+extern char *afb_uri_api_name(const char *uri);
