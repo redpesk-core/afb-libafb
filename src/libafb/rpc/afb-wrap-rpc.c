@@ -25,14 +25,17 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
 
+#include <rp-utils/rp-escape.h>
 #include <rp-utils/rp-verbose.h>
 
 #include "sys/x-uio.h"
 
+#include "misc/afb-uri.h"
 #include "misc/afb-ws.h"
 #include "rpc/afb-rpc-coder.h"
 #include "core/afb-ev-mgr.h"
@@ -259,9 +262,13 @@ static int init(
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
+		const char *uri,
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
+#if WITH_GNUTLS
+	const char *cert_path, *key_path;
+#endif
 	ev_fd_cb_t onevent_cb = onevent;
 	void (*notify_cb)(void*, struct afb_rpc_coder*) = notify;
 
@@ -291,10 +298,22 @@ static int init(
 #if WITH_GNUTLS
 			wrap->gnutls_session = NULL;
 			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
-				rc = tls_gnu_creds_init(&wrap->gnutls_creds);
-				if (rc >= 0) {
-					notify_cb = notify_tls;
-					rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
+				/* get cert & key from uri query arguments */
+				const char **args = rp_unescape_args(strchr(uri, '?') + 1); // TODO safety check
+				cert_path = rp_unescaped_args_get(args, "cert");
+				key_path = rp_unescaped_args_get(args, "key");
+
+				if (cert_path && key_path) {
+					/* setup GnuTLS */
+					rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, rp_unescaped_args_get(args, "trust"));
+					if (rc >= 0) {
+						notify_cb = notify_tls;
+						rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
+					}
+				}
+				else {
+					RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
+					rc = X_EINVAL;
 				}
 			}
 #endif
@@ -322,6 +341,7 @@ int afb_wrap_rpc_create(
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
+		const char *uri,
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
@@ -333,7 +353,7 @@ int afb_wrap_rpc_create(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = init(*wrap, fd, autoclose, mode, apiname, callset);
+		rc = init(*wrap, fd, autoclose, mode, uri, apiname, callset);
 		if (rc < 0) {
 			free(*wrap);
 			*wrap = NULL;
@@ -365,7 +385,7 @@ int afb_wrap_rpc_upgrade(
 ) {
 	struct afb_wrap_rpc *wrap;
 	enum afb_wrap_rpc_mode mode = websock ? Wrap_Rpc_Mode_Websocket : Wrap_Rpc_Mode_Raw;
-	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, mode, NULL, callset);
+	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, mode, NULL, NULL, callset);
 	if (rc >= 0) {
 		afb_stub_rpc_set_session(wrap->stub, session);
 		afb_stub_rpc_set_token(wrap->stub, token);

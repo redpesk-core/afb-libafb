@@ -38,7 +38,8 @@ static gnutls_priority_t priority_cache;
 /* disable DTLS and all TLS versions before TLS 1.3 */
 #define CIPHER_PRIORITY "SECURE128:-VERS-DTLS-ALL:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2"
 
-extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds) {
+int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds, const char *cert_path, const char *key_path, const char *trust_path)
+{
     int rc;
 
     /* check version */
@@ -54,26 +55,26 @@ extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds) {
         goto error;
     }
 
-# if 0
-    /* use the system's trusted CAs */
-    rc = gnutls_certificate_set_x509_system_trust(*creds);
-    if (rc < 0) {
-        RP_ERROR("couldn't use system's trusted CAs");
-        goto error;
+    if (trust_path) {
+        /* use local trust dir */
+        rc = gnutls_certificate_set_x509_trust_dir(*creds, trust_path, GNUTLS_X509_FMT_PEM);
+        if (rc < 0) {
+            RP_ERROR("couldn't set local trust directory");
+            goto error;
+        }
     }
-#else
-    /* use local trust dir */
-    // TODO trust path should be provided by the user
-    rc = gnutls_certificate_set_x509_trust_file(*creds, "../trust_dir/cert.pem", GNUTLS_X509_FMT_PEM);
-    if (rc < 0) {
-        RP_ERROR("couldn't set local trust file");
-        goto error;
+    else {
+        /* use the system's trusted CAs */
+        rc = gnutls_certificate_set_x509_system_trust(*creds);
+        if (rc < 0) {
+            RP_ERROR("couldn't use system's trusted CAs");
+            goto error;
+        }
     }
-#endif
+
 
     /* set certificate */
-    // TODO cert and key paths should be provided by the user
-    rc = gnutls_certificate_set_x509_key_file(*creds, "cert.pem", "key.pem", GNUTLS_X509_FMT_PEM);
+    rc = gnutls_certificate_set_x509_key_file(*creds, cert_path, key_path, GNUTLS_X509_FMT_PEM);
     if (rc < 0) {
         RP_ERROR("failed to set certificate/private key pair");
         goto error;
@@ -87,7 +88,8 @@ error:
     return rc;
 }
 
-extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd) {
+int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd)
+{
     int rc;
     gnutls_init_flags_t flag = server ? GNUTLS_SERVER : GNUTLS_CLIENT;
 
@@ -133,7 +135,7 @@ extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_cr
     gnutls_transport_set_int(*session, fd);
 
     /* handshake */
-    gnutls_handshake_set_timeout(*session, 5000);
+    gnutls_handshake_set_timeout(*session, 3000);
     do {
         rc = gnutls_handshake(*session);
     } while (rc != GNUTLS_E_SUCCESS && !gnutls_error_is_fatal(rc));

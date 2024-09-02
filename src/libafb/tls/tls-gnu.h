@@ -32,12 +32,28 @@
 #include <gnutls/gnutls.h>
 
 /**
- * 
+ * @brief initializes a GnuTLS credentials object
+ *
+ * All certificates and keys provided must be in PEM format
+ *
+ * @param creds pointer where to store the address of the allocated credentials object
+ * @param cert_path path to the certificate
+ * @param key_path path to the private key matching the certificate
+ * @param trust_path path to the directory containing the trusted certificates, NULL to use system trust dir
+ *
+ * @return 0 if OK, <0 if KO (in which case creds is freeed for you)
  */
-extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds);
+extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds, const char *cert_path, const char *key_path, const char *trust_path);
 
 /**
- * 
+ * @brief initializes a GnuTLS session object
+ *
+ * @param session pointer where to store the address of the allocated session object
+ * @param creds credentials to use for the session (see tls_gnu_creds_init)
+ * @param server true if server, false if client
+ * @param fd socket file descriptor to receive and transmit TLS data
+ *
+ * @return 0 if OK, <0 if KO (in which case session is freed for you)
  */
 extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd);
 

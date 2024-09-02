@@ -66,10 +66,10 @@ struct server
 	uint8_t tls;
 #endif
 
-	/** api name of the interface */
+	/** offset in uri of the interface api name */
 	uint16_t offapi;
 
-	/** the uri of the server socket */
+	/** full uri of the server socket and api name only, separated by a \0  */
 	char uri[];
 };
 
@@ -160,7 +160,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0) {
 		/* create the client wrap */
 		fd = rc;
-		rc = afb_wrap_rpc_create(&wrap, fd, 1, mode, apiname, call_set);
+		rc = afb_wrap_rpc_create(&wrap, fd, 1, mode, uri, apiname, call_set);
 		if (rc >= 0) {
 			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
@@ -223,7 +223,7 @@ static void server_accept(struct server *server, int fd)
 		apiname = &server->uri[server->offapi];
 		if (apiname[0] == 0)
 			apiname = NULL;
-		rc = afb_wrap_rpc_create(&wrap, fdc, 1, mode, apiname, server->apiset);
+		rc = afb_wrap_rpc_create(&wrap, fdc, 1, mode, server->uri, apiname, server->apiset);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
