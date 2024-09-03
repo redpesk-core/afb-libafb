@@ -36,6 +36,10 @@
 #include "core/afb-threads.h"
 #include "core/afb-ev-mgr.h"
 
+#ifndef AFB_THREADS_DEFAULT_RESERVE_COUNT
+#define AFB_THREADS_DEFAULT_RESERVE_COUNT 2
+#endif
+
 #define DEBUGGING 0
 #if DEBUGGING
 #include <stdio.h>
@@ -76,10 +80,17 @@ struct thread
 IFDBG(unsigned id;)
 };
 
+/***********************************************************************/
+
+/** count of allowed threads */
+static int normal_count = 1;
+
+/** allowed count of thread to wait in reserve */
+static int reserve_count = AFB_THREADS_DEFAULT_RESERVE_COUNT;
+
 /* synchronisation of threads (TODO: try to use lock-free technics) */
 static x_mutex_t mutex = X_MUTEX_INITIALIZER;
 static x_cond_t *asleep_waiter_cond = 0;
-
 
 /* list of threads */
 static struct thread *threads = 0;
@@ -87,23 +98,15 @@ static struct thread *threads = 0;
 static int active_count = 0;
 
 /***********************************************************************/
-#ifndef WITH_THREADS_RESERVE
-#define  WITH_THREADS_RESERVE 1
-#endif
-#if WITH_THREADS_RESERVE
 /*
 * Reserve is a reserved already started threads but not
 * active. These thread structures are stored in the list
 * headed by `reserve_head`. The value `reserve_decount` is the
 * remaining count of threads allowed to enter the reserve.
 */
-#ifndef AFB_THREADS_RESERVE_COUNT
-#define AFB_THREADS_RESERVE_COUNT 4
-#endif
 static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
-static int reserve_decount = AFB_THREADS_RESERVE_COUNT;
+static int reserve_decount = AFB_THREADS_DEFAULT_RESERVE_COUNT;
 static struct thread *reserve_head = 0;
-#endif
 
 /***********************************************************************/
 static inline int match_any_class(int classid)
@@ -244,7 +247,6 @@ static void *thread_main(void *arg)
 	for (;;) {
 		x_mutex_lock(&mutex);
 		thread_run(thr);
-#if WITH_THREADS_RESERVE
 		x_mutex_lock(&reserve_lock);
 		if (reserve_decount > 0) {
 			thr->next = reserve_head;
@@ -255,12 +257,24 @@ static void *thread_main(void *arg)
 			continue;
 		}
 		x_mutex_unlock(&reserve_lock);
-#endif
 		break;
 	}
 	free(thr);
 	return 0;
 }
+
+
+/***********************************************************************/
+
+void afb_threads_setup_counts(int normal, int reserve)
+{
+	if (normal >= 0)
+		normal_count = normal;
+	if (reserve >= 0)
+		reserve_count = reserve;
+}
+
+/***********************************************************************/
 
 int afb_threads_active_count(int classid)
 {
@@ -293,13 +307,13 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	int rc;
 	struct thread *thr;
 
-#if WITH_THREADS_RESERVE
 	x_mutex_lock(&reserve_lock);
 	thr = reserve_head;
 	if (thr != NULL) {
 
 		reserve_head = thr->next;
-		reserve_decount++;
+		if (reserve_decount < reserve_count)
+			reserve_decount++;
 		thr->asleep = 0;
 		thr->stopped = 0;
 		thr->classid = classid;
@@ -312,7 +326,6 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		return 0;
 	}
 	x_mutex_unlock(&reserve_lock);
-#endif
 	thr = malloc(sizeof *thr);
 	if (thr == NULL)
 		return X_ENOMEM;

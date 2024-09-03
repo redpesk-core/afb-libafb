@@ -468,6 +468,7 @@ int afb_sched_start(
 	/* records the allowed count */
 	allowed_thread_count = allowed_count;
 	afb_jobs_set_max_count(max_jobs_count);
+	afb_threads_setup_counts(allowed_count, -1);
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {

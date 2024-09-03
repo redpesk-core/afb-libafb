@@ -104,6 +104,16 @@ typedef struct afb_threads_job_desc afb_threads_job_desc_t;
 typedef int (*afb_threads_job_getter_t)(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid);
 
 /**
+ * Setup the count of threads.
+ *
+ * If any of the given value is negative, the recorded value is unchanged.
+ *
+ * @param normal count of thread that can normally be kept alive and waiting
+ * @param reserve count of dead thread that can be hold ready
+ */
+extern void afb_threads_setup_counts(int normal, int reserve);
+
+/**
  * start a thread of classid with a job getter
  *
  * @param classid classid of the started thread
