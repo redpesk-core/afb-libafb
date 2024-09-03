@@ -187,8 +187,6 @@ static void thread_run(struct thread *me)
 IFDBG(static unsigned id = 0; me->id = ++id;)
 
 PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
-	/* initiate thread tempo */
-	afb_sig_monitor_init_timeouts();
 
 	while (!me->stopped) {
 		/* get a job */
@@ -245,23 +243,24 @@ static void *thread_main(void *arg)
 {
 	struct thread *thr = arg;
 
+	/* initiate thread tempo */
+	afb_sig_monitor_init_timeouts();
+
 	for (;;) {
 		x_mutex_lock(&mutex);
 		thread_run(thr);
 		x_mutex_lock(&reserve_lock);
-		if (reserve_decount > 0) {
-			thr->next = reserve_head;
-			reserve_head = thr;
-			reserve_decount--;
-			x_cond_wait(&thr->cond, &reserve_lock);
+		if (reserve_decount <= 0) {
 			x_mutex_unlock(&reserve_lock);
-			continue;
+			free(thr);
+			return 0;
 		}
+		thr->next = reserve_head;
+		reserve_head = thr;
+		reserve_decount--;
+		x_cond_wait(&thr->cond, &reserve_lock);
 		x_mutex_unlock(&reserve_lock);
-		break;
 	}
-	free(thr);
-	return 0;
 }
 
 
@@ -345,6 +344,8 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 	me.getjob = jobget;
 	me.getjobcls = closure;
 
+	/* initiate thread tempo */
+	afb_sig_monitor_init_timeouts();
 	link_thread(&me);
 	thread_run(&me);
 
