@@ -456,14 +456,14 @@ int afb_sched_start(
 	afb_ev_mgr_init();
 
 	x_mutex_lock(&mutex);
-	pexiting = &exiting;
 
 	/* check whether already running */
-	if (allowed_thread_count) {
+	if (pexiting != NULL) {
 		RP_ERROR("sched already started");
-		exiting.code = X_EINVAL;
-		goto error;
+		x_mutex_unlock(&mutex);
+		return X_EBUSY;
 	}
+	pexiting = &exiting;
 
 	/* records the allowed count */
 	allowed_thread_count = allowed_count;
