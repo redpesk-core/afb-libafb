@@ -77,7 +77,8 @@ struct thread
 	/** synchronisation with the thread */
 	x_cond_t  cond;
 
-IFDBG(unsigned id;)
+	/* an id if debugging */
+	IFDBG(unsigned id;)
 };
 
 /***********************************************************************/
