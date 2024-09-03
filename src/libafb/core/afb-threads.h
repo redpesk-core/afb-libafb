@@ -146,16 +146,6 @@ extern int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void 
 extern int afb_threads_active_count(int classid);
 
 /**
- * Get the count of managed threads matching the classid mask and
- * being sleeping.
- *
- * @param classid the mask of the threads to count
- *
- * @return the count found
- */
-extern int afb_threads_asleep_count(int classid);
-
-/**
  * Wake up the managed threads matching the classid mask and
  * being sleeping.
  *
@@ -186,27 +176,11 @@ extern int afb_threads_stop(int classid, int count);
 extern int afb_threads_has_thread(x_thread_t tid);
 
 /**
- * Stop the given thread if it is managed
- *
- * @param tid  the thread id of the thread to stop
- *
- * @return 1 if the thread is stopped or 0 else
- */
-extern int afb_threads_stop_thread(x_thread_t tid);
-
-/**
  * Checks if the current thread is managed
  *
  * @return 1 if the current thread is managed or 0 else
  */
 extern int afb_threads_has_me();
-
-/**
- * Stop the current thread if it is managed
- *
- * @return 1 if the thread is stopped or 0 else
- */
-extern int afb_threads_stop_me();
 
 /**
  * Wait until all managed threads matching the classid mask are sleeping.

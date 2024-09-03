@@ -291,17 +291,6 @@ int afb_threads_active_count(int classid)
 	return count;
 }
 
-int afb_threads_asleep_count(int classid)
-{
-	struct thread *ithr;
-	int count;
-	x_mutex_lock(&mutex);
-	for (count = 0, ithr = threads ; ithr ; ithr = ithr->next)
-		count += (ithr->asleep && match_class(ithr, classid));
-	x_mutex_unlock(&mutex);
-	return count;
-}
-
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
 {
 	int rc;
@@ -417,26 +406,9 @@ int afb_threads_has_thread(x_thread_t tid)
 	return resu;
 }
 
-int afb_threads_stop_thread(x_thread_t tid)
-{
-	int resu;
-	struct thread *thr;
-	x_mutex_lock(&mutex);
-	thr = get_thread(tid);
-	if ((resu = (thr != NULL && !thr->stopped)))
-		stop(thr);
-	x_mutex_unlock(&mutex);
-	return resu;
-}
-
 int afb_threads_has_me()
 {
 	return afb_threads_has_thread(x_thread_self());
-}
-
-int afb_threads_stop_me()
-{
-	return afb_threads_stop_thread(x_thread_self());
 }
 
 int afb_threads_wait_idle(int classid, int timeoutms)
