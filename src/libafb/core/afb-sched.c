@@ -169,7 +169,7 @@ static int start_thread(int classid)
 static int start_one_thread(enum afb_sched_mode mode)
 {
 	int classid;
-	if (afb_threads_active_count(ANY_CLASSID) < allowed_thread_count)
+	if (afb_threads_active_count() < allowed_thread_count)
 		classid = CLASSID_OTHERS;
 	else if (mode == Afb_Sched_Mode_Start)
 		classid = CLASSID_EXTRA;
@@ -404,7 +404,7 @@ int afb_sched_enter(
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
-	if (afb_threads_active_count(ANY_CLASSID) <= afb_threads_has_me())
+	if (afb_threads_active_count() <= afb_threads_has_me())
 		start_one_thread(Afb_Sched_Mode_Start);
 	return afb_threads_wait_idle(ANY_CLASSID, timeout * 1000);
 }
@@ -471,7 +471,7 @@ int afb_sched_start(
 	afb_threads_setup_counts(allowed_count, -1);
 
 	/* start at least one thread: the current one */
-	while (afb_threads_active_count(CLASSID_OTHERS) + 1 < start_count) {
+	while (afb_threads_active_count() + 1 < start_count) {
 		exiting.code = start_thread(CLASSID_OTHERS);
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");

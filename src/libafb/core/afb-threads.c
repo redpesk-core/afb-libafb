@@ -276,19 +276,9 @@ void afb_threads_setup_counts(int normal, int reserve)
 
 /***********************************************************************/
 
-int afb_threads_active_count(int classid)
+int afb_threads_active_count()
 {
-	struct thread *ithr;
-	int count;
-	x_mutex_lock(&mutex);
-	if (match_any_class(classid))
-		count = active_count;
-	else {
-		for (count = 0, ithr = threads ; ithr ; ithr = ithr->next)
-			count += (!ithr->stopped && match_class(ithr, classid));
-	}
-	x_mutex_unlock(&mutex);
-	return count;
+	return __atomic_load_n(&active_count, __ATOMIC_RELAXED);
 }
 
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
