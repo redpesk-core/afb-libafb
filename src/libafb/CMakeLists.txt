@@ -67,18 +67,18 @@ INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 ###########################################################################
 
-add_library(libafbso SHARED  $<TARGET_OBJECTS:libafb>)
-set_target_properties(libafbso PROPERTIES
-	OUTPUT_NAME afb
-	VERSION ${LIBAFB_VERSION}
-	SOVERSION ${LIBAFB_SOVERSION}
-)
-TARGET_LINK_LIBRARIES(libafbso
-	${ldflags}
-	-Wl,--as-needed
-	-Wl,--gc-sections
-)
-INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+#add_library(libafbso SHARED  $<TARGET_OBJECTS:libafb>)
+#set_target_properties(libafbso PROPERTIES
+#	OUTPUT_NAME afb
+#	VERSION ${LIBAFB_VERSION}
+#	SOVERSION ${LIBAFB_SOVERSION}
+#)
+#TARGET_LINK_LIBRARIES(libafbso
+#	${ldflags}
+#	-Wl,--as-needed
+#	-Wl,--gc-sections
+#)
+#INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # install pkgconfig file
 

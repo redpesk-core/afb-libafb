@@ -1,0 +1,5 @@
+name: afb-libafb
+build:
+  depends:
+    - afb-binding
+    - rp-lib-utils
