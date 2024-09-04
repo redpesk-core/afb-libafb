@@ -375,18 +375,17 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 	return 0;
 }
 
-int afb_threads_wakeup(int classid, int count)
+int afb_threads_wakeup_one()
 {
-	int decount = 0;
+	int found = 0;
 	struct thread *ithr;
 PRINT("++++++++++++ B-TWU %d\n",count);
 	x_mutex_lock(&list_lock);
-	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
-		if (match_class(ithr, classid))
-			decount += wakeup(ithr);
+	for (ithr = threads ; ithr && !found ; ithr = ithr->next)
+		found = wakeup(ithr);
 	x_mutex_unlock(&list_lock);
 PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
-	return decount;
+	return found;
 }
 
 void afb_threads_stop_all()

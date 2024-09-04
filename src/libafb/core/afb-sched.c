@@ -183,7 +183,7 @@ static int start_one_thread(enum afb_sched_mode mode)
  */
 static void adapt(enum afb_sched_mode mode)
 {
-	if (!afb_threads_wakeup(ANY_CLASSID, 1))
+	if (!afb_threads_wakeup_one())
 		start_one_thread(mode);
 }
 

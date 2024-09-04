@@ -143,15 +143,11 @@ extern int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void 
 extern int afb_threads_active_count();
 
 /**
- * Wake up the managed threads matching the classid mask and
- * being sleeping.
+ * Wake up one managed threads being sleeping.
  *
- * @param classid the mask of the threads to wakeup
- * @param count   the maximum count of thread to awake
- *
- * @return the count of thread awaken
+ * @return the 1 if one thread awaken or 0 else when none was awake
  */
-extern int afb_threads_wakeup(int classid, int count);
+extern int afb_threads_wakeup_one();
 
 /**
  * Stop all the managed threads.
