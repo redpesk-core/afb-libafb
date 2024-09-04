@@ -120,14 +120,6 @@ static inline int match_class(struct thread *thr, int classid)
 	return thr->classid & classid;
 }
 
-static void link_thread(struct thread *thr)
-{
-	x_mutex_lock(&mutex);
-	thr->next = threads;
-	threads = thr;
-	active_count++;
-}
-
 static void unlink_thread(struct thread *thr)
 {
 	struct thread *ithr;
@@ -171,7 +163,7 @@ PRINT("++++++++++++ WUsA[%u]%p\n",thr->id,thr);
 
 static void stop(struct thread *thr)
 {
-	active_count--;
+	__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 	thr->stopped = 1;
 	if (thr->asleep) {
 		thr->asleep = 0;
@@ -278,7 +270,7 @@ void afb_threads_setup_counts(int normal, int reserve)
 
 int afb_threads_active_count()
 {
-	return __atomic_load_n(&active_count, __ATOMIC_RELAXED);
+	return __atomic_load_n(&active_count, __ATOMIC_SEQ_CST);
 }
 
 int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
@@ -298,17 +290,23 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		thr->classid = classid;
 		thr->getjob = jobget;
 		thr->getjobcls = closure;
-		link_thread(thr);
-		x_cond_signal(&thr->cond);
+		x_mutex_lock(&mutex);
+		thr->next = threads;
+		threads = thr;
+		__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 		x_mutex_unlock(&mutex);
+		x_cond_signal(&thr->cond);
 		x_mutex_unlock(&reserve_lock);
 		return 0;
 	}
 	x_mutex_unlock(&reserve_lock);
+
+	/* create a new thread */
 	thr = malloc(sizeof *thr);
 	if (thr == NULL)
 		return X_ENOMEM;
 
+	/* init it */
 	thr->next = 0;
 	thr->asleep = 0;
 	thr->stopped = 0;
@@ -317,12 +315,15 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	thr->getjob = jobget;
 	thr->getjobcls = closure;
 
-	link_thread(thr);
+	x_mutex_lock(&mutex);
+	thr->next = threads;
+	threads = thr;
+	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 	rc = x_thread_create(&thr->tid, thread_main, thr, 1);
 	if (rc < 0) {
 		rc = -errno;
+		__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 		unlink_thread(thr);
-		active_count--;
 		free(thr);
 		RP_CRITICAL("not able to start thread: %s", strerror(-rc));
 
@@ -335,6 +336,7 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 {
 	struct thread me;
 
+	/* setup the structure for me */
 	me.next = 0;
 	me.tid = x_thread_self();
 	me.asleep = 0;
@@ -346,7 +348,13 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 
 	/* initiate thread tempo */
 	afb_sig_monitor_init_timeouts();
-	link_thread(&me);
+
+	/* enter the thread now */
+	x_mutex_lock(&mutex);
+	me.next = threads;
+	threads = &me;
+	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+
 	thread_run(&me);
 
 	return 0;
