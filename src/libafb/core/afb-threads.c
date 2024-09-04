@@ -86,11 +86,15 @@ struct thread
 /** count of allowed threads */
 static int normal_count = 1;
 
-/* synchronisation of threads (TODO: try to use lock-free technics) */
+/** synchronisation of thread's list management */
 static x_mutex_t list_lock = X_MUTEX_INITIALIZER;
+
+/** synchronisation of running threads for job acquisition */
+static x_mutex_t run_lock = X_MUTEX_INITIALIZER;
+
 static x_cond_t *asleep_waiter_cond = 0;
 
-/* list of threads */
+/** list of threads */
 static struct thread *threads = 0;
 
 static int active_count = 0;
@@ -185,6 +189,7 @@ IFDBG(static unsigned id = 0; me->id = ++id;)
 
 PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 
+	x_mutex_lock(&run_lock);
 	while (!me->stopped) {
 		/* get a job */
 		status = me->getjob(me->getjobcls, &jobdesc, me->tid);
@@ -196,20 +201,24 @@ PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 		case AFB_THREADS_EXEC:
 			/* execute the retrieved job */
 PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
-			x_mutex_unlock(&list_lock);
+			x_mutex_unlock(&run_lock);
 			jobdesc.run(jobdesc.job, me->tid);
-			x_mutex_lock(&list_lock);
+			x_mutex_lock(&run_lock);
 			break;
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
 PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
+			x_mutex_lock(&list_lock);
 			me->asleep = 1;
 			if (asleep_waiter_cond != NULL) {
 				x_cond_signal(asleep_waiter_cond);
 				asleep_waiter_cond = NULL;
 			}
+			x_mutex_unlock(&run_lock);
 			x_cond_wait(&me->cond, &list_lock);
+			x_mutex_unlock(&list_lock);
+			x_mutex_lock(&run_lock);
 PRINT("++++++++++++ TRwA[%u]%p classid=%d\n",me->id,me,me->classid);
 			break;
 
@@ -220,7 +229,9 @@ PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
 			break;
 		}
 	}
+	x_mutex_unlock(&run_lock);
 
+	x_mutex_lock(&list_lock);
 	unlink_thread(me);
 	if (asleep_waiter_cond != NULL) {
 		x_cond_signal(asleep_waiter_cond);
@@ -244,7 +255,6 @@ static void *thread_main(void *arg)
 	afb_sig_monitor_init_timeouts();
 
 	for (;;) {
-		x_mutex_lock(&list_lock);
 		thread_run(thr);
 		x_mutex_lock(&reserve_lock);
 		if (current_reserve_count >= reserve_count) {
@@ -358,6 +368,7 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 	me.next = threads;
 	threads = &me;
 	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+	x_mutex_unlock(&list_lock);
 
 	thread_run(&me);
 
