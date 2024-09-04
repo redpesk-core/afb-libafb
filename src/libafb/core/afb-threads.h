@@ -116,6 +116,18 @@ extern void afb_threads_setup_counts(int normal, int reserve);
 extern int afb_threads_start(afb_threads_job_getter_t jobget, void *closure);
 
 /**
+ * start a thread with a job getter but don't start it if
+ * force == 0 and the normal_count of threads is already active
+ *
+ * @param jobget  the getter function @see afb_threads_job_getter_t
+ * @param closure closure for the getter
+ * @param force   enforce starting a thread
+ *
+ * @return 0 on succes or a negative error code
+ */
+extern int afb_threads_start_cond(afb_threads_job_getter_t jobget, void *closure, int force);
+
+/**
  * dont start a thread but use the current one to run the loop.
  *
  * @param jobget  the getter function @see afb_threads_job_getter_t
