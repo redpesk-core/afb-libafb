@@ -86,9 +86,6 @@ struct thread
 /** count of allowed threads */
 static int normal_count = 1;
 
-/** allowed count of thread to wait in reserve */
-static int reserve_count = AFB_THREADS_DEFAULT_RESERVE_COUNT;
-
 /* synchronisation of threads (TODO: try to use lock-free technics) */
 static x_mutex_t list_lock = X_MUTEX_INITIALIZER;
 static x_cond_t *asleep_waiter_cond = 0;
@@ -102,12 +99,20 @@ static int active_count = 0;
 /*
 * Reserve is a reserved already started threads but not
 * active. These thread structures are stored in the list
-* headed by `reserve_head`. The value `reserve_decount` is the
-* remaining count of threads allowed to enter the reserve.
+* headed by `reserve_head` and counted using `current_reserve_count`.
 */
-static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
-static int reserve_decount = AFB_THREADS_DEFAULT_RESERVE_COUNT;
+
+/** count of thread allowed to wait in reserve */
+static int reserve_count = AFB_THREADS_DEFAULT_RESERVE_COUNT;
+
+/** current count of thread in reserve */
+static int current_reserve_count = 0;
+
+/** head of the list of threads in reserve */
 static struct thread *reserve_head = 0;
+
+/** lock for managing reserve of threads */
+static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
 
 /***********************************************************************/
 static inline int match_any_class(int classid)
@@ -242,14 +247,14 @@ static void *thread_main(void *arg)
 		x_mutex_lock(&list_lock);
 		thread_run(thr);
 		x_mutex_lock(&reserve_lock);
-		if (reserve_decount <= 0) {
+		if (current_reserve_count >= reserve_count) {
 			x_mutex_unlock(&reserve_lock);
 			free(thr);
 			return 0;
 		}
+		current_reserve_count++;
 		thr->next = reserve_head;
 		reserve_head = thr;
-		reserve_decount--;
 		x_cond_wait(&thr->cond, &reserve_lock);
 		x_mutex_unlock(&reserve_lock);
 	}
@@ -283,8 +288,7 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	if (thr != NULL) {
 
 		reserve_head = thr->next;
-		if (reserve_decount < reserve_count)
-			reserve_decount++;
+		current_reserve_count--;
 		thr->asleep = 0;
 		thr->stopped = 0;
 		thr->classid = classid;
