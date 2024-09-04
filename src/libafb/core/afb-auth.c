@@ -21,6 +21,9 @@
  * $RP_END_LICENSE$
  */
 
+// json-c/json.h: No such file or directory
+
+#if 0
 
 #include <stdlib.h>
 
@@ -115,3 +118,15 @@ struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t sessi
 
 	return result;
 }
+
+#else
+
+#include <stdlib.h>
+#include <stdint.h>
+
+struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t session)
+{
+	return NULL;
+}
+
+#endif
