@@ -59,8 +59,8 @@ struct thread
 	/** thread id */
 	x_thread_t tid;
 
-	/** sleeping status */
-	unsigned char asleep;
+	/** is extra */
+	unsigned char extra;
 
 	/** stop request */
 	unsigned char stopped;
@@ -96,8 +96,20 @@ static struct thread *threads = 0;
 
 static int active_count = 0;
 
-/***********************************************************************/
-/*
+/***********************************************************************
+* asleep threads will wait for being woken up on the wakeup_cond
+*/
+
+/** signaling condition for waking up threads */
+static x_cond_t wakeup_cond = X_COND_INITIALIZER;
+
+/** synchronisation of wakeup/asleep management */
+static x_mutex_t asleep_lock = X_MUTEX_INITIALIZER;
+
+/** count of asleep threads */
+static int asleep_count = 0;
+
+/***********************************************************************
 * Reserve is a reserved already started threads but not
 * active. These thread structures are stored in the list
 * headed by `reserve_head` and counted using `current_reserve_count`.
@@ -116,6 +128,12 @@ static struct thread *reserve_head = 0;
 static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
 
 /***********************************************************************/
+
+/**
+ * Removes @ref thr from the list of active threads.
+ * The mutex @ref list_lock must be held when this function is called.
+ * The value of active_count is unchanged because it should be done in @ref stop
+ */
 static void unlink_thread(struct thread *thr)
 {
 	struct thread *ithr;
@@ -125,45 +143,6 @@ static void unlink_thread(struct thread *thr)
 		for (ithr = threads ; ithr && ithr->next != thr ; ithr = ithr->next);
 		if (ithr)
 			ithr->next = thr->next;
-	}
-}
-
-
-static inline int wait_new_asleep(struct timespec *expire)
-{
-	int resu = 0;
-	x_cond_t cond = X_COND_INITIALIZER;
-	x_cond_t *oldcond = asleep_waiter_cond;
-	asleep_waiter_cond = &cond;
-	if (expire == NULL)
-		x_cond_wait(&cond, &list_lock);
-	else {
-		if (x_cond_timedwait(&cond, &list_lock, expire))
-			resu = 1;
-	}
-	asleep_waiter_cond = oldcond;
-	return resu;
-}
-
-static int wakeup(struct thread *thr)
-{
-	if (thr->stopped || !thr->asleep)
-		return 0;
-
-PRINT("++++++++++++ WUsB[%u]%p\n",thr->id,thr);
-	thr->asleep = 0;
-	x_cond_signal(&thr->cond);
-PRINT("++++++++++++ WUsA[%u]%p\n",thr->id,thr);
-	return 1;
-}
-
-static void stop(struct thread *thr)
-{
-	__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
-	thr->stopped = 1;
-	if (thr->asleep) {
-		thr->asleep = 0;
-		x_cond_signal(&thr->cond);
 	}
 }
 
@@ -191,28 +170,34 @@ PRINT("++++++++++++ TR run B[%u]%p\n",me->id,me);
 			x_mutex_unlock(&run_lock);
 			jobdesc.run(jobdesc.job, me->tid);
 			x_mutex_lock(&run_lock);
+PRINT("++++++++++++ TR run A[%u]%p\n",me->id,me);
 			break;
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
+			if (me->extra)
+				goto stopme;
 PRINT("++++++++++++ TRwB[%u]%p\n",me->id,me);
-			x_mutex_lock(&list_lock);
-			me->asleep = 1;
+			x_mutex_lock(&asleep_lock);
+			x_mutex_unlock(&run_lock);
+			__atomic_add_fetch(&asleep_count, 1, __ATOMIC_ACQ_REL);
 			if (asleep_waiter_cond != NULL) {
 				x_cond_signal(asleep_waiter_cond);
 				asleep_waiter_cond = NULL;
 			}
-			x_mutex_unlock(&run_lock);
-			x_cond_wait(&me->cond, &list_lock);
-			x_mutex_unlock(&list_lock);
+			x_cond_wait(&wakeup_cond, &asleep_lock);
+			__atomic_sub_fetch(&asleep_count, 1, __ATOMIC_ACQ_REL);
+			x_mutex_unlock(&asleep_lock);
 			x_mutex_lock(&run_lock);
 PRINT("++++++++++++ TRwA[%u]%p\n",me->id,me);
 			break;
 
 		default:
 			/* stop current thread */
+stopme:
 PRINT("++++++++++++ TR stop B[%u]%p\n",me->id,me);
-			stop(me);
+			__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+			me->stopped = 1;
 			break;
 		}
 	}
@@ -220,11 +205,14 @@ PRINT("++++++++++++ TR stop B[%u]%p\n",me->id,me);
 
 	x_mutex_lock(&list_lock);
 	unlink_thread(me);
+	x_mutex_unlock(&list_lock);
+
+	x_mutex_lock(&asleep_lock);
 	if (asleep_waiter_cond != NULL) {
 		x_cond_signal(asleep_waiter_cond);
 		asleep_waiter_cond = NULL;
 	}
-	x_mutex_unlock(&list_lock);
+	x_mutex_unlock(&asleep_lock);
 
 	afb_ev_mgr_try_recover_for_me();
 
@@ -286,14 +274,14 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 
 		reserve_head = thr->next;
 		current_reserve_count--;
-		thr->asleep = 0;
 		thr->stopped = 0;
 		thr->getjob = jobget;
 		thr->getjobcls = closure;
 		x_mutex_lock(&list_lock);
 		thr->next = threads;
 		threads = thr;
-		__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+		thr->extra = __atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL)
+		           > __atomic_load_n(&normal_count, __ATOMIC_SEQ_CST);
 		x_mutex_unlock(&list_lock);
 		x_cond_signal(&thr->cond);
 		x_mutex_unlock(&reserve_lock);
@@ -308,7 +296,6 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 
 	/* init it */
 	thr->next = 0;
-	thr->asleep = 0;
 	thr->stopped = 0;
 	thr->cond = (x_cond_t)X_COND_INITIALIZER;
 	thr->getjob = jobget;
@@ -317,7 +304,8 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 	x_mutex_lock(&list_lock);
 	thr->next = threads;
 	threads = thr;
-	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+	thr->extra = __atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL)
+	           > __atomic_load_n(&normal_count, __ATOMIC_SEQ_CST);
 	rc = x_thread_create(&thr->tid, thread_main, thr, 1);
 	if (rc < 0) {
 		rc = -errno;
@@ -338,7 +326,7 @@ int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 	/* setup the structure for me */
 	me.next = 0;
 	me.tid = x_thread_self();
-	me.asleep = 0;
+	me.extra = 0;
 	me.stopped = 0;
 	me.cond = (x_cond_t)X_COND_INITIALIZER;
 	me.getjob = jobget;
@@ -361,24 +349,32 @@ int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 
 int afb_threads_wakeup_one()
 {
-	int found = 0;
-	struct thread *ithr;
-PRINT("++++++++++++ B-TWU %d\n",count);
-	x_mutex_lock(&list_lock);
-	for (ithr = threads ; ithr && !found ; ithr = ithr->next)
-		found = wakeup(ithr);
-	x_mutex_unlock(&list_lock);
-PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
-	return found;
+	int result;
+	x_mutex_lock(&asleep_lock);
+PRINT("++++++++++++ B-TWU\n");
+	if (!__atomic_load_n(&asleep_count, __ATOMIC_SEQ_CST))
+		result = 0;
+	else {
+		x_cond_signal(&wakeup_cond);
+		result = 1;
+	}
+	x_mutex_unlock(&asleep_lock);
+PRINT("++++++++++++ A-TWU -> %d\n", result);
+	return result;
 }
 
 void afb_threads_stop_all()
 {
 	struct thread *ithr;
 	x_mutex_lock(&list_lock);
-	for (ithr = threads ; ithr ; ithr = ithr->next)
-		stop(ithr);
+	for (ithr = threads ; ithr ; ithr = ithr->next) {
+		ithr->stopped = 1;
+		__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+	}
 	x_mutex_unlock(&list_lock);
+	x_mutex_lock(&asleep_lock);
+	x_cond_broadcast(&wakeup_cond);
+	x_mutex_unlock(&asleep_lock);
 }
 
 static struct thread *get_thread(x_thread_t tid)
@@ -394,7 +390,7 @@ int afb_threads_has_thread(x_thread_t tid)
 	struct thread *thr;
 	x_mutex_lock(&list_lock);
 	thr = get_thread(tid);
-	resu = thr != NULL;
+	resu = thr != NULL && !thr->stopped;
 	x_mutex_unlock(&list_lock);
 	return resu;
 }
@@ -404,12 +400,36 @@ int afb_threads_has_me()
 	return afb_threads_has_thread(x_thread_self());
 }
 
+
+static inline int wait_new_asleep(struct timespec *expire)
+{
+	int resu = 0;
+	x_cond_t *oldcond, cond = X_COND_INITIALIZER;
+
+	x_mutex_lock(&asleep_lock);
+	oldcond = asleep_waiter_cond;
+	asleep_waiter_cond = &cond;
+	if (expire == NULL)
+		x_cond_wait(&cond, &asleep_lock);
+	else {
+		if (x_cond_timedwait(&cond, &asleep_lock, expire))
+			resu = 1;
+	}
+	asleep_waiter_cond = oldcond;
+	if (oldcond && !resu)
+		x_cond_signal(oldcond);
+	x_mutex_unlock(&asleep_lock);
+	return resu;
+}
+
+
+
 int afb_threads_wait_idle(int timeoutms)
 {
-	x_thread_t tid = x_thread_self();
-	int resu = 0;
 	struct timespec expire, *pexp;
-	struct thread *ithr;
+	int hasme = afb_threads_has_me();
+	int result = 0;
+PRINT("++++++++++++ B-TWI %d\n", timeoutms);
 	if (timeoutms <= 0)
 		pexp = NULL;
 	else {
@@ -422,22 +442,13 @@ int afb_threads_wait_idle(int timeoutms)
 		}
 		pexp = &expire;
 	}
-	x_mutex_lock(&list_lock);
-	for (ithr = threads ; ithr ; ) {
-		if (!x_thread_equal(ithr->tid, tid) /* not me */
-		 && !ithr->stopped
-		 && !ithr->asleep /* active but not asleep */) {
-			/* an active thread is found, wait any new asleep one */
-			if (wait_new_asleep(pexp)) {
-				resu = X_ETIMEDOUT;
-				break;
-			}
-			/* restart search loop */
-			ithr = threads;
+	while (__atomic_load_n(&active_count, __ATOMIC_SEQ_CST) - __atomic_load_n(&asleep_count, __ATOMIC_SEQ_CST) > hasme) {
+PRINT("++++++++++++ I-TWI active %d asleep %d hasme %d\n", active_count, asleep_count, hasme);
+		if (wait_new_asleep(pexp)) {
+			result = X_ETIMEDOUT;
+			break;
 		}
-		else
-			ithr = ithr->next;
 	}
-	x_mutex_unlock(&list_lock);
-	return resu;
+PRINT("++++++++++++ A-TWI %d\n", result);
+	return result;
 }
