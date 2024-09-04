@@ -57,5 +57,7 @@ if(CONFIG_AFB_BINDER)
     # unsure
     set(WITH_THREAD_LOCAL 1)
 
-    #add_subdirectory(.. afb-libafb)
+    include_directories(${afb-binding_SOURCE_DIR})
+    include_directories(${rp-lib-utils_SOURCE_DIR})
+    add_subdirectory(.. afb-libafb)
 endif()
