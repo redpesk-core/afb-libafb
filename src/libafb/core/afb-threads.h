@@ -154,14 +154,10 @@ extern int afb_threads_active_count();
 extern int afb_threads_wakeup(int classid, int count);
 
 /**
- * Stop the managed threads matching the classid mask.
+ * Stop all the managed threads.
  *
- * @param classid the mask of the threads to stop
- * @param count   the maximum count of thread to stop
- *
- * @return the count of thread stopped
  */
-extern int afb_threads_stop(int classid, int count);
+extern void afb_threads_stop_all();
 
 /**
  * Checks if the given thread is managed

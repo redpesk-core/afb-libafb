@@ -389,18 +389,13 @@ PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
 	return decount;
 }
 
-int afb_threads_stop(int classid, int count)
+void afb_threads_stop_all()
 {
-	int decount = 0;
 	struct thread *ithr;
 	x_mutex_lock(&list_lock);
-	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
-		if (!ithr->stopped && match_class(ithr, classid)) {
-			stop(ithr);
-			decount++;
-		}
+	for (ithr = threads ; ithr ; ithr = ithr->next)
+		stop(ithr);
 	x_mutex_unlock(&list_lock);
-	return decount;
 }
 
 static struct thread *get_thread(x_thread_t tid)

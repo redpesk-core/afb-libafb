@@ -432,7 +432,7 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 		while (afb_jobs_get_pending_count() || afb_sched_wait_idle(1, 1) < 0)
 			afb_ev_mgr_wakeup();
 	}
-	afb_threads_stop(ANY_CLASSID, INT_MAX);
+	afb_threads_stop_all();
 	afb_ev_mgr_release_for_me();
 	afb_ev_mgr_wakeup();
 	x_mutex_unlock(&mutex);
@@ -476,7 +476,7 @@ int afb_sched_start(
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
-			afb_threads_stop(CLASSID_OTHERS, INT_MAX);
+			afb_threads_stop_all();
 			goto error;
 		}
 	}
