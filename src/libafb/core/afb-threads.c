@@ -65,9 +65,6 @@ struct thread
 	/** stop request */
 	unsigned char stopped;
 
-	/** class of the thread */
-	int classid;
-
 	/** job getter */
 	afb_threads_job_getter_t getjob;
 
@@ -119,16 +116,6 @@ static struct thread *reserve_head = 0;
 static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
 
 /***********************************************************************/
-static inline int match_any_class(int classid)
-{
-	return !~classid;
-}
-
-static inline int match_class(struct thread *thr, int classid)
-{
-	return thr->classid & classid;
-}
-
 static void unlink_thread(struct thread *thr)
 {
 	struct thread *ithr;
@@ -187,7 +174,7 @@ static void thread_run(struct thread *me)
 
 IFDBG(static unsigned id = 0; me->id = ++id;)
 
-PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ START[%u] %p\n",me->id,me);
 
 	x_mutex_lock(&run_lock);
 	while (!me->stopped) {
@@ -200,7 +187,7 @@ PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 
 		case AFB_THREADS_EXEC:
 			/* execute the retrieved job */
-PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ TR run B[%u]%p\n",me->id,me);
 			x_mutex_unlock(&run_lock);
 			jobdesc.run(jobdesc.job, me->tid);
 			x_mutex_lock(&run_lock);
@@ -208,7 +195,7 @@ PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
-PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ TRwB[%u]%p\n",me->id,me);
 			x_mutex_lock(&list_lock);
 			me->asleep = 1;
 			if (asleep_waiter_cond != NULL) {
@@ -219,12 +206,12 @@ PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
 			x_cond_wait(&me->cond, &list_lock);
 			x_mutex_unlock(&list_lock);
 			x_mutex_lock(&run_lock);
-PRINT("++++++++++++ TRwA[%u]%p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ TRwA[%u]%p\n",me->id,me);
 			break;
 
 		default:
 			/* stop current thread */
-PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ TR stop B[%u]%p\n",me->id,me);
 			stop(me);
 			break;
 		}
@@ -244,7 +231,7 @@ PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
 	/* terminate */
 	afb_sig_monitor_clean_timeouts();
 
-PRINT("++++++++++++ STOP[%u] %p classid=%d\n",me->id,me,me->classid);
+PRINT("++++++++++++ STOP[%u] %p\n",me->id,me);
 }
 
 static void *thread_main(void *arg)
@@ -288,7 +275,7 @@ int afb_threads_active_count()
 	return __atomic_load_n(&active_count, __ATOMIC_SEQ_CST);
 }
 
-int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure)
+int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 {
 	int rc;
 	struct thread *thr;
@@ -301,7 +288,6 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		current_reserve_count--;
 		thr->asleep = 0;
 		thr->stopped = 0;
-		thr->classid = classid;
 		thr->getjob = jobget;
 		thr->getjobcls = closure;
 		x_mutex_lock(&list_lock);
@@ -325,7 +311,6 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	thr->asleep = 0;
 	thr->stopped = 0;
 	thr->cond = (x_cond_t)X_COND_INITIALIZER;
-	thr->classid = classid;
 	thr->getjob = jobget;
 	thr->getjobcls = closure;
 
@@ -346,7 +331,7 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	return rc;
 }
 
-int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closure)
+int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 {
 	struct thread me;
 
@@ -356,7 +341,6 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 	me.asleep = 0;
 	me.stopped = 0;
 	me.cond = (x_cond_t)X_COND_INITIALIZER;
-	me.classid = classid;
 	me.getjob = jobget;
 	me.getjobcls = closure;
 
@@ -410,7 +394,7 @@ int afb_threads_has_thread(x_thread_t tid)
 	struct thread *thr;
 	x_mutex_lock(&list_lock);
 	thr = get_thread(tid);
-	resu = thr ? thr->classid : 0;
+	resu = thr != NULL;
 	x_mutex_unlock(&list_lock);
 	return resu;
 }

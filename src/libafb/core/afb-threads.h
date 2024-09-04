@@ -51,14 +51,6 @@
  */
 
 /**
- * Each started thread has a classid. The classid is an
- * integer seen for its bits.
- *
- * The constant AFB_THREAD_ANY_CLASS matches any classid
- */
-#define AFB_THREAD_ANY_CLASS (-1)
-
-/**
  * Structure for getting jobs to be executed.
  *
  * When getting a job, the structure must be filled with accurate values
@@ -114,26 +106,24 @@ typedef int (*afb_threads_job_getter_t)(void *closure, afb_threads_job_desc_t *d
 extern void afb_threads_setup_counts(int normal, int reserve);
 
 /**
- * start a thread of classid with a job getter
+ * start a thread with a job getter
  *
- * @param classid classid of the started thread
  * @param jobget  the getter function @see afb_threads_job_getter_t
  * @param closure closure for the getter
  *
  * @return 0 on succes or a negative error code
  */
-extern int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closure);
+extern int afb_threads_start(afb_threads_job_getter_t jobget, void *closure);
 
 /**
  * dont start a thread but use the current one to run the loop.
  *
- * @param classid classid of the started thread
  * @param jobget  the getter function @see afb_threads_job_getter_t
  * @param closure closure for the getter
  *
  * @return 0 on succes or a negative error code
  */
-extern int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closure);
+extern int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure);
 
 /**
  * Get the count of active threads.

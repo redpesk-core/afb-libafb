@@ -44,12 +44,6 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
 
-#define CLASSID_MAIN    1
-#define CLASSID_OTHERS  2
-#define CLASSID_EXTRA   4
-#define CLASSID_REGULAR (CLASSID_MAIN | CLASSID_OTHERS)
-#define ANY_CLASSID     AFB_THREAD_ANY_CLASS
-
 /**
  * Description of synchronous jobs
  */
@@ -131,7 +125,6 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 {
 	struct afb_job *job;
 	long delayms;
-	int classid = (int)(intptr_t)closure;
 
 	/* priority is to execute jobs */
 	job = afb_jobs_dequeue(&delayms);
@@ -143,7 +136,7 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	}
 
 	/* stop on requirement */
-	if (classid == CLASSID_EXTRA || allowed_thread_count == 0) {
+	if (allowed_thread_count == 0) {
 		afb_ev_mgr_release(tid);
 		return AFB_THREADS_STOP;
 	}
@@ -161,21 +154,15 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	return AFB_THREADS_IDLE;
 }
 
-static int start_thread(int classid)
+static int start_thread()
 {
-	return afb_threads_start(classid, get_job_cb, (void*)(intptr_t)classid);
+	return afb_threads_start(get_job_cb, NULL);
 }
 
 static int start_one_thread(enum afb_sched_mode mode)
 {
-	int classid;
-	if (afb_threads_active_count() < allowed_thread_count)
-		classid = CLASSID_OTHERS;
-	else if (mode == Afb_Sched_Mode_Start)
-		classid = CLASSID_EXTRA;
-	else
-		return 0;
-	return start_thread(classid);
+	return afb_threads_active_count() < allowed_thread_count || mode == Afb_Sched_Mode_Start
+		? start_thread() : 0;
 }
 
 /**
@@ -333,6 +320,8 @@ int afb_sched_sync(
 	sync.enter = callback;
 	sync.arg = closure;
 	sync.status = 0;
+	x_mutex_init(&sync.mutex);
+	x_cond_init(&sync.condsync);
 
 	/* call the function */
 	afb_sig_monitor_run(timeout, sync_cb, &sync);
@@ -472,7 +461,7 @@ int afb_sched_start(
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count() + 1 < start_count) {
-		exiting.code = start_thread(CLASSID_OTHERS);
+		exiting.code = start_thread();
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
 			allowed_thread_count = 0;
@@ -488,7 +477,7 @@ int afb_sched_start(
 
 	/* run until end */
 	x_mutex_unlock(&mutex);
-	afb_threads_enter(CLASSID_MAIN, get_job_cb, (void*)(intptr_t)CLASSID_MAIN);
+	afb_threads_enter(get_job_cb, NULL);
 	afb_ev_mgr_release_for_me();
 	x_mutex_lock(&mutex);
 error:
