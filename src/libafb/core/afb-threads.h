@@ -172,12 +172,11 @@ extern int afb_threads_has_thread(x_thread_t tid);
 extern int afb_threads_has_me();
 
 /**
- * Wait until all managed threads matching the classid mask are sleeping.
+ * Wait until all managed threads are sleeping.
  * Correctly handles the case of the current thread being managed.
  *
- * @param classid the mask of the threads to wait
  * @param timeout if greater than zero, the timeout in milliseconds to wait.
  *
  * @return 0 on success or a negative error code on timeout
  */
-extern int afb_threads_wait_idle(int classid, int timeoutms);
+extern int afb_threads_wait_idle(int timeoutms);

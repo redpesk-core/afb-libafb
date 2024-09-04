@@ -406,7 +406,7 @@ int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
 	if (afb_threads_active_count() <= afb_threads_has_me())
 		start_one_thread(Afb_Sched_Mode_Start);
-	return afb_threads_wait_idle(ANY_CLASSID, timeout * 1000);
+	return afb_threads_wait_idle(timeout * 1000);
 }
 
 /* Exit threads and call handler if not NULL. */

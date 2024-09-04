@@ -420,7 +420,7 @@ int afb_threads_has_me()
 	return afb_threads_has_thread(x_thread_self());
 }
 
-int afb_threads_wait_idle(int classid, int timeoutms)
+int afb_threads_wait_idle(int timeoutms)
 {
 	x_thread_t tid = x_thread_self();
 	int resu = 0;
@@ -441,7 +441,6 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 	x_mutex_lock(&list_lock);
 	for (ithr = threads ; ithr ; ) {
 		if (!x_thread_equal(ithr->tid, tid) /* not me */
-		 && match_class(ithr, classid) /* match the given class */
 		 && !ithr->stopped
 		 && !ithr->asleep /* active but not asleep */) {
 			/* an active thread is found, wait any new asleep one */
