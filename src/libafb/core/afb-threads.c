@@ -90,7 +90,7 @@ static int normal_count = 1;
 static int reserve_count = AFB_THREADS_DEFAULT_RESERVE_COUNT;
 
 /* synchronisation of threads (TODO: try to use lock-free technics) */
-static x_mutex_t mutex = X_MUTEX_INITIALIZER;
+static x_mutex_t list_lock = X_MUTEX_INITIALIZER;
 static x_cond_t *asleep_waiter_cond = 0;
 
 /* list of threads */
@@ -140,9 +140,9 @@ static inline int wait_new_asleep(struct timespec *expire)
 	x_cond_t *oldcond = asleep_waiter_cond;
 	asleep_waiter_cond = &cond;
 	if (expire == NULL)
-		x_cond_wait(&cond, &mutex);
+		x_cond_wait(&cond, &list_lock);
 	else {
-		if (x_cond_timedwait(&cond, &mutex, expire))
+		if (x_cond_timedwait(&cond, &list_lock, expire))
 			resu = 1;
 	}
 	asleep_waiter_cond = oldcond;
@@ -191,9 +191,9 @@ PRINT("++++++++++++ START[%u] %p classid=%d\n",me->id,me,me->classid);
 		case AFB_THREADS_EXEC:
 			/* execute the retrieved job */
 PRINT("++++++++++++ TR run B[%u]%p classid=%d\n",me->id,me,me->classid);
-			x_mutex_unlock(&mutex);
+			x_mutex_unlock(&list_lock);
 			jobdesc.run(jobdesc.job, me->tid);
-			x_mutex_lock(&mutex);
+			x_mutex_lock(&list_lock);
 			break;
 
 		case AFB_THREADS_IDLE:
@@ -204,7 +204,7 @@ PRINT("++++++++++++ TRwB[%u]%p classid=%d\n",me->id,me,me->classid);
 				x_cond_signal(asleep_waiter_cond);
 				asleep_waiter_cond = NULL;
 			}
-			x_cond_wait(&me->cond, &mutex);
+			x_cond_wait(&me->cond, &list_lock);
 PRINT("++++++++++++ TRwA[%u]%p classid=%d\n",me->id,me,me->classid);
 			break;
 
@@ -221,7 +221,7 @@ PRINT("++++++++++++ TR stop B[%u]%p classid=%d\n",me->id,me,me->classid);
 		x_cond_signal(asleep_waiter_cond);
 		asleep_waiter_cond = NULL;
 	}
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 
 	afb_ev_mgr_try_recover_for_me();
 
@@ -239,7 +239,7 @@ static void *thread_main(void *arg)
 	afb_sig_monitor_init_timeouts();
 
 	for (;;) {
-		x_mutex_lock(&mutex);
+		x_mutex_lock(&list_lock);
 		thread_run(thr);
 		x_mutex_lock(&reserve_lock);
 		if (reserve_decount <= 0) {
@@ -290,11 +290,11 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		thr->classid = classid;
 		thr->getjob = jobget;
 		thr->getjobcls = closure;
-		x_mutex_lock(&mutex);
+		x_mutex_lock(&list_lock);
 		thr->next = threads;
 		threads = thr;
 		__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
-		x_mutex_unlock(&mutex);
+		x_mutex_unlock(&list_lock);
 		x_cond_signal(&thr->cond);
 		x_mutex_unlock(&reserve_lock);
 		return 0;
@@ -315,7 +315,7 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 	thr->getjob = jobget;
 	thr->getjobcls = closure;
 
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	thr->next = threads;
 	threads = thr;
 	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
@@ -328,7 +328,7 @@ int afb_threads_start(int classid, afb_threads_job_getter_t jobget, void *closur
 		RP_CRITICAL("not able to start thread: %s", strerror(-rc));
 
 	}
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 	return rc;
 }
 
@@ -350,7 +350,7 @@ int afb_threads_enter(int classid, afb_threads_job_getter_t jobget, void *closur
 	afb_sig_monitor_init_timeouts();
 
 	/* enter the thread now */
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	me.next = threads;
 	threads = &me;
 	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
@@ -365,11 +365,11 @@ int afb_threads_wakeup(int classid, int count)
 	int decount = 0;
 	struct thread *ithr;
 PRINT("++++++++++++ B-TWU %d\n",count);
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
 		if (match_class(ithr, classid))
 			decount += wakeup(ithr);
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 PRINT("++++++++++++ A-TWU %d -> %d\n",count,decount);
 	return decount;
 }
@@ -378,13 +378,13 @@ int afb_threads_stop(int classid, int count)
 {
 	int decount = 0;
 	struct thread *ithr;
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	for (ithr = threads ; ithr && decount < count ; ithr = ithr->next)
 		if (!ithr->stopped && match_class(ithr, classid)) {
 			stop(ithr);
 			decount++;
 		}
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 	return decount;
 }
 
@@ -399,10 +399,10 @@ int afb_threads_has_thread(x_thread_t tid)
 {
 	int resu;
 	struct thread *thr;
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	thr = get_thread(tid);
 	resu = thr ? thr->classid : 0;
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 	return resu;
 }
 
@@ -429,7 +429,7 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 		}
 		pexp = &expire;
 	}
-	x_mutex_lock(&mutex);
+	x_mutex_lock(&list_lock);
 	for (ithr = threads ; ithr ; ) {
 		if (!x_thread_equal(ithr->tid, tid) /* not me */
 		 && match_class(ithr, classid) /* match the given class */
@@ -446,6 +446,6 @@ int afb_threads_wait_idle(int classid, int timeoutms)
 		else
 			ithr = ithr->next;
 	}
-	x_mutex_unlock(&mutex);
+	x_mutex_unlock(&list_lock);
 	return resu;
 }
