@@ -44,6 +44,9 @@
 #include "sys/ev-mgr.h"
 #include "core/afb-sig-monitor.h"
 
+#define AFB_SCHED_WAIT_IDLE_MINIMAL_EXPIRATION	 30 /* thirty seconds */
+#define AFB_SCHED_EXITING_EXPIRATION	         10 /* ten seconds */
+
 /**
  * Description of synchronous jobs
  */
@@ -91,8 +94,10 @@ struct exiting
 };
 static struct exiting *pexiting = 0;
 
-/* counts for threads */
-static int allowed_thread_count = 0;	/**< allowed count of threads */
+/* request activity */
+#define ACTIVE_JOBS  1
+#define ACTIVE_EVMGR 2
+static int8_t activity = 0;
 
 /**
  * run the event loop
@@ -124,29 +129,27 @@ static void run_ev_loop(void *arg, x_thread_t tid)
 static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid)
 {
 	struct afb_job *job;
-	long delayms;
+	long delayms = 0;
 
 	/* priority is to execute jobs */
-	job = afb_jobs_dequeue(&delayms);
-	if (job) {
-		afb_ev_mgr_release(tid);
-		desc->run = run_one_job;
-		desc->job = job;
-		return AFB_THREADS_EXEC;
-	}
-
-	/* stop on requirement */
-	if (allowed_thread_count == 0) {
-		afb_ev_mgr_release(tid);
-		return AFB_THREADS_STOP;
+	if (activity & ACTIVE_JOBS) {
+		job = afb_jobs_dequeue(&delayms);
+		if (job) {
+			afb_ev_mgr_release(tid);
+			desc->run = run_one_job;
+			desc->job = job;
+			return AFB_THREADS_EXEC;
+		}
 	}
 
 	/* should handle the event loop? */
-	if (afb_ev_mgr_try_get(tid) != NULL) {
-		/* yes, handle the event loop */
-		desc->run = run_ev_loop;
-		desc->job = (void*)(intptr_t)delayms;
-		return AFB_THREADS_EXEC;
+	if (activity & ACTIVE_EVMGR) {
+		if (afb_ev_mgr_try_get(tid) != NULL) {
+			/* yes, handle the event loop */
+			desc->run = run_ev_loop;
+			desc->job = (void*)(intptr_t)delayms;
+			return AFB_THREADS_EXEC;
+		}
 	}
 
 	/* nothing to do, idle */
@@ -164,8 +167,9 @@ static int start_one_thread(enum afb_sched_mode mode)
  */
 static void adapt(enum afb_sched_mode mode)
 {
-	if (!afb_threads_wakeup_one())
-		start_one_thread(mode);
+	if (activity & ACTIVE_JOBS)
+		if (!afb_threads_wakeup_one())
+			start_one_thread(mode);
 }
 
 /* Schedule the given job */
@@ -243,9 +247,6 @@ static void sync_cb(int signum, void *closure)
 
 	/* normal case */
 	if (signum == 0) {
-		x_mutex_init(&sync->mutex);
-		x_cond_init(&sync->condsync);
-
 		/* link the structure */
 		x_mutex_lock(&sync_jobs_mutex);
 		sync->id = ++sync_jobs_cptr;
@@ -263,8 +264,8 @@ static void sync_cb(int signum, void *closure)
 			adapt(Afb_Sched_Mode_Start);
 			sync->status = x_cond_wait(&sync->condsync, &sync->mutex);
 		}
-		x_mutex_unlock(&sync->mutex);
 	}
+	x_mutex_unlock(&sync->mutex);
 
 	/* unlink the structure */
 	x_mutex_lock(&sync_jobs_mutex);
@@ -387,17 +388,41 @@ int afb_sched_enter(
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
-	if (afb_threads_active_count() <= afb_threads_has_me())
+	struct timespec expire;
+	int has_me, result = 0;
+
+	/* release the event loop */
+	afb_ev_mgr_release_for_me();
+
+	/* start a thread for processing */
+	has_me = afb_threads_has_me();
+	if (afb_threads_active_count() <= has_me)
 		start_one_thread(Afb_Sched_Mode_Start);
-	return afb_threads_wait_idle(timeout * 1000);
+
+	/* compute the expiration */
+	clock_gettime(CLOCK_REALTIME, &expire);
+	expire.tv_sec += timeout > 0 ? timeout : AFB_SCHED_WAIT_IDLE_MINIMAL_EXPIRATION;
+
+	/* wait for job completion */
+	while (result == 0 && wait_jobs != 0 && afb_jobs_get_pending_count() > 0) {
+		adapt(Afb_Sched_Mode_Start); /* ensure someone process the job */
+		result = afb_threads_wait_new_asleep(&expire);
+	}
+
+	/* wait for idle completion */
+	if (result == 0) {
+		activity = 0;
+		afb_ev_mgr_wakeup();
+		while (result == 0 && afb_threads_active_count() > afb_threads_asleep_count() + has_me)
+			result = afb_threads_wait_new_asleep(&expire);
+		activity = ACTIVE_JOBS | ACTIVE_EVMGR;
+	}
+	return result;
 }
 
 /* Exit threads and call handler if not NULL. */
 void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitcode)
 {
-	/* acquire evmgr */
-	afb_ev_mgr_get_for_me();
-
 	x_mutex_lock(&mutex);
 	if (pexiting) {
 	        /* record handler and exit code */
@@ -406,19 +431,15 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 		pexiting->code = exitcode;
 		pexiting = 0;
 	}
-	/* disallow start */
-	allowed_thread_count = 0;
+	x_mutex_unlock(&mutex);
 
 	/* stop */
-	if (!force) {
-		afb_ev_mgr_release_for_me();
-		while (afb_jobs_get_pending_count() || afb_sched_wait_idle(1, 1) < 0)
-			afb_ev_mgr_wakeup();
-	}
+	if (!force)
+		afb_sched_wait_idle(1, AFB_SCHED_EXITING_EXPIRATION);
+	activity = 0;
 	afb_threads_stop_all();
 	afb_ev_mgr_release_for_me();
 	afb_ev_mgr_wakeup();
-	x_mutex_unlock(&mutex);
 }
 
 /* Enter the jobs processing loop */
@@ -449,23 +470,21 @@ int afb_sched_start(
 	pexiting = &exiting;
 
 	/* records the allowed count */
-	allowed_thread_count = allowed_count;
 	afb_jobs_set_max_count(max_jobs_count);
 	afb_threads_setup_counts(allowed_count, -1);
+	activity = ACTIVE_JOBS | ACTIVE_EVMGR;
 
 	/* start at least one thread: the current one */
 	while (afb_threads_active_count() + 1 < start_count) {
 		exiting.code = start_one_thread(Afb_Sched_Mode_Start);
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
-			allowed_thread_count = 0;
-			afb_threads_stop_all();
 			goto error;
 		}
 	}
 
 	/* queue the start job */
-	exiting.code = afb_sched_post_job(NULL, 0, 0, start, arg, Afb_Sched_Mode_Start);
+	exiting.code = afb_sched_post_job(NULL, 0, 0, start, arg, Afb_Sched_Mode_Normal);
 	if (exiting.code < 0)
 		goto error;
 
@@ -476,8 +495,9 @@ int afb_sched_start(
 	x_mutex_lock(&mutex);
 error:
 	pexiting = 0;
-	allowed_thread_count = 0;
 	x_mutex_unlock(&mutex);
+	afb_threads_setup_counts(0, -1);
+	afb_threads_stop_all();
 	if (exiting.handler) {
 		exiting.handler(exiting.closure);
 		exiting.handler = 0;
