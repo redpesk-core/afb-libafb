@@ -58,7 +58,15 @@
 #include "sys/x-errno.h"
 
 #if WITH_REQ_PROCESS_ASYNC
-#define RUNJOB afb_sched_wait_idle(1,1);
+void exit_when_idle(int signum, void *arg)
+{
+	afb_sched_exit(0, NULL, NULL, 0);
+}
+void runjob()
+{
+	afb_sched_start(2, 2, 100, exit_when_idle, NULL);
+}
+#define RUNJOB runjob();
 #else
 #define RUNJOB (void)0
 #endif

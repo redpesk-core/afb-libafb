@@ -39,6 +39,7 @@
 #include "core/afb-sched.h"
 #include "core/afb-jobs.h"
 #include "core/afb-sig-monitor.h"
+#include "core/afb-threads.h"
 
 /*********************************************************************/
 
@@ -122,12 +123,14 @@ void exit_handler(void *data){
 
 void test_start_job(int sig, void* arg){
 
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
     if(sig == 0){
         pthread_mutex_lock(&gval.mutex);
         fprintf(stderr, "start_test_job received sig %d with arg %d\n", sig, p2i(arg));
 
         // wait for jobs to end
         while(gval.runingJobs > 0 || !gval.lastJob) {
+	    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
             pthread_mutex_unlock(&gval.mutex);
             nsleep(10000);
             pthread_mutex_lock(&gval.mutex);
@@ -149,8 +152,10 @@ void test_start_job(int sig, void* arg){
     fprintf(stderr, "querying exit\n");
     pthread_mutex_unlock(&gval.mutex);
 
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
     afb_sched_exit(0, exit_handler, NULL, 0);
     fprintf(stderr, "leaving test_start_job\n");
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
 }
 
 void test_job_sync(int sig, void* arg){
@@ -223,6 +228,7 @@ START_TEST(test_async){
 
     // run them asynchronously
     sched_runing = TRUE;
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
     ck_assert_int_eq(afb_sched_start(NBJOBS, NBJOBS, NBJOBS+1, test_start_job, i2p(NBJOBS)), 0);
 
     // check everything went alright
@@ -339,6 +345,7 @@ void test_start_sched_adapt(int sig, void * arg){
     int r,i;
 
     fprintf(stderr, "test_start_sched_adapt received sig %d with arg %d\n", sig, p2i(arg));
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
 
     if(sig == 0){
 
@@ -347,11 +354,13 @@ void test_start_sched_adapt(int sig, void * arg){
             r = afb_sched_post_job(NULL, 0, 0, test_job, i2p(i+1), Afb_Sched_Mode_Start);
             ck_assert_int_gt(r, 0);
             fprintf(stderr, "job %d queued with id %d: pending jobs = %d\n", i+1, r, afb_jobs_get_pending_count());
+            fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
         }
 
         r=0;
         while(afb_jobs_get_pending_count() != 0){
             fprintf(stderr, "[%d] pending jobs = %d\n", r, afb_jobs_get_pending_count());
+            fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
             fflush(stderr);
             nsleep(250000);
             r++;
@@ -400,6 +409,7 @@ START_TEST(test_sched_adapt){
 
     // run them asynchronously with N-1 threads allowed
     sched_runing = TRUE;
+    fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
     r = afb_sched_start(NBJOBS+1, NBJOBS, NBJOBS+1, test_start_sched_adapt, i2p(NBJOBS));
     ck_assert_int_eq(r, 0);
 

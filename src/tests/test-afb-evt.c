@@ -110,7 +110,7 @@ void check_mask(int * tab, int mask){
 
 /******************************* tests *******************************/
 
-START_TEST (test_init)
+void do_test_init()
 {
     struct afb_evt * evt;
     struct afb_evt * ev;
@@ -124,7 +124,7 @@ START_TEST (test_init)
     int rc;
     int evt_id;
 
-    fprintf(stderr, "\n******** test_intit ********\n");
+    fprintf(stderr, "\n******** test_init ********\n");
 
     fprintf(stderr, "\n## afb_evt_create2...\n");
 	rc = afb_evt_create2(&evt, PREFIX, NAME);
@@ -175,12 +175,18 @@ START_TEST (test_init)
     afb_evt_listener_unref(rc_ev_listener);
 
 #if WITH_AFB_HOOK
-   afb_hook_unref_evt(hook_evt);
+    afb_hook_unref_evt(hook_evt);
 #endif
+    afb_sched_exit(0, NULL, NULL, 0);
+}
+
+START_TEST (test_init)
+{
+	afb_sched_start(1, 1, 100, do_test_init, NULL);
 }
 END_TEST
 
-START_TEST (test_functional)
+void do_test_functional()
 {
     // struct afb_evt * evt;
     struct afb_evt_itf ev_itf = {
@@ -304,11 +310,16 @@ START_TEST (test_functional)
 #if WITH_AFB_HOOK
    afb_hook_unref_evt(hook_evt);
 #endif
+    afb_sched_exit(0, NULL, NULL, 0);
+}
 
+START_TEST (test_functional)
+{
+	afb_sched_start(1, 1, 100, do_test_functional, NULL);
 }
 END_TEST
 
-START_TEST (test_afb_event_x2)
+void do_test_afb_event_x2()
 {
     struct afb_evt * evt;
     struct afb_event_x2 * evt_x2;
@@ -394,6 +405,12 @@ START_TEST (test_afb_event_x2)
 
     afb_event_x2_unref(evt_x2);
 
+    afb_sched_exit(0, NULL, NULL, 0);
+}
+
+START_TEST (test_afb_event_x2)
+{
+	afb_sched_start(1, 1, 100, do_test_afb_event_x2, NULL);
 }
 END_TEST
 
@@ -438,8 +455,8 @@ int main(int ac, char **av)
 	mksuite("afb-jobs");
 		addtcase("afb-jobs");
 			addtest(test_init);
-            addtest(test_functional);
-            addtest(test_afb_event_x2);
+			addtest(test_functional);
+			addtest(test_afb_event_x2);
 #if TEST_EVT_MAX_COUNT
             addtest(test_afb_maxcount);
 #endif
