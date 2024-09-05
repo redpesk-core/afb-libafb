@@ -263,6 +263,11 @@ int afb_threads_active_count()
 	return __atomic_load_n(&active_count, __ATOMIC_SEQ_CST);
 }
 
+int afb_threads_asleep_count()
+{
+	return __atomic_load_n(&asleep_count, __ATOMIC_SEQ_CST);
+}
+
 int afb_threads_start_cond(afb_threads_job_getter_t jobget, void *closure, int force)
 {
 	return !force && __atomic_load_n(&active_count, __ATOMIC_SEQ_CST) >= normal_count

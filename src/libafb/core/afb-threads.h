@@ -145,6 +145,13 @@ extern int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure);
 extern int afb_threads_active_count();
 
 /**
+ * Get the count of asleep threads.
+ *
+ * @return the count found
+ */
+extern int afb_threads_asleep_count();
+
+/**
  * Wake up one managed threads being sleeping.
  *
  * @return the 1 if one thread awaken or 0 else when none was awake
