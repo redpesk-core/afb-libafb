@@ -190,13 +190,3 @@ extern int afb_threads_has_me();
  * @return 0 on success or -1 if error or expiration
  */
 extern int afb_threads_wait_new_asleep(struct timespec *expire);
-
-/**
- * Wait until all managed threads are sleeping.
- * Correctly handles the case of the current thread being managed.
- *
- * @param timeout if greater than zero, the timeout in milliseconds to wait.
- *
- * @return 0 on success or a negative error code on timeout
- */
-extern int afb_threads_wait_idle(int timeoutms);
