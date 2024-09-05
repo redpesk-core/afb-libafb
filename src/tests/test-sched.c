@@ -276,8 +276,8 @@ void test_job_enter(int sig, void * arg, struct afb_sched_lock * sched_lock){
     int r;
     fprintf(stderr, "entering test_job_enter\n");
     r = afb_sched_leave(sched_lock);
-    if(r)reachError++;
     fprintf(stderr, "leaving test_job_enter %d\n", r);
+    if(r)reachError++;
 }
 
 void test_job_enter_timeout(int sig, void * arg, struct afb_sched_lock * sched_lock){
@@ -287,6 +287,7 @@ void test_job_enter_timeout(int sig, void * arg, struct afb_sched_lock * sched_l
         sleep(2);
         fprintf(stderr, "unbroken test_job_enter_timeout!!\n");
         r = afb_sched_leave(sched_lock);
+        fprintf(stderr, "unbroken test_job_enter_timeout afb_sched_leave=%d!!\n",r);
         if(r)reachError++;
     }
     fprintf(stderr, "leaving test_job_enter_timeout %d\n", r);
@@ -333,7 +334,7 @@ START_TEST(test_sched_enter){
     ck_assert_int_eq(afb_sched_start(3, 3, 3, test_start_sched_enter, i2p(NBJOBS)),0);
 
     // check everything went alright
-    ck_assert_int_eq(reachError, FALSE);
+    ck_assert_int_eq(reachError, 0);
     ck_assert_int_eq(sched_runing,FALSE);
     ck_assert_int_eq(gval.runingJobs, 0);
     ck_assert_int_eq(gval.killedJobs, 0);

@@ -58,11 +58,11 @@ struct sync_job
 	/** identifier */
 	uintptr_t id;
 
-	/** status */
-	int status;
-
 	/** done */
 	int done;
+
+	/** last signal number */
+	int signum;
 
 	/** synchronize mutex */
 	x_mutex_t mutex;
@@ -243,50 +243,19 @@ static struct sync_job *get_sync_job(uintptr_t id)
  */
 static void sync_cb(int signum, void *closure)
 {
-	struct sync_job *ps, *sync = closure;
+	struct sync_job *sync = closure;
 
-	/* normal case */
+	sync->signum = signum;
+	sync->enter(signum, sync->arg, (struct afb_sched_lock*)sync->id);
 	if (signum == 0) {
-		/* link the structure */
-		x_mutex_lock(&sync_jobs_mutex);
-		sync->id = ++sync_jobs_cptr;
-		sync->next = sync_jobs_head;
-		sync_jobs_head = sync;
-		x_mutex_unlock(&sync_jobs_mutex);
-
-		/* enter */
-		sync->done = 0;
-		sync->enter(0, sync->arg, (struct afb_sched_lock*)sync->id);
-
-		/* wait */
 		x_mutex_lock(&sync->mutex);
 		if (sync->done == 0) {
 			adapt(Afb_Sched_Mode_Start);
-			sync->status = x_cond_wait(&sync->condsync, &sync->mutex);
+			x_cond_wait(&sync->condsync, &sync->mutex);
 		}
 	}
+	/* always unlock for ensuring destruction of mutex works even when signum != 0 */
 	x_mutex_unlock(&sync->mutex);
-
-	/* unlink the structure */
-	x_mutex_lock(&sync_jobs_mutex);
-	ps = sync_jobs_head;
-	if (ps == sync)
-		sync_jobs_head = sync->next;
-	else {
-		while (ps->next != sync)
-			ps = ps->next;
-		ps->next = sync->next;
-	}
-	x_mutex_unlock(&sync_jobs_mutex);
-
-	/*  */
-	if (signum != 0) {
-		sync->enter(signum, sync->arg, NULL);
-		sync->status = X_EINTR;
-	}
-
-	x_cond_destroy(&sync->condsync);
-	x_mutex_destroy(&sync->mutex);
 }
 
 /**
@@ -309,18 +278,40 @@ int afb_sched_sync(
 		void (*callback)(int signum, void *closure, struct afb_sched_lock *lock),
 		void *closure
 ) {
-	struct sync_job sync;
+	struct sync_job sync, **itsync;
 
 	/* init the structure */
 	sync.enter = callback;
 	sync.arg = closure;
-	sync.status = 0;
-	x_mutex_init(&sync.mutex);
-	x_cond_init(&sync.condsync);
+	sync.signum = 0;
+	sync.done = 0;
+	sync.condsync = (x_cond_t) X_COND_INITIALIZER;
+	sync.mutex = (x_mutex_t) X_MUTEX_INITIALIZER;
 
-	/* call the function */
+	/* link the structure */
+	x_mutex_lock(&sync_jobs_mutex);
+	sync.id = ++sync_jobs_cptr;
+	sync.next = sync_jobs_head;
+	sync_jobs_head = &sync;
+	x_mutex_unlock(&sync_jobs_mutex);
+
+	/* call the function with a timeout */
 	afb_sig_monitor_run(timeout, sync_cb, &sync);
-	return sync.status;
+
+	x_mutex_lock(&sync_jobs_mutex);
+	itsync = &sync_jobs_head;
+	while (*itsync != &sync)
+		itsync = &(*itsync)->next;
+	*itsync = sync.next;
+	x_mutex_unlock(&sync_jobs_mutex);
+
+	/* release the sync data */
+	if (x_cond_destroy(&sync.condsync) != 0)
+		RP_CRITICAL("failed to destroy condition");
+	if (x_mutex_destroy(&sync.mutex) != 0)
+		RP_CRITICAL("failed to destroy mutex");
+
+	return sync.done ? 0 : sync.signum ? X_EINTR : X_ECANCELED;
 }
 
 /**
@@ -335,21 +326,26 @@ int afb_sched_leave(struct afb_sched_lock *lock)
 
 	x_mutex_lock(&sync_jobs_mutex);
 	sync = get_sync_job((uintptr_t)lock);
-	if (sync == NULL)
+	if (sync == NULL) {
+		x_mutex_unlock(&sync_jobs_mutex);
 		rc = X_ENOENT;
+	}
+	else if (sync->signum) {
+		x_mutex_unlock(&sync_jobs_mutex);
+		rc = X_EINTR;
+	}
 	else {
 		x_mutex_lock(&sync->mutex);
+		x_mutex_unlock(&sync_jobs_mutex);
 		if (sync->done != 0)
-			rc = X_EINVAL;
+			rc = X_EEXIST;
 		else {
 			sync->done = 1;
-			rc = x_cond_signal(&sync->condsync);
-			if (rc < 0)
-				rc = -errno;
+			x_cond_signal(&sync->condsync);
+			rc = 0;
 		}
 		x_mutex_unlock(&sync->mutex);
 	}
-	x_mutex_unlock(&sync_jobs_mutex);
 
 	return rc;
 }
@@ -357,15 +353,18 @@ int afb_sched_leave(struct afb_sched_lock *lock)
 /* return the argument of the sched_enter */
 void *afb_sched_lock_arg(struct afb_sched_lock *lock)
 {
-	void *result;
+	void *result = NULL;
 	struct sync_job *sync;
 
 	x_mutex_lock(&sync_jobs_mutex);
 	sync = get_sync_job((uintptr_t)lock);
-	result = sync == NULL ? NULL : sync->arg;
+	if (sync != NULL) {
+		x_mutex_lock(&sync->mutex);
+		result = sync->arg;
+		x_mutex_unlock(&sync->mutex);
+	}
 	x_mutex_unlock(&sync_jobs_mutex);
 	return result;
-
 }
 
 #if WITH_DEPRECATED_OLDER_THAN_5_1
@@ -378,6 +377,7 @@ int afb_sched_enter(
 		void (*callback)(int signum, void *closure, struct afb_sched_lock *afb_sched_lock),
 		void *closure
 ) {
+	RP_NOTICE("Legacy afb_sched_enter called!");
 	if (group != NULL)
 		return X_EINVAL;
 
