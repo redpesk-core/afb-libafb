@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <time.h>
+
 /**
  * This module implement a basic thread manager.
  * Each started (or entered -see below-) thread run
@@ -179,6 +181,15 @@ extern int afb_threads_has_thread(x_thread_t tid);
  * @return 1 if the current thread is managed or 0 else
  */
 extern int afb_threads_has_me();
+
+/**
+ * Wait until a new thread become sleep.
+ *
+ * @param expire an expiration time or NULL
+ *
+ * @return 0 on success or -1 if error or expiration
+ */
+extern int afb_threads_wait_new_asleep(struct timespec *expire);
 
 /**
  * Wait until all managed threads are sleeping.

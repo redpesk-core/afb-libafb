@@ -412,6 +412,29 @@ int afb_threads_has_me()
 }
 
 
+int afb_threads_wait_new_asleep(struct timespec *expire)
+{
+	int rc, resu = 0;
+	x_cond_t cond = X_COND_INITIALIZER;
+	x_cond_t *oldcond;
+
+	x_mutex_lock(&asleep_lock);
+	oldcond = asleep_waiter_cond;
+	asleep_waiter_cond = &cond;
+	rc = expire == NULL
+		? x_cond_wait(&cond, &asleep_lock)
+		: x_cond_timedwait(&cond, &asleep_lock, expire);
+	if (rc != 0)
+		resu = X_ETIMEDOUT;
+	if (asleep_waiter_cond == &cond)
+		asleep_waiter_cond = oldcond;
+	if (oldcond != NULL && resu == 0)
+		x_cond_signal(oldcond);
+	x_mutex_unlock(&asleep_lock);
+	return resu;
+}
+
+
 static inline int wait_new_asleep(struct timespec *expire)
 {
 	int resu = 0;
