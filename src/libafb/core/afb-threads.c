@@ -229,6 +229,7 @@ static void *thread_main(void *arg)
 		x_mutex_lock(&reserve_lock);
 		if (current_reserve_count >= reserve_count) {
 			x_mutex_unlock(&reserve_lock);
+			x_cond_destroy(&thr->cond);
 			free(thr);
 			return 0;
 		}
@@ -317,6 +318,7 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 		rc = -errno;
 		__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 		unlink_thread(thr);
+		x_cond_destroy(&thr->cond);
 		free(thr);
 		RP_CRITICAL("not able to start thread: %s", strerror(-rc));
 
@@ -349,6 +351,7 @@ int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 	x_mutex_unlock(&list_lock);
 
 	thread_run(&me);
+	x_cond_destroy(&me.cond);
 
 	return 0;
 }
