@@ -41,7 +41,7 @@
  * @param key_path path to the private key matching the certificate
  * @param trust_path path to the directory containing the trusted certificates, NULL to use system trust dir
  *
- * @return 0 if OK, <0 if KO (in which case creds is freeed for you)
+ * @return 0 if OK, <0 if KO (in which case creds is freed for you)
  */
 extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds, const char *cert_path, const char *key_path, const char *trust_path);
 

@@ -254,6 +254,62 @@ static struct afb_ws_itf wsitf =
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
+/* websocket initialisation */
+static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
+{
+	wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
+	if (wrap->ws == NULL)
+		return X_ENOMEM;
+
+	/* unpacking is required for websockets */
+	afb_stub_rpc_set_unpack(wrap->stub, 1);
+	/* callback for emission */
+	afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
+	return 0;
+}
+
+#if WITH_GNUTLS
+static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd)
+{
+	int rc;
+	const char *cert_path, *key_path;
+	wrap->gnutls_session = NULL;
+
+	/* get cert & key from uri query arguments */
+	const char *argsstr = strchr(uri, '?');
+	if (argsstr == NULL || strlen(argsstr) < 1)
+		goto args_error;
+
+	const char **args = rp_unescape_args(argsstr + 1);
+	cert_path = rp_unescaped_args_get(args, "cert");
+	key_path = rp_unescaped_args_get(args, "key");
+
+	if (!(cert_path && key_path))
+		goto args_error;
+
+	/* setup GnuTLS */
+	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, rp_unescaped_args_get(args, "trust"));
+	if (rc >= 0)
+		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
+
+	return rc;
+
+args_error:
+	RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
+	return X_EINVAL;
+}
+#endif
+
+static int init_raw(struct afb_wrap_rpc *wrap, int fd, int autoclose, ev_fd_cb_t onevent_cb, void (*notify_cb)(void*, struct afb_rpc_coder*))
+{
+	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent_cb, wrap, 0, autoclose);
+	if (rc >= 0)
+		/* callback for emission */
+		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+
+	return rc;
+}
+
 /**
 * Initialize the wrapper
 */
@@ -266,10 +322,6 @@ static int init(
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
-#if WITH_GNUTLS
-	const char *cert_path, *key_path;
-#endif
-	ev_fd_cb_t onevent_cb = onevent;
 	void (*notify_cb)(void*, struct afb_rpc_coder*) = notify;
 
 	/* create the stub */
@@ -277,54 +329,25 @@ static int init(
 	if (rc < 0) {
 		if (autoclose)
 			close(fd);
-	} else {
+	}
+	else {
 		if (mode == Wrap_Rpc_Mode_Websocket) {
-			/* websocket initialisation */
 			wrap->efd = NULL;
-			wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
-			if (wrap->ws == NULL)
-				rc = X_ENOMEM;
-			else {
-				/* unpacking is required for websockets */
-				afb_stub_rpc_set_unpack(wrap->stub, 1);
-				/* callback for emission */
-				afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
-				rc = 0;
-			}
+			rc = init_ws(wrap, fd, autoclose);
 		}
 		else {
 			wrap->ws = NULL;
 
 #if WITH_GNUTLS
-			wrap->gnutls_session = NULL;
 			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
-				/* get cert & key from uri query arguments */
-				const char **args = rp_unescape_args(strchr(uri, '?') + 1); // TODO safety check
-				cert_path = rp_unescaped_args_get(args, "cert");
-				key_path = rp_unescaped_args_get(args, "key");
-
-				if (cert_path && key_path) {
-					/* setup GnuTLS */
-					rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, rp_unescaped_args_get(args, "trust"));
-					if (rc >= 0) {
-						notify_cb = notify_tls;
-						rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
-					}
-				}
-				else {
-					RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-					rc = X_EINVAL;
-				}
+				rc = init_tls(wrap, uri, mode, fd);
+				notify_cb = notify_tls;
 			}
 #endif
 
 			/* direct initialisation */
-			if (rc >= 0) {
-				rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent_cb, wrap, 0, autoclose);
-				if (rc >= 0)
-					/* callback for emission */
-					afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
-			}
+			if (rc >= 0)
+				rc = init_raw(wrap, fd, autoclose, onevent, notify_cb);
 		}
 		if (rc >= 0) {
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
@@ -332,6 +355,7 @@ static int init(
 		}
 		afb_stub_rpc_unref(wrap->stub);
 	}
+
 	return rc;
 }
 
