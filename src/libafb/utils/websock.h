@@ -32,6 +32,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#if !defined(WEBSOCKET_DEFAULT_MAXLENGTH)
+#  define WEBSOCKET_DEFAULT_MAXLENGTH 1048500  /* 76 less than 1M, probably enougth for headers */
+#endif
+
 struct iovec;
 
 #define WEBSOCKET_CODE_OK                1000

@@ -36,10 +36,6 @@
 #include "utils/websock.h"
 #include "sys/x-errno.h"
 
-#if !defined(WEBSOCKET_DEFAULT_MAXLENGTH)
-#  define WEBSOCKET_DEFAULT_MAXLENGTH 1048500  /* 76 less than 1M, probably enougth for headers */
-#endif
-
 #define FRAME_GET_FIN(BYTE)         (((BYTE) >> 7) & 0x01)
 #define FRAME_GET_RSV1(BYTE)        (((BYTE) >> 6) & 0x01)
 #define FRAME_GET_RSV2(BYTE)        (((BYTE) >> 5) & 0x01)
