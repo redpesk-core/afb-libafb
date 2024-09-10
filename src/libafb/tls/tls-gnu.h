@@ -52,9 +52,10 @@ extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds, const cha
  * @param creds credentials to use for the session (see tls_gnu_creds_init)
  * @param server true if server, false if client
  * @param fd socket file descriptor to receive and transmit TLS data
+ * @param host hostname or IP address of the peer
  *
  * @return 0 if OK, <0 if KO (in which case session is freed for you)
  */
-extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd);
+extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd, const char *host);
 
 #endif

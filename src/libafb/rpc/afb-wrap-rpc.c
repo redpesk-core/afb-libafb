@@ -62,6 +62,8 @@ struct afb_wrap_rpc
 #if WITH_GNUTLS
 	gnutls_certificate_credentials_t gnutls_creds;
 	gnutls_session_t gnutls_session;
+	/* IP or hostname; necessary for handshakes, so it must live as long as the session lives */
+	char *host;
 #endif
 };
 
@@ -272,7 +274,8 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd)
 {
 	int rc;
-	const char *cert_path, *key_path;
+	const char *cert_path, *key_path, *host, *host_end;
+	size_t host_len;
 	wrap->gnutls_session = NULL;
 
 	/* get cert & key from uri query arguments */
@@ -289,8 +292,24 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 
 	/* setup GnuTLS */
 	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, rp_unescaped_args_get(args, "trust"));
-	if (rc >= 0)
-		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd);
+	if (rc >= 0) {
+		host = strchr(uri, ':') + 1;
+		host_end = strchr(host, ':');
+		host_len = (size_t)(host_end - host);
+		wrap->host = malloc(host_len + 1);
+		if (!wrap->host) {
+			RP_ERROR("out of memory");
+			return X_ENOMEM;
+		}
+		strncpy(wrap->host, host, host_len);
+		wrap->host[host_len] = '\0';
+
+		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd, wrap->host);
+		if (rc < 0) {
+			free(wrap->host);
+			gnutls_certificate_free_credentials(wrap->gnutls_creds);
+		}
+	}
 
 	return rc;
 

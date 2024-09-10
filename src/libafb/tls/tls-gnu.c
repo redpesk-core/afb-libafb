@@ -88,7 +88,7 @@ error:
     return rc;
 }
 
-int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd)
+int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd, const char *host)
 {
     int rc;
     gnutls_init_flags_t flag = server ? GNUTLS_SERVER : GNUTLS_CLIENT;
@@ -126,10 +126,12 @@ int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentia
     if (server)
         gnutls_certificate_server_set_request(*session, GNUTLS_CERT_REQUIRE);
 
-    /* check peer certificate */
-    // TODO hostname verification
-    // TODO allow callback (whitelist use case), see gnutls_certificate_set_verify_function
-    gnutls_session_set_verify_cert(*session, NULL, 0);
+    /* check server certificate */
+    // TODO allow callback (whitelist use case), see gnutls_session_set_verify_function
+    if (server)
+        gnutls_session_set_verify_cert(*session, NULL, 0);
+    else
+        gnutls_session_set_verify_cert(*session, host, 0);
 
     /* set transport */
     gnutls_transport_set_int(*session, fd);
