@@ -1,5 +1,11 @@
-Version 5.2.0
+Version next
 ------------
+
+  fixes
+   - ensure that jobs posted with a delay are correctly delayed
+
+Version 5.2.0
+-------------
 
   major versions of libafb and libafbcli is now 6 because of broken API
 

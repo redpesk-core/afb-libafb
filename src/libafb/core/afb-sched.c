@@ -183,8 +183,11 @@ int afb_sched_post_job(
 ) {
 	int rc;
 	rc = afb_jobs_post(group, delayms, timeout, callback, arg);
-	if (rc >= 0)
+	if (rc >= 0) {
 		adapt(mode);
+		if (delayms)
+			afb_ev_mgr_wakeup();
+	}
 	return rc;
 }
 
@@ -200,8 +203,11 @@ int afb_sched_post_job2(
 ) {
 	int rc;
 	rc = afb_jobs_post2(group, delayms, timeout, callback, arg1, arg2);
-	if (rc >= 0)
+	if (rc >= 0) {
 		adapt(mode);
+		if (delayms)
+			afb_ev_mgr_wakeup();
+	}
 	return rc;
 }
 
