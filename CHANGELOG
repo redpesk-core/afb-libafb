@@ -1,5 +1,5 @@
-Version next
-------------
+Version 5.2.1
+-------------
 
   fixes
    - ensure that jobs posted with a delay are correctly delayed
