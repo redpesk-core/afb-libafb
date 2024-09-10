@@ -822,7 +822,8 @@ static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], a
 		case Afb_Typeid_Predefined_Json_C:
 			cptr = (void*)json_object_to_json_string_length((json_object*)cptr, 0, &size);
 			size++;
-			/*@fallthrough@*/
+			typenum = AFB_RPC_V3_ID_TYPE_JSON;
+			break;
 #endif
 		case Afb_Typeid_Predefined_Json:
 			typenum = AFB_RPC_V3_ID_TYPE_JSON;
