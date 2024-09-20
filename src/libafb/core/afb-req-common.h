@@ -47,27 +47,27 @@ struct afb_event_x2;
 struct afb_req_common_query_itf
 {
 	/**
-	 * callback receiving the reply to the request
+	 * callback receiving the reply to the request (can not be NULL)
 	 */
 	void (*reply)(struct afb_req_common *req, int status, unsigned nreplies, struct afb_data * const replies[]);
 
 	/**
-	 * callback receiving the unreferenced event
+	 * callback receiving the unreferenced event (can not be NULL)
 	 */
 	void (*unref)(struct afb_req_common *req);
 
 	/**
-	 * callback receiving subscribe requests
+	 * callback receiving subscribe requests (can be NULL)
 	 */
 	int (*subscribe)(struct afb_req_common *req, struct afb_evt *event);
 
 	/**
-	 * callback receiving unsubscribe requests
+	 * callback receiving unsubscribe requests (can be NULL)
 	 */
 	int (*unsubscribe)(struct afb_req_common *req, struct afb_evt *event);
 
 	/**
-	 * callback for retrieving an interface
+	 * callback for retrieving an interface (can be NULL)
 	 */
 	int (*interface)(struct afb_req_common *req, int id, const char *name, void **result);
 };
