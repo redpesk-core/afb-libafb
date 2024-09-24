@@ -389,7 +389,7 @@ int afb_wrap_rpc_create(
 		struct afb_apiset *callset
 ) {
 	int rc;
-	*wrap = malloc(sizeof **wrap);
+	*wrap = calloc(1, sizeof **wrap);
 	if (*wrap == NULL) {
 		if (autoclose)
 			close(fd);
