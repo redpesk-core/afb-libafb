@@ -1,3 +1,9 @@
+Version 5.3.1
+-------------
+
+  fixes
+   - fix bug in initialisation of rpc sockets
+
 Version 5.3.0
 -------------
 
