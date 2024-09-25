@@ -40,7 +40,6 @@
 #include "core/afb-hook.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
-#include "core/afb-error-text.h"
 
 #include "core/afb-sched.h"
 #include "sys/x-errno.h"

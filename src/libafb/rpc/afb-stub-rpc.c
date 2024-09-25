@@ -69,7 +69,6 @@ json_object_to_json_string_length(
 #include "core/afb-type.h"
 #include "core/afb-type-predefined.h"
 #include "core/afb-token.h"
-#include "core/afb-error-text.h"
 #include "core/afb-sched.h"
 #include "utils/u16id.h"
 #include "core/containerof.h"
@@ -88,6 +87,7 @@ json_object_to_json_string_length(
 
 #include "rpc/afb-rpc-v0.h"
 #if WITH_RPC_V1
+# include "core/afb-error-text.h"
 # include "rpc/afb-rpc-v1.h"
 #endif
 #if WITH_RPC_V3

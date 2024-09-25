@@ -53,7 +53,6 @@
 #include "core/afb-req-common.h"
 #include "core/afb-req-v3.h"
 #include "core/afb-calls.h"
-#include "core/afb-error-text.h"
 #include "core/afb-string-mode.h"
 
 #if WITH_SYSTEMD

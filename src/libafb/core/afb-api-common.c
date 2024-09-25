@@ -48,7 +48,6 @@
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
 #include "core/afb-calls.h"
-#include "core/afb-error-text.h"
 #include "core/afb-string-mode.h"
 
 #include "core/afb-sched.h"

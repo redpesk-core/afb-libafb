@@ -48,7 +48,6 @@
 #include "core/afb-session.h"
 #include "utils/locale-root.h"
 #include "core/afb-token.h"
-#include "core/afb-error-text.h"
 #include "core/afb-req-common.h"
 #include "core/afb-json-legacy.h"
 #include "core/containerof.h"

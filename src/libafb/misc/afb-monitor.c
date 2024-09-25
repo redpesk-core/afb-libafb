@@ -44,7 +44,6 @@
 #include "misc/afb-trace.h"
 #endif
 #include "core/afb-session.h"
-#include "core/afb-error-text.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-data.h"
 #include "core/afb-type-predefined.h"

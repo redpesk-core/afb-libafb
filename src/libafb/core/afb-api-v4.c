@@ -53,7 +53,6 @@
 #include "core/afb-sched.h"
 #include "core/afb-type.h"
 #include "core/afb-calls.h"
-#include "core/afb-error-text.h"
 #include "core/afb-string-mode.h"
 
 #if WITH_SYSTEMD
