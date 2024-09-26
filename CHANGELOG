@@ -1,3 +1,9 @@
+Version 5.3.2
+-------------
+
+  fixes
+   - release event manager when sync_cb must wait
+
 Version 5.3.1
 -------------
 
