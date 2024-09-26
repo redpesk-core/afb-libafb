@@ -256,6 +256,7 @@ static void sync_cb(int signum, void *closure)
 	if (signum == 0) {
 		x_mutex_lock(&sync->mutex);
 		if (sync->done == 0) {
+			afb_ev_mgr_release_for_me();
 			adapt(Afb_Sched_Mode_Start);
 			x_cond_wait(&sync->condsync, &sync->mutex);
 		}
