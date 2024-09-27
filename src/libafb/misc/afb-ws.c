@@ -206,6 +206,15 @@ error:
 }
 
 /*
+ * Set the payload 'maxlen' for 'ws'
+ */
+void afb_ws_set_max_length(struct afb_ws *ws, size_t maxlen)
+{
+	if (ws->ws)
+		websock_set_max_length(ws->ws, maxlen);
+}
+
+/*
  * Destroys the websocket 'ws'
  * It first hangup (but without calling on_hangup for safety reasons)
  * if needed.

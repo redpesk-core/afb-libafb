@@ -76,6 +76,8 @@ extern struct afb_proto_ws *afb_proto_ws_create_server(int fd, int autoclose, co
 extern void afb_proto_ws_unref(struct afb_proto_ws *protows);
 extern void afb_proto_ws_addref(struct afb_proto_ws *protows);
 
+extern void afb_proto_ws_set_max_length(struct afb_proto_ws *protows, size_t maxlen);
+
 extern int afb_proto_ws_is_client(struct afb_proto_ws *protows);
 extern int afb_proto_ws_is_server(struct afb_proto_ws *protows);
 

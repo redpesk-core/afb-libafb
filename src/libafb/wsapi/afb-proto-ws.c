@@ -1304,6 +1304,12 @@ void afb_proto_ws_addref(struct afb_proto_ws *protows)
 	__atomic_add_fetch(&protows->refcount, 1, __ATOMIC_RELAXED);
 }
 
+void afb_proto_ws_set_max_length(struct afb_proto_ws *protows, size_t maxlen)
+{
+	if (protows->ws)
+		afb_ws_set_max_length(protows->ws, maxlen);
+}
+
 int afb_proto_ws_is_client(struct afb_proto_ws *protows)
 {
 	return !!protows->client_itf;

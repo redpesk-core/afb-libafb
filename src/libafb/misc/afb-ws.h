@@ -39,6 +39,7 @@ struct afb_ws_itf
 };
 
 extern struct afb_ws *afb_ws_create(int fd, int autoclose, const struct afb_ws_itf *itf, void *closure);
+extern void afb_ws_set_max_length(struct afb_ws *ws, size_t maxlen);
 extern void afb_ws_destroy(struct afb_ws *ws);
 extern void afb_ws_hangup(struct afb_ws *ws);
 extern void afb_ws_set_masking(struct afb_ws *ws, int onoff);

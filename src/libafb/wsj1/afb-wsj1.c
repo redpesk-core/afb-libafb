@@ -154,6 +154,11 @@ void afb_wsj1_set_masking(struct afb_wsj1 *wsj1, int onoff)
 	afb_ws_set_masking(wsj1->ws, onoff);
 }
 
+void afb_wsj1_set_max_length(struct afb_wsj1 *wsj1, size_t maxlen)
+{
+	afb_ws_set_max_length(wsj1->ws, maxlen);
+}
+
 static void wsj1_on_hangup(struct afb_wsj1 *wsj1)
 {
 	struct wsj1_call *call, *ncall;

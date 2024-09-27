@@ -85,6 +85,11 @@ extern void afb_wsj1_unref(struct afb_wsj1 *wsj1);
 extern int afb_wsj1_close(struct afb_wsj1 *wsj1, uint16_t code, const char *text);
 
 /*
+ * Set the maximum payload length
+ */
+extern void afb_wsj1_set_max_length(struct afb_wsj1 *wsj1, size_t maxlen);
+
+/*
  * Set the masking mode in output (sending) active if onoff is not zero
  */
 extern void afb_wsj1_set_masking(struct afb_wsj1 *wsj1, int onoff);
