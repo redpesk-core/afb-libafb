@@ -1,3 +1,9 @@
+Version 5.3.3
+-------------
+
+  change
+   - propagate maximum payload length of websockets
+
 Version 5.3.2
 -------------
 
