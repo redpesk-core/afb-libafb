@@ -316,8 +316,13 @@ static const char *get_json(struct afb_data *data) {
 #if !WITHOUT_JSON_C
 UNUSED_POLICY
 static int make_json_c(struct afb_data **result, struct json_object *value) {
-	return value ? afb_data_create_raw(result, &PREDEF(json_c), value, 0,
-				(void*)json_object_put, value) : X_ENOMEM;
+	return afb_data_create_raw(result, &PREDEF(json_c), value, 0,
+					(void*)json_object_put, value);
+}
+
+UNUSED_POLICY
+static int make_json_c_not_null(struct afb_data **result, struct json_object *value) {
+	return value ? make_json_c(result, value) : X_ENOMEM;
 }
 
 UNUSED_POLICY
@@ -368,7 +373,7 @@ CONVERT(opaque,json_c)
 
 	rc = opaque_to_string(in, buffer, sizeof buffer);
 	if (rc >= 0)
-		rc = make_json_c(out, json_object_new_string(buffer));
+		rc = make_json_c_not_null(out, json_object_new_string(buffer));
 	return rc;
 }
 #endif
@@ -411,14 +416,18 @@ CONVERT(stringz,json)
 	const char *istr;
 	char *ostr;
 	size_t isz, osz;
+	int rc;
+
+	/* get string parameters */
+	rc = afb_data_get_constant(in, (void**)&istr, &isz);
+	if (rc < 0)
+		return rc;
 
 	/* null is still null */
-	istr = afb_data_ro_pointer(in);
-	if (!istr)
+	if (!istr || !isz)
 		return afb_data_create_raw(out, type, "null", 5, 0, 0);
 
 	/* empty case is optimized */
-	isz = afb_data_size(in);
 	if (isz <= 1)
 		return afb_data_create_raw(out, type, "\"\"", 3, 0, 0);
 
@@ -444,8 +453,8 @@ CONVERT(stringz,bytearray)
 	size_t sz;
 	int rc;
 
+	/* get string parameters */
 	rc = afb_data_get_constant(in, &ptr, &sz);
-
 	if (rc >= 0) {
 		rc = afb_data_create_raw(out, type, ptr, sz - !!sz, 0, 0);
 		if (rc >= 0) {
@@ -458,23 +467,51 @@ CONVERT(stringz,bytearray)
 }
 
 #if !WITHOUT_JSON_C
+
+
+static int str_to_json_c(
+	struct afb_data *in,
+	struct afb_data **out,
+	int fallback
+) {
+	int rc, sts, len;
+	struct json_tokener *tok;
+	json_object *json;
+	const char *str;
+	size_t sz;
+
+	/* get string parameters */
+	rc = afb_data_get_constant(in, (void**)&str, &sz);
+	if (rc >= 0) {
+		if (str == NULL || sz == 0)
+			rc = make_json_c(out, NULL);
+		else if (sz > INT_MAX)
+			rc = X_E2BIG;
+		else {
+			len = (int)sz - 1;
+			tok = json_tokener_new();
+			sts = tok != NULL;
+			if (tok == NULL)
+				rc = X_ENOMEM;
+			else {
+				json = json_tokener_parse_ex(tok, str, len);
+				sts =  json_tokener_get_error(tok) == json_tokener_success && (int)json_tokener_get_parse_end(tok) == len;
+				json_tokener_free(tok);
+				if (sts)
+					rc = make_json_c(out, json);
+				else if (fallback)
+					rc = make_json_c_not_null(out, json_object_new_string_len(str, len));
+				else
+					rc = X_EINVAL;
+			}
+		}
+	}
+	return rc;
+}
+
 CONVERT(stringz,json_c)
 {
-	int rc;
-	json_object *json;
-	enum json_tokener_error jerr;
-	const char *str;
-
-	str = afb_data_ro_pointer(in);
-	if (str == NULL)
-		json = NULL;
-	else {
-		json = json_tokener_parse_verbose(str, &jerr);
-		if (jerr != json_tokener_success)
-			json = json_object_new_string(str);
-	}
-	rc = make_json_c(out, json);
-	return rc;
+	return str_to_json_c(in, out, 1);
 }
 #endif
 
@@ -496,18 +533,7 @@ PREDEFINED_TYPE(stringz, Afb_Typeid_Predefined_Stringz, FLAG_IS_STREAMABLE, 0, &
 #if !WITHOUT_JSON_C
 CONVERT(json,json_c)
 {
-	int rc;
-	json_object *json;
-	enum json_tokener_error jerr;
-	const char *str;
-
-	str = afb_data_ro_pointer(in);
-	json = json_tokener_parse_verbose(str, &jerr);
-	if (jerr != json_tokener_success)
-		rc = X_EINVAL;
-	else
-		rc = make_json_c(out, json);
-	return rc;
+	return str_to_json_c(in, out, 0);
 }
 #endif
 
@@ -724,7 +750,7 @@ CONVERT(bool,json)
 #if !WITHOUT_JSON_C
 CONVERT(bool,json_c)
 {
-	return make_json_c(out, json_object_new_boolean(get_bool(in)));
+	return make_json_c_not_null(out, json_object_new_boolean(get_bool(in)));
 }
 
 EXTRACT(json_c,struct json_object*,bool,uint8_t)
@@ -784,7 +810,7 @@ CONVERT(i32,json)
 #if !WITHOUT_JSON_C
 CONVERT(i32,json_c)
 {
-	return make_json_c(out, json_object_new_int(get_i32(in)));
+	return make_json_c_not_null(out, json_object_new_int(get_i32(in)));
 }
 
 EXTRACT(json_c,struct json_object*,i32,int32_t)
@@ -845,7 +871,7 @@ CONVERT(u32,json)
 #if !WITHOUT_JSON_C
 CONVERT(u32,json_c)
 {
-	return make_json_c(out, json_object_new_int64((int64_t)get_u32(in)));
+	return make_json_c_not_null(out, json_object_new_int64((int64_t)get_u32(in)));
 }
 
 EXTRACT(json_c,struct json_object*,u32,uint32_t)
@@ -905,7 +931,7 @@ CONVERT(i64,json)
 #if !WITHOUT_JSON_C
 CONVERT(i64,json_c)
 {
-	return make_json_c(out, json_object_new_int64(get_i64(in)));
+	return make_json_c_not_null(out, json_object_new_int64(get_i64(in)));
 }
 
 EXTRACT(json_c,struct json_object*,i64,int64_t)
@@ -995,7 +1021,7 @@ CONVERT(double,json)
 #if !WITHOUT_JSON_C
 CONVERT(double,json_c)
 {
-	return make_json_c(out, json_object_new_double(get_double(in)));
+	return make_json_c_not_null(out, json_object_new_double(get_double(in)));
 }
 
 EXTRACT(json_c,struct json_object*,double,double)
