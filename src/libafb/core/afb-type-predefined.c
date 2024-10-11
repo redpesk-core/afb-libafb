@@ -495,7 +495,12 @@ static int str_to_json_c(
 				rc = X_ENOMEM;
 			else {
 				json = json_tokener_parse_ex(tok, str, len);
-				sts =  json_tokener_get_error(tok) == json_tokener_success && (int)json_tokener_get_parse_end(tok) == len;
+				sts =  json_tokener_get_error(tok) == json_tokener_success
+#if JSON_C_VERSION_NUM >= 0x000E00
+				   && (int)json_tokener_get_parse_end(tok) == len;
+#else
+				   && tok->char_offset == len;
+#endif
 				json_tokener_free(tok);
 				if (sts)
 					rc = make_json_c(out, json);
