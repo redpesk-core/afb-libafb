@@ -1,5 +1,5 @@
-next
-----
+Version 5.3.4
+-------------
 
   fixes
    - improve conversion from stringz to json and json-c
