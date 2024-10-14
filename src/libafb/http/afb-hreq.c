@@ -336,7 +336,6 @@ static const char *mimetype_fd_name(int fd, const char *filename)
 {
 	const char *result = NULL;
 
-#if INFER_EXTENSION
 	/*
 	 * Set some well-known extensions
 	 * Note that it is mandatory for example for css files in order to provide
@@ -380,7 +379,6 @@ static const char *mimetype_fd_name(int fd, const char *filename)
 				l = i + 1;
 		}
 	}
-#endif
 #if HAVE_LIBMAGIC
 	if (result == NULL)
 		result = magic_mimetype_fd(fd);

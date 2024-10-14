@@ -87,8 +87,6 @@
 #cmakedefine01 WITHOUT_JSON_C
 
 #if WITH_LIBMICROHTTPD
-/* Always add INFER_EXTENSION (more details in afb-hreq.c) */
-#  define INFER_EXTENSION 1
 #  cmakedefine01 HAVE_LIBMAGIC
 #endif
 #if !WITH_AFB_HOOK && WITH_AFB_TRACE
