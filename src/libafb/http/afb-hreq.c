@@ -309,13 +309,12 @@ static magic_t lazy_libmagic()
 			 but you can specify different things */
 		RP_INFO("Loading mimetype default magic database");
 		result = magic_open(MAGIC_MIME_TYPE);
-		if (result == NULL) {
-			RP_ERROR("unable to initialize magic library");
-		}
+		if (result == NULL)
+			RP_WARNING("Not able to initialize libmagic");
 		/* Warning: should not use NULL for DB
 				[libmagic bug wont pass efence check] */
 		else if (magic_load(result, MAGIC_DB) != 0) {
-			RP_ERROR("cannot load magic database: %s", magic_error(result));
+			RP_WARNING("No magic database %s", magic_error(result));
 			magic_close(result);
 			result = NULL;
 		}

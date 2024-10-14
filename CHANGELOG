@@ -4,6 +4,9 @@ next
   fixes
    - improve conversion from stringz to json and json-c
 
+  change
+   - make libmagic optional
+
 Version 5.3.3
 -------------
 
