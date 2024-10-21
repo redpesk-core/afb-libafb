@@ -163,9 +163,15 @@ if (NOT WITH_ZEPHYR)
 	endif()
 
 	if(WITH_RPUTILS_STATIC)
-		PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils-static>=0.0.3)
+		PKG_CHECK_MODULES(librp-utils REQUIRED
+				librp-utils-core-static
+				librp-utils-file-static
+				librp-utils-json-c-static)
 	else()
-		PKG_CHECK_MODULES(librp-utils REQUIRED librp-utils>=0.0.3)
+		PKG_CHECK_MODULES(librp-utils REQUIRED
+				librp-utils-core
+				librp-utils-file
+				librp-utils-json-c)
 	endif()
 endif()
 

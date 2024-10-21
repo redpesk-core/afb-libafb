@@ -1,3 +1,10 @@
+next
+----
+
+  change
+   - use splitted librp-utils:
+     librp-utils-core, librp-utils-file, librp-utils-json-c
+
 Version 5.3.4
 -------------
 

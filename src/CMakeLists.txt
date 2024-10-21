@@ -49,7 +49,9 @@ set(libdirs
 
 set(deps
 	json-c
-	librp-utils
+	librp-utils-core
+	librp-utils-file
+	librp-utils-json-c
 )
 
 set(privs
