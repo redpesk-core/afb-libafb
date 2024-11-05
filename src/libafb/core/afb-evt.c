@@ -163,6 +163,12 @@ static struct afb_evt *evt_list_head = NULL;
 static uint16_t event_genid = 0;
 static uint16_t event_count = 0;
 
+#if 1 /* only one group until conversion of data thread safe */
+#define GROUP_OF_LISTENER(listener) ((void*)&listeners)
+#else
+#define GROUP_OF_LISTENER(listener) ((listener)->group)
+#endif
+
 /**************************************************************************/
 /** MANAGE LISTENERS INTERNALY                                           **/
 /**************************************************************************/
@@ -339,7 +345,7 @@ static int broadcast(const char *event, unsigned nparams, struct afb_data * cons
 			for (rc = 0; listener != NULL; listener = listener->next) {
 				job_evt_broadcast_addref(jb);
 				listener_internal_addref(listener);
-				rc2 = afb_sched_post_job2(listener->group, 0, 0, broadcast_job, jb, listener, Afb_Sched_Mode_Normal);
+				rc2 = afb_sched_post_job2(GROUP_OF_LISTENER(listener), 0, 0, broadcast_job, jb, listener, Afb_Sched_Mode_Normal);
 				if (rc2 < 0)
 					RP_ERROR("Can't queue push a broadcast job for %s", event);
 			}
@@ -564,7 +570,7 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 				rc++;
 				job_evt_push_addref(je);
 				listener_internal_addref(watch->listener);
-				rc2 = afb_sched_post_job2(watch->listener->group, 0, 0, push_job, je, watch->listener, Afb_Sched_Mode_Normal);
+				rc2 = afb_sched_post_job2(GROUP_OF_LISTENER(watch->listener), 0, 0, push_job, je, watch->listener, Afb_Sched_Mode_Normal);
 				if (rc2 < 0)
 					RP_ERROR("Can't queue push an evt job for %s", evt->fullname);
 			}
