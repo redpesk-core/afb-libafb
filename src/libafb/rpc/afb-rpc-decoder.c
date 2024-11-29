@@ -54,7 +54,7 @@ int afb_rpc_decoder_peek_pointer(afb_rpc_decoder_t *decoder, const void **cptr, 
 	int rc;
 	uint32_t after = size + decoder->offset;
 	if (after < size || after > decoder->size)
-		rc = X_EINVAL;
+		rc = X_EPIPE;
 	else {
 		*cptr = (const char*)decoder->pointer + decoder->offset;
 		rc = 0;
@@ -80,7 +80,7 @@ int afb_rpc_decoder_read_pointer(afb_rpc_decoder_t *decoder, const void **cptr, 
 {
 	uint32_t after = size + decoder->offset;
 	if (after > decoder->size || /* overflow */ after < size)
-		return X_EINVAL;
+		return X_EPIPE;
 
 	*cptr = (const char*)decoder->pointer + decoder->offset;
 	decoder->offset = after;
@@ -106,7 +106,7 @@ int afb_rpc_decoder_skip(afb_rpc_decoder_t *decoder, uint32_t size)
 	int rc;
 	uint32_t after = size + decoder->offset;
 	if (after < size || after > decoder->size)
-		rc = X_EINVAL;
+		rc = X_EPIPE;
 	else {
 		decoder->offset = after;
 		rc = 0;
