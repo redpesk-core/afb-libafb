@@ -2776,11 +2776,11 @@ static ssize_t decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 #if RPC_DEBUG
 		RP_DEBUG("RPC decode_block after(%p, %u/%u)", stub, stub->decoder.offset, stub->decoder.size);
 #endif
-		if (rc == 0)
+		if (rc >= 0)
 			szr = (ssize_t)stub->decoder.offset;
 	}
 	stub->receive.current_inblock = NULL;
-	return rc == 0 || rc == X_EPIPE ? szr : (ssize_t)rc;
+	return rc >= 0 || rc == X_EPIPE ? szr : (ssize_t)rc;
 }
 
 /**************************************************************************

@@ -55,12 +55,19 @@
 # include <sys/socket.h>
 #endif
 /*
+* structure for wrapping RPC
 */
 struct afb_wrap_rpc
 {
 	struct afb_stub_rpc *stub;
 	struct afb_ws *ws;
 	struct ev_fd *efd;
+	struct {
+		uint8_t *buffer;
+		size_t size;
+		uint8_t dropped;
+	}
+		mem;
 #if WITH_GNUTLS
 	gnutls_certificate_credentials_t gnutls_creds;
 	gnutls_session_t gnutls_session;
@@ -99,58 +106,108 @@ static void hangup(struct afb_wrap_rpc *wrap)
 		ev_fd_unref(wrap->efd);
 	if (wrap->ws != NULL)
 		{/*TODO*/}
+	free(wrap->mem.buffer);
 	free(wrap);
 }
 
 static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct afb_wrap_rpc *wrap = closure;
-	void *buffer;
+	uint8_t *buffer;
 	size_t esz;
 	ssize_t ssz;
 	int rc, avail;
 
+	/* hangup event? */
 	if (revents & EPOLLHUP) {
 		hangup(wrap);
+		return;
 	}
-	else if (revents & EPOLLIN) {
+
+	/* something to read? */
+	if ((revents & EPOLLIN) == 0)
+		return; /* no */
+
+	/* get size to read */
 #if QUERY_RCV_SIZE
-		rc = ioctl(fd, FIONREAD, &avail);
-		esz = rc < 0 ? RECEIVE_BLOCK_LENGTH : (size_t)(unsigned)avail;
+	rc = ioctl(fd, FIONREAD, &avail);
+	esz = rc < 0 ? RECEIVE_BLOCK_LENGTH : (size_t)(unsigned)avail;
 #else
-		esz = RECEIVE_BLOCK_LENGTH;
+	esz = RECEIVE_BLOCK_LENGTH;
 #endif
-		buffer = malloc(esz);
-		if (buffer != NULL) {
-#if WITH_GNUTLS
-			if (wrap->gnutls_session)
-				ssz = gnutls_record_recv(wrap->gnutls_session, buffer, esz);
-			else
-#endif
-			{
-#if USE_SND_RCV
-				ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
-#else
-				ssz = read(fd, buffer, esz);
-#endif
-			}
-			if (ssz >= 0) {
-				if (esz > (size_t)ssz) {
-					void *newbuffer = realloc(buffer, (size_t)ssz);
-					if (newbuffer != NULL)
-						buffer = newbuffer;
-				}
-				afb_stub_rpc_receive(wrap->stub, buffer, (size_t)ssz);
-			}
-			else {
-				free(buffer);
-				buffer = NULL;
-			}
-		}
-		if (buffer == NULL) {
-			hangup(wrap);
-		}
+
+	/* allocate memory */
+	buffer = realloc(wrap->mem.buffer, wrap->mem.size + esz);
+	if (buffer == NULL) {
+		/* allocation failed */
+		hangup(wrap);
+		return;
 	}
+	wrap->mem.buffer = buffer;
+	buffer += wrap->mem.size;
+	wrap->mem.size += esz;
+
+	/* read in buffer */
+#if WITH_GNUTLS
+	if (wrap->gnutls_session)
+		ssz = gnutls_record_recv(wrap->gnutls_session, buffer, esz);
+	else
+#endif
+	{
+#if USE_SND_RCV
+		ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
+#else
+		ssz = read(fd, buffer, esz);
+#endif
+	}
+
+	/* read error? */
+	if (ssz < 0) {
+		wrap->mem.size = 0;
+		hangup(wrap);
+		return;
+	}
+
+	/* nothing in!? */
+	if (ssz == 0)
+		return;
+
+	/* shrink buffer if too big */
+	if (esz > (size_t)ssz) {
+		wrap->mem.size -= esz - (size_t)ssz;
+		buffer = realloc(wrap->mem.buffer, wrap->mem.size);
+		if (buffer != NULL)
+			wrap->mem.buffer = buffer;
+	}
+
+	/* process the buffer */
+	wrap->mem.dropped = 0;
+	ssz = afb_stub_rpc_receive(wrap->stub, wrap->mem.buffer, wrap->mem.size);
+	if (ssz < 0) {
+		/* processing error */
+		if (!wrap->mem.dropped)
+			wrap->mem.buffer = NULL; /* not released yet */
+		hangup(wrap);
+		return;
+	}
+
+	/* check processed size */
+	wrap->mem.size -= (size_t)ssz;
+	if (wrap->mem.size == 0)
+		buffer = NULL;
+	else {
+		buffer = malloc(wrap->mem.size);
+		if (buffer == NULL) {
+			if (!wrap->mem.dropped)
+				wrap->mem.buffer = NULL; /* not released yet */
+			hangup(wrap);
+			return;
+		}
+		memcpy(buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+	}
+	if (wrap->mem.dropped)
+		free(wrap->mem.buffer);
+	wrap->mem.buffer = buffer;
 }
 
 static void notify(void *closure, struct afb_rpc_coder *coder)
@@ -182,7 +239,11 @@ static void notify(void *closure, struct afb_rpc_coder *coder)
 
 static void disposebufs(void *closure, void *buffer, size_t size)
 {
-	free(buffer);
+	struct afb_wrap_rpc *wrap = closure;
+	if (buffer == wrap->mem.buffer)
+		wrap->mem.dropped = 1; /* in receiving callback, provision incomplete case */
+	else
+		free(buffer);
 }
 
 /******************************************************************************/

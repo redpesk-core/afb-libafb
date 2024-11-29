@@ -3,6 +3,7 @@ Version 5.3.7
 
   change
    - RPC transmit type's name of not predefined types
+   - RPC handle correctly reception of incomplete buffers
 
 Version 5.3.6
 -------------
