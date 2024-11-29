@@ -43,7 +43,9 @@
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-wrap-rpc.h"
 
+#if WITH_GNUTLS
 #include "tls/tls-gnu.h"
+#endif
 
 #define RECEIVE_BLOCK_LENGTH 4080
 #define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
