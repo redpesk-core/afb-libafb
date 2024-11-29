@@ -269,6 +269,9 @@ struct afb_stub_rpc
 	/** transmitted tokens */
 	struct u16id2ptr *token_proxies;
 
+	/** transmitted types */
+	struct u16id2ptr *type_proxies;
+
 	/** outgoing calls (and describes) */
 	struct outcall *outcalls;
 
@@ -286,6 +289,9 @@ struct afb_stub_rpc
 
 	/** sent tokens */
 	struct u16id2bool *token_flags;
+
+	/** sent types */
+	struct u16id2bool *type_flags;
 
 	/** free indescs */
 	struct indesc *indesc_pool;
@@ -796,17 +802,44 @@ static int send_describe_reply_v1(struct afb_stub_rpc *stub, uint16_t callid, co
 * PART - SENDING FOR V3
 **************************************************************************/
 
-static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], afb_rpc_v3_value_t values[])
+static int send_resource_create_v3(struct afb_stub_rpc *stub, uint16_t id, const char *value, uint16_t kind)
 {
+	afb_rpc_v3_msg_resource_create_t creres;
+
+	creres.kind = kind;
+	creres.id = id;
+	creres.data = (void*)value;
+	creres.length = value ? (uint16_t)(1 + strlen(value)) : 0; /* TODO check size */
+	return afb_rpc_v3_code_resource_create(&stub->coder, &creres);
+}
+
+static int send_resource_destroy_v3(struct afb_stub_rpc *stub, uint16_t id, uint16_t kind)
+{
+	afb_rpc_v3_msg_resource_destroy_t desres;
+
+	desres.kind = kind;
+	desres.id = id;
+	return afb_rpc_v3_code_resource_destroy(&stub->coder, &desres);
+}
+
+static int datas_to_values_v3(
+		struct afb_stub_rpc *stub,
+		unsigned ndata,
+		struct afb_data * const datas[],
+		afb_rpc_v3_value_t values[]
+) {
+	int rc;
 	unsigned i;
 	void *cptr;
 	size_t size;
 	uint16_t typenum;
+	struct afb_type *type;
 	struct afb_data *data;
 
 	for (i = 0 ; i < ndata ; i++) {
 		data = datas[i];
-		typenum = afb_typeid(afb_data_type(data));
+		type = afb_data_type(data);
+		typenum = afb_typeid(type);
 		afb_data_get_constant(data, &cptr, &size);
 		switch (typenum) {
 		case Afb_Typeid_Predefined_Opaque:
@@ -889,7 +922,15 @@ static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], a
 			break;
 #endif
 		default:
-			typenum = 0; /* TODO */
+			if (!u16id2bool_get(stub->type_flags, typenum)) {
+				if (!afb_type_is_streamable(type))
+					return X_EBADMSG;
+				u16id2bool_set(&stub->type_flags, typenum, 1);
+				rc = send_resource_create_v3(stub, typenum, afb_type_name(type), AFB_RPC_V3_ID_KIND_TYPE);
+				if (rc < 0)
+					return rc;
+			}
+			break;
 		}
 		if (size > UINT16_MAX - 8)
 			return X_EOVERFLOW;
@@ -904,26 +945,6 @@ static int datas_to_values_v3(unsigned ndata, struct afb_data * const datas[], a
 static void dispose_dataids_v3(void *closure, void *arg)
 {
 	afb_data_array_unref((unsigned)(intptr_t)closure, (struct afb_data**)arg);
-}
-
-static int send_resource_create_v3(struct afb_stub_rpc *stub, uint16_t id, const char *value, uint16_t kind)
-{
-	afb_rpc_v3_msg_resource_create_t creres;
-
-	creres.kind = kind;
-	creres.id = id;
-	creres.data = (void*)value;
-	creres.length = value ? (uint16_t)(1 + strlen(value)) : 0; /* TODO check size */
-	return afb_rpc_v3_code_resource_create(&stub->coder, &creres);
-}
-
-static int send_resource_destroy_v3(struct afb_stub_rpc *stub, uint16_t id, uint16_t kind)
-{
-	afb_rpc_v3_msg_resource_destroy_t desres;
-
-	desres.kind = kind;
-	desres.id = id;
-	return afb_rpc_v3_code_resource_destroy(&stub->coder, &desres);
 }
 
 static int send_session_create_v3(struct afb_stub_rpc *stub, uint16_t id, const char *value)
@@ -958,7 +979,7 @@ static int send_event_push_v3(struct afb_stub_rpc *stub, uint16_t eventid, unsig
 	afb_rpc_v3_value_t values[nparams];
 	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
 
-	int rc = datas_to_values_v3(nparams, params, values);
+	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
 		push.eventid = eventid;
 		rc = afb_rpc_v3_code_event_push(&stub->coder, &push, &valarr);
@@ -997,7 +1018,7 @@ static int send_call_reply_v3(struct afb_stub_rpc *stub, int status, unsigned np
 	afb_rpc_v3_value_t values[nparams];
 	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
 
-	int rc = datas_to_values_v3(nparams, params, values);
+	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
 		reply.callid = callid;
 		reply.status = (int32_t)status;
@@ -1024,7 +1045,7 @@ static int send_call_request_v3(
 	afb_rpc_v3_value_t values[nparams];
 	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
 
-	int rc = datas_to_values_v3(nparams, params, values);
+	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
 		memset(&request, 0, sizeof request);
 		request.callid = callid;
@@ -1860,6 +1881,37 @@ static int receive_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 	return rc;
 }
 
+static int receive_type_create(struct afb_stub_rpc *stub, uint16_t typeid, const char *typestr)
+{
+	struct afb_type *type;
+	int rc;
+
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_type_create(%p, %d, %s)", stub, (int)typeid, typestr);
+#endif
+	rc = afb_type_lookup(&type, typestr);
+	if (rc < 0)
+		RP_ERROR("unknown type %s", typestr);
+	else {
+		rc = u16id2ptr_add(&stub->type_proxies, typeid, type);
+		if (rc < 0)
+			RP_ERROR("can't record type %s", typestr);
+	}
+	return rc;
+}
+
+static int receive_type_destroy(struct afb_stub_rpc *stub, uint16_t typeid)
+{
+	int rc;
+
+#if RPC_DEBUG
+	RP_DEBUG("RPC receive_type_destroy(%p, %d)", stub, (int)typeid);
+#endif
+	rc = u16id2ptr_drop(&stub->type_proxies, typeid, NULL);
+	return rc;
+}
+
+
 static int receive_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 {
 #if RPC_DEBUG
@@ -2239,8 +2291,8 @@ static int decode_v1(struct afb_stub_rpc *stub)
 
 static int typed_value_to_data_v3(struct afb_stub_rpc *stub, uint16_t typenum, uint32_t length, const void *value, struct afb_data **data)
 {
-	int rc;
-	struct afb_type *type1 = 0, *type2 = 0;
+	int rc = 0;
+	struct afb_type *type1 = NULL, *type2 = NULL;
 	uint8_t size;
 	char buffer[8];
 
@@ -2393,21 +2445,21 @@ static int typed_value_to_data_v3(struct afb_stub_rpc *stub, uint16_t typenum, u
 		}
 		break;
 	default:
-		return X_ENOTSUP; /* TODO */
+		rc = u16id2ptr_get(stub->type_proxies, typenum, (void**)&type1);
+		break;
 	}
-	if (type1) {
-		if (length)
+	if (type1 != NULL) {
+		if (length == 0)
+			rc = afb_data_create_raw(data, type1, NULL, 0, 0, 0);
+		else
 			rc = afb_data_create_raw(data, type1, value, length,
 					inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-		else
-			rc = afb_data_create_raw(data, type1, NULL, 0, 0, 0);
 	}
-	else if (type2) {
+	else if (type2 != NULL) {
 		rc = afb_data_create_copy(data, type2, value, size);
 	}
-	else {
+	else if (rc == 0)
 		rc = X_EPROTO;
-	}
 
 	return rc;
 }
@@ -2534,9 +2586,11 @@ static int decode_resource_create_v3(struct afb_stub_rpc *stub, afb_rpc_v3_msg_r
 	case AFB_RPC_V3_ID_KIND_EVENT:
 		rc = receive_event_create(stub, msg->id, msg->data);
 		break;
+	case AFB_RPC_V3_ID_KIND_TYPE:
+		rc = receive_type_create(stub, msg->id, msg->data);
+		break;
 	case AFB_RPC_V3_ID_KIND_API:
 	case AFB_RPC_V3_ID_KIND_VERB:
-	case AFB_RPC_V3_ID_KIND_TYPE:
 	case AFB_RPC_V3_ID_KIND_DATA:
 	case AFB_RPC_V3_ID_KIND_KIND:
 	case AFB_RPC_V3_ID_KIND_CREDS:
@@ -2560,9 +2614,11 @@ static int decode_resource_destroy_v3(struct afb_stub_rpc *stub, afb_rpc_v3_msg_
 	case AFB_RPC_V3_ID_KIND_EVENT:
 		rc = receive_event_destroy(stub, msg->id);
 		break;
+	case AFB_RPC_V3_ID_KIND_TYPE:
+		rc = receive_type_destroy(stub, msg->id);
+		break;
 	case AFB_RPC_V3_ID_KIND_API:
 	case AFB_RPC_V3_ID_KIND_VERB:
-	case AFB_RPC_V3_ID_KIND_TYPE:
 	case AFB_RPC_V3_ID_KIND_DATA:
 	case AFB_RPC_V3_ID_KIND_KIND:
 	case AFB_RPC_V3_ID_KIND_CREDS:
@@ -2947,6 +3003,12 @@ static void disconnect(struct afb_stub_rpc *stub)
 		u16id2ptr_forall(i2p, release_all_tokens_cb, NULL);
 		u16id2ptr_destroy(&i2p);
 	}
+
+	/* clear types */
+	i2b = __atomic_exchange_n(&stub->type_flags, NULL, __ATOMIC_RELAXED);
+	i2p = __atomic_exchange_n(&stub->type_proxies, NULL, __ATOMIC_RELAXED);
+	u16id2bool_destroy(&i2b);
+	u16id2ptr_destroy(&i2p);
 }
 
 /* sub one reference and free resources if falling to zero */
