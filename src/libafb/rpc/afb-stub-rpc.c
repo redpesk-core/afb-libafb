@@ -2738,8 +2738,9 @@ static int decode_v0(struct afb_stub_rpc *stub)
 /**************************************************************************
 * PART - DISPATCH INCOMING MESSAGES
 **************************************************************************/
-static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
+static ssize_t decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 {
+	ssize_t szr = 0;
 	int rc = 0;
 
 	if (inblock->size > UINT32_MAX)
@@ -2775,24 +2776,29 @@ static int decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 #if RPC_DEBUG
 		RP_DEBUG("RPC decode_block after(%p, %u/%u)", stub, stub->decoder.offset, stub->decoder.size);
 #endif
+		if (rc == 0)
+			szr = (ssize_t)stub->decoder.offset;
 	}
 	stub->receive.current_inblock = NULL;
-	return rc;
+	return rc == 0 || rc == X_EPIPE ? szr : (ssize_t)rc;
 }
 
 /**************************************************************************
 * PART - RECEIVING BUFFERS
 **************************************************************************/
 
-int afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size)
+ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size)
 {
+	ssize_t res;
 	struct inblock *inblock;
 	int rc = inblock_get(stub, data, size, &inblock);
-	if (rc >= 0) {
-		rc = decode_block(stub, inblock);
+	if (rc < 0)
+		res = (ssize_t)rc;
+	else {
+		res = decode_block(stub, inblock);
 		inblock_unref(inblock);
 	}
-	return rc;
+	return res;
 }
 
 void afb_stub_rpc_receive_set_dispose(struct afb_stub_rpc *stub, void (*dispose)(void*, void*, size_t), void *closure)

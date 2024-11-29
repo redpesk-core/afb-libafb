@@ -131,9 +131,10 @@ extern int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset 
  * @param data the received buffer to be processed
  * @param size size of the received buffer in bytes
  *
- * @return 0 in case of success or else a negative error code
+ * @return the size used in case of success (zero or less than 'size' if incomplete message)
+ *         or else a negative error code
  */
-extern int afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size);
+extern ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size);
 
 /**
  * Record the function to call for disposing of received buffers
