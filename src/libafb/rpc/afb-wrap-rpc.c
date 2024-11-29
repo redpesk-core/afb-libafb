@@ -148,37 +148,51 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	wrap->mem.size += esz;
 
 	/* read in buffer */
+	for (;;) {
+		ssz =
 #if WITH_GNUTLS
-	if (wrap->gnutls_session)
-		ssz = gnutls_record_recv(wrap->gnutls_session, buffer, esz);
-	else
+			wrap->gnutls_session ? gnutls_record_recv(wrap->gnutls_session, buffer, esz) :
 #endif
-	{
 #if USE_SND_RCV
-		ssz = recv(fd, buffer, esz, MSG_DONTWAIT);
+			recv(fd, buffer, esz, MSG_DONTWAIT);
 #else
-		ssz = read(fd, buffer, esz);
+			read(fd, buffer, esz);
 #endif
-	}
+		/* read error? */
+		if (ssz < 0) {
+			wrap->mem.size = 0;
+			hangup(wrap);
+			return;
+		}
 
-	/* read error? */
-	if (ssz < 0) {
-		wrap->mem.size = 0;
-		hangup(wrap);
-		return;
+		/* shrink buffer if too big */
+		if (esz > (size_t)ssz) {
+			wrap->mem.size -= esz - (size_t)ssz;
+			buffer = realloc(wrap->mem.buffer, wrap->mem.size);
+			if (buffer != NULL)
+				wrap->mem.buffer = buffer;
+			break;
+		}
+
+#if QUERY_RCV_SIZE
+		/* available data as returned by ioctl were read */
+		if (rc == 0)
+			break; /* no more data */
+#endif
+
+		/* allocate more for reading more */
+		buffer = realloc(wrap->mem.buffer, wrap->mem.size + RECEIVE_BLOCK_LENGTH);
+		if (buffer == NULL)
+			break; /* not this time, maybe later... */
+		wrap->mem.buffer = buffer;
+		buffer += wrap->mem.size;
+		esz = RECEIVE_BLOCK_LENGTH;
+		wrap->mem.size += RECEIVE_BLOCK_LENGTH;
 	}
 
 	/* nothing in!? */
-	if (ssz == 0)
+	if (wrap->mem.size == 0)
 		return;
-
-	/* shrink buffer if too big */
-	if (esz > (size_t)ssz) {
-		wrap->mem.size -= esz - (size_t)ssz;
-		buffer = realloc(wrap->mem.buffer, wrap->mem.size);
-		if (buffer != NULL)
-			wrap->mem.buffer = buffer;
-	}
 
 	/* process the buffer */
 	wrap->mem.dropped = 0;
