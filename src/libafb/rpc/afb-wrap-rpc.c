@@ -205,11 +205,22 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 		return;
 	}
 
+	/* fully incomplete */
+	if (ssz == 0)
+		return;
+
 	/* check processed size */
 	wrap->mem.size -= (size_t)ssz;
 	if (wrap->mem.size == 0)
+		/* fully complete */
 		buffer = NULL;
 	else {
+		/*
+		* partially incomplete
+		* copy is preferred to avoid changing addresses of pointers
+		* even if downsizing memory with realloc normally returns the
+		* same address, it is no guarantied by its specs
+		*/
 		buffer = malloc(wrap->mem.size);
 		if (buffer == NULL) {
 			if (!wrap->mem.dropped)
