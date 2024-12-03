@@ -140,6 +140,8 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	buffer = realloc(wrap->mem.buffer, wrap->mem.size + esz);
 	if (buffer == NULL) {
 		/* allocation failed */
+		if (wrap->mem.size + esz == 0)
+			wrap->mem.buffer = NULL;
 		hangup(wrap);
 		return;
 	}
