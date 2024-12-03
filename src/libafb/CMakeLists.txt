@@ -53,17 +53,30 @@ set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ###########################################################################
 
-add_library(libafb OBJECT ${LIBAFBSRCS})
-target_include_directories(libafb BEFORE PUBLIC ${LIBAFB_SOURCE_DIR})
+
 
 ###########################################################################
 
-add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
-set_target_properties(libafbsta PROPERTIES
-	OUTPUT_NAME afb
-	VERSION ${LIBAFB_VERSION}
-)
-INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if (NOT WITH_ZEPHYR)
+	add_library(libafb OBJECT ${LIBAFBSRCS})
+	target_include_directories(libafb BEFORE PUBLIC ${LIBAFB_SOURCE_DIR})
+
+	add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
+	set_target_properties(libafbsta PROPERTIES
+		OUTPUT_NAME afb
+		VERSION ${LIBAFB_VERSION}
+	)
+	INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+else()
+	set(alldirs core utils sys http apis misc wsapi wsj1 extend tls rpc)
+	zephyr_library_named(libafb)
+	target_include_directories(${ZEPHYR_CURRENT_LIBRARY} PUBLIC
+		${alldirs})
+
+	foreach(src ${LIBAFBSRCS})
+		zephyr_library_sources(${src})
+	endforeach()
+endif()
 
 ###########################################################################
 
