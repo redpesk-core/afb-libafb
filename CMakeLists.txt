@@ -45,11 +45,13 @@ set(LIBAFB_SOVERSION "6")
 set(LIBAFBCLI_VERSION "6.0")
 set(LIBAFBCLI_SOVERSION "6")
 
-include(FindPkgConfig)
-include(CheckIncludeFiles)
-include(CheckLibraryExists)
-include(GNUInstallDirs)
-include(CTest)
+if (NOT ZEPHYR_BASE)
+  include(FindPkgConfig)
+  include(CheckIncludeFiles)
+  include(CheckLibraryExists)
+  include(GNUInstallDirs)
+  include(CTest)
+endif()
 
 ###########################################################################
 ## possible settings
@@ -160,8 +162,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 ###########################################################################
 
-include(FindThreads)
-find_package(Threads)
+if (NOT WITH_ZEPHYR)
+  include(FindThreads)
+  find_package(Threads)
+endif()
 
 if (WITH_ZEPHYR)
     # almost sure
