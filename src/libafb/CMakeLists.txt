@@ -71,7 +71,7 @@ else()
 	set(alldirs core utils sys http apis misc wsapi wsj1 extend tls rpc)
 	zephyr_library_named(libafb)
 	target_include_directories(${ZEPHYR_CURRENT_LIBRARY} PUBLIC
-		${alldirs})
+		${LIBAFB_SOURCE_DIR})
 
 	foreach(src ${LIBAFBSRCS})
 		zephyr_library_sources(${src})
