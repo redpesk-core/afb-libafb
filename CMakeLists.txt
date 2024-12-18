@@ -103,6 +103,7 @@ option(WITH_REALPATH              "Use realpath function"                  ON)
 option(WITH_UNIX_SOCKET           "Allow use of Unix Domain Sockets"       ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
+option(MINIMAL_LOCALE_ROOT        "Use minimal locale-root"                OFF)
 #
 ###########################################################################
 if(WITHOUT_JSON_C)
