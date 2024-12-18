@@ -223,6 +223,7 @@ if (WITH_ZEPHYR)
 
     # unsure
     set(WITH_THREAD_LOCAL ON)
+    add_compile_definitions(HAVENT_alloca_h=1)
 
     include_directories(${afb-binding_SOURCE_DIR})
     #include_directories(${rp-lib-utils_SOURCE_DIR})

@@ -27,8 +27,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
+#if JUNK
 #include <sys/timerfd.h>
-
+#endif
 #include <rp-utils/rp-verbose.h>
 
 #include "sys/x-errno.h"

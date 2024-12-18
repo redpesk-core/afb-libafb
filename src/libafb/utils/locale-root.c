@@ -699,7 +699,11 @@ static char *iter_resolve(struct iter *iter)
 #if WITH_OPENAT
 			rc = faccessat(iter->root->rootfd, iter->path, F_OK, 0);
 #else
+#if JUNK
 			rc = access(iter->path, F_OK);
+#else
+	rc = 0;
+#endif
 #endif
 			if (rc == 0)
 				return strdup(iter->path);

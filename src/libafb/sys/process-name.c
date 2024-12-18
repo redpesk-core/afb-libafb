@@ -23,7 +23,10 @@
 
 #include <string.h>
 #include <unistd.h>
+#if JUNK
 #include <sys/prctl.h>
+#endif
+
 #include "sys/x-errno.h"
 
 #include "sys/process-name.h"

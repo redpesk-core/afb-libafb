@@ -28,6 +28,7 @@
 #include "utils/globset.h"
 #include "utils/globmatch.h"
 #include "sys/x-errno.h"
+#include "sys/x-alloca.h"
 
 /*************************************************************************
  * internal types

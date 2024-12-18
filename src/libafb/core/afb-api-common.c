@@ -56,10 +56,7 @@
 #include "sys/x-realpath.h"
 #include "sys/x-errno.h"
 
-//This line should fix but not
 #include "sys/x-alloca.h"
-//This line fix but it's more than ugly
-#define alloca(size) __builtin_alloca(size)
 
 /*************************************************************************
  * internal types

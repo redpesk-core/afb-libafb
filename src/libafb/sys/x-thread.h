@@ -67,7 +67,11 @@ static inline int x_thread_equal(x_thread_t t1, x_thread_t t2)
 
 static inline int x_thread_kill(x_thread_t tid, int sig)
 {
+#if JUNK
 	return pthread_kill(tid, sig);
+#else
+	return 0;
+#endif
 }
 
 static inline void x_thread_exit(void *retval)
