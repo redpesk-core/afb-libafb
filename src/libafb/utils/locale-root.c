@@ -24,6 +24,8 @@
 
 #include "../libafb-config.h"
 
+#if MINIMAL_LOCALE_ROOT
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -820,4 +822,136 @@ int main(int ac,char**av)
 	locale_search_unref(search); search = NULL;
 	locale_root_unref(root); root = NULL;
 }
+#endif
+
+#else
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+struct locale_root
+{
+	unsigned refcount;
+	unsigned length;
+#if WITH_OPENAT
+	int dirfd;
+#endif
+	char path[];
+};
+
+struct locale_root *locale_root_create_path(const char *path)
+{
+	unsigned length = (unsigned)strlen(path);
+	struct locale_root *root = malloc(length + 1 + sizeof *root);
+	if (root != NULL) {
+		root->refcount = 1;
+		root->length = length;
+#if WITH_OPENAT
+		root->dirfd = -1;
+#endif
+		memcpy(root->path, path, length + 1);
+	}
+	return root;
+}
+
+struct locale_root *locale_root_addref(struct locale_root *root)
+{
+	__atomic_add_fetch(&root->refcount, 1, __ATOMIC_RELAXED);
+	return root;
+}
+
+void locale_root_unref(struct locale_root *root)
+{
+	if (root != NULL && !__atomic_sub_fetch(&root->refcount, 1, __ATOMIC_RELAXED)) {
+#if WITH_OPENAT
+		if (root->dirfd >= 0)
+			close(root->dirfd);
+#endif
+		free(root);
+	}
+}
+
+struct locale_search *locale_root_search(struct locale_root *root, const char *definition, int immediate)
+{
+	return (struct locale_search*)locale_root_addref(root);
+}
+
+struct locale_search *locale_search_addref(struct locale_search *search)
+{
+	return (struct locale_search*)locale_root_addref((struct locale_root*)search);
+}
+
+void locale_search_unref(struct locale_search *search)
+{
+	locale_root_unref((struct locale_root*)search);
+}
+
+void locale_root_set_default_search(struct locale_root *root, struct locale_search *search)
+{
+}
+
+const char *locale_root_get_path(struct locale_root *root)
+{
+	return root->path;
+}
+
+static int _locale_root_build_(struct locale_root *root, const char *filename, char *buffer)
+{
+	return sprintf(buffer, "%s/%s", root->path, filename);
+}
+
+int locale_root_open(struct locale_root *root, const char *filename, int flags, const char *locale)
+{
+	char buffer[PATH_MAX];
+	_locale_root_build_(root, filename, buffer);
+	return open(buffer, flags);
+}
+
+char *locale_root_resolve(struct locale_root *root, const char *filename, const char *locale)
+{
+	char buffer[PATH_MAX];
+	_locale_root_build_(root, filename, buffer);
+	return strdup(buffer);
+}
+
+int locale_search_open(struct locale_search *search, const char *filename, int flags)
+{
+	return locale_root_open((struct locale_root*)search, filename, flags, "");
+}
+
+char *locale_search_resolve(struct locale_search *search, const char *filename)
+{
+	return locale_root_resolve((struct locale_root*)search, filename, "");
+}
+
+#if WITH_OPENAT
+struct locale_root *locale_root_create_at(int dirfd, const char *path)
+{
+	struct locale_root *root = locale_root_create_path(path);
+	if (root != NULL)
+		root->dirfd = dirfd;
+	return root;
+}
+
+struct locale_root *locale_root_create(int dirfd)
+{
+	ssize_t sz;
+	char buffer[50];
+	char path[PATH_MAX];
+	snprintf(buffer, sizeof buffer, "/proc/self/fd/%d", dirfd);
+	sz = readlink(buffer, path, sizeof path);
+	path[sz] = 0;
+	return locale_root_create_at(dirfd, path);
+}
+
+int locale_root_get_dirfd(struct locale_root *root)
+{
+	return root->dirfd;
+}
+#endif
+
 #endif
