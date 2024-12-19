@@ -30,7 +30,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+
 #include <fcntl.h>
+#include <sys/fcntl.h>
 
 #if !WITHOUT_JSON_C
 #include <json-c/json.h>
@@ -43,6 +45,7 @@
 #include "sys/x-uio.h"
 #include "sys/x-mutex.h"
 #include "sys/x-errno.h"
+
 
 /******** implementation of internal binder protocol per api **************/
 /*

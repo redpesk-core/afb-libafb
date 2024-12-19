@@ -27,7 +27,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
 #include <fcntl.h>
+#include <sys/fcntl.h>
+
 #include <unistd.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
