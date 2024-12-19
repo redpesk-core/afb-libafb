@@ -30,6 +30,8 @@
 #include "afb-rpc-coder.h"
 #include "afb-rpc-decoder.h"
 
+#define MSG_CMSG_CLOEXEC 0x40000000	/* Set close_on_exec for file*/
+
 /** receive as much as data as possible */
 int afb_rpc_sock_recv_decoder(int sockfd, afb_rpc_decoder_t *decoder)
 {
