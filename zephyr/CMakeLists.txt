@@ -49,7 +49,7 @@ if(CONFIG_AFB_BINDER)
     set(WITH_TRACK_JOB_CALL 0)
     set(WITH_UNIX_SOCKET 0)
     set(WITH_WSCLIENT_URI_COPY 0)
-
+    set(MINIMAL_LOCALE_ROOT 0)
     # tunable
     set(ARCH32 0)
     set(WITH_AFB_HOOK 0)
