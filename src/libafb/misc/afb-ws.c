@@ -432,6 +432,8 @@ static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt)
 	return rc;
 }
 
+#define TCP_CORK		3
+
 /*
  * callback for corking emissions
  */
