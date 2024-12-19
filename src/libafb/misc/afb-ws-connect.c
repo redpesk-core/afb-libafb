@@ -31,7 +31,9 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <fcntl.h>
+#if JUNK
 #include <sys/un.h>
+#endif
 #include <time.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

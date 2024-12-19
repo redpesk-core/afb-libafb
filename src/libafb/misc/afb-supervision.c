@@ -30,7 +30,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+
+#if JUNK
 #include <sys/un.h>
+#endif
 
 #include <json-c/json.h>
 #include <rp-utils/rp-jsonc.h>

@@ -49,7 +49,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <sys/types.h>
+#if JUNK
 #include <sys/un.h>
+#endif
 
 #endif
 
