@@ -25,6 +25,10 @@
 
 #include "../libafb-config.h"
 
+#if !JUNK
+#include <zephyr/net/net_ip.h>
+#endif
+
 #if WITH_SYS_UIO
 
 #include <sys/uio.h>
@@ -34,10 +38,12 @@
 #include <unistd.h>
 
 #if !__iovec_defined
+#if JUNK
 struct iovec {
 	void  *iov_base;    /* Starting address */
 	size_t iov_len;     /* Number of bytes to transfer */
 };
+#endif
 #endif
 
 extern ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
