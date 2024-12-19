@@ -23,9 +23,8 @@
 
 #include <string.h>
 #include <unistd.h>
-#if JUNK
-#include <sys/prctl.h>
-#endif
+
+//#include <sys/prctl.h>
 
 #include "sys/x-errno.h"
 
@@ -33,7 +32,11 @@
 
 int process_name_set_name(const char *name)
 {
+#if JUNK
 	return prctl(PR_SET_NAME, name, 0, 0, 0) < 0 ? -errno : 0;
+#else
+	return 0;
+#endif
 }
 
 int process_name_replace_cmdline(char **argv, const char *name)
@@ -69,7 +72,9 @@ int process_name_replace_cmdline(char **argv, const char *name)
 	if (beg != end)
 		*beg++ = 0;
 	/* inform system */
+#if JUNK
 	prctl(PR_SET_MM, PR_SET_MM_ARG_END, (unsigned long)(intptr_t)beg, 0, 0);
+#endif
 	/* update remaining args (for keeping initial length correct) */
 	while (*av)
 		*av++ = beg;
