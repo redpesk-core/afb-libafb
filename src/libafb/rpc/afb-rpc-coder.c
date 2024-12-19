@@ -382,16 +382,18 @@ int afb_rpc_coder_write_subcoder(afb_rpc_coder_t *coder, afb_rpc_coder_t *subcod
 }
 
 #if !RPC_NO_IOVEC
-
+#if JUNK
 #include <sys/uio.h>
-
+#endif
 static inline void *extriovec(void *closure, void *data, uint32_t length)
 {
+#if JUNK
 	struct iovec **ariovs = closure;
 	ariovs[0]->iov_base = data;
 	ariovs[0]->iov_len = length;
 	ariovs[0]++;
 	return ariovs[0] == ariovs[1] ? 0 : ariovs;
+#endif
 }
 
 /**
@@ -399,11 +401,16 @@ static inline void *extriovec(void *closure, void *data, uint32_t length)
  */
 int afb_rpc_coder_output_get_subiovec(afb_rpc_coder_t *coder, struct iovec *iov, int iovcnt, uint32_t size, uint32_t offset)
 {
+#if JUNK
 	struct iovec *ariovs[2] = { iov, iov + iovcnt };
 
 	extract(coder, offset, size, extriovec, ariovs);
 
 	return (int)(ariovs[0] - iov);
+#else
+	return 0;
+#endif
+
 }
 
 /**
@@ -416,6 +423,7 @@ int afb_rpc_coder_output_get_iovec(afb_rpc_coder_t *coder, struct iovec *iov, in
 
 int afb_rpc_coder_write_iovec(afb_rpc_coder_t *coder, const struct iovec *iov, int iovcnt)
 {
+	#if JUNK
 	int rc, idx;
 	for(idx = rc = 0 ; rc == 0 && idx < iovcnt ; idx++)
 		if (iov[idx].iov_len > UINT32_MAX)
@@ -423,17 +431,25 @@ int afb_rpc_coder_write_iovec(afb_rpc_coder_t *coder, const struct iovec *iov, i
 		else
 			rc = afb_rpc_coder_write(coder, iov[idx].iov_base, (uint32_t)iov[idx].iov_len);
 	return rc;
+	#else
+	return 0;
+	#endif
 }
 
 int afb_rpc_coder_write_copy_iovec(afb_rpc_coder_t *coder, const struct iovec *iov, int iovcnt)
 {
 	int rc, idx;
+
+	#if JUNK
 	for(idx = rc = 0 ; rc == 0 && idx < iovcnt ; idx++)
 		if (iov[idx].iov_len > UINT32_MAX)
 			rc = X_EINVAL;
 		else
 			rc = afb_rpc_coder_write_copy(coder, iov[idx].iov_base, (uint32_t)iov[idx].iov_len);
 	return rc;
+	#else
+	return 0;
+	#endif
 }
 #endif
 

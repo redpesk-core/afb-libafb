@@ -24,8 +24,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#if JUNK
 #include <sys/uio.h>
-
+#endif
 #include <check.h>
 
 #include "rpc/afb-rpc-coder.h"
