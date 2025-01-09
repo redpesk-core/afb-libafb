@@ -170,6 +170,7 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_api_event_handler_del       afb_api_v4_event_handler_del_hookable
 #define afb_api_call                    afb_api_v4_call_hookable
 #define afb_api_call_sync               afb_api_v4_call_sync_hookable
+#define afb_api_wants_log_level(a,l)    (afb_api_logmask(a) & (1 << (l)))
 #define afb_api_add_verb                afb_api_v4_add_verb_hookable
 #define afb_api_del_verb                afb_api_v4_del_verb_hookable
 #define afb_api_seal                    afb_api_v4_seal_hookable
@@ -178,10 +179,10 @@ typedef afb_timer_handler_x4_t		afb_timer_handler_t;
 #define afb_api_provide_class           afb_api_v4_class_provide_hookable
 #define afb_api_require_class           afb_api_v4_class_require_hookable
 #define afb_api_delete                  afb_api_v4_delete_api_hookable
+#define afb_api_add_alias               afb_api_v4_add_alias_hookable
 
 /*-- MISC ------------------------------------------*/
 
 #define afb_create_api                  afb_api_v4_new_api_hookable
 #define afb_job_post                    afb_api_v4_post_job_hookable
-#define afb_alias_api                   afb_api_v4_add_alias_hookable
 #define afb_setup_shared_object         afb_v4_itf_setup_shared_object
