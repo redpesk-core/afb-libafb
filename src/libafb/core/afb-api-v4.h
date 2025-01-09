@@ -540,15 +540,16 @@ afb_api_v4_vverbose_hookable(
 	va_list args
 );
 
+extern
 void
-afb_api_v4_vverbose_hookable(
+afb_api_v4_verbose_hookable(
 	struct afb_api_v4 *apiv4,
 	int level,
 	const char *file,
 	int line,
-	const char *function,
+	const char * func,
 	const char *fmt,
-	va_list args
+	...
 );
 
 extern
