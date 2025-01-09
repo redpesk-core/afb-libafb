@@ -218,8 +218,8 @@ if (WITH_ZEPHYR)
     set(ARCH32 OFF)
     set(WITH_AFB_HOOK OFF)
     set(WITH_CRED OFF)
-    set(WITH_REPLY_JOB ON)
-    set(WITH_REQ_PROCESS_ASYNC ON)
+    set(WITH_REPLY_JOB OFF)
+    set(WITH_REQ_PROCESS_ASYNC OFF)
 
     # unsure
     set(WITH_THREAD_LOCAL ON)
