@@ -36,7 +36,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/timerfd.h>
+#if WITH_TIMERFD
+#  include <sys/timerfd.h>
+#endif
 
 #include <rp-utils/rp-verbose.h>
 
@@ -44,6 +46,7 @@
 #include "sys/x-epoll.h"
 
 #include "sys/ev-mgr.h"
+
 
 /******************************************************************************/
 #undef WAKEUP_TGKILL
@@ -91,6 +94,25 @@
 #  include <fcntl.h>
 #endif
 /******************************************************************************/
+#if !WITH_EPOLL
+#  if WAKEUP_EVENTFD || WAKEUP_PIPE
+#    define IDX_SIGNAL 0
+#    if WITH_TIMERFD
+#      define IDX_TIME 1
+#      define IDX_FDS0 2
+#    else
+#      define IDX_FDS0 1
+#    endif
+#  else
+#    if WITH_TIMERFD
+#      define IDX_TIME 0
+#      define IDX_FDS0 1
+#    else
+#      define IDX_FDS0 0
+#    endif
+#  endif
+#endif
+/******************************************************************************/
 
 /**
  * structure for managing file descriptor events
@@ -121,8 +143,10 @@ struct ev_fd
 	/** is active ? */
 	uint16_t is_active: 1;
 
+#if WITH_EPOLL
 	/** is set in epoll ? */
 	uint16_t is_set: 1;
+#endif
 
 	/** has changed since set ? */
 	uint16_t has_changed: 1;
@@ -166,6 +190,9 @@ typedef uint64_t time_ns_t;
 
 /** converts a millisecond value to a nanosecond value */
 #define MS2NS(x)  (((time_ns_t)(ONEMILLISEC))*((time_ns_t)(x)))
+
+/** converts a nanosecond value to a millisecond value */
+#define NS2MS(x)  ((time_ns_t)((x)/(ONEMILLISEC)))
 
 /** get the default or min or value of x */
 #define GETTM(x,def,min) ((x)==0 ? (def) : (x)<(min) ? (min) : (x))
@@ -270,8 +297,18 @@ struct ev_mgr
 	/** list of preparers */
 	struct ev_prepare *preparers;
 
+#if WITH_EPOLL
 	/** latest event to be dispatched */
 	struct epoll_event event;
+
+	/** internally used epoll file descriptor */
+	int epollfd;
+#else
+	/** */
+	uint16_t szpollfds;
+	uint16_t nrpollfds;
+	struct pollfd *pollfds;
+#endif
 
 #if WAKEUP_TGKILL
 	/** last known awaiting thread id */
@@ -287,11 +324,10 @@ struct ev_mgr
 	int pipefds[2];
 #endif
 
-	/** internally used epoll file descriptor */
-	int epollfd;
-
+#if WITH_TIMERFD
 	/** internally used timerfd */
 	int timerfd;
+#endif
 
 	/** last value set to the timer */
 	time_ns_t last_timer;
@@ -314,6 +350,10 @@ struct ev_mgr
 	/** flag indicating that a cleanup of preparers is needed */
 	uint16_t preparers_cleanup: 1;
 };
+
+#if !WITH_EPOLL
+static int add_poll(struct ev_mgr *mgr, int fd, uint32_t events);
+#endif
 
 /******************************************************************************/
 /******************************************************************************/
@@ -344,7 +384,9 @@ int ev_mgr_add_fd(
 		efd->events = events;
 		efd->refcount = 1;
 		efd->is_active = 1;
+#if WITH_EPOLL
 		efd->is_set = 0;
+#endif
 	        efd->has_changed = 0;
 	        efd->auto_close = !!autoclose;
 		efd->auto_unref = !!autounref;
@@ -368,13 +410,14 @@ struct ev_fd *ev_fd_addref(struct ev_fd *efd)
 
 void ev_fd_unref(struct ev_fd *efd)
 {
-	int rc;
 	if (efd && !__atomic_sub_fetch(&efd->refcount, 1, __ATOMIC_RELAXED)) {
+#if WITH_EPOLL
 		if (efd->is_active && efd->is_set) {
-			rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
+			int rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
 			if (rc == 0)
 				efd->is_set = 0;
 		}
+#endif
 		efd->is_active = 0;
 		efd->is_deleted = 1;
 		if (efd->mgr)
@@ -399,10 +442,10 @@ uint32_t ev_fd_events(struct ev_fd *efd)
 
 void ev_fd_set_events(struct ev_fd *efd, uint32_t events)
 {
-	int rc = 0;
-	struct epoll_event ev;
-
+#if WITH_EPOLL
 	if (efd->events != events) {
+		int rc = 0;
+		struct epoll_event ev;
 		ev.data.ptr = efd;
 		ev.events = efd->events = events;
 		if (efd->is_active) {
@@ -424,6 +467,9 @@ void ev_fd_set_events(struct ev_fd *efd, uint32_t events)
 			efd->mgr->efds_changed = 1;
 		}
 	}
+#else
+	efd->events = events;
+#endif
 }
 
 void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closure)
@@ -437,12 +483,14 @@ static void fd_dispatch(struct ev_fd *efd, uint32_t events)
 	efd->handler(efd, efd->fd, events, efd->closure);
 	if (events & EPOLLHUP) {
 		if (efd->fd >= 0) {
+#if WITH_EPOLL
 			if (efd->is_set && (efd->auto_close || efd->auto_unref)) {
 				efd->is_set = 0;
 				efd->is_active = 0;
 				if (efd->mgr)
 					epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
 			}
+#endif
 			if (efd->auto_close) {
 				close(efd->fd);
 				efd->fd = -1;
@@ -455,19 +503,18 @@ static void fd_dispatch(struct ev_fd *efd, uint32_t events)
 
 static int efds_prepare(struct ev_mgr *mgr)
 {
-	int rc, s;
-	struct ev_fd **pefd, *efd;
+	int rc;
+	struct ev_fd *efd;
+#if WITH_EPOLL
+	int s;
 	struct epoll_event ev;
-
-	/* check somthing ot be done */
-	if (!mgr->efds_changed)
-		return 0;
+#endif
 
 	mgr->efds_changed = 0;
 	rc = 0;
-	pefd = &mgr->efds;
-	efd = *pefd;
+	efd = mgr->efds;
 	while (efd) {
+#if WITH_EPOLL
 		if (efd->is_active) {
 			if (!efd->is_set) {
 				efd->is_set = 1;
@@ -494,7 +541,11 @@ static int efds_prepare(struct ev_mgr *mgr)
 			if (s < 0)
 				rc = s;
 		}
-		pefd = &efd->next;
+#else
+		if (efd->is_active)
+			rc = add_poll(mgr, efd->fd, efd->events);
+		efd->has_changed = 0;
+#endif
 		efd = efd->next;
 	}
 	return rc;
@@ -510,8 +561,10 @@ static void efds_cleanup(struct ev_mgr *mgr)
 		efd = *pefd;
 		while (efd) {
 			if (efd->is_deleted) {
+#if WITH_EPOLL
 				if (efd->is_set)
 					epoll_ctl(mgr->epollfd, EPOLL_CTL_DEL, efd->fd, 0);
+#endif
 				if (efd->auto_close && efd->fd >= 0)
 					close(efd->fd);
 				*pefd = efd->next;
@@ -568,43 +621,30 @@ static time_ns_t now_ns()
  */
 static int timer_arm(struct ev_mgr *mgr, time_ns_t when)
 {
-	int rc;
-	struct itimerspec its;
-	lldiv_t dr;
-	struct epoll_event epe;
+	if (when < mgr->last_timer || mgr->last_timer == 0) {
+#if WITH_TIMERFD
+		int rc;
+		struct itimerspec its;
+		lldiv_t dr;
 
-	if (mgr->last_timer && when >= mgr->last_timer)
-		return 0;
+		if (mgr->last_timer && when >= mgr->last_timer)
+			return 0;
 
-	/* ensure existing timerfd */
-	if (mgr->timerfd < 0) {
-		/* create the timerfd */
-		mgr->timerfd = timerfd_create(CLOCK, TFD_NONBLOCK|TFD_CLOEXEC);
-		if (mgr->timerfd < 0)
+		/* set the timer */
+		dr = lldiv((long long)when, ONESEC);
+		its.it_value.tv_sec = (time_t)dr.quot;
+		its.it_value.tv_nsec = (time_t)dr.rem;
+		its.it_interval.tv_sec = 0;
+		its.it_interval.tv_nsec = 0;
+		rc = timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
+		if (rc < 0)
 			return -errno;
-
-		/* add the timer to the polls */
-		epe.events = EPOLLIN;
-		epe.data.ptr = 0;
-		rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->timerfd, &epe);
-		if (rc < 0) {
-			rc = -errno;
-			close(mgr->timerfd);
-			mgr->timerfd = -1;
-			return rc;
-		}
+#else
+		if (mgr->state == Waiting)
+			ev_mgr_wakeup(mgr);
+#endif
+		mgr->last_timer = when;
 	}
-
-	/* set the timer */
-	dr = lldiv((long long)when, ONESEC);
-	its.it_value.tv_sec = (time_t)dr.quot;
-	its.it_value.tv_nsec = (time_t)dr.rem;
-	its.it_interval.tv_sec = 0;
-	its.it_interval.tv_nsec = 0;
-	rc = timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
-	if (rc < 0)
-		return -errno;
-	mgr->last_timer = when;
 	return 0;
 }
 
@@ -687,6 +727,7 @@ static void timer_dispatch(
 	}
 }
 
+#if WITH_TIMERFD
 /**
  * function to handle a timer event: tries to read the timerfd
  * and if needed dispatch its value.
@@ -703,6 +744,7 @@ static int timer_event(
 		timer_dispatch(mgr);
 	return 0;
 }
+#endif
 
 /* create a new timer object */
 int ev_mgr_add_timer(
@@ -868,6 +910,25 @@ static void do_cleanup(struct ev_mgr *mgr)
 	preparers_cleanup(mgr);
 }
 
+#if !WITH_EPOLL
+static int add_poll(struct ev_mgr *mgr, int fd, uint32_t events)
+{
+	if (mgr->nrpollfds == mgr->szpollfds) {
+		uint16_t nxtsz = mgr->szpollfds + 4;
+		size_t szall = nxtsz * sizeof *mgr->pollfds;
+		struct pollfd *pollfds = realloc(mgr->pollfds, szall);
+		if (pollfds == NULL)
+			return X_ENOMEM;
+		mgr->pollfds = pollfds;
+		mgr->szpollfds = nxtsz;
+	}
+	mgr->pollfds[mgr->nrpollfds].fd = fd;
+	mgr->pollfds[mgr->nrpollfds].events = (short)events;
+	mgr->nrpollfds++;
+	return 0;
+}
+#endif
+
 
 /**
  * Prepare the event loop manager
@@ -883,7 +944,14 @@ static int do_prepare(struct ev_mgr *mgr, time_ns_t wakeup_ms)
 		do_cleanup(mgr);
 		preparers_prepare(mgr);
 		timer_set(mgr, wakeup_ms);
-		rc = efds_prepare(mgr);
+		if (!mgr->efds_changed)
+			rc = 0;
+		else {
+#if !WITH_EPOLL
+			mgr->nrpollfds = IDX_FDS0;
+#endif
+			rc = efds_prepare(mgr);
+		}
 		mgr->state = Ready;
 	}
 	return rc;
@@ -894,7 +962,7 @@ static int do_prepare(struct ev_mgr *mgr, time_ns_t wakeup_ms)
  */
 static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 {
-	int rc;
+	int rc = 0;
 
 	if (mgr->state != Ready)
 		rc = X_ENOTSUP;
@@ -905,17 +973,39 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 		mgr->tid = x_thread_self();
 #endif
 		mgr->state = Waiting;
-		rc = epoll_wait(mgr->epollfd, &mgr->event, 1,
-					timeout_ms < 0 ? -1 : timeout_ms);
+#if !WITH_TIMERFD
+		if (mgr->last_timer) {
+			time_ns_t nxt = mgr->last_timer;
+			time_ns_t now = now_ns();
+			if (now <= nxt) {
+				int delay = (int)NS2MS(nxt - now);
+				if (timeout_ms < 0 || timeout_ms > delay)
+					timeout_ms = delay;
+			}
+		}
+#endif
+		if (timeout_ms < 0)
+			timeout_ms = -1;
+#if WITH_EPOLL
+		rc = epoll_wait(mgr->epollfd, &mgr->event, 1, timeout_ms);
+#else
+		rc = poll(mgr->pollfds, mgr->nrpollfds, timeout_ms);
+#endif
 		if (rc < 1) {
-			mgr->state = Idle;
+#if WITH_EPOLL
 			mgr->event.events = 0;
+#endif
+			mgr->state = Idle;
 			rc = rc ? -errno : rc;
 		}
 		else {
 			mgr->state = Pending;
 #if WAKEUP_EVENTFD || WAKEUP_PIPE
+#if WITH_EPOLL
 			if (mgr->event.data.ptr == mgr) {
+#else
+			if (mgr->pollfds[IDX_SIGNAL].revents) {
+#endif
 #if WAKEUP_EVENTFD
 				uint64_t x;
 				read(mgr->eventfd, &x, sizeof x);
@@ -923,9 +1013,17 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 				char x;
 				read(mgr->pipefds[0], &x, sizeof x);
 #endif
+#if WITH_EPOLL
 				mgr->event.events = 0;
 				mgr->state = Idle;
 				rc = X_EINTR;
+#else
+				rc--;
+				if (rc == 0) {
+					mgr->state = Idle;
+					rc = X_EINTR;
+				}
+#endif
 			}
 #endif
 		}
@@ -939,14 +1037,40 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 static void do_dispatch(struct ev_mgr *mgr)
 {
 	struct ev_fd *efd;
+#if !WITH_EPOLL
+	struct pollfd *it, *end;
+#endif
 
 	if (mgr->state == Pending) {
 		mgr->state = Dispatching;
+#if !WITH_TIMERFD
+		timer_dispatch(mgr);
+#endif
+#if WITH_EPOLL
 		efd = mgr->event.data.ptr;
-		if (!efd)
-			timer_event(mgr);
-		else
+		if (efd)
 			fd_dispatch(efd, mgr->event.events);
+#if WITH_TIMERFD
+		else
+			timer_event(mgr);
+#endif
+#else
+#if WITH_TIMERFD
+		if (mgr->pollfds[IDX_TIME])
+			timer_event(mgr);
+#endif
+		it = &mgr->pollfds[IDX_FDS0];
+		end = &mgr->pollfds[mgr->nrpollfds];
+		for ( ; it != end ; it++) {
+			if (it->revents) {
+				for (efd = mgr->efds ; efd ; efd = efd->next)
+					if (efd->fd == it->fd) {
+						fd_dispatch(efd, it->revents);
+						break;
+					}
+			}
+		}
+#endif
 		mgr->state = Idle;
 	}
 }
@@ -1055,13 +1179,17 @@ void ev_mgr_recover_run(struct ev_mgr *mgr)
 /* pollable file descriptor */
 int ev_mgr_get_fd(struct ev_mgr *mgr)
 {
+#if WITH_EPOLL
 	return mgr->epollfd;
+#else
+	return X_ENOTSUP;
+#endif
 }
 
 /* create an event manager */
 int ev_mgr_create(struct ev_mgr **result)
 {
-#if WAKEUP_EVENTFD || WAKEUP_PIPE
+#if WITH_EPOLL && (WAKEUP_EVENTFD || WAKEUP_PIPE || WITH_TIMERFD)
 	struct epoll_event ee;
 #endif
 	struct ev_mgr *mgr;
@@ -1075,69 +1203,109 @@ int ev_mgr_create(struct ev_mgr **result)
 		goto error;
 	}
 
+	/* init */
+	mgr->refcount = 1;
+	mgr->state = Idle;
+	mgr->last_timer = 0;
+#if WITH_EPOLL
+	mgr->epollfd = -1;
+#endif
+#if WAKEUP_EVENTFD
+	mgr->eventfd = -1;
+#elif WAKEUP_PIPE
+	mgr->pipefds[0] = -1;
+	mgr->pipefds[1] = -1;
+#endif
+#if WITH_TIMERFD
+	mgr->timerfd = -1;
+#endif
+
 	/* create the event loop */
-	rc = epoll_create1(EPOLL_CLOEXEC);
-	if (rc < 0) {
+#if WITH_EPOLL
+	mgr->epollfd = epoll_create1(EPOLL_CLOEXEC);
+	if (mgr->epollfd < 0) {
 		rc = -errno;
 		RP_ERROR("can't make new epollfd");
 		goto error2;
 	}
-	mgr->epollfd = rc;
+#endif
 
-	/* create signaling */
 #if WAKEUP_EVENTFD
-	rc = eventfd(0, EFD_CLOEXEC|EFD_SEMAPHORE);
-	if (rc < 0) {
+	/* create signaling */
+	mgr->eventfd = eventfd(0, EFD_CLOEXEC|EFD_SEMAPHORE);
+	if (mgr->eventfd < 0) {
 		rc = -errno;
 		RP_ERROR("can't make eventfd for events");
-		goto error3;
+		goto error2;
 	}
-	mgr->eventfd = rc;
 
+#if WITH_EPOLL
 	ee.events = EPOLLIN;
 	ee.data.ptr = mgr;
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->eventfd, &ee);
+#else
+	rc = add_poll(mgr, mgr->eventfd, EPOLLIN);
+#endif
 	if (rc < 0) {
 		rc = -errno;
 		RP_ERROR("can't poll the eventfd");
-		close(mgr->eventfd);
-		goto error3;
+		goto error2;
 	}
 #elif WAKEUP_PIPE
 	rc = pipe2(mgr->pipefds, O_CLOEXEC);
 	if (rc < 0) {
 		rc = -errno;
 		RP_ERROR("can't make pipes for events");
-		goto error3;
+		goto error2;
 	}
 
+#if WITH_EPOLL
 	ee.events = EPOLLIN;
 	ee.data.ptr = mgr;
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->pipefds[0], &ee);
+#else
+	rc = add_poll(mgr, mgr->pipefds[0], EPOLLIN);
+#endif
 	if (rc < 0) {
 		rc = -errno;
 		RP_ERROR("can't poll the pipes");
-		close(mgr->pipefds[0]);
-		close(mgr->pipefds[1]);
-		goto error3;
+		goto error2;
 	}
 #endif
 
-	mgr->timerfd = -1;
-	mgr->last_timer = 0;
-	mgr->state = Idle;
-	mgr->refcount = 1;
+#if WITH_TIMERFD
+	/* create the timerfd */
+	mgr->timerfd = timerfd_create(CLOCK, TFD_NONBLOCK|TFD_CLOEXEC);
+	if (mgr->timerfd < 0) {
+		rc = -errno;
+		RP_ERROR("can't make timerfd");
+		goto error2;
+	}
+
+	/* add the timer to the polls */
+#if WITH_EPOLL
+	ee.events = EPOLLIN;
+	ee.data.ptr = 0;
+	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->timerfd, &ee);
+#else
+	rc = add_poll(mgr, mgr->timerfd, EPOLLIN);
+#endif
+	if (rc < 0) {
+		rc = -errno;
+		RP_ERROR("can't poll the timer");
+		goto error2;
+	}
+#endif
 
 	/* finalize the creation */
 	*result = mgr;
 	return 0;
 
-#if WAKEUP_EVENTFD || WAKEUP_PIPE
-error3:
-	close(mgr->epollfd);
-#endif
+#if WITH_EPOLL || WAKEUP_EVENTFD || WAKEUP_PIPE || WITH_TIMERFD
 error2:
-	free(mgr);
+	ev_mgr_unref(mgr);
+#endif
+
 error:
 	*result = 0;
 	return rc;
@@ -1164,15 +1332,25 @@ void ev_mgr_unref(struct ev_mgr *mgr)
 				timer->mgr = 0;
 			for (efd = mgr->efds ; efd ; efd = efd->next)
 				efd->mgr = 0;
-			close(mgr->epollfd);
-#if WAKEUP_EVENTFD
-			close(mgr->eventfd);
-#elif WAKEUP_PIPE
-			close(mgr->pipefds[0]);
-			close(mgr->pipefds[1]);
+#if WITH_EPOLL
+			if (mgr->epollfd >= 0)
+				close(mgr->epollfd);
+#else
+			free(mgr->pollfds);
 #endif
+#if WAKEUP_EVENTFD
+			if (mgr->eventfd >= 0)
+				close(mgr->eventfd);
+#elif WAKEUP_PIPE
+			if (mgr->pipefds[0] >= 0)
+				close(mgr->pipefds[0]);
+			if (mgr->pipefds[1] >= 0)
+				close(mgr->pipefds[1]);
+#endif
+#if WITH_TIMERFD
 			if (mgr->timerfd >= 0)
 				close(mgr->timerfd);
+#endif
 			free(mgr);
 		}
 	}
