@@ -157,7 +157,7 @@ static ssize_t ws_writev_masked(struct websock *ws, const struct iovec *iov, int
 		/* fill the buffer with masked data until end or full */
 		while (idx < iovcnt && remain > 0) {
 			/* available count in iov */
-			iptr = iov[idx].iov_base + off;
+			iptr = ((char*)iov[idx].iov_base) + off;
 			avail = iov[idx].iov_len - off;
 			/* masked size */
 			if (remain < avail)
@@ -170,7 +170,7 @@ static ssize_t ws_writev_masked(struct websock *ws, const struct iovec *iov, int
 			}
 			mask = domask(mask, iptr, optr, sz);
 			lociov.iov_len += sz;
-			optr += sz;
+			optr = ((char*)optr) + sz;
 			remain -= sz;
 		}
 		lociov.iov_len = sizeof buffer - remain;

@@ -115,7 +115,7 @@ static int writeall(int fd, const void *buffer, size_t size)
 
 	offset = 0;
 	while (size > offset) {
-		ssz = write(fd, buffer + offset, size - offset);
+		ssz = write(fd, (const char*)buffer + offset, size - offset);
 		if (ssz >= 0)
 			offset += (size_t)ssz;
 		else if (errno == EAGAIN) {

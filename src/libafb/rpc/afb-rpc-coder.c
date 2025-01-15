@@ -231,7 +231,7 @@ static int write_in_middle(afb_rpc_coder_t *coder, const void *data, uint32_t si
 			size -= sz;
 			if (size == 0)
 				break;
-			data += sz;
+			data = ((const char*)data) + sz;
 			buf++;
 			sz = buf->size;
 			ptr = sz > AFB_RPC_OUTPUT_INLINE_SIZE ? (char*)buf->data.pointer : buf->data.inl;
@@ -253,7 +253,7 @@ int afb_rpc_coder_write(afb_rpc_coder_t *coder, const void *data, uint32_t size)
 		else {
 			rc = write_in_middle(coder, data, exsz);
 			if (rc >= 0)
-				rc = write_at_end(coder, data + exsz, size - exsz);
+				rc = write_at_end(coder, (const char*)data + exsz, size - exsz);
 		}
 	}
 	return rc;

@@ -395,7 +395,7 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 			if (iov2 != iov) {
 				/* copied block */
 				iov2 += i;
-				iov2->iov_base += rc;
+				iov2->iov_base = (char*)iov2->iov_base + rc;
 				iov2->iov_len -= (size_t)rc;
 			}
 			else if (rc == 0) {
@@ -407,7 +407,7 @@ static ssize_t aws_writev(struct afb_ws *ws, const struct iovec *iov, int iovcnt
 				/* needed copy block */
 				iov2 = alloca((unsigned)iovcnt * sizeof *iov2);
 				memcpy(iov2, &iov[i], (unsigned)iovcnt * sizeof *iov2);
-				iov2->iov_base += rc;
+				iov2->iov_base = (char*)iov2->iov_base + rc;
 				iov2->iov_len -= (size_t)rc;
 			}
 		}
