@@ -127,14 +127,24 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	/* check the api name */
 	uri_no_tls = prefix_tls_remove(uri);
 #if WITH_TLS
-	tls = uri_no_tls != uri; // fix: if no WITH_TLS and prefix tls+ present, error
+	tls = uri_no_tls != uri;
 #else
-	RP_ERROR("TLS is not supported in this libafb build");
-	rc = X_EINVAL;
-	goto error;
+	if (uri_no_tls != uri) {
+		RP_ERROR("TLS is not supported. Can't use %s", uri);
+		rc = X_EINVAL;
+		goto error;
+	}
 #endif
 	turi = prefix_ws_remove(uri_no_tls);
 	websock = turi != uri_no_tls;
+#if WITH_TLS
+	if (tls && websock) {
+		RP_ERROR("cannot do both TLS and Websocket, client RPC service to %s won't be created", uri);
+		rc = X_EINVAL;
+		goto error;
+	}
+#endif
+
 	apiname = afb_uri_api_name(turi);
 	if (apiname == NULL) {
 		RP_ERROR("invalid (too long) rpc client uri %s", uri);
@@ -144,11 +154,6 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 
 	/* set the correct connection mode */
 #if WITH_TLS
-	if (tls && websock) {
-		RP_ERROR("cannot do both TLS and Websocket, client RPC service to %s won't be created", uri);
-		rc = X_EINVAL;
-		goto error;
-	}
 	if (tls)
 		mode = Wrap_Rpc_Mode_Tls_Client;
 #endif
@@ -169,8 +174,8 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 		if (rc < 0 && strong)
 			RP_ERROR("can't create client rpc service to %s", uri);
 	}
-error:
 	free(apiname);
+error:
 	return strong ? rc : 0;
 }
 
