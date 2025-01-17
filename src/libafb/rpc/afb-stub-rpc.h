@@ -155,7 +155,7 @@ extern void afb_stub_rpc_receive_set_dispose(struct afb_stub_rpc *stub, void (*d
  *
  * @param stub the stub object
  *
- * @return 0 in if no data is ready of else returns a not null valeu
+ * @return 0 in if no data is ready of else returns a not null value
  */
 extern int afb_stub_rpc_emit_is_ready(struct afb_stub_rpc *stub);
 

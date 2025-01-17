@@ -53,7 +53,7 @@ struct afb_wrap_rpc;
  * @param fd        file descriptor of the socket
  * @param autoclose if not zero, the socket is closed at end
  * @param websock   if not zero, initiate a websocket upgrading process
- * @param uri		sockspec URI specified by the user
+ * @param uri       sockspec URI specified by the user
  * @param apiname   the default API name, can be NULL except for clients
  * @param callset   the call set for received calls
  *
