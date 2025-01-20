@@ -51,7 +51,6 @@ static inline const char *session_of_req(struct afb_req_common *req)
 
 #include <stdint.h>
 #include <pthread.h>
-#include <sys/epoll.h>
 #include <errno.h>
 #include <string.h>
 
