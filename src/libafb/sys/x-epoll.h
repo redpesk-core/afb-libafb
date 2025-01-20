@@ -28,9 +28,9 @@
 #if WITH_EPOLL
 #include <sys/epoll.h>
 #else
-#define EPOLLIN  1
-#define EPOLLPRI 2
-#define EPOLLOUT 4
-#define EPOLLERR 8
-#define EPOLLHUP 16
+#include "x-poll.h"
+#define EPOLLIN  POLLIN
+#define EPOLLOUT POLLOUT
+#define EPOLLERR POLLERR
+#define EPOLLHUP POLLHUP
 #endif
