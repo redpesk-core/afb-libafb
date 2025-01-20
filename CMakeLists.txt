@@ -82,10 +82,6 @@ option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
 option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
 ## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
-option(WITH_FDEV_POLL             "Use poll implementation of fdev"        OFF)
-option(WITH_FDEV_EPOLL            "Use epoll implementation of fdev"       OFF)
-option(WITH_FDEV_SELECT           "Use select implementation of fdev"      OFF)
-option(WITH_FDEV_SYSTEMD          "Use systemd implementation of fdev"     ON)
 option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
 option(WITH_LOCALE_SEARCH_NODE    "Use folder in searchs in locale-root"   ON) # TODO: set to OFF
 option(WITH_WSCLIENT_URI_COPY     "Copy URI of ws-client specification"    OFF)

@@ -57,10 +57,6 @@
 #cmakedefine01 WITH_LIBUUID
 #cmakedefine01 WITH_EPOLL
 #cmakedefine01 WITH_EVENTFD
-#cmakedefine01 WITH_FDEV_SYSTEMD
-#cmakedefine01 WITH_FDEV_EPOLL
-#cmakedefine01 WITH_FDEV_POLL
-#cmakedefine01 WITH_FDEV_SELECT
 #cmakedefine01 WITH_CLOCK_GETTIME
 #cmakedefine01 WITH_RANDOM_R
 #cmakedefine01 WITH_OPENAT
