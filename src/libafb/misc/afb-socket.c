@@ -31,6 +31,9 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#if __ZEPHYR__
+#  include <sys/fcntl.h>
+#endif
 
 #include <rp-utils/rp-verbose.h>
 

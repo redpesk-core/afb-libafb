@@ -25,7 +25,7 @@
 
 #if __ZEPHYR__
 
-#include <net/socket.h>
+#include <zephyr/net/socket.h>
 
 #define poll(x,y,z)    zsock_poll(x,y,z)
 #define pollfd         zsock_pollfd

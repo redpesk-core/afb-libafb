@@ -25,14 +25,17 @@
 
 #include "../libafb-config.h"
 
-#if WITH_SYS_UIO
+#if __ZEPHYR__
+
+#include <zephyr/net/net_ip.h>
+
+#elif WITH_SYS_UIO
 
 #include <sys/uio.h>
 
 #else
 
 #include <unistd.h>
-
 #if !__iovec_defined
 struct iovec {
 	void  *iov_base;    /* Starting address */
@@ -40,6 +43,11 @@ struct iovec {
 };
 #endif
 
+#endif
+
+#if __ZEPHYR__ || !WITH_SYS_UIO
+
+#include <unistd.h>
 extern ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 extern ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 

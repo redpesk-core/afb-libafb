@@ -30,6 +30,10 @@
 #include "afb-rpc-coder.h"
 #include "afb-rpc-decoder.h"
 
+#if __ZEPHYR__
+#  define MSG_CMSG_CLOEXEC 0
+#endif
+
 /** receive as much as data as possible */
 int afb_rpc_sock_recv_decoder(int sockfd, afb_rpc_decoder_t *decoder)
 {

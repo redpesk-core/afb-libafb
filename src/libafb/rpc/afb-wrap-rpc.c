@@ -27,13 +27,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <sys/param.h>
 
 #include <rp-utils/rp-escape.h>
 #include <rp-utils/rp-verbose.h>
 
 #include "sys/x-uio.h"
+#include "sys/x-socket.h"
 
 #include "misc/afb-uri.h"
 #include "misc/afb-ws.h"

@@ -23,7 +23,7 @@
 
 #include "../libafb-config.h"
 
-#if !WITH_SYS_UIO
+#if __ZEPHYR__ || !WITH_SYS_UIO
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -45,7 +45,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 		size = iov->iov_len;
 		while (size) {
 			do {
-				rc = write(fd, base, size);
+				rc = read(fd, base, size);
 			} while (rc < 0 && errno == EINTR);
 			if (rc <= 0)
 				return result ? result : rc;
@@ -71,7 +71,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 		size = iov->iov_len;
 		while (size) {
 			do {
-				rc = read(fd, base, size);
+				rc = write(fd, base, size);
 			} while (rc < 0 && errno == EINTR);
 			if (rc <= 0)
 				return result ? result : rc;

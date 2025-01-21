@@ -40,6 +40,20 @@ static inline int x_thread_create(
 			int detached)
 {
 	int rc;
+#if __ZEPHYR__
+	/*
+	* Using attribute with zephyr leads to problems
+	* It is revealed by the message "<err> os: tid 0x20001418 is in use!"
+	* That message comes indirectly from calling pthread_attr_destroy on the
+	* attribute. The function pthread_attr_destroy tries to free the stack
+	* of the attribute using k_thread_stack_free.
+	* On the other hand, if pthread_attr_destroy weren't called, it would
+	* avoid the call to k_thread_stack_free even at thread termination.
+	*/
+	rc = pthread_create(tid, NULL, (void*(*)(void*))entry, arg) ? -errno : 0;
+	if (detached && rc == 0)
+		pthread_detach(*tid);
+#else
 	pthread_attr_t attr;
 
 	pthread_attr_init(&attr);
@@ -47,6 +61,7 @@ static inline int x_thread_create(
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	rc = pthread_create(tid, &attr, (void*(*)(void*))entry, arg) ? -errno : 0;
 	pthread_attr_destroy(&attr);
+#endif
 	return rc;
 }
 
@@ -67,7 +82,11 @@ static inline int x_thread_equal(x_thread_t t1, x_thread_t t2)
 
 static inline int x_thread_kill(x_thread_t tid, int sig)
 {
+#if __ZEPHYR__
+	return 0;
+#else
 	return pthread_kill(tid, sig);
+#endif
 }
 
 static inline void x_thread_exit(void *retval)

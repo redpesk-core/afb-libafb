@@ -23,6 +23,15 @@
 
 #include "../libafb-config.h"
 
+#if __ZEPHYR__
+#  undef WITH_TIMERFD
+#  define WITH_TIMERFD 0
+#endif
+#if !defined(WITH_TIMERFD)
+#  define WITH_TIMERFD 1
+#endif
+
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -70,6 +79,9 @@
 #  undef WAKEUP_PIPE
 #  define WAKEUP_EVENTFD 1
 #  include <sys/eventfd.h>
+#  if __ZEPHYR__
+#    define EFD_CLOEXEC 0
+#  endif
 #else
 #  undef WAKEUP_TGKILL
 #  undef WAKEUP_THREAD_KILL

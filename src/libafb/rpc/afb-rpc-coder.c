@@ -382,8 +382,7 @@ int afb_rpc_coder_write_subcoder(afb_rpc_coder_t *coder, afb_rpc_coder_t *subcod
 }
 
 #if !RPC_NO_IOVEC
-
-#include <sys/uio.h>
+#include "sys/x-uio.h"
 
 static inline void *extriovec(void *closure, void *data, uint32_t length)
 {

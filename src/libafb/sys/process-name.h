@@ -22,6 +22,10 @@
 
 #pragma once
 
+#if __ZEPHYR__
+#define process_name_set_name(x)          0
+#define process_name_replace_cmdline(x,y) 0
+#else
 extern int process_name_set_name(const char *name);
 extern int process_name_replace_cmdline(char **argv, const char *name);
-
+#endif

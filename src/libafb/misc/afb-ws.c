@@ -438,8 +438,10 @@ static ssize_t aws_readv(struct afb_ws *ws, const struct iovec *iov, int iovcnt)
  */
 static void aws_cork(struct afb_ws *ws, int onoff)
 {
+#if !__ZEPHYR__
 	int optval = !!onoff;
 	setsockopt(ws->fd, IPPROTO_TCP, TCP_CORK, &optval, sizeof optval);
+#endif
 }
 
 /*

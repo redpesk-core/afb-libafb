@@ -21,6 +21,8 @@
  */
 
 
+#if !__ZEPHYR__
+
 #include <string.h>
 #include <unistd.h>
 #include <sys/prctl.h>
@@ -78,3 +80,4 @@ int process_name_replace_cmdline(char **argv, const char *name)
 	return 0;
 }
 
+#endif
