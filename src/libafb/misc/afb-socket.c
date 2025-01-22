@@ -182,11 +182,14 @@ static int open_unix(const char *spec, int server)
  */
 static int open_tcp(const char *spec, int server, int reuseaddr)
 {
-	int rc, fd;
+	int rc, fd, isport;
 	unsigned len;
+	long port;
 	const char *service, *host, *tail;
 	char *tmp;
-	struct addrinfo hint, *rai, *iai;
+	struct addrinfo hints[2], *rai, *iai;
+	struct sockaddr_in addr4;
+	struct sockaddr_in6 addr6;
 
 	/* scan the uri */
 	tail = strchrnul(spec, '/');
@@ -203,32 +206,55 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
         memcpy(tmp, service, len);
         tmp[len] = 0;
         service = tmp;
+	port = strtol(service, &tmp, 10);
+	isport = (tmp != service) && *tmp == '\0' && port > 0 && port <= 65535;
 
 	/* get addr */
-	memset(&hint, 0, sizeof hint);
-	hint.ai_family = AF_INET;
-	hint.ai_socktype = SOCK_STREAM;
+	memset(&hints, 0, sizeof hints);
+	hints[0].ai_family = AF_INET;
+	hints[0].ai_socktype = SOCK_STREAM;
 	if (server) {
-		hint.ai_flags = AI_PASSIVE;
+		hints[0].ai_flags = AI_PASSIVE;
 		if (host[0] == 0 || (host[0] == '*' && host[1] == 0))
 			host = NULL;
 	}
-	rc = getaddrinfo(host, service, &hint, &rai);
-	if (rc != 0) {
-		switch(rc) {
-		case EAI_MEMORY:
-			return X_ENOMEM;
-		default:
-			return X_ECANCELED;
+	if (host == NULL && isport && server) {
+		hints[0].ai_addrlen = sizeof addr4;
+		hints[0].ai_addr = (void*)&addr4;
+		hints[0].ai_canonname = "*";
+		hints[0].ai_next = &hints[1];
+		hints[1].ai_family = AF_INET6;
+		hints[1].ai_socktype = SOCK_STREAM;
+		hints[1].ai_addrlen = sizeof addr6;
+		hints[1].ai_addr = (void*)&addr6;
+		hints[1].ai_canonname = "*";
+		hints[1].ai_next = NULL;
+		memset(&addr4, 0, sizeof addr4);
+		addr4.sin_family = AF_INET;
+		addr4.sin_port = (in_port_t)htons((in_port_t)port);
+		memset(&addr6, 0, sizeof addr6);
+		addr6.sin6_family = AF_INET6;
+		addr6.sin6_port = (in_port_t)htons((in_port_t)port);
+		rai = NULL;
+		iai = hints;
+	}
+	else {
+		rc = getaddrinfo(host, service, &hints[0], &rai);
+		if (rc != 0) {
+			switch(rc) {
+			case EAI_MEMORY:
+				return X_ENOMEM;
+			default:
+				return X_ECANCELED;
+			}
 		}
+		/* check emptiness */
+		if (!rai)
+			return X_ENOENT;
+		iai = rai;
 	}
 
-	/* check emptiness */
-	if (!rai)
-		return X_ENOENT;
-
 	/* get the socket */
-	iai = rai;
 	while (iai != NULL) {
 		fd = socket(iai->ai_family, iai->ai_socktype, iai->ai_protocol);
 		if (fd >= 0) {
@@ -244,14 +270,16 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 				rc = connect(fd, iai->ai_addr, iai->ai_addrlen);
 			}
 			if (rc == 0) {
-				freeaddrinfo(rai);
+				if (rai != NULL)
+					freeaddrinfo(rai);
 				return fd;
 			}
 			close(fd);
 		}
 		iai = iai->ai_next;
 	}
-	freeaddrinfo(rai);
+	if (rai != NULL)
+		freeaddrinfo(rai);
 	return -errno;
 }
 
