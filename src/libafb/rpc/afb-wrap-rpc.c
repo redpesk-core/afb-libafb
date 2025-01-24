@@ -44,13 +44,28 @@
 #include "rpc/afb-wrap-rpc.h"
 
 #if WITH_GNUTLS
-#include "tls/tls-gnu.h"
+#  include "tls/tls-gnu.h"
 #endif
 
-#define RECEIVE_BLOCK_LENGTH 4080
-#define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
-#define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
+#ifndef RECEIVE_BLOCK_LENGTH
+#  define RECEIVE_BLOCK_LENGTH 4080
+#endif
+#if __ZEPHYR__
+#  undef USE_SND_RCV
+#  undef QUERY_RCV_SIZE
+#  define USE_SND_RCV          1
+#  define QUERY_RCV_SIZE       0
+#endif
+#ifndef USE_SND_RCV
+#  define USE_SND_RCV          0          /* TODO make a mix, use what is possible rcv/snd if possible */
+#endif
+#ifndef QUERY_RCV_SIZE
+#  define QUERY_RCV_SIZE       1          /* TODO is it to be continued ? */
+#endif
 
+#if QUERY_RCV_SIZE
+#  include <sys/ioctl.h>
+#endif
 #if USE_SND_RCV
 # include <sys/socket.h>
 #endif
@@ -116,7 +131,9 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	uint8_t *buffer;
 	size_t esz;
 	ssize_t ssz;
+#if QUERY_RCV_SIZE
 	int rc, avail;
+#endif
 
 	/* hangup event? */
 	if (revents & EPOLLHUP) {
@@ -198,7 +215,9 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 
 	/* process the buffer */
 	wrap->mem.dropped = 0;
+
 	ssz = afb_stub_rpc_receive(wrap->stub, wrap->mem.buffer, wrap->mem.size);
+
 	if (ssz < 0) {
 		/* processing error */
 		if (!wrap->mem.dropped)
