@@ -26,6 +26,10 @@
 
 #if WITH_WSAPI
 
+#if WITHOUT_JSON_C
+#error "json-c is required"
+#endif
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
