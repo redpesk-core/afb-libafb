@@ -52,52 +52,75 @@ endforeach(entry)
 set(LIBAFB_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ###########################################################################
+## FOR LINUX
 
-add_library(libafb OBJECT ${LIBAFBSRCS})
-target_include_directories(libafb BEFORE PUBLIC ${LIBAFB_SOURCE_DIR})
+if (NOT WITH_ZEPHYR)
+
+	########################
+	# static lib
+
+	add_library(libafb OBJECT ${LIBAFBSRCS})
+	target_include_directories(libafb BEFORE PUBLIC ${LIBAFB_SOURCE_DIR})
+
+	add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
+	set_target_properties(libafbsta PROPERTIES
+		OUTPUT_NAME afb
+		VERSION ${LIBAFB_VERSION}
+	)
+	INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+	########################
+	# shared lib
+
+	add_library(libafbso SHARED  $<TARGET_OBJECTS:libafb>)
+	set_target_properties(libafbso PROPERTIES
+		OUTPUT_NAME afb
+		VERSION ${LIBAFB_VERSION}
+		SOVERSION ${LIBAFB_SOVERSION}
+	)
+	TARGET_LINK_LIBRARIES(libafbso
+		${ldflags}
+		-Wl,--as-needed
+		-Wl,--gc-sections
+	)
+	INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+	########################
+	# install pkgconfig file
+
+	#list(JOIN deps " " PCREQUIRES)
+	set(PCREQUIRES "")
+	foreach(x IN LISTS deps)
+		string(APPEND PCREQUIRES " " ${x})
+	endforeach(x)
+
+	#list(JOIN privs " " PCLIBSPRIV)
+	set(PCLIBSPRIV "")
+	foreach(x IN LISTS privs)
+		string(APPEND PCLIBSPRIV " " ${x})
+	endforeach(x)
+
+	CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
+	INSTALL(FILES
+			${CMAKE_CURRENT_BINARY_DIR}/libafb.pc
+		DESTINATION
+			${CMAKE_INSTALL_LIBDIR}/pkgconfig
+	)
+
+endif()
+
 
 ###########################################################################
+## FOR ZEPHYR
 
-add_library(libafbsta STATIC $<TARGET_OBJECTS:libafb>)
-set_target_properties(libafbsta PROPERTIES
-	OUTPUT_NAME afb
-	VERSION ${LIBAFB_VERSION}
-)
-INSTALL(TARGETS libafbsta ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if (WITH_ZEPHYR)
+	set(alldirs core utils sys http apis misc wsapi wsj1 extend tls rpc)
+	zephyr_library_named(libafb)
+	target_include_directories(${ZEPHYR_CURRENT_LIBRARY} BEFORE PUBLIC
+		${LIBAFB_SOURCE_DIR})
 
-###########################################################################
-
-add_library(libafbso SHARED  $<TARGET_OBJECTS:libafb>)
-set_target_properties(libafbso PROPERTIES
-	OUTPUT_NAME afb
-	VERSION ${LIBAFB_VERSION}
-	SOVERSION ${LIBAFB_SOVERSION}
-)
-TARGET_LINK_LIBRARIES(libafbso
-	${ldflags}
-	-Wl,--as-needed
-	-Wl,--gc-sections
-)
-INSTALL(TARGETS libafbso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-# install pkgconfig file
-
-#list(JOIN deps " " PCREQUIRES)
-set(PCREQUIRES "")
-foreach(x IN LISTS deps)
-	string(APPEND PCREQUIRES " " ${x})
-endforeach(x)
-
-#list(JOIN privs " " PCLIBSPRIV)
-set(PCLIBSPRIV "")
-foreach(x IN LISTS privs)
-	string(APPEND PCLIBSPRIV " " ${x})
-endforeach(x)
-
-CONFIGURE_FILE(libafb.pc.in libafb.pc @ONLY)
-INSTALL(FILES
-		${CMAKE_CURRENT_BINARY_DIR}/libafb.pc
-	DESTINATION
-		${CMAKE_INSTALL_LIBDIR}/pkgconfig
-)
+	foreach(src ${LIBAFBSRCS})
+		zephyr_library_sources(${src})
+	endforeach()
+endif()
 

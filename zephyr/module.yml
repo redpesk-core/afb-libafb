@@ -1,0 +1,6 @@
+name: afb-libafb
+build:
+  cmake: .
+  depends:
+    - afb-binding
+    - rp-lib-utils

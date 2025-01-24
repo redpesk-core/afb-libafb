@@ -37,14 +37,8 @@ set(LIBAFB_SOVERSION "6")
 set(LIBAFBCLI_VERSION "6.0")
 set(LIBAFBCLI_SOVERSION "6")
 
-include(FindPkgConfig)
-include(CheckIncludeFiles)
-include(CheckLibraryExists)
-include(GNUInstallDirs)
-include(CTest)
-
 ###########################################################################
-# possible settings
+## possible settings
 option(WITH_SYSTEMD               "Require use of libsystemd"              ON)
 option(WITHOUT_CYNAGORA           "Forbids use of cynagora"                OFF)
 option(WITHOUT_TESTS              "Avoid compiling tests"                  OFF)
@@ -102,7 +96,6 @@ option(WITH_UNIX_SOCKET           "Allow use of Unix Domain Sockets"       ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
 option(MINIMAL_LOCALE_ROOT        "Use minimal locale-root"                OFF)
-#
 ###########################################################################
 if(WITHOUT_JSON_C)
 	set(WITH_AFB_HOOK OFF)
@@ -116,45 +109,81 @@ if(WITH_GNUTLS AND WITH_MBEDTLS)
 	message(ERROR "Only one TLS library must be defined")
 endif()
 ###########################################################################
+# Detect the platform reliably
+if(ZEPHYR_BASE)
+	if (NOT CONFIG_AFB_BINDER)
+		return()
+	endif()
+	SET(WITH_ZEPHYR YES)
+	# almost sure
+	set(WITH_AFB_CALL_SYNC OFF)
+	set(WITH_AFB_DEBUG OFF)
+	set(WITH_AFB_TRACE OFF)
+	set(WITH_API_CREATOR OFF)
+	set(WITH_CALL_PERSONALITY OFF)
+	set(WITH_CASE_FOLDING OFF)
+	set(WITH_CLOCK_GETTIME OFF)
+	set(WITH_DIRENT OFF)
+	set(WITH_DYNAMIC_BINDING OFF)
+	set(WITH_ENVIRONMENT OFF)
+	set(WITH_EPOLL OFF)
+	set(WITH_EVENTFD ON)
+	set(WITH_EXTENSION OFF)
+	set(WITH_FNMATCH OFF)
+	set(WITH_GNUTLS OFF)
+	set(WITH_L4VSOCK OFF)
+	set(WITH_LIBMAGIC OFF)
+	set(WITH_LIBMICROHTTPD OFF)
+	set(WITH_LIBUUID OFF)
+	set(WITH_LOCALE_FOLDER OFF)
+	set(WITH_LOCALE_SEARCH_NODE OFF)
+	set(WITH_OPENAT OFF)
+	set(WITHOUT_CYNAGORA ON)
+	set(WITHOUT_JSON_C ON)
+	set(WITHOUT_TESTS ON)
+	set(WITH_RANDOM_R OFF)
+	set(WITH_REALPATH OFF)
+	set(WITH_RPC_V1 OFF)
+	set(WITH_RPC_V3 ON)
+	set(WITH_RPUTILS_STATIC ON)
+	set(WITH_SIG_MONITOR_DUMPSTACK OFF)
+	set(WITH_SIG_MONITOR_FOR_CALL OFF)
+	set(WITH_SIG_MONITOR_SIGNALS OFF)
+	set(WITH_SIG_MONITOR_TIMERS OFF)
+	set(WITH_SUPERVISION OFF)
+	set(WITH_SYSTEMD OFF)
+	set(WITH_SYS_UIO ON)
+	set(WITH_TRACK_JOB_CALL OFF)
+	set(WITH_UNIX_SOCKET OFF)
+	set(WITH_WSCLIENT_URI_COPY OFF)
 
-link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
+	# tunable
+	set(ARCH32 OFF)
+	set(WITH_AFB_HOOK OFF)
+	set(WITH_CRED OFF)
+	set(WITH_REPLY_JOB ON)
+	set(WITH_REQ_PROCESS_ASYNC ON)
 
-add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
-add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
-add_compile_options(-Wsign-compare -Wsign-conversion)
-add_compile_options(
-	$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-	$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-	$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-	$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-	$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
-)
-add_compile_options(-ffunction-sections -fdata-sections)
-add_compile_options(-fPIC)
-add_compile_options(-g -O2)
-set (CMAKE_CXX_STANDARD 14)
+	# unsure
+	set(WITH_THREAD_LOCAL ON)
+	add_compile_definitions(HAVENT_alloca_h=1)
 
-if(ARCH32)
-	add_compile_options(-m32)
-	link_libraries(-m32)
-endif()
+	include_directories(${afb-binding_SOURCE_DIR})
+	include_directories(${ZEPHYR_RP_LIB_UTILS_MODULE_DIR}/src)
+	find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
-set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
-#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
-#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
-set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
-set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
-set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
+else(ZEPHYR_BASE)
 
-# for tools use
-set(CMAKE_EXPORT_COMPILE_COMMANDS on)
+	SET(WITH_ZEPHYR NO)
 
-###########################################################################
+	include(FindPkgConfig)
+	include(CheckIncludeFiles)
+	include(CheckLibraryExists)
+	include(GNUInstallDirs)
+	include(FindThreads)
+	find_package(Threads)
+	include(CTest)
 
-include(FindThreads)
-find_package(Threads)
-
-if (NOT WITH_ZEPHYR)
 	PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
 	
 	if (NOT WITHOUT_JSON_C)
@@ -172,7 +201,8 @@ if (NOT WITH_ZEPHYR)
 				librp-utils-file
 				librp-utils-json-c)
 	endif()
-endif()
+
+endif(ZEPHYR_BASE)
 
 if(WITH_LIBMICROHTTPD)
 	PKG_CHECK_MODULES(libmicrohttpd REQUIRED libmicrohttpd>=0.9.60)
@@ -190,6 +220,7 @@ if(WITH_LIBMICROHTTPD)
 else()
 	set(WITH_LIBMAGIC OFF)
 endif(WITH_LIBMICROHTTPD)
+
 if(WITH_LIBMAGIC)
 	set(HAVE_LIBMAGIC 1)
 else()
@@ -203,8 +234,6 @@ endif()
 
 if(WITH_SYSTEMD)
 	PKG_CHECK_MODULES(libsystemd REQUIRED libsystemd>=222)
-else()
-	#PKG_CHECK_MODULES(libsystemd libsystemd>=222)
 endif(WITH_SYSTEMD)
 
 if(WITH_LIBUUID)
@@ -218,9 +247,44 @@ endif()
 
 if(WITH_GNUTLS)
 	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.6.5)
+	add_definitions(-DWITH_TLS)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
+
+###########################################################################
+#link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
+#
+#add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
+#add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
+#add_compile_options(-Wsign-compare -Wsign-conversion)
+#add_compile_options(
+#	$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+#	$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+#	$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+#	$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+#	$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
+#)
+#add_compile_options(-ffunction-sections -fdata-sections)
+#add_compile_options(-fPIC)
+#add_compile_options(-g -O2)
+#set (CMAKE_CXX_STANDARD 14)
+#
+#if(ARCH32)
+#	add_compile_options(-m32)
+#	link_libraries(-m32)
+#endif()
+#
+#set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
+##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
+##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
+#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
+#set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
+#set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
+#
+## for tools use
+#set(CMAKE_EXPORT_COMPILE_COMMANDS on)
+###########################################################################
 
 add_subdirectory(src)
 
