@@ -74,7 +74,7 @@ int afb_rpc_v0_code_version_offer_v3(afb_rpc_coder_t *coder)
 
 int afb_rpc_v0_code_version_offer_v1_or_v3(afb_rpc_coder_t *coder)
 {
-	uint8_t versions[] = { AFBRPC_PROTO_VERSION_1, AFBRPC_PROTO_VERSION_3 };
+	uint8_t versions[] = { AFBRPC_PROTO_VERSION_3, AFBRPC_PROTO_VERSION_1 };
 	return afb_rpc_v0_code_version_offer(coder, 2, versions);
 }
 

@@ -2896,11 +2896,11 @@ int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub)
 	int rc = 0;
 	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
 		uint8_t versions[] = {
-#if WITH_RPC_V1
-			AFBRPC_PROTO_VERSION_1,
-#endif
 #if WITH_RPC_V3
 			AFBRPC_PROTO_VERSION_3,
+#endif
+#if WITH_RPC_V1
+			AFBRPC_PROTO_VERSION_1,
 #endif
 		};
 		rc = afb_rpc_v0_code_version_offer(&stub->coder, (uint8_t)(sizeof versions / sizeof *versions), versions);
