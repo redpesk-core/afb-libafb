@@ -25,12 +25,6 @@
 
 #include "../libafb-config.h"
 
-#if WITH_EPOLL
+#if !__ZEPHYR__
 #include <sys/epoll.h>
-#else
-#include "x-poll.h"
-#define EPOLLIN  POLLIN
-#define EPOLLOUT POLLOUT
-#define EPOLLERR POLLERR
-#define EPOLLHUP POLLHUP
 #endif

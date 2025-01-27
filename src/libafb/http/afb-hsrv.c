@@ -624,7 +624,7 @@ int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, c
 	}
 
 	/* record it to the main loop */
-	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EPOLLIN, listen_callback, hsrv, 0, 0) < 0) {
+	if (afb_ev_mgr_add_fd(&hsrv->efd, info->epoll_fd, EV_FD_IN, listen_callback, hsrv, 0, 0) < 0) {
 		MHD_stop_daemon(httpd);
 		RP_ERROR("connection to events for httpd failed");
 		return 0;
@@ -681,11 +681,11 @@ static void hsrv_itf_callback(struct ev_fd *efd, int fd, uint32_t revents, void 
 	struct sockaddr addr;
 	socklen_t lenaddr;
 
-	if ((revents & EPOLLHUP) != 0) {
+	if ((revents & EV_FD_HUP) != 0) {
 		RP_ERROR("disconnection for server %s: %m", itf->uri);
 		hsrv_itf_connect(itf);
 		ev_fd_unref(efd);
-	} else if ((revents & EPOLLIN) != 0) {
+	} else if ((revents & EV_FD_IN) != 0) {
 		lenaddr = (socklen_t)sizeof addr;
 		fdc = accept(fd, &addr, &lenaddr);
 		if (fdc < 0)
@@ -712,7 +712,7 @@ static int hsrv_itf_connect(struct hsrv_itf *itf)
 		RP_ERROR("can't create socket %s", itf->uri);
 		return -errno;
 	}
-	rc = afb_ev_mgr_add_fd(&itf->efd, fd, EPOLLIN, hsrv_itf_callback, itf, 0, 1);
+	rc = afb_ev_mgr_add_fd(&itf->efd, fd, EV_FD_IN, hsrv_itf_callback, itf, 0, 1);
 	if (rc < 0) {
 		RP_ERROR("can't connect socket %s", itf->uri);
 		return rc;

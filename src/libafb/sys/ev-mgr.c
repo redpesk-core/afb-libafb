@@ -43,6 +43,7 @@
 #include <rp-utils/rp-verbose.h>
 
 #include "sys/x-errno.h"
+#include "sys/x-poll.h"
 #include "sys/x-epoll.h"
 
 #include "sys/ev-mgr.h"
@@ -352,7 +353,61 @@ struct ev_mgr
 };
 
 #if !WITH_EPOLL
-static int add_poll(struct ev_mgr *mgr, int fd, uint32_t events);
+static int add_poll(struct ev_mgr *mgr, int fd, short events);
+#endif
+
+/******************************************************************************/
+/******************************************************************************/
+/** SECTION conversion                                                       **/
+/******************************************************************************/
+/******************************************************************************/
+#define _TEST_(M,X)        (EV_FD_##X == M##X)
+#define _SAME_MASK_(M,X)   (_TEST_(M,X) ? EV_FD_##X : 0)
+#define _TO_MASK_(M,X,V)   (_TEST_(M,X) ? 0 : ((V) & EV_FD_##X) ? M##X : 0)
+#define _FROM_MASK_(M,X,V) (_TEST_(M,X) ? 0 : ((V) & M##X) ? EV_FD_##X : 0)
+#define SAME_MASK(M)       (_SAME_MASK_(M,IN)|_SAME_MASK_(M,OUT)|_SAME_MASK_(M,ERR)|_SAME_MASK_(M,HUP))
+#define TO_MASK(M,V)       (_TO_MASK_(M,IN,V)|_TO_MASK_(M,OUT,V)|_TO_MASK_(M,ERR,V)|_TO_MASK_(M,HUP,V))
+#define FROM_MASK(M,V)     (_FROM_MASK_(M,IN,V)|_FROM_MASK_(M,OUT,V)|_FROM_MASK_(M,ERR,V)|_FROM_MASK_(M,HUP,V))
+
+
+inline uint32_t ev_fd_from_poll(short events)
+{
+	uint32_t r = (uint32_t)(events & SAME_MASK(POLL));
+	r |= (uint32_t)FROM_MASK(POLL,events);
+	return r;
+}
+
+inline short ev_fd_to_poll(uint32_t events)
+{
+	short r = (short)(events & SAME_MASK(POLL));
+	r |= (short)TO_MASK(POLL,events);
+	return r;
+}
+
+#if WITH_EPOLL
+inline uint32_t ev_fd_from_epoll(uint32_t events)
+{
+	uint32_t r = (uint32_t)(events & SAME_MASK(EPOLL));
+	r |= (uint32_t)FROM_MASK(EPOLL,events);
+	return r;
+}
+
+inline uint32_t ev_fd_to_epoll(uint32_t events)
+{
+	uint32_t r = (uint32_t)(events & SAME_MASK(EPOLL));
+	r |= (uint32_t)TO_MASK(EPOLL,events);
+	return r;
+}
+#else
+inline uint32_t ev_fd_from_epoll(uint32_t events)
+{
+	return ev_fd_from_poll((short)events);
+}
+
+inline uint32_t ev_fd_to_epoll(uint32_t events)
+{
+	return (uint32_t)ev_fd_to_poll(events);
+}
 #endif
 
 /******************************************************************************/
@@ -445,10 +500,10 @@ void ev_fd_set_events(struct ev_fd *efd, uint32_t events)
 #if WITH_EPOLL
 	if (efd->events != events) {
 		int rc = 0;
-		struct epoll_event ev;
-		ev.data.ptr = efd;
-		ev.events = efd->events = events;
 		if (efd->is_active) {
+			struct epoll_event ev;
+			ev.data.ptr = efd;
+			ev.events = efd->events = ev_fd_to_epoll(events);
 			if (efd->is_set)
 				rc = epoll_ctl(efd->mgr->epollfd, EPOLL_CTL_MOD, efd->fd, &ev);
 			else {
@@ -481,7 +536,7 @@ void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closure)
 static void fd_dispatch(struct ev_fd *efd, uint32_t events)
 {
 	efd->handler(efd, efd->fd, events, efd->closure);
-	if (events & EPOLLHUP) {
+	if (events & EV_FD_HUP) {
 		if (efd->fd >= 0) {
 #if WITH_EPOLL
 			if (efd->is_set && (efd->auto_close || efd->auto_unref)) {
@@ -520,7 +575,7 @@ static int efds_prepare(struct ev_mgr *mgr)
 				efd->is_set = 1;
 				efd->has_changed = 0;
 				ev.data.ptr = efd;
-				ev.events = efd->events;
+				ev.events = ev_fd_to_epoll(efd->events);
 				s = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, efd->fd, &ev);
 				if (s < 0)
 					rc = s;
@@ -528,7 +583,7 @@ static int efds_prepare(struct ev_mgr *mgr)
 			else if (efd->has_changed) {
 				efd->has_changed = 0;
 				ev.data.ptr = efd;
-				ev.events = efd->events;
+				ev.events = ev_fd_to_epoll(efd->events);
 				s = epoll_ctl(mgr->epollfd, EPOLL_CTL_MOD, efd->fd, &ev);
 				if (s < 0)
 					rc = s;
@@ -543,7 +598,7 @@ static int efds_prepare(struct ev_mgr *mgr)
 		}
 #else
 		if (efd->is_active)
-			rc = add_poll(mgr, efd->fd, efd->events);
+			rc = add_poll(mgr, efd->fd, ev_fd_to_poll(efd->events));
 		efd->has_changed = 0;
 #endif
 		efd = efd->next;
@@ -911,7 +966,7 @@ static void do_cleanup(struct ev_mgr *mgr)
 }
 
 #if !WITH_EPOLL
-static int add_poll(struct ev_mgr *mgr, int fd, uint32_t events)
+static int add_poll(struct ev_mgr *mgr, int fd, short events)
 {
 	if (mgr->nrpollfds == mgr->szpollfds) {
 		uint16_t nxtsz = mgr->szpollfds + 4;
@@ -1049,7 +1104,7 @@ static void do_dispatch(struct ev_mgr *mgr)
 #if WITH_EPOLL
 		efd = mgr->event.data.ptr;
 		if (efd)
-			fd_dispatch(efd, mgr->event.events);
+			fd_dispatch(efd, ev_fd_from_epoll(mgr->event.events));
 #if WITH_TIMERFD
 		else
 			timer_event(mgr);
@@ -1065,7 +1120,7 @@ static void do_dispatch(struct ev_mgr *mgr)
 			if (it->revents) {
 				for (efd = mgr->efds ; efd ; efd = efd->next)
 					if (efd->fd == it->fd) {
-						fd_dispatch(efd, it->revents);
+						fd_dispatch(efd, ev_fd_from_poll(it->revents));
 						break;
 					}
 			}
@@ -1244,7 +1299,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	ee.data.ptr = mgr;
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->eventfd, &ee);
 #else
-	rc = add_poll(mgr, mgr->eventfd, EPOLLIN);
+	rc = add_poll(mgr, mgr->eventfd, POLLIN);
 #endif
 	if (rc < 0) {
 		rc = -errno;
@@ -1264,7 +1319,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	ee.data.ptr = mgr;
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->pipefds[0], &ee);
 #else
-	rc = add_poll(mgr, mgr->pipefds[0], EPOLLIN);
+	rc = add_poll(mgr, mgr->pipefds[0], POLLIN);
 #endif
 	if (rc < 0) {
 		rc = -errno;
@@ -1288,7 +1343,7 @@ int ev_mgr_create(struct ev_mgr **result)
 	ee.data.ptr = 0;
 	rc = epoll_ctl(mgr->epollfd, EPOLL_CTL_ADD, mgr->timerfd, &ee);
 #else
-	rc = add_poll(mgr, mgr->timerfd, EPOLLIN);
+	rc = add_poll(mgr, mgr->timerfd, POLLIN);
 #endif
 	if (rc < 0) {
 		rc = -errno;

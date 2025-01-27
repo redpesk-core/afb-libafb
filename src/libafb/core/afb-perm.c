@@ -58,6 +58,7 @@ static inline const char *session_of_req(struct afb_req_common *req)
 
 #include "core/afb-ev-mgr.h"
 #include "sys/ev-mgr.h"
+#include "sys/x-epoll.h"
 
 struct memo_check
 {
@@ -127,10 +128,10 @@ static int cynagora_async_ctl_cb(
 		evfd = NULL;
 	}
 	if (op == EPOLL_CTL_ADD) {
-		rc = afb_ev_mgr_add_fd(&evfd, fd, events, evfdcb, 0, 1, 0);
+		rc = afb_ev_mgr_add_fd(&evfd, fd, ev_fd_from_epoll(events), evfdcb, 0, 1, 0);
 	}
 	if (op == EPOLL_CTL_MOD) {
-		ev_fd_set_events(evfd, events);
+		ev_fd_set_events(evfd, ev_fd_from_epoll(events));
 	}
 	return rc;
 }

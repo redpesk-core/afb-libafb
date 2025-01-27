@@ -263,9 +263,9 @@ static void server_listen_callback(struct ev_fd *efd, int fd, uint32_t revents, 
 {
 	struct server *server = closure;
 
-	if ((revents & EPOLLHUP) != 0)
+	if ((revents & EV_FD_HUP) != 0)
 		server_hangup(server);
-	else if ((revents & EPOLLIN) != 0)
+	else if ((revents & EV_FD_IN) != 0)
 		server_accept(server, fd);
 }
 
@@ -286,7 +286,7 @@ static int server_connect(struct server *server)
 	else {
 		/* listen for service */
 		fd = rc;
-		rc = afb_ev_mgr_add_fd(&server->efd, fd, EPOLLIN, server_listen_callback, server, 0, 1);
+		rc = afb_ev_mgr_add_fd(&server->efd, fd, EV_FD_IN, server_listen_callback, server, 0, 1);
 		if (rc < 0) {
 			close(fd);
 			RP_ERROR("can't connect socket %s", server->uri);

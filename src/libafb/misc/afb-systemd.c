@@ -84,7 +84,7 @@ struct sd_event *afb_systemd_get_event_loop()
 	if (result && !set) {
 		fd = sd_event_get_fd(result);
 		afb_ev_mgr_add_prepare(&prep, onprepare, result);
-		afb_ev_mgr_add_fd(&efd, fd, EPOLLIN, onevent, result, 1, 0);
+		afb_ev_mgr_add_fd(&efd, fd, EV_FD_IN, onevent, result, 1, 0);
 		set = 1;
 	}
 	return result;

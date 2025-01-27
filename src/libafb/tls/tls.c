@@ -118,7 +118,7 @@ static void terminate(struct tls *tls, const char *error)
 
 	if (tls->state == state_established) {
 		tls->state = state_bye;
-		ev_fd_set_events(tls->crypt.efd, EPOLLIN);
+		ev_fd_set_events(tls->crypt.efd, EV_FD_IN);
 		ev_fd_set_handler(tls->crypt.efd, bye_cb, tls);
 		gnutls_bye (tls->session, GNUTLS_SHUT_WR);
 		return;
@@ -149,7 +149,7 @@ static void do_write(struct tls *tls, struct tls_flow *in, struct tls_flow *out)
 		if (len)
 			memmove(in->buffer, &in->buffer[off], len);
 	}
-	ev_fd_set_events(out->efd, len ? EPOLLIN|EPOLLOUT : EPOLLIN);
+	ev_fd_set_events(out->efd, len ? EV_FD_IN|EV_FD_OUT : EV_FD_IN);
 }
 
 static void do_read_write(struct tls *tls, struct tls_flow *in, struct tls_flow *out)
@@ -205,7 +205,7 @@ static void bye_cb(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct tls *tls = closure;
 
-	if (revents & EPOLLIN) {
+	if (revents & EV_FD_IN) {
 		do_decrypt(tls);
 	}
 }
@@ -215,14 +215,14 @@ static void crypt_cb(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct tls *tls = closure;
 
-	if (revents & EPOLLHUP) {
+	if (revents & EV_FD_HUP) {
 		terminate(tls, 0);
 		return;
 	}
-	if (revents & EPOLLOUT) {
+	if (revents & EV_FD_OUT) {
 		do_crypt_next(tls);
 	}
-	if (revents & EPOLLIN) {
+	if (revents & EV_FD_IN) {
 		do_decrypt(tls);
 	}
 }
@@ -232,14 +232,14 @@ static void plain_cb(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct tls *tls = closure;
 
-	if (revents & EPOLLHUP) {
+	if (revents & EV_FD_HUP) {
 		terminate(tls, 0);
 		return;
 	}
-	if (revents & EPOLLOUT) {
+	if (revents & EV_FD_OUT) {
 		do_decrypt_next(tls);
 	}
-	if (revents & EPOLLIN) {
+	if (revents & EV_FD_IN) {
 		do_crypt(tls);
 	}
 }
@@ -257,8 +257,8 @@ static int do_handshake(struct tls *tls)
 	}
 
 	tls->state = state_established;
-	ev_fd_set_events(tls->crypt.efd, EPOLLIN);
-	ev_fd_set_events(tls->plain.efd, EPOLLIN);
+	ev_fd_set_events(tls->crypt.efd, EV_FD_IN);
+	ev_fd_set_events(tls->plain.efd, EV_FD_IN);
 	ev_fd_set_handler(tls->crypt.efd, crypt_cb, tls);
         return 0;
 }
@@ -267,7 +267,7 @@ static void handshake_cb(struct ev_fd *efd, int fd, uint32_t revents, void *clos
 {
 	struct tls *tls = closure;
 
-	if (revents & EPOLLHUP) {
+	if (revents & EV_FD_HUP) {
 		terminate(tls, 0);
 		return;
 	}
@@ -328,7 +328,7 @@ int tls_upgrade_client(struct ev_mgr *mgr, int sd, const char *hostname)
 	tls->plain.fd = pairfd[1];
 	rc = ev_mgr_add_fd(mgr, &tls->plain.efd, pairfd[1], 0, plain_cb, tls, 1, 1);
 	if (rc >= 0) {
-		rc = ev_mgr_add_fd(mgr, &tls->crypt.efd, sd, EPOLLIN, handshake_cb, tls, 1, 1);
+		rc = ev_mgr_add_fd(mgr, &tls->crypt.efd, sd, EV_FD_IN, handshake_cb, tls, 1, 1);
 		if (rc >= 0) {
                         rc = do_handshake(tls);
         		if (rc >= 0)

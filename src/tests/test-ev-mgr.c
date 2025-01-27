@@ -81,7 +81,7 @@ START_TEST (fd)
 	rc = pipe2(fds, O_CLOEXEC|O_DIRECT|O_NONBLOCK);
 	ck_assert_int_eq(rc, 0);
 
-	rc = ev_mgr_add_fd(mgr, &efd, fds[0], EPOLLIN, readcb, readcb, 1, 1);
+	rc = ev_mgr_add_fd(mgr, &efd, fds[0], EV_FD_IN, readcb, readcb, 1, 1);
 	ck_assert_int_eq(rc, 0);
 
 	rc = ev_mgr_run(mgr, 100);
@@ -105,7 +105,7 @@ START_TEST (fd)
 	ck_assert_int_eq(rc, 0);
 	ck_assert_int_eq(0, readdata);
 
-	ev_fd_set_events(efd, EPOLLIN);
+	ev_fd_set_events(efd, EV_FD_IN);
 	rc = ev_mgr_run(mgr, 100);
 	ck_assert_int_eq(rc, 1);
 	ck_assert_int_eq(x, readdata);

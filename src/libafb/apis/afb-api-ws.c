@@ -167,9 +167,9 @@ static void api_ws_server_listen_callback(struct ev_fd *efd, int fd, uint32_t re
 {
 	struct api_ws_server *apiws = closure;
 
-	if ((revents & EPOLLHUP) != 0)
+	if ((revents & EV_FD_HUP) != 0)
 		api_ws_server_connect(apiws);
-	else if ((revents & EPOLLIN) != 0)
+	else if ((revents & EV_FD_IN) != 0)
 		api_ws_server_accept(apiws, fd);
 }
 
@@ -193,7 +193,7 @@ static int api_ws_server_connect(struct api_ws_server *apiws)
 	else {
 		/* listen for service */
 		fd = rc;
-		rc = afb_ev_mgr_add_fd(&apiws->efd, fd, EPOLLIN, api_ws_server_listen_callback, apiws, 0, 1);
+		rc = afb_ev_mgr_add_fd(&apiws->efd, fd, EV_FD_IN, api_ws_server_listen_callback, apiws, 0, 1);
 		if (rc < 0) {
 			close(fd);
 			RP_ERROR("can't connect socket %s", apiws->uri);

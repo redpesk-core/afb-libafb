@@ -148,9 +148,9 @@ static void aws_disconnect(struct afb_ws *ws, int call_on_hangup)
 
 static void evfdcb(struct ev_fd *efd, int fd, uint32_t revents, void *ws)
 {
-	if ((revents & EPOLLHUP) != 0)
+	if ((revents & EV_FD_HUP) != 0)
 		afb_ws_hangup(ws);
-	else if ((revents & EPOLLIN) != 0)
+	else if ((revents & EV_FD_IN) != 0)
 		aws_on_readable(ws);
 }
 
@@ -183,7 +183,7 @@ struct afb_ws *afb_ws_create(int fd, int autoclose, const struct afb_ws_itf *itf
 	result->buffer.buffer = NULL;
 	result->buffer.size = 0;
 
-	rc = afb_ev_mgr_add_fd(&result->efd, fd, EPOLLIN, evfdcb, result, 0, autoclose);
+	rc = afb_ev_mgr_add_fd(&result->efd, fd, EV_FD_IN, evfdcb, result, 0, autoclose);
 	if (rc < 0)
 		goto error2;
 

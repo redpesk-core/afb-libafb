@@ -136,13 +136,13 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 #endif
 
 	/* hangup event? */
-	if (revents & EPOLLHUP) {
+	if (revents & EV_FD_HUP) {
 		hangup(wrap);
 		return;
 	}
 
 	/* something to read? */
-	if ((revents & EPOLLIN) == 0)
+	if ((revents & EV_FD_IN) == 0)
 		return; /* no */
 
 	/* get size to read */
@@ -430,7 +430,7 @@ args_error:
 
 static int init_raw(struct afb_wrap_rpc *wrap, int fd, int autoclose, ev_fd_cb_t onevent_cb, void (*notify_cb)(void*, struct afb_rpc_coder*))
 {
-	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EPOLLIN, onevent_cb, wrap, 0, autoclose);
+	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_cb, wrap, 0, autoclose);
 	if (rc >= 0)
 		/* callback for emission */
 		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);

@@ -26,8 +26,6 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "x-epoll.h"
-
 /******************************************************************************/
 
 struct ev_mgr;
@@ -160,6 +158,11 @@ extern void ev_prepare_unref(struct ev_prepare *prep);
 
 /******************************************************************************/
 
+#define EV_FD_IN    1
+#define EV_FD_OUT   4
+#define EV_FD_ERR   8
+#define EV_FD_HUP  16
+
 struct ev_fd;
 
 typedef void (*ev_fd_cb_t)(struct ev_fd *efd, int fd, uint32_t revents, void *closure);
@@ -194,6 +197,11 @@ extern uint32_t ev_fd_events(struct ev_fd *efd);
 extern void ev_fd_set_events(struct ev_fd *efd, uint32_t events);
 
 extern void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closure);
+
+extern uint32_t ev_fd_from_epoll(uint32_t events);
+extern uint32_t ev_fd_to_epoll(uint32_t events);
+extern uint32_t ev_fd_from_poll(short events);
+extern short    ev_fd_to_poll(uint32_t events);
 
 /******************************************************************************/
 
