@@ -379,52 +379,62 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 	return 0;
 }
 
-#if WITH_GNUTLS
+#if WITH_TLS
 static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd)
 {
 	int rc;
-	const char *cert_path, *key_path, *host, *host_end;
+	const char *cert_path, *key_path, *trust, *host, *host_end, *argsstr, **args;
 	size_t host_len;
 	wrap->gnutls_session = NULL;
 
 	/* get cert & key from uri query arguments */
-	const char *argsstr = strchr(uri, '?');
-	if (argsstr == NULL || strlen(argsstr) < 1)
-		goto args_error;
-
-	const char **args = rp_unescape_args(argsstr + 1);
-	cert_path = rp_unescaped_args_get(args, "cert");
-	key_path = rp_unescaped_args_get(args, "key");
-
-	if (!(cert_path && key_path))
-		goto args_error;
-
-	/* setup GnuTLS */
-	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, rp_unescaped_args_get(args, "trust"));
-	if (rc >= 0) {
-		host = strchr(uri, ':') + 1;
-		host_end = strchr(host, ':');
-		host_len = (size_t)(host_end - host);
-		wrap->host = malloc(host_len + 1);
-		if (!wrap->host) {
-			RP_ERROR("out of memory");
-			return X_ENOMEM;
-		}
-		strncpy(wrap->host, host, host_len);
-		wrap->host[host_len] = '\0';
-
-		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd, wrap->host);
-		if (rc < 0) {
-			free(wrap->host);
-			gnutls_certificate_free_credentials(wrap->gnutls_creds);
-		}
+	cert_path = key_path = trust = NULL;
+	args = NULL;
+	argsstr = strchr(uri, '?');
+	if (argsstr != NULL && *argsstr != 0) {
+		args = rp_unescape_args(argsstr + 1);
+		cert_path = rp_unescaped_args_get(args, "cert");
+		key_path = rp_unescaped_args_get(args, "key");
+		trust = rp_unescaped_args_get(args, "trust");
+	}
+	if (cert_path == NULL || key_path == NULL) {
+		free(args);
+		RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
+		return X_EINVAL;
 	}
 
-	return rc;
+	/* copy host name */
+	host = strchr(uri, ':') + 1;
+	host_end = strchr(host, ':');
+	host_len = (size_t)(host_end - host);
+	wrap->host = malloc(host_len + 1);
+	if (!wrap->host) {
+		free(args);
+		RP_ERROR("out of memory");
+		return X_ENOMEM;
+	}
+	strncpy(wrap->host, host, host_len);
+	wrap->host[host_len] = '\0';
 
-args_error:
-	RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-	return X_EINVAL;
+	/* setup GnuTLS */
+#if WITH_GNUTLS
+	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, trust);
+	if (rc >= 0) {
+		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd, wrap->host);
+		if (rc < 0)
+			gnutls_certificate_free_credentials(wrap->gnutls_creds);
+	}
+#else
+#  error "unimplemented TLS backend"
+#endif
+
+	/* cleanup */
+	free(args);
+	if (rc < 0) {
+		free(wrap->host);
+		wrap->host = NULL;
+	}
+	return rc;
 }
 #endif
 
@@ -466,7 +476,7 @@ static int init(
 		else {
 			wrap->ws = NULL;
 
-#if WITH_GNUTLS
+#if WITH_TLS
 			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
 				rc = init_tls(wrap, uri, mode, fd);
 				notify_cb = notify_tls;

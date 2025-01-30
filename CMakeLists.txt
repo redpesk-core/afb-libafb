@@ -73,6 +73,7 @@ option(WITH_REQ_PROCESS_ASYNC     "Enforce asynchronous processing of requests" 
 option(WITH_CASE_FOLDING          "Fold case for API, VERB, EVENT names"   OFF)
 option(WITH_EXTENSION             "Activate ability to load extensions"    ON)
 option(WITH_GNUTLS                "Activate TLS ability with gnutls"       OFF)
+option(WITH_MBEDTLS               "Activate TLS ability with mbedtls"      OFF)
 option(WITH_BINDINGS_V3           "Support legacy bindings version 3"      ON)
 option(WITH_WSJ1                  "Activate WSJ1 protocol"                 ON)
 option(WITH_WSAPI                 "Activate WSAPI protocol"                ON)
@@ -111,8 +112,8 @@ if(WITHOUT_JSON_C)
 	set(WITH_RPC_V1 OFF)
 endif()
 
-if(WITH_GNUTLS)
-	add_definitions(-DWITH_TLS)
+if(WITH_GNUTLS AND WITH_MBEDTLS)
+	message(ERROR "Only one TLS library must be defined")
 endif()
 ###########################################################################
 

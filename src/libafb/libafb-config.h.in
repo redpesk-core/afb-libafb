@@ -75,6 +75,7 @@
 #cmakedefine01 WITH_CASE_FOLDING
 #cmakedefine01 WITH_EXTENSION
 #cmakedefine01 WITH_GNUTLS
+#cmakedefine01 WITH_MBEDTLS
 #cmakedefine01 WITH_BINDINGS_V3
 #cmakedefine01 WITH_WSJ1
 #cmakedefine01 WITH_WSAPI
@@ -91,4 +92,6 @@
 #  undef WITH_AFB_TRACE
 #  define WITH_AFB_TRACE 0
 #endif
+
+#define WITH_TLS (WITH_GNUTLS || WITH_MBEDTLS)
 
