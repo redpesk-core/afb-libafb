@@ -69,25 +69,47 @@
 #if USE_SND_RCV
 # include <sys/socket.h>
 #endif
+
 /*
 * structure for wrapping RPC
 */
 struct afb_wrap_rpc
 {
+	/** the protocol stub handler */
 	struct afb_stub_rpc *stub;
+
+	/** the websocket handler or NULL */
 	struct afb_ws *ws;
+
+	/** the FD event handler */
 	struct ev_fd *efd;
+
+	/** receiving handler */
 	struct {
+		/** the receiving buffer */
 		uint8_t *buffer;
+		/** the received size */
 		size_t size;
+		/** detection of in callback release */
 		uint8_t dropped;
 	}
 		mem;
-#if WITH_GNUTLS
-	gnutls_certificate_credentials_t gnutls_creds;
-	gnutls_session_t gnutls_session;
+
+	/* FOR TLS */
+#if WITH_TLS
 	/* IP or hostname; necessary for handshakes, so it must live as long as the session lives */
 	char *host;
+
+#if WITH_GNUTLS
+	/** the TLS session handler */
+	gnutls_certificate_credentials_t gnutls_creds;
+
+	/** the TLS session handler */
+	gnutls_session_t gnutls_session;
+#else
+#  error "unimplemented TLS backend"
+#endif
+
 #endif
 };
 
@@ -256,7 +278,7 @@ static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 	wrap->mem.buffer = buffer;
 }
 
-static void notify(void *closure, struct afb_rpc_coder *coder)
+static void notify_fd(void *closure, struct afb_rpc_coder *coder)
 {
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
@@ -379,13 +401,22 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 	return 0;
 }
 
+static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, ev_fd_cb_t onevent_cb, void (*notify_cb)(void*, struct afb_rpc_coder*))
+{
+	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_cb, wrap, 0, autoclose);
+	if (rc >= 0)
+		/* callback for emission */
+		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+
+	return rc;
+}
+
 #if WITH_TLS
-static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd)
+static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
 {
 	int rc;
 	const char *cert_path, *key_path, *trust, *host, *host_end, *argsstr, **args;
 	size_t host_len;
-	wrap->gnutls_session = NULL;
 
 	/* get cert & key from uri query arguments */
 	cert_path = key_path = trust = NULL;
@@ -418,6 +449,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 
 	/* setup GnuTLS */
 #if WITH_GNUTLS
+	wrap->gnutls_session = NULL;
 	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, trust);
 	if (rc >= 0) {
 		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_FD_Tls_Server, fd, wrap->host);
@@ -428,25 +460,19 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 #  error "unimplemented TLS backend"
 #endif
 
-	/* cleanup */
-	free(args);
+	if (rc >= 0)
+		rc = init_fd(wrap, fd, autoclose, onevent, notify_tls);
+
 	if (rc < 0) {
 		free(wrap->host);
 		wrap->host = NULL;
 	}
+
+	/* cleanup */
+	free(args);
 	return rc;
 }
 #endif
-
-static int init_raw(struct afb_wrap_rpc *wrap, int fd, int autoclose, ev_fd_cb_t onevent_cb, void (*notify_cb)(void*, struct afb_rpc_coder*))
-{
-	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_cb, wrap, 0, autoclose);
-	if (rc >= 0)
-		/* callback for emission */
-		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
-
-	return rc;
-}
 
 /**
 * Initialize the wrapper
@@ -460,7 +486,6 @@ static int init(
 		const char *apiname,
 		struct afb_apiset *callset
 ) {
-	void (*notify_cb)(void*, struct afb_rpc_coder*) = notify;
 
 	/* create the stub */
 	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
@@ -475,17 +500,12 @@ static int init(
 		}
 		else {
 			wrap->ws = NULL;
-
 #if WITH_TLS
-			if (mode == Wrap_Rpc_Mode_FD_Tls_Client || mode == Wrap_Rpc_Mode_FD_Tls_Server) {
-				rc = init_tls(wrap, uri, mode, fd);
-				notify_cb = notify_tls;
-			}
+			if (mode == Wrap_Rpc_Mode_FD_Tls_Client || mode == Wrap_Rpc_Mode_FD_Tls_Server)
+				rc = init_tls(wrap, uri, mode, fd, autoclose);
+			else
 #endif
-
-			/* direct initialisation */
-			if (rc >= 0)
-				rc = init_raw(wrap, fd, autoclose, onevent, notify_cb);
+				rc = init_fd(wrap, fd, autoclose, onevent, notify_fd);
 		}
 		if (rc >= 0) {
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
