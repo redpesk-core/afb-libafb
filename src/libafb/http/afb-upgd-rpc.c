@@ -41,7 +41,7 @@ static int upgrade_cb(
 		void (*cleanup)(void*),
 		void *cleanup_closure
 ) {
-	return afb_wrap_rpc_upgrade(
+	return afb_wrap_rpc_websocket_upgrade(
 		closure,
 		fd,
 		0,
@@ -68,7 +68,7 @@ void *afb_rpc_upgd_ws(
 		void (*cleanup)(void*),
 		void *cleanup_closure)
 {
-	int rc = afb_wrap_rpc_upgrade(
+	int rc = afb_wrap_rpc_websocket_upgrade(
 		closure,
 		fd,
 		autoclose,

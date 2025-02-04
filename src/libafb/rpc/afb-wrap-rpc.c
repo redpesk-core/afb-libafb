@@ -420,7 +420,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 #if WITH_GNUTLS
 	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, trust);
 	if (rc >= 0) {
-		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_Tls_Server, fd, wrap->host);
+		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_FD_Tls_Server, fd, wrap->host);
 		if (rc < 0)
 			gnutls_certificate_free_credentials(wrap->gnutls_creds);
 	}
@@ -477,7 +477,7 @@ static int init(
 			wrap->ws = NULL;
 
 #if WITH_TLS
-			if (mode == Wrap_Rpc_Mode_Tls_Client || mode == Wrap_Rpc_Mode_Tls_Server) {
+			if (mode == Wrap_Rpc_Mode_FD_Tls_Client || mode == Wrap_Rpc_Mode_FD_Tls_Server) {
 				rc = init_tls(wrap, uri, mode, fd);
 				notify_cb = notify_tls;
 			}
@@ -498,7 +498,7 @@ static int init(
 }
 
 /* creation of the wrapper */
-int afb_wrap_rpc_create(
+int afb_wrap_rpc_create_fd(
 		struct afb_wrap_rpc **wrap,
 		int fd,
 		int autoclose,
@@ -534,7 +534,7 @@ int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *decl
 }
 
 /* HTTP upgrade of the connection 'fd' to RPC/WS */
-int afb_wrap_rpc_upgrade(
+int afb_wrap_rpc_websocket_upgrade(
 		void *closure,
 		int fd,
 		int autoclose,
@@ -546,8 +546,8 @@ int afb_wrap_rpc_upgrade(
 		int websock
 ) {
 	struct afb_wrap_rpc *wrap;
-	enum afb_wrap_rpc_mode mode = websock ? Wrap_Rpc_Mode_Websocket : Wrap_Rpc_Mode_Raw;
-	int rc = afb_wrap_rpc_create(&wrap, fd, autoclose, mode, NULL, NULL, callset);
+	enum afb_wrap_rpc_mode mode = websock ? Wrap_Rpc_Mode_Websocket : Wrap_Rpc_Mode_FD;
+	int rc = afb_wrap_rpc_create_fd(&wrap, fd, autoclose, mode, NULL, NULL, callset);
 	if (rc >= 0) {
 		afb_stub_rpc_set_session(wrap->stub, session);
 		afb_stub_rpc_set_token(wrap->stub, token);

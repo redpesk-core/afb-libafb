@@ -122,7 +122,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 #if WITH_TLS
 	int tls;
 #endif
-	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_Raw;
+	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_FD;
 
 	/* check the api name */
 	uri_no_tls = prefix_tls_remove(uri);
@@ -155,7 +155,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	/* set the correct connection mode */
 #if WITH_TLS
 	if (tls)
-		mode = Wrap_Rpc_Mode_Tls_Client;
+		mode = Wrap_Rpc_Mode_FD_Tls_Client;
 #endif
 	if (websock)
 		mode = Wrap_Rpc_Mode_Websocket;
@@ -165,7 +165,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0) {
 		/* create the client wrap */
 		fd = rc;
-		rc = afb_wrap_rpc_create(&wrap, fd, 1, mode, uri, apiname, call_set);
+		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, uri, apiname, call_set);
 		if (rc >= 0) {
 			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
@@ -209,7 +209,7 @@ static void server_accept(struct server *server, int fd)
 	socklen_t lenaddr;
 	struct afb_wrap_rpc *wrap;
 	const char *apiname;
-	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_Raw;
+	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_FD;
 
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
@@ -223,12 +223,12 @@ static void server_accept(struct server *server, int fd)
 			mode = Wrap_Rpc_Mode_Websocket;
 #if WITH_TLS
 		if (server->tls)
-			mode = Wrap_Rpc_Mode_Tls_Server;
+			mode = Wrap_Rpc_Mode_FD_Tls_Server;
 #endif
 		apiname = &server->uri[server->offapi];
 		if (apiname[0] == 0)
 			apiname = NULL;
-		rc = afb_wrap_rpc_create(&wrap, fdc, 1, mode, server->uri, apiname, server->apiset);
+		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, mode, server->uri, apiname, server->apiset);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);

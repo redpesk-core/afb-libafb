@@ -28,13 +28,13 @@
  * RPC wrap connection mode, TLS and WebSocket are mutually exclusive
  */
 enum afb_wrap_rpc_mode {
-	/* direct */
-	Wrap_Rpc_Mode_Raw,
+	/* file descriptor */
+	Wrap_Rpc_Mode_FD,
 #if WITH_TLS
-	/* TLS (client) */
-	Wrap_Rpc_Mode_Tls_Client,
-	/* TLS (server) */
-	Wrap_Rpc_Mode_Tls_Server,
+	/* file descriptor for TLS (client) */
+	Wrap_Rpc_Mode_FD_Tls_Client,
+	/* file descriptor for TLS (server) */
+	Wrap_Rpc_Mode_FD_Tls_Server,
 #endif
 	/* WebSocket */
 	Wrap_Rpc_Mode_Websocket
@@ -60,7 +60,7 @@ struct afb_wrap_rpc;
  * @returns 0 on success or a negative error code
  */
 extern
-int afb_wrap_rpc_create(
+int afb_wrap_rpc_create_fd(
 		struct afb_wrap_rpc **wrap,
 		int fd,
 		int autoclose,
@@ -93,7 +93,7 @@ const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap);
  * Function for implementing upgrade from HTTP to RPC on Websocket over HTTP.
  */
 extern
-int afb_wrap_rpc_upgrade(
+int afb_wrap_rpc_websocket_upgrade(
 		void *closure,
 		int fd,
 		int autoclose,
