@@ -147,7 +147,7 @@ static void hangup(struct afb_wrap_rpc *wrap)
 	free(wrap);
 }
 
-static void onevent(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
+static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	uint8_t *buffer;
@@ -401,9 +401,9 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 	return 0;
 }
 
-static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, ev_fd_cb_t onevent_cb, void (*notify_cb)(void*, struct afb_rpc_coder*))
+static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*notify_cb)(void*, struct afb_rpc_coder*))
 {
-	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_cb, wrap, 0, autoclose);
+	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_fd, wrap, 0, autoclose);
 	if (rc >= 0)
 		/* callback for emission */
 		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
@@ -461,7 +461,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 #endif
 
 	if (rc >= 0)
-		rc = init_fd(wrap, fd, autoclose, onevent, notify_tls);
+		rc = init_fd(wrap, fd, autoclose, notify_tls);
 
 	if (rc < 0) {
 		free(wrap->host);
@@ -505,7 +505,7 @@ static int init(
 				rc = init_tls(wrap, uri, mode, fd, autoclose);
 			else
 #endif
-				rc = init_fd(wrap, fd, autoclose, onevent, notify_fd);
+				rc = init_fd(wrap, fd, autoclose, notify_fd);
 		}
 		if (rc >= 0) {
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
