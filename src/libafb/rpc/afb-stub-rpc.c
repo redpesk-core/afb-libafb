@@ -2046,8 +2046,10 @@ static int reply_description(struct afb_stub_rpc *stub, struct json_object *obje
 #if WITHOUT_JSON_C
 	return send_describe_reply(stub, callid, NULL);
 #else
+	int rc = send_describe_reply(stub, callid, json_object_to_json_string(object));
 	afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object);
-	return send_describe_reply(stub, callid, json_object_to_json_string(object));
+	emit(stub);
+	return rc;
 #endif
 }
 
