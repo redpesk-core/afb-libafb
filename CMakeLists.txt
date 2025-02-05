@@ -168,9 +168,8 @@ if(ZEPHYR_BASE)
 	set(WITH_THREAD_LOCAL ON)
 	add_compile_definitions(HAVENT_alloca_h=1)
 
-	include_directories(${afb-binding_SOURCE_DIR})
-	include_directories(${ZEPHYR_RP_LIB_UTILS_MODULE_DIR}/src)
 	find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+        zephyr_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/libafb)
 
 else(ZEPHYR_BASE)
 
