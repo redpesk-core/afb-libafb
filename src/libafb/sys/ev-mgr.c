@@ -1111,7 +1111,7 @@ static void do_dispatch(struct ev_mgr *mgr)
 #endif
 #else
 #if WITH_TIMERFD
-		if (mgr->pollfds[IDX_TIME])
+		if (mgr->pollfds[IDX_TIME].revents)
 			timer_event(mgr);
 #endif
 		it = &mgr->pollfds[IDX_FDS0];

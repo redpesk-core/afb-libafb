@@ -34,6 +34,7 @@ set(incdirs
 	${afb-binding_INCLUDE_DIRS}
 	${librp-utils_INCLUDE_DIRS}
 )
+
 set(ldflags
 	${CMAKE_THREAD_LIBS_INIT}
 	${json-c_LDFLAGS}

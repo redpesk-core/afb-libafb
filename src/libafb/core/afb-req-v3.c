@@ -104,13 +104,13 @@ static inline struct afb_req_x2 *req_v3_to_req_x2(struct afb_req_v3 *req)
 
 /******************************************************************************/
 
-inline struct afb_req_v3 *afb_req_v3_addref(struct afb_req_v3 *req)
+static inline struct afb_req_v3 *afb_req_v3_addref(struct afb_req_v3 *req)
 {
 	__atomic_add_fetch(&req->refcount, 1, __ATOMIC_RELAXED);
 	return req;
 }
 
-inline void afb_req_v3_unref(struct afb_req_v3 *req)
+static inline void afb_req_v3_unref(struct afb_req_v3 *req)
 {
 	struct afb_req_common *comreq;
 

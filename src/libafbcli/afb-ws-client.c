@@ -42,8 +42,12 @@
 
 #include "misc/afb-socket.h"
 #include "core/afb-ev-mgr.h"
+#if WITH_WSAPI && !WITHOUT_JSON_C
 #include "wsapi/afb-proto-ws.h"
+#endif
+#if WITH_WSJ1 && !WITHOUT_JSON_C
 #include "wsj1/afb-wsj1.h"
+#endif
 #include "tls/tls.h"
 #include "sys/ev-mgr.h"
 #include "sys/x-socket.h"
@@ -465,6 +469,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 
 	/* get the socket */
 	result = NULL;
+#if WITH_WSJ1 && !WITHOUT_JSON_C
 	iai = rai;
 	while (iai != NULL) {
 		struct sockaddr_in *a = (struct sockaddr_in*)(iai->ai_addr);
@@ -507,6 +512,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 		}
 		iai = iai->ai_next;
 	}
+#endif
 	freeaddrinfo(rai);
 	return result;
 }
@@ -577,6 +583,7 @@ static int sockopen(struct sd_event *eloop, const char *uri, int server)
  */
 struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const char *uri, struct afb_proto_ws_client_itf *itf, void *closure)
 {
+#if WITH_WSAPI && !WITHOUT_JSON_C
 	struct afb_proto_ws *pws;
 	int fd;
 
@@ -588,6 +595,7 @@ struct afb_proto_ws *afb_ws_client_connect_api(struct sd_event *eloop, const cha
 			return pws;
 		}
 	}
+#endif
 	return NULL;
 }
 

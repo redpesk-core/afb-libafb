@@ -174,6 +174,8 @@ if(ZEPHYR_BASE)
 else(ZEPHYR_BASE)
 
 	SET(WITH_ZEPHYR NO)
+	add_compile_options(-fPIC)
+	set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 	include(FindPkgConfig)
 	include(CheckIncludeFiles)
@@ -184,9 +186,10 @@ else(ZEPHYR_BASE)
 	include(CTest)
 
 	PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
-	
+
 	if (NOT WITHOUT_JSON_C)
 		PKG_CHECK_MODULES(json-c REQUIRED json-c)
+		add_compile_definitions(${})
 	endif()
 
 	if(WITH_RPUTILS_STATIC)
@@ -246,7 +249,6 @@ endif()
 
 if(WITH_GNUTLS)
 	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.6.5)
-	add_definitions(-DWITH_TLS)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
@@ -265,7 +267,7 @@ add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
 #	$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
 #)
 #add_compile_options(-ffunction-sections -fdata-sections)
-#add_compile_options(-fPIC)
+#
 #add_compile_options(-g -O2)
 #set (CMAKE_CXX_STANDARD 14)
 #
