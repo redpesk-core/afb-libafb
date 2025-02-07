@@ -57,6 +57,7 @@
 #define WITH_LIBUUID 0
 #define WITH_EPOLL 0
 #define WITH_EVENTFD 1
+#define WITH_TIMERFD 0
 #define WITH_CLOCK_GETTIME 0
 #define WITH_RANDOM_R 0
 #define WITH_OPENAT 0
