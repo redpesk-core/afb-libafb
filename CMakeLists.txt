@@ -111,7 +111,7 @@ endif()
 ###########################################################################
 # Detect the platform reliably
 if(ZEPHYR_BASE)
-	if (NOT CONFIG_AFB_BINDER)
+	if (NOT CONFIG_AFB_ZEPHYR)
 		return()
 	endif()
 	SET(WITH_ZEPHYR YES)
