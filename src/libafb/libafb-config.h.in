@@ -82,6 +82,7 @@
 #cmakedefine01 WITH_RPC_V1
 #cmakedefine01 WITH_RPC_V3
 #cmakedefine01 WITH_TRACK_JOB_CALL
+#cmakedefine01 WITH_VCOMM
 #cmakedefine01 WITHOUT_JSON_C
 #cmakedefine01 MINIMAL_LOCALE_ROOT
 

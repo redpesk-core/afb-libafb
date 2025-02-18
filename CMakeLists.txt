@@ -74,6 +74,7 @@ option(WITH_WSAPI                 "Activate WSAPI protocol"                ON)
 option(WITH_RPC_V1                "Activate RPC protocol version 1"        ON)
 option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
 option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
+option(WITH_VCOMM                 "support VCOMM layer"                    ON)
 option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
 ## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
@@ -156,6 +157,7 @@ if(ZEPHYR_BASE)
 	set(WITH_TRACK_JOB_CALL OFF)
 	set(WITH_UNIX_SOCKET OFF)
 	set(WITH_WSCLIENT_URI_COPY OFF)
+	set(WITH_VCOMM ON)
 
 	# tunable
 	set(ARCH32 OFF)

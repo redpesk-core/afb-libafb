@@ -118,3 +118,25 @@ void afb_wrap_rpc_set_cred(
 		struct afb_wrap_rpc *wrap,
 		struct afb_cred *cred);
 #endif
+
+#if WITH_VCOMM
+struct afb_vcomm;
+
+/**
+ * Creates an RPC wrapper for the 'com'.
+ *
+ * @param wrap      pointer receiving the created wrapper
+ * @param com       communication object
+ * @param apiname   the default API name, can be NULL except for clients
+ * @param callset   the call set for received calls
+ *
+ * @returns 0 on success or a negative error code
+ */
+extern
+int afb_wrap_rpc_create_vcomm(
+		struct afb_wrap_rpc **wrap,
+		struct afb_vcomm *vcomm,
+		const char *apiname,
+		struct afb_apiset *callset
+);
+#endif

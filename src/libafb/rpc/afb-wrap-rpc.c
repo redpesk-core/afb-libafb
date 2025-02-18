@@ -37,6 +37,7 @@
 
 #include "misc/afb-uri.h"
 #include "misc/afb-ws.h"
+#include "misc/afb-vcomm.h"
 #include "rpc/afb-rpc-coder.h"
 #include "core/afb-ev-mgr.h"
 #include "core/afb-cred.h"
@@ -81,9 +82,12 @@ struct afb_wrap_rpc
 	/** the websocket handler or NULL */
 	struct afb_ws *ws;
 
-	/** the FD event handler */
+	/** the FD event handler or NULL */
 	struct ev_fd *efd;
-
+#if WITH_VCOMM
+	/** the COM handler or NULL */
+	struct afb_vcomm *vcomm;
+#endif
 	/** receiving handler */
 	struct {
 		/** the receiving buffer */
@@ -143,6 +147,10 @@ static void hangup(struct afb_wrap_rpc *wrap)
 		ev_fd_unref(wrap->efd);
 	if (wrap->ws != NULL)
 		{/*TODO*/}
+#if WITH_VCOMM
+	if (wrap->vcomm != NULL)
+		afb_vcomm_close(wrap->vcomm);
+#endif
 	free(wrap->mem.buffer);
 	free(wrap);
 }
@@ -257,6 +265,10 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 	if (wrap->mem.size == 0)
 		/* fully complete */
 		buffer = NULL;
+	else if (wrap->mem.dropped) {
+		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+		wrap->mem.dropped = 0;
+	}
 	else {
 		/*
 		* partially incomplete
@@ -589,3 +601,153 @@ void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred)
 }
 #endif
 
+
+#if WITH_VCOMM
+
+/******************************************************************************/
+/***       V C O M M                                                        ***/
+/******************************************************************************/
+
+static void onevent_vcomm(void *closure, const void *data, size_t size)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	uint8_t *buffer;
+	size_t esz;
+	ssize_t ssz;
+
+	/* allocate memory */
+	esz = size;
+	buffer = realloc(wrap->mem.buffer, wrap->mem.size + esz);
+	if (buffer == NULL) {
+		/* allocation failed */
+		if (wrap->mem.size + esz == 0)
+			wrap->mem.buffer = NULL;
+		hangup(wrap);
+		return;
+	}
+	wrap->mem.buffer = buffer;
+	buffer += wrap->mem.size;
+	wrap->mem.size += esz;
+
+	/* read in buffer */
+	memcpy(buffer, data, esz);
+
+	/* nothing in!? */
+	if (wrap->mem.size == 0)
+		return;
+
+	/* process the buffer */
+	wrap->mem.dropped = 0;
+
+	ssz = afb_stub_rpc_receive(wrap->stub, wrap->mem.buffer, wrap->mem.size);
+
+	if (ssz < 0) {
+		/* processing error */
+		if (!wrap->mem.dropped)
+			wrap->mem.buffer = NULL; /* not released yet */
+		hangup(wrap);
+		return;
+	}
+
+	/* fully incomplete */
+	if (ssz == 0)
+		return;
+
+	/* check processed size */
+	wrap->mem.size -= (size_t)ssz;
+	if (wrap->mem.size == 0)
+		/* fully complete */
+		buffer = NULL;
+	else if (wrap->mem.dropped) {
+		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+		wrap->mem.dropped = 0;
+	}
+	else {
+		/*
+		* partially incomplete
+		* copy is preferred to avoid changing addresses of pointers
+		* even if downsizing memory with realloc normally returns the
+		* same address, it is no guarantied by its specs
+		*/
+		buffer = malloc(wrap->mem.size);
+		if (buffer == NULL) {
+			hangup(wrap);
+			return;
+		}
+		memcpy(buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+	}
+	if (wrap->mem.dropped)
+		free(wrap->mem.buffer);
+	wrap->mem.buffer = buffer;
+}
+
+/**
+* Send the content to the connection
+*/
+static void notify_vcomm(void *closure, struct afb_rpc_coder *coder)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	struct afb_vcomm *vcomm = wrap->vcomm;
+	uint32_t size;
+	void *buffer;
+	int rc;
+
+	afb_rpc_coder_output_sizes(coder, &size);
+	rc = afb_vcomm_get_tx_buffer(vcomm, &buffer, size);
+	if (rc < 0)
+		RP_ERROR("Failed to get a send buffer for %u bytes", (unsigned)size);
+	else {
+		afb_rpc_coder_output_get_buffer(coder, buffer, size);
+		rc = afb_vcomm_send_nocopy(vcomm, buffer, size);
+		if (rc < 0) {
+			RP_ERROR("Failed to send a buffer of %u bytes", (unsigned)size);
+			afb_vcomm_drop_tx_buffer(vcomm, buffer);
+		}
+		afb_rpc_coder_output_dispose(coder);
+	}
+}
+
+/**
+* Initialize the wrapper
+*/
+static int init_vcomm(
+		struct afb_wrap_rpc *wrap,
+		struct afb_vcomm *vcomm,
+		enum afb_wrap_rpc_mode mode,
+		const char *apiname,
+		struct afb_apiset *callset
+) {
+	/* create the stub */
+	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+	if (rc >= 0) {
+		wrap->vcomm = vcomm;
+		rc = afb_vcomm_on_message(vcomm, onevent_vcomm, wrap);
+		if (rc >= 0)
+			/* callback for emission */
+			afb_stub_rpc_emit_set_notify(wrap->stub, notify_vcomm, wrap);
+	}
+	return rc;
+}
+
+/* wrap a vcomm */
+int afb_wrap_rpc_create_vcomm(
+		struct afb_wrap_rpc **wrap,
+		struct afb_vcomm *vcomm,
+		const char *apiname,
+		struct afb_apiset *callset
+) {
+	int rc;
+	*wrap = calloc(1, sizeof **wrap);
+	if (*wrap == NULL)
+		rc = X_ENOMEM;
+	else {
+		rc = init_vcomm(*wrap, vcomm, 0, apiname, callset);
+		if (rc < 0) {
+			free(*wrap);
+			*wrap = NULL;
+		}
+	}
+	return rc;
+}
+
+#endif

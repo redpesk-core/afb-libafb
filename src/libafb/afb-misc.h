@@ -26,6 +26,7 @@
 #include "libafb-config.h"
 #include "misc/afb-autoset.h"
 #include "misc/afb-debug.h"
+#include "misc/afb-com.h"
 #include "misc/afb-monitor.h"
 #include "misc/afb-socket.h"
 #include "misc/afb-supervision.h"
