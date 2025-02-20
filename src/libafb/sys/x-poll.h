@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if __ZEPHYR__
 
 #include <zephyr/net/socket.h>

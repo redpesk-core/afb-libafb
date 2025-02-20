@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if HAVENT_vasprintf
 #include <stdio.h>
 #include <stdarg.h>

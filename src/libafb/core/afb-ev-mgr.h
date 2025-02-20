@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include "../sys/x-thread.h"
 #include "../sys/ev-mgr.h"
 

@@ -23,5 +23,7 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 extern const char *afb_error_text(int code);
 extern int afb_error_code(const char *error);

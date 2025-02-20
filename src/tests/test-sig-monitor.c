@@ -22,7 +22,6 @@
  $RP_END_LICENSE$
 */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>

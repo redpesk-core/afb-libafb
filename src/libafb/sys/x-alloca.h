@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if HAVENT_alloca_h
 
 #undef alloca

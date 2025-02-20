@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if WITH_WSAPI
 
 struct afb_stub_ws;

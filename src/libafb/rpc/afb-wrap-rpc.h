@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 /**
  * RPC wrap connection mode, TLS and WebSocket are mutually exclusive
  */

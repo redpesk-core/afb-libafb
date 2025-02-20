@@ -24,6 +24,8 @@
 #pragma once
 
 
+#include "../libafb-config.h"
+
 typedef struct afb_rpc_coder afb_rpc_coder_t;
 typedef struct afb_rpc_decoder afb_rpc_decoder_t;
 

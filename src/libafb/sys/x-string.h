@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if HAVENT_strcasecmp
 #include <ctype.h>
 static inline int strcasecmp(const char *s1, const char *s2)

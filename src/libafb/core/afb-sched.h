@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_sched_lock;
 struct ev_mgr;
 

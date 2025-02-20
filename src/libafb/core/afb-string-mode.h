@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 /**
  * Defines how to handle strings associated strings
  */

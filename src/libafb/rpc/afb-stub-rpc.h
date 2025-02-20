@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_stub_rpc;
 struct afb_apiset;
 struct afb_session;

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <pthread.h>
 
 #define x_rwlock_t                     pthread_rwlock_t

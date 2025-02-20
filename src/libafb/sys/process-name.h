@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if __ZEPHYR__
 #define process_name_set_name(x)          0
 #define process_name_replace_cmdline(x,y) 0
