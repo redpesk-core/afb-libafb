@@ -185,7 +185,32 @@ if(ZEPHYR_BASE)
 else(ZEPHYR_BASE)
 
 	SET(WITH_ZEPHYR NO)
+
 	add_compile_options(-fPIC)
+	link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
+
+	add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
+	add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
+	add_compile_options(-Wsign-compare -Wsign-conversion)
+	add_compile_options(
+		$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+		$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+		$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+		$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+		$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
+	)
+	add_compile_options(-ffunction-sections -fdata-sections)
+
+	set (CMAKE_CXX_STANDARD 14)
+
+	set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
+	#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
+	#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
+	set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
+	set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
+	set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
+
+	# for tools use
 	set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 	include(FindPkgConfig)
@@ -263,40 +288,6 @@ if(WITH_GNUTLS)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
-
-###########################################################################
-#link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
-#
-#add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
-#add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
-#add_compile_options(-Wsign-compare -Wsign-conversion)
-#add_compile_options(
-#	$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-#	$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-#	$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-#	$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-#	$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
-#)
-#add_compile_options(-ffunction-sections -fdata-sections)
-#
-#add_compile_options(-g -O2)
-#set (CMAKE_CXX_STANDARD 14)
-#
-#if(ARCH32)
-#	add_compile_options(-m32)
-#	link_libraries(-m32)
-#endif()
-#
-#set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
-##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
-##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
-#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
-#set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
-#set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
-#
-## for tools use
-#set(CMAKE_EXPORT_COMPILE_COMMANDS on)
-###########################################################################
 
 add_subdirectory(src)
 
