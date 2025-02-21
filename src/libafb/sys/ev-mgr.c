@@ -1080,9 +1080,13 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 			rc = rc ? -errno : rc;
 #else
 			if (rc == 0) {
-				mgr->state = Pending;
-				mgr->last_timer = 0;
-				rc = 1;
+				if (mgr->last_timer == 0)
+					mgr->state = Idle;
+				else {
+					mgr->state = Pending;
+					mgr->last_timer = 0;
+					rc = 1;
+				}
 			}
 			else {
 				mgr->state = Idle;
