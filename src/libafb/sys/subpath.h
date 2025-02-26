@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 extern int subpath_is_valid(const char *path);
 extern const char *subpath(const char *path);
 extern const char *subpath_force(const char *path);

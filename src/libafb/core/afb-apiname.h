@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 extern int afb_apiname_is_valid(const char *apiname);
 
 static inline int afb_apiname_is_public(const char *apiname)

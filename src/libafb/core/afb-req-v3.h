@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if WITH_BINDINGS_V3
 
 struct afb_req_common;

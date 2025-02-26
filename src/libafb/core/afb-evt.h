@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <stdint.h>
 
 #include <rp-utils/rp-uuid.h>

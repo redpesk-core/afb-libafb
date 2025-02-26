@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_apiset;
 
 extern int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong);

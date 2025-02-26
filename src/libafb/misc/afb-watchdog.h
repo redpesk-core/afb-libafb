@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if !defined(HAS_WATCHDOG)
 #  if defined(NO_JOBS_WATCHDOG)
 #     define HAS_WATCHDOG 0

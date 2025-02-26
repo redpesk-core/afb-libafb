@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <sys/param.h>
 
 #if !defined(htole32)

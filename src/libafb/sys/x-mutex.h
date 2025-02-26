@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <pthread.h>
 
 #define x_mutex_t                pthread_mutex_t

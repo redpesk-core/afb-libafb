@@ -23,40 +23,6 @@
 
 #include "../libafb-config.h"
 
-/*******************************************************************************
-*  sig-monitor is under the control of several compilation flags
-*******************************************************************************/
-
-/* controls whether to dump stack or not */
-#if !defined(WITH_SIG_MONITOR_DUMPSTACK)
-#  define WITH_SIG_MONITOR_DUMPSTACK 1
-#endif
-
-/* control whether to monitor signals */
-#if !defined(WITH_SIG_MONITOR_SIGNALS)
-#  define WITH_SIG_MONITOR_SIGNALS 1
-#endif
-
-/* controls whether to monitor calls */
-#if !defined(WITH_SIG_MONITOR_FOR_CALL)
-#  define WITH_SIG_MONITOR_FOR_CALL 1
-#endif
-
-/* control whether to monitor timers */
-#if !defined(WITH_SIG_MONITOR_TIMERS)
-#  define WITH_SIG_MONITOR_TIMERS 1
-#endif
-
-#if !WITH_SIG_MONITOR_SIGNALS
-#  undef WITH_SIG_MONITOR_FOR_CALL
-#  define WITH_SIG_MONITOR_FOR_CALL 0
-#endif
-
-#if !WITH_SIG_MONITOR_FOR_CALL
-#  undef WITH_SIG_MONITOR_TIMERS
-#  define WITH_SIG_MONITOR_TIMERS 0
-#endif
-
 /******************************************************************************/
 
 #include <stdlib.h>
@@ -71,11 +37,9 @@
 #include "sys/x-thread.h"
 
 /******************************************************************************/
-#if !WITH_SIG_MONITOR_DUMPSTACK
-
-static inline void dumpstack(int crop, int signum) {}
-
-#else
+/**** DUMP THE STACK                                                        ***/
+/******************************************************************************/
+#if WITH_SIG_MONITOR_DUMPSTACK
 
 #include <execinfo.h>
 
@@ -117,16 +81,7 @@ static void dumpstack(int crop, int signum)
 
 #endif
 /******************************************************************************/
-#if !WITH_SIG_MONITOR_TIMERS
-
-static inline int timeout_create() { return 0; }
-static inline int timeout_arm(int timeout) { return 0; }
-static inline void timeout_disarm() {}
-static inline void timeout_delete() {}
-
-#define SIG_FOR_TIMER   0
-
-#else
+#if WITH_SIG_MONITOR_TIMERS
 
 #include <time.h>
 #include <sys/syscall.h>
@@ -261,15 +216,19 @@ static void monitor_run(int timeout, void (*function)(int sig, void*), void *arg
 	signum = sigsetjmp(recovery.jmpbuf, 1);
 	if (signum == 0) {
 		x_tls_set_error_handler(&recovery);
+#if WITH_SIG_MONITOR_TIMERS
 		if (timeout > 0)
 			timeout_arm(timeout);
+#endif
 		function(0, arg);
 	} else if (recovery.prevsig == 0) {
 		recovery.prevsig = signum;
 		function(signum, arg);
 	}
+#if WITH_SIG_MONITOR_TIMERS
 	if (timeout > 0)
 		timeout_disarm();
+#endif
 	x_tls_set_error_handler(older);
 }
 
@@ -277,7 +236,11 @@ static inline void monitor_raise(int signo)
 {
 	struct recovery *recovery = x_tls_get_error_handler();
 	if (recovery != NULL) {
+#if WITH_SIG_MONITOR_TIMERS
 		int signum = signo == SIG_FOR_TIMER ? SIGALRM : signo ? signo : SIGABRT;
+#else
+		int signum = signo ? signo : SIGABRT;
+#endif
 		struct undoer *undoer = recovery->undoers;
 		while(undoer != NULL) {
 			recovery->undoers = undoer->previous;
@@ -315,21 +278,28 @@ static inline void monitor_do_run(int timeout, void (*function)(int sig, void*),
 }
 #endif
 /******************************************************************************/
-#if !WITH_SIG_MONITOR_SIGNALS
-
-static inline int enable_signal_handling() { return 0; }
-
-#else
+#if WITH_SIG_MONITOR_SIGNALS
 
 #include <signal.h>
 
 /* internal signal lists */
-static int sigerr[] = { SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIG_FOR_TIMER, 0 };
-static int sigterm[] = { SIGINT, SIGABRT, SIGTERM, 0 };
+static int sigerr[] = {
+	SIGSEGV,
+	SIGFPE,
+	SIGILL,
+	SIGBUS,
+#if WITH_SIG_MONITOR_TIMERS
+	SIG_FOR_TIMER,
+#endif
+	0 };
+static int sigterm[] = {
+	SIGINT,
+	SIGABRT,
+	SIGTERM,
+	0 };
 
 static int exiting = 0;
 static int enabled = 0;
-static int dumpstack_enabled = 1;
 
 /* install the handlers */
 static int set_signals_handler(void (*handler)(int), int *signals)
@@ -392,14 +362,10 @@ static void safe_exit(int code)
 }
 #endif
 
-#if !WITH_SIG_MONITOR_DUMPSTACK
-
-static inline void safe_dumpstack(int crop, int signum) {}
-#define is_in_safe_dumpstack() (0)
-
-#else
+#if WITH_SIG_MONITOR_DUMPSTACK
 
 X_TLS(void,in_safe_dumpstack)
+static int dumpstack_enabled = 1;
 
 static void safe_dumpstack_cb(int signum, void *closure)
 {
@@ -429,38 +395,36 @@ static inline int is_in_safe_dumpstack()
 /* Handles signals that terminate the process */
 static void on_signal_terminate (int signum)
 {
+#if WITH_SIG_MONITOR_DUMPSTACK
 	if (!is_in_safe_dumpstack()) {
 		RP_ERROR("Terminating signal %d received: %s", signum, strsignal(signum));
 		if (dumpstack_enabled && signum == SIGABRT)
 			safe_dumpstack(3, signum);
 	}
+#endif
 	safe_exit(1);
 }
 
 /* Handles monitored signals that can be continued */
 static void on_signal_error(int signum)
 {
+#if WITH_SIG_MONITOR_DUMPSTACK
 	if (!is_in_safe_dumpstack()) {
 		RP_ERROR("ALERT! signal %d received: %s", signum, strsignal(signum));
 		if (dumpstack_enabled)
 			safe_dumpstack(3, signum);
 	}
+#endif
+#if WITH_SIG_MONITOR_FOR_CALL
 	monitor_raise(signum);
-
-	if (signum != SIG_FOR_TIMER) {
-		RP_ERROR("Unmonitored signal %d received: %s", signum, strsignal(signum));
-		safe_exit(2);
-	}
+#if WITH_SIG_MONITOR_TIMERS
+	if (signum == SIG_FOR_TIMER)
+		return;
+#endif
+#endif
+	RP_ERROR("Unmonitored signal %d received: %s", signum, strsignal(signum));
+	safe_exit(2);
 }
-
-/*
-static void disable_signal_handling()
-{
-	set_signals_handler(SIG_DFL, sigerr);
-	set_signals_handler(SIG_DFL, sigterm);
-	enabled = 0;
-}
-*/
 
 static int enable_signal_handling()
 {
@@ -477,11 +441,14 @@ static int enable_signal_handling()
 #endif
 /******************************************************************************/
 
+#if WITH_SIG_MONITOR_SIGNALS
 int afb_sig_monitor_init(int enable)
 {
 	return enable ? enable_signal_handling() : 0;
 }
+#endif
 
+#if WITH_SIG_MONITOR_TIMERS
 int afb_sig_monitor_init_timeouts()
 {
 	return timeout_create();
@@ -491,36 +458,37 @@ void afb_sig_monitor_clean_timeouts()
 {
 	timeout_delete();
 }
+#endif
+
+#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 
 void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *arg)
 {
-#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 	if (enabled)
 		monitor_run(timeout, function, arg);
 	else
-#endif
 		function(0, arg);
 }
 
 void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg)
 {
-#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 	if (enabled)
 		monitor_do(function, arg);
 	else
-#endif
 		function(0, arg);
 }
 
 void afb_sig_monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg)
 {
-#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 	if (enabled)
 		monitor_do_run(timeout, function, arg);
 	else
-#endif
 		function(0, arg);
 }
+#endif
+
+
+#if WITH_SIG_MONITOR_DUMPSTACK
 
 void afb_sig_monitor_dumpstack()
 {
@@ -533,3 +501,5 @@ void afb_sig_monitor_dumpstack_enable(int enable)
 	dumpstack_enabled = enable;
 #endif
 }
+
+#endif

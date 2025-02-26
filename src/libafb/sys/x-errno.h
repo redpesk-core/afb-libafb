@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <errno.h>
 
 #define X_E2BIG		-E2BIG

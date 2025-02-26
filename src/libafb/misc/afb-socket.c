@@ -174,7 +174,7 @@ static int open_unix(const char *spec, int server)
 #endif
 
 /******************************************************************************/
-
+#if WITH_TCP_SOCKET
 /**
  * open a tcp socket for client or server
  *
@@ -285,9 +285,10 @@ static int open_tcp(const char *spec, int server, int reuseaddr)
 		freeaddrinfo(rai);
 	return -errno;
 }
+#endif
 
 /******************************************************************************/
-#if WITH_SYSTEMD
+#if WITH_SYSD_SOCKET
 
 #include "sys/systemd.h"
 
@@ -466,10 +467,12 @@ static int open_uri(const char *uri, int server, const char *scheme)
 		fd = open_unix(uri, server);
 		break;
 #endif
+#if WITH_TCP_SOCKET
 	case Type_Inet:
 		fd = open_tcp(uri, server, !e->noreuseaddr);
 		break;
-#if WITH_SYSTEMD
+#endif
+#if WITH_SYSD_SOCKET
 	case Type_Systemd:
 		if (server)
 			fd = open_systemd(uri);

@@ -53,7 +53,6 @@
 #cmakedefine01 WITH_CALL_PERSONALITY
 #cmakedefine01 WITH_AFB_CALL_SYNC
 #cmakedefine01 WITH_FNMATCH
-#cmakedefine01 WITH_L4VSOCK
 #cmakedefine01 WITH_LIBUUID
 #cmakedefine01 WITH_EPOLL
 #cmakedefine01 WITH_EVENTFD
@@ -68,7 +67,11 @@
 #cmakedefine01 WITH_WSCLIENT_URI_COPY
 #cmakedefine01 WITH_REALPATH
 #cmakedefine01 WITH_CRED
+#cmakedefine01 WITH_SOCKETS
+#cmakedefine01 WITH_L4VSOCK
 #cmakedefine01 WITH_UNIX_SOCKET
+#cmakedefine01 WITH_TCP_SOCKET
+#cmakedefine01 WITH_SYSD_SOCKET
 #cmakedefine01 WITH_THREAD_LOCAL
 #cmakedefine01 WITH_API_CREATOR
 #cmakedefine01 WITH_REQ_PROCESS_ASYNC
@@ -82,6 +85,7 @@
 #cmakedefine01 WITH_RPC_V1
 #cmakedefine01 WITH_RPC_V3
 #cmakedefine01 WITH_TRACK_JOB_CALL
+#cmakedefine01 WITH_VCOMM
 #cmakedefine01 WITHOUT_JSON_C
 #cmakedefine01 MINIMAL_LOCALE_ROOT
 

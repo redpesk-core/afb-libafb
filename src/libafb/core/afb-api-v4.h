@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include "afb-api-common.h"
 #include "afb-v4-itf.h"
 

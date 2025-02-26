@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 /*
  * CAUTION!
  * the default setting uses an abstract socket path

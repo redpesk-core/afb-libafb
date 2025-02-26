@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 extern int afb_socket_open_scheme(const char *uri, int server, const char *scheme);
 
 extern const char *afb_socket_api(const char *uri);

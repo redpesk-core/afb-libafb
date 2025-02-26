@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_api_common;
 struct afb_apiset;
 

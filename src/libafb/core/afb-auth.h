@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if !WITHOUT_JSON_C
 
 #include <stdint.h>

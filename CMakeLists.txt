@@ -55,7 +55,6 @@ option(WITH_AFB_TRACE             "Include monitoring trace"               ON)
 option(WITH_SUPERVISION           "Activates installation of supervision"  ON)
 option(WITH_DYNAMIC_BINDING       "Allow to load dynamic bindings (shared libraries)" ON)
 option(WITH_LIBMICROHTTPD         "Activates HTTP server through LIBMICROHTTPD" ON)
-option(WITH_L4VSOCK               "Activates L4RE support of VIRTIO-SOCKS" OFF)
 option(WITH_CRED                  "Activate tracking of peer credentials"  ON)
 option(WITH_REPLY_JOB             "Send replies in separate job"           ON)
 option(WITH_ENVIRONMENT           "Use environment variables"              ON)
@@ -74,6 +73,7 @@ option(WITH_WSAPI                 "Activate WSAPI protocol"                ON)
 option(WITH_RPC_V1                "Activate RPC protocol version 1"        ON)
 option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
 option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
+option(WITH_VCOMM                 "support VCOMM layer"                    ON)
 option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
 ## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
@@ -92,7 +92,11 @@ option(WITH_OPENAT                "Use openat where possible"              ON)
 option(WITH_DIRENT                "Use opendir and directory browsing"     ON)
 option(WITH_SYS_UIO               "Use sys/uio.h for vectored IO"          ON)
 option(WITH_REALPATH              "Use realpath function"                  ON)
-option(WITH_UNIX_SOCKET           "Allow use of Unix Domain Sockets"       ON)
+option(WITH_SOCKETS               "support sockets"                        ON)
+option(WITH_L4VSOCK               "Activates L4RE support of VIRTIO-SOCKS" OFF)
+option(WITH_UNIX_SOCKET           "support UNIX sockets"                   ON)
+option(WITH_TCP_SOCKET            "support TCP sockets"                    ON)
+option(WITH_SYSD_SOCKET           "support SystemD sockets"                ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
 option(MINIMAL_LOCALE_ROOT        "Use minimal locale-root"                OFF)
@@ -103,6 +107,12 @@ if(WITHOUT_JSON_C)
 	set(WITH_WSJ1 OFF)
 	set(WITH_WSAPI OFF)
 	set(WITH_RPC_V1 OFF)
+endif()
+if(NOT WITH_SOCKETS)
+	set(WITH_L4VSOCK OFF)
+	set(WITH_UNIX_SOCKET OFF)
+	set(WITH_TCP_SOCKET OFF)
+	set(WITH_SYSD_SOCKET OFF)
 endif()
 
 if(WITH_GNUTLS AND WITH_MBEDTLS)
@@ -132,7 +142,6 @@ if(ZEPHYR_BASE)
 	set(WITH_EXTENSION OFF)
 	set(WITH_FNMATCH OFF)
 	set(WITH_GNUTLS OFF)
-	set(WITH_L4VSOCK OFF)
 	set(WITH_LIBMAGIC OFF)
 	set(WITH_LIBMICROHTTPD OFF)
 	set(WITH_LIBUUID OFF)
@@ -156,7 +165,9 @@ if(ZEPHYR_BASE)
 	set(WITH_SYS_UIO ON)
 	set(WITH_TRACK_JOB_CALL OFF)
 	set(WITH_UNIX_SOCKET OFF)
+	set(WITH_L4VSOCK OFF)
 	set(WITH_WSCLIENT_URI_COPY OFF)
+	set(WITH_VCOMM ON)
 
 	# tunable
 	set(ARCH32 OFF)
@@ -175,7 +186,32 @@ if(ZEPHYR_BASE)
 else(ZEPHYR_BASE)
 
 	SET(WITH_ZEPHYR NO)
+
 	add_compile_options(-fPIC)
+	link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
+
+	add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
+	add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
+	add_compile_options(-Wsign-compare -Wsign-conversion)
+	add_compile_options(
+		$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+		$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
+		$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+		$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
+		$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
+	)
+	add_compile_options(-ffunction-sections -fdata-sections)
+
+	set (CMAKE_CXX_STANDARD 14)
+
+	set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
+	#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
+	#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
+	set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
+	set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
+	set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
+
+	# for tools use
 	set(CMAKE_EXPORT_COMPILE_COMMANDS on)
 
 	include(FindPkgConfig)
@@ -253,40 +289,6 @@ if(WITH_GNUTLS)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
-
-###########################################################################
-#link_libraries(-Wl,--as-needed -Wl,--gc-sections -Wl,--no-undefined)
-#
-#add_compile_options(-Wall -Wextra -Wconversion -Wincompatible-pointer-types)
-#add_compile_options(-Wno-unused-parameter) # frankly not using a parameter does it care?
-#add_compile_options(-Wsign-compare -Wsign-conversion)
-#add_compile_options(
-#	$<$<C_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-#	$<$<CXX_COMPILER_ID:GNU>:-Werror=maybe-uninitialized>
-#	$<$<C_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-#	$<$<CXX_COMPILER_ID:Clang>:-Werror=sometimes-uninitialized>
-#	$<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
-#)
-#add_compile_options(-ffunction-sections -fdata-sections)
-#
-#add_compile_options(-g -O2)
-#set (CMAKE_CXX_STANDARD 14)
-#
-#if(ARCH32)
-#	add_compile_options(-m32)
-#	link_libraries(-m32)
-#endif()
-#
-#set(CMAKE_C_FLAGS_RELEASE      "-g -O3")
-##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=address -fno-omit-frame-pointer -lasan")
-##set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb -fsanitize=thread -fno-omit-frame-pointer")
-#set(CMAKE_C_FLAGS_DEBUG        "-g -O1 -ggdb")
-#set(CMAKE_C_FLAGS_PROFILING    "-g -O1 -pg")
-#set(CMAKE_C_FLAGS_COVERAGE     "-g -O1 --coverage")
-#
-## for tools use
-#set(CMAKE_EXPORT_COMPILE_COMMANDS on)
-###########################################################################
 
 add_subdirectory(src)
 

@@ -23,6 +23,9 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
+#if WITH_SIG_MONITOR_SIGNALS
 /**
  * initialise signal monitoring
  *
@@ -31,7 +34,9 @@
  * @return 0 in case of success
  */
 extern int afb_sig_monitor_init(int enable);
+#endif
 
+#if WITH_SIG_MONITOR_TIMERS
 /**
  * Remove time out of the current thread
  */
@@ -43,7 +48,10 @@ extern void afb_sig_monitor_clean_timeouts();
  * @return  0 in case of success
  */
 extern int afb_sig_monitor_init_timeouts();
+#endif
 
+
+#if WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL
 /**
  * When monitoring is enabled (@see function afb_sig_monitor_init)
  * run the given function within monitoring of signals and timeout.
@@ -85,7 +93,10 @@ extern void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg);
  * @param arg       the arguments to pass to the job
  */
 extern void afb_sig_monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg);
+#endif
 
+
+#if WITH_SIG_MONITOR_DUMPSTACK
 /**
  * Dumps the current stack
  */
@@ -95,3 +106,22 @@ extern void afb_sig_monitor_dumpstack();
  * enable or disable stack dumps
  */
 extern void afb_sig_monitor_dumpstack_enable(int enable);
+#endif
+
+
+#if !WITH_SIG_MONITOR_SIGNALS
+static inline int afb_sig_monitor_init(int enable) { return 0; }
+#endif
+#if !WITH_SIG_MONITOR_TIMERS
+static inline void afb_sig_monitor_clean_timeouts() {}
+static inline int afb_sig_monitor_init_timeouts() { return 0; }
+#endif
+#if !(WITH_SIG_MONITOR_SIGNALS && WITH_SIG_MONITOR_FOR_CALL)
+static inline void afb_sig_monitor_run(int timeout, void (*function)(int sig, void*), void *arg) { function(0, arg); }
+static inline void afb_sig_monitor_do(void (*function)(int sig, void*), void *arg) { function(0, arg); }
+static inline void afb_sig_monitor_do_run(int timeout, void (*function)(int sig, void*), void *arg) { function(0, arg); }
+#endif
+#if !WITH_SIG_MONITOR_DUMPSTACK
+static inline void afb_sig_monitor_dumpstack() {}
+static inline void afb_sig_monitor_dumpstack_enable(int enable) {}
+#endif

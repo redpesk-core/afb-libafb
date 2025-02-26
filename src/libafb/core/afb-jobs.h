@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #define AFB_JOBS_MAX_COUNT_MIN  4
 #define AFB_JOBS_MAX_COUNT_MAX  65000
 

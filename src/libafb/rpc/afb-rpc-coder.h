@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>

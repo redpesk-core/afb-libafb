@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if WITH_WSJ1
 
 struct afb_ws_json1;

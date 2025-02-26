@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_apiset;
 
 extern int afb_monitor_init(struct afb_apiset *declare_set, struct afb_apiset *call_set);

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if WITH_WSJ1
 
 #include <stdint.h>

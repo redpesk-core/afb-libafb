@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 #if WITH_WSAPI
 
 #if WITHOUT_JSON_C

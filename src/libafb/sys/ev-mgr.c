@@ -113,6 +113,59 @@
 #    endif
 #  endif
 #endif
+
+/******************************************************************************/
+
+/** for times in nano seconds (685 years since 1970 -> 2655) */
+typedef int64_t time_unit_t;
+
+/** maximum value of time_unit_t instances */
+#define TIME_UNIT_MAX INT64_MAX
+
+#if __ZEPHYR__
+# define TIME_IN_MILLISEC 1
+# define TIME_IN_NANOSEC  0
+#else
+# define TIME_IN_MILLISEC 1
+# define TIME_IN_NANOSEC  0
+#endif
+
+#if TIME_IN_MILLISEC
+#define ONESEC       1000        /**< value of one second in nanosecond */
+#define ONEMILLISEC     1        /**< value of one millisecond in nanosecond */
+#define MS2UT(x)     ((time_unit_t)(x))              /**< convert ms to ut */
+#define UT2MS(x)     (x)                             /**< convert ut to ms */
+#define NS2UT(x)     ((time_unit_t)((x) / 1000000))  /**< convert ns to ut */
+#define UT2NS(x)     ((x) * 1000000)                 /**< convert ut to ns */
+#endif
+
+#if TIME_IN_NANOSEC
+#define ONESEC      1000000000   /**< value of one second in nanosecond */
+#define ONEMILLISEC    1000000   /**< value of one millisecond in nanosecond */
+#define MS2UT(x)     ((time_unit_t)((x) * 1000000)) /**< convert ms to ut */
+#define UT2MS(x)     ((x) / 1000000)                /**< convert ut to ms */
+#define NS2UT(x)     ((time_unit_t)(x))             /**< convert ns to ut */
+#define UT2NS(x)     (x)                            /**< convert ut to ns */
+#endif
+
+/** what clock to use for timers */
+#define CLOCK CLOCK_REALTIME
+
+/** minimal period value (milliseconds)  */
+#define PERIOD_MIN_MS 1
+
+/** default period (milliseconds) */
+#define DEFAULT_PERIOD_MS 1000
+
+/** minimal period accuracy value (milliseconds) */
+#define ACCURACY_MIN_MS 1
+
+/** default a period accuracy (milliseconds) */
+#define DEFAULT_ACCURACY_MS  ACCURACY_MIN_MS
+
+/** get the default or min or value of x */
+#define GETTM(x,def,min) ((x)==0 ? (def) : (x)<(min) ? (min) : (x))
+
 /******************************************************************************/
 
 /**
@@ -162,42 +215,6 @@ struct ev_fd
 	uint16_t auto_unref: 1;
 };
 
-/** value of one second in nanosecond */
-#define ONESEC 1000000000
-
-/** value of one millisecond in nanosecond */
-#define ONEMILLISEC 1000000
-
-/** for times in nano seconds (685 years since 1970 -> 2655) */
-typedef uint64_t time_ns_t;
-
-/** maximum value of time_ns_t instances */
-#define TIME_NS_MAX INT64_MAX
-
-/** what clock to use for timers */
-#define CLOCK CLOCK_REALTIME
-
-/** minimal period value (milliseconds)  */
-#define PERIOD_MIN_MS 1
-
-/** default period (milliseconds) */
-#define DEFAULT_PERIOD_MS 1000
-
-/** minimal period accuracy value (milliseconds) */
-#define ACCURACY_MIN_MS 1
-
-/** default a period accuracy (milliseconds) */
-#define DEFAULT_ACCURACY_MS 1
-
-/** converts a millisecond value to a nanosecond value */
-#define MS2NS(x)  (((time_ns_t)(ONEMILLISEC))*((time_ns_t)(x)))
-
-/** converts a nanosecond value to a millisecond value */
-#define NS2MS(x)  ((time_ns_t)((x)/(ONEMILLISEC)))
-
-/** get the default or min or value of x */
-#define GETTM(x,def,min) ((x)==0 ? (def) : (x)<(min) ? (min) : (x))
-
 /**
  * structure for recording timers
  */
@@ -216,13 +233,13 @@ struct ev_timer
 	void *closure;
 
 	/** time of the next expected occurence in nanoseconds */
-	time_ns_t next_ns;
+	time_unit_t next_ut;
 
 	/** expected accuracy of the timer in nanoseconds */
-	time_ns_t accuracy_ns;
+	time_unit_t accuracy_ut;
 
 	/** period between 2 events in nanoseconds */
-	time_ns_t period_ns;
+	time_unit_t period_ut;
 
 	/** decount of occurences or zero if infinite */
 	unsigned decount;
@@ -331,7 +348,7 @@ struct ev_mgr
 #endif
 
 	/** last value set to the timer */
-	time_ns_t last_timer;
+	time_unit_t last_timer;
 
 	/** reference count */
 	uint16_t refcount;
@@ -664,17 +681,21 @@ static void timers_cleanup(struct ev_mgr *mgr)
 /**
  * returns the current value of the time in ms
  */
-static time_ns_t now_ns()
+static time_unit_t now_ut()
 {
+#if __ZEPHYR__
+	return MS2UT(k_uptime_get());
+#else
 	struct timespec ts;
 	clock_gettime(CLOCK, &ts);
-	return (time_ns_t)ts.tv_sec * ONESEC + (time_ns_t)ts.tv_nsec;
+	return (time_unit_t)ts.tv_sec * ONESEC + (time_unit_t)NS2UT(ts.tv_nsec);
+#endif
 }
 
 /**
  * Arm the timer
  */
-static int timer_arm(struct ev_mgr *mgr, time_ns_t when)
+static int timer_arm(struct ev_mgr *mgr, time_unit_t when)
 {
 	if (when < mgr->last_timer || mgr->last_timer == 0) {
 #if WITH_TIMERFD
@@ -688,30 +709,30 @@ static int timer_arm(struct ev_mgr *mgr, time_ns_t when)
 		/* set the timer */
 		dr = lldiv((long long)when, ONESEC);
 		its.it_value.tv_sec = (time_t)dr.quot;
-		its.it_value.tv_nsec = (time_t)dr.rem;
+		its.it_value.tv_nsec = (time_t)UT2NS(dr.rem);
 		its.it_interval.tv_sec = 0;
 		its.it_interval.tv_nsec = 0;
 		rc = timerfd_settime(mgr->timerfd, TFD_TIMER_ABSTIME, &its, 0);
 		if (rc < 0)
 			return -errno;
+		mgr->last_timer = when;
 #else
+		mgr->last_timer = when;
 		if (mgr->state == Waiting)
 			ev_mgr_wakeup(mgr);
 #endif
-		mgr->last_timer = when;
 	}
 	return 0;
 }
-
 
 /**
  * Compute the next time for blowing an event
  * Then arm the timer.
  */
-static int timer_set(struct ev_mgr *mgr, time_ns_t upper)
+static int timer_set(struct ev_mgr *mgr, time_unit_t upper)
 {
 	struct ev_timer *timer;
-	time_ns_t lower, lo, up;
+	time_unit_t lower, lo, up;
 
 	timers_cleanup(mgr);
 
@@ -720,9 +741,9 @@ static int timer_set(struct ev_mgr *mgr, time_ns_t upper)
 	timer = mgr->timers;
 	while (timer) {
 		if (timer->is_active) {
-			lo = timer->next_ns;
+			lo = timer->next_ut;
 			if (lo <= upper) {
-				up = lo + timer->accuracy_ns;
+				up = lo + timer->accuracy_ut;
 				if (up <= lower) {
 					lower = lo;
 					upper = up;
@@ -749,17 +770,17 @@ static void timer_dispatch(
 	struct ev_mgr *mgr
 ) {
 	struct ev_timer *timer, **prvtim;
-	time_ns_t now;
+	time_unit_t now;
 
 	/* extract expired timers */
-	now = now_ns();
+	now = now_ut();
 	prvtim = &mgr->timers;
 	while ((timer = *prvtim)) {
 		/* process the timer */
-		if (timer->is_active && timer->next_ns <= now) {
+		if (timer->is_active && timer->next_ut <= now) {
 			timer->handler(timer, timer->closure, timer->decount);
 			/* hack, hack, hack: below, just ignore blind events */
-			do { timer->next_ns += timer->period_ns; } while(timer->next_ns <= now);
+			do { timer->next_ut += timer->period_ut; } while(timer->next_ut <= now);
 			if (timer->decount) {
 				/* deactivate or delete if counted down */
 				timer->decount--;
@@ -768,7 +789,7 @@ static void timer_dispatch(
 					if (timer->auto_unref)
 						timer->is_deleted = 1;
 					else
-						timer->next_ns = TIME_NS_MAX;
+						timer->next_ut = TIME_UNIT_MAX;
 				}
 			}
 		}
@@ -826,18 +847,20 @@ int ev_mgr_add_timer(
 		timer->handler = handler;
 		timer->closure = closure;
 		timer->decount = count;
-		timer->period_ns = MS2NS(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
-		timer->accuracy_ns = MS2NS(GETTM(accuracy_ms, DEFAULT_ACCURACY_MS, ACCURACY_MIN_MS));
+		timer->period_ut = MS2UT(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
+		timer->accuracy_ut = MS2UT(GETTM(accuracy_ms, DEFAULT_ACCURACY_MS, ACCURACY_MIN_MS));
+#if !__ZEPHYR__
 		if (absolute)
 			start_sec -= time(NULL);
-		timer->next_ns = now_ns() + MS2NS(start_sec * 1000 + start_ms);
+#endif
+		timer->next_ut = now_ut() + MS2UT(start_sec * 1000 + start_ms);
 		timer->is_deleted = 0;
 		timer->auto_unref = !!autounref;
 		timer->is_active = 1;
 		timer->refcount = 1;
 		timer->next = mgr->timers;
 		mgr->timers = timer;
-		rc = timer_set(mgr, TIME_NS_MAX);
+		rc = timer_set(mgr, TIME_UNIT_MAX);
 		if (rc < 0) {
 			timer->is_deleted = 1;
 			timer->is_active = 0;
@@ -868,9 +891,9 @@ void ev_timer_unref(struct ev_timer *timer)
 /* modify the period of the timer */
 void ev_timer_modify_period(struct ev_timer *timer, unsigned period_ms)
 {
-	timer->period_ns = MS2NS(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
-	timer->next_ns = now_ns() + timer->period_ns;
-	timer_set(timer->mgr, TIME_NS_MAX);
+	timer->period_ut = MS2UT(GETTM(period_ms, DEFAULT_PERIOD_MS, PERIOD_MIN_MS));
+	timer->next_ut = now_ut() + timer->period_ut;
+	timer_set(timer->mgr, TIME_UNIT_MAX);
 }
 
 /******************************************************************************/
@@ -988,7 +1011,7 @@ static int add_poll(struct ev_mgr *mgr, int fd, short events)
 /**
  * Prepare the event loop manager
  */
-static int do_prepare(struct ev_mgr *mgr, time_ns_t wakeup_ms)
+static int do_prepare(struct ev_mgr *mgr, time_unit_t wakeup_ms)
 {
 	int rc;
 
@@ -1030,10 +1053,12 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 		mgr->state = Waiting;
 #if !WITH_TIMERFD
 		if (mgr->last_timer) {
-			time_ns_t nxt = mgr->last_timer;
-			time_ns_t now = now_ns();
-			if (now <= nxt) {
-				int delay = (int)NS2MS(nxt - now);
+			time_unit_t nxt = mgr->last_timer;
+			time_unit_t now = now_ut();
+			if (now > nxt)
+				timeout_ms = 0;
+			else {
+				int delay = (int)UT2MS(nxt - now);
 				if (timeout_ms < 0 || timeout_ms > delay)
 					timeout_ms = delay;
 			}
@@ -1050,8 +1075,24 @@ static int do_wait(struct ev_mgr *mgr, int timeout_ms)
 #if WITH_EPOLL
 			mgr->event.events = 0;
 #endif
+#if WITH_TIMERFD
 			mgr->state = Idle;
 			rc = rc ? -errno : rc;
+#else
+			if (rc == 0) {
+				if (mgr->last_timer == 0)
+					mgr->state = Idle;
+				else {
+					mgr->state = Pending;
+					mgr->last_timer = 0;
+					rc = 1;
+				}
+			}
+			else {
+				mgr->state = Idle;
+				rc = -errno;
+			}
+#endif
 		}
 		else {
 			mgr->state = Pending;
@@ -1177,7 +1218,7 @@ void *ev_mgr_try_change_holder(struct ev_mgr *mgr, void *holder, void *next)
  */
 int ev_mgr_prepare(struct ev_mgr *mgr)
 {
-	return do_prepare(mgr, TIME_NS_MAX);
+	return do_prepare(mgr, TIME_UNIT_MAX);
 }
 
 /**
@@ -1185,7 +1226,7 @@ int ev_mgr_prepare(struct ev_mgr *mgr)
  */
 int ev_mgr_prepare_with_wakeup(struct ev_mgr *mgr, int wakeup_ms)
 {
-	return do_prepare(mgr, wakeup_ms >= 0 ? now_ns() + MS2NS(wakeup_ms) : TIME_NS_MAX);
+	return do_prepare(mgr, wakeup_ms >= 0 ? now_ut() + MS2UT(wakeup_ms) : TIME_UNIT_MAX);
 }
 
 /**
@@ -1211,7 +1252,7 @@ int ev_mgr_run(struct ev_mgr *mgr, int timeout_ms)
 {
 	int rc;
 
-	rc = do_prepare(mgr, TIME_NS_MAX);
+	rc = do_prepare(mgr, TIME_UNIT_MAX);
 	if (rc >= 0) {
 		rc = do_wait(mgr, timeout_ms);
 		if (rc > 0)

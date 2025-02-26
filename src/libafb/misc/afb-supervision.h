@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 struct afb_apiset;
 struct json_object;
 

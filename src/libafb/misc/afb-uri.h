@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "../libafb-config.h"
+
 /**
  * Get API name from a sockspec URI
  *
