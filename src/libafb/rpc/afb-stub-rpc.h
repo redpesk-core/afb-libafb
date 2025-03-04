@@ -89,6 +89,7 @@ extern void afb_stub_rpc_set_session(struct afb_stub_rpc *stub, struct afb_sessi
 extern void afb_stub_rpc_set_token(struct afb_stub_rpc *stub, struct afb_token *token);
 
 #if WITH_CRED
+struct afb_cred;
 /**
  * Set the pair credentials of the stub.
  * The reference count of cred is not incremented but is decremented
