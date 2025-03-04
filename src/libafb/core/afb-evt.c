@@ -164,12 +164,6 @@ static struct afb_evt *evt_list_head = NULL;
 static uint16_t event_genid = 0;
 static uint16_t event_count = 0;
 
-#if 1 /* only one group until conversion of data thread safe */
-#define GROUP_OF_LISTENER(listener) ((void*)&listeners)
-#else
-#define GROUP_OF_LISTENER(listener) ((listener)->group)
-#endif
-
 /**************************************************************************/
 /** MANAGE LISTENERS INTERNALY                                           **/
 /**************************************************************************/
@@ -247,6 +241,8 @@ static void listener_internal_unref_sync(int signum, void *closure, struct afb_s
 struct job_evt_broadcast {
 	/** use count for releasing it at end */
 	unsigned refcount;
+	/** locker */
+	x_mutex_t mutex;
 	/** the broadcasted event */
 	struct afb_evt_broadcasted ev;
 };
@@ -272,6 +268,7 @@ job_evt_broadcast_create(
 	jb = malloc(sizeof *jb + nparams * sizeof jb->ev.data.params[0] + sz);
 	if (jb) {
 		jb->refcount = 1;
+		x_mutex_init(&jb->mutex);
 		jb->ev.data.nparams = (uint16_t)nparams;
 		afb_data_array_copy(nparams, params, jb->ev.data.params);
 		jb->ev.hop = hop;
@@ -304,6 +301,7 @@ job_evt_broadcast_unref(struct job_evt_broadcast *jb)
 {
 	if (!__atomic_sub_fetch(&jb->refcount, 1, __ATOMIC_RELAXED)) {
 		afb_data_array_unref(jb->ev.data.nparams, jb->ev.data.params);
+		x_mutex_destroy(&jb->mutex);
 		free(jb);
 	}
 }
@@ -315,8 +313,11 @@ static void broadcast_job(int signum, void *closure1, void *closure2)
 {
 	struct job_evt_broadcast *jb = closure1;
 	struct afb_evt_listener *listener = closure2;
-	if (signum == 0)
+	if (signum == 0) {
+		x_mutex_lock(&jb->mutex);
 		listener->itf->broadcast(listener->closure, &jb->ev);
+	}
+	x_mutex_unlock(&jb->mutex);
 	listener_internal_unref(listener);
 	job_evt_broadcast_unref(jb);
 }
@@ -343,13 +344,16 @@ static int broadcast(const char *event, unsigned nparams, struct afb_data * cons
 			rc = X_ENOMEM;
 		}
 		else {
+			x_mutex_lock(&jb->mutex);
 			for (rc = 0; listener != NULL; listener = listener->next) {
 				job_evt_broadcast_addref(jb);
 				listener_internal_addref(listener);
-				rc2 = afb_sched_post_job2(GROUP_OF_LISTENER(listener), 0, 0, broadcast_job, jb, listener, Afb_Sched_Mode_Normal);
+				rc2 = afb_sched_post_job2(listener->group, 0, 0,
+					       broadcast_job, jb, listener, Afb_Sched_Mode_Normal);
 				if (rc2 < 0)
 					RP_ERROR("Can't queue push a broadcast job for %s", event);
 			}
+			x_mutex_unlock(&jb->mutex);
 			job_evt_broadcast_unref(jb);
 		}
 	}
@@ -473,6 +477,8 @@ int afb_evt_broadcast_name_hookable(const char *event, unsigned nparams, struct 
 struct job_evt_push {
 	/** use count for releasing it at end */
 	unsigned refcount;
+	/** locker */
+	x_mutex_t mutex;
 	/** the pushed event */
 	struct afb_evt_pushed ev;
 };
@@ -495,6 +501,7 @@ job_evt_push_create(
 		afb_data_array_unref(nparams, params);
 	else {
 		je->refcount = 1;
+		x_mutex_init(&je->mutex);
 		je->ev.evt = afb_evt_addref(evt);
 		je->ev.data.nparams = (uint16_t)nparams;
 		afb_data_array_copy(nparams, params, je->ev.data.params);
@@ -525,6 +532,7 @@ job_evt_push_unref(struct job_evt_push *je)
 	if (!__atomic_sub_fetch(&je->refcount, 1, __ATOMIC_RELAXED)) {
 		afb_evt_unref(je->ev.evt);
 		afb_data_array_unref(je->ev.data.nparams, je->ev.data.params);
+		x_mutex_destroy(&je->mutex);
 		free(je);
 	}
 }
@@ -536,8 +544,11 @@ static void push_job(int signum, void *closure1, void *closure2)
 {
 	struct job_evt_push *je = closure1;
 	struct afb_evt_listener *listener = closure2;
-	if (signum == 0)
+	if (signum == 0) {
+		x_mutex_lock(&je->mutex);
 		listener->itf->push(listener->closure, &je->ev);
+	}
+	x_mutex_unlock(&je->mutex);
 	listener_internal_unref(listener);
 	job_evt_push_unref(je);
 }
@@ -567,14 +578,17 @@ int afb_evt_push(struct afb_evt *evt, unsigned nparams, struct afb_data * const 
 			rc = X_ENOMEM;
 		}
 		else {
+			x_mutex_lock(&je->mutex);
 			for (rc = 0; watch != NULL; watch = watch->next_by_evt) {
 				rc++;
 				job_evt_push_addref(je);
 				listener_internal_addref(watch->listener);
-				rc2 = afb_sched_post_job2(GROUP_OF_LISTENER(watch->listener), 0, 0, push_job, je, watch->listener, Afb_Sched_Mode_Normal);
+				rc2 = afb_sched_post_job2(watch->listener->group, 0, 0,
+					       push_job, je, watch->listener, Afb_Sched_Mode_Normal);
 				if (rc2 < 0)
 					RP_ERROR("Can't queue push an evt job for %s", evt->fullname);
 			}
+			x_mutex_unlock(&je->mutex);
 			job_evt_push_unref(je);
 		}
 	}
