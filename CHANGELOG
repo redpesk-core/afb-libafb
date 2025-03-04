@@ -1,3 +1,20 @@
+Version 5.3.8
+-------------
+
+  change
+   - make timerfd as optional
+   - allows minimal implementation of locale-root
+   - allows use of poll instead of epoll in event loop
+
+
+  feature
+   - compatibility to Zephyr OS
+
+  fix
+   - bug #7594
+   - big RPC buffers
+   - TLS for RPC
+
 Version 5.3.7
 -------------
 
