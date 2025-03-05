@@ -1,0 +1,8 @@
+#/bin/sh
+
+for file
+do
+	name=$(basename "$file")
+	cp "$file" "$name"
+	sed -i 's:\.\./libafb-config\.h:libafb-config.h:g' "$name"
+done

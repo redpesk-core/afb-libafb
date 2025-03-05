@@ -26,7 +26,7 @@
 # build and install libafbcli
 ###########################################
 
-set(DIR ../libafb)
+set(DIR ${CMAKE_CURRENT_SOURCE_DIR}/../libafb)
 
 set(LIBAFBCLI_SOURCES
 	afb-ws-client.c
@@ -71,18 +71,28 @@ target_link_libraries(libafbcliso
 set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${gnutls_LDFLAGS} ${librp-utils_LDFLAGS} -lpthread)
 list(JOIN PCLIBSPRIV " " PCLIBSPRIV)
 
-INSTALL(TARGETS libafbclista ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-INSTALL(TARGETS libafbcliso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-INSTALL(FILES
-		afb-ws-client.h
+install(TARGETS libafbclista ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS libafbcliso LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+add_custom_target(libafbcli-headers
+	${CMAKE_CURRENT_SOURCE_DIR}/trfhdr
 		${DIR}/wsj1/afb-wsj1.h
 		${DIR}/wsapi/afb-proto-ws.h
+	WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+add_dependencies(libafbcli libafbcli-headers)
+add_dependencies(libafbclista libafbcli-headers)
+
+install(FILES
+		afb-ws-client.h
+		${CMAKE_CURRENT_BINARY_DIR}/afb-wsj1.h
+		${CMAKE_CURRENT_BINARY_DIR}/afb-proto-ws.h
+		${CMAKE_CURRENT_BINARY_DIR}/../libafb/libafb-config.h
 	DESTINATION
 		${CMAKE_INSTALL_INCLUDEDIR}/libafbcli
 )
 
-CONFIGURE_FILE(libafbcli.pc.in libafbcli.pc @ONLY)
-INSTALL(FILES
+configure_file(libafbcli.pc.in libafbcli.pc @ONLY)
+install(FILES
 		${CMAKE_CURRENT_BINARY_DIR}/libafbcli.pc
 	DESTINATION
 		${CMAKE_INSTALL_LIBDIR}/pkgconfig

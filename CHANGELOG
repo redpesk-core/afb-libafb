@@ -1,3 +1,9 @@
+Version 5.3.10
+--------------
+
+  fix
+   - fix includes of libafb-config.h in libafbcli
+
 Version 5.3.9
 -------------
 
