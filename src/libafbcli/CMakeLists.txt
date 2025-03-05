@@ -86,6 +86,7 @@ install(FILES
 		afb-ws-client.h
 		${CMAKE_CURRENT_BINARY_DIR}/afb-wsj1.h
 		${CMAKE_CURRENT_BINARY_DIR}/afb-proto-ws.h
+		${CMAKE_CURRENT_BINARY_DIR}/afb-proto-ws.h
 		${CMAKE_CURRENT_BINARY_DIR}/../libafb/libafb-config.h
 	DESTINATION
 		${CMAKE_INSTALL_INCLUDEDIR}/libafbcli

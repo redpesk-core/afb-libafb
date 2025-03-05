@@ -23,7 +23,7 @@
 
 #include "../libafb-config.h"
 
-#if WITH_DYNAMIC_BINDING
+#if WITH_DYNAMIC_BINDING || WITH_ZEPHYR_LLEXT
 
 #include <stdlib.h>
 #include <string.h>
@@ -137,12 +137,6 @@ static int init_for_root(struct afb_api_v4 *api, void *closure)
 	ctlarg.root_entry.config = settings(api, iniv4->config);
 
 	return afb_api_v4_safe_ctlproc(api, iniv4->dlv4.mainctl, afb_ctlid_Root_Entry, &ctlarg);
-}
-
-/* add the binding of dynlib for path */
-int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
-{
-	return afb_api_so_v4_add_config(path, dynlib, declare_set, call_set, NULL);
 }
 
 /**
@@ -269,6 +263,12 @@ int afb_api_so_v4_add_config(const char *path, x_dynlib_t *dynlib, struct afb_ap
 
 error:
 	return rc;
+}
+
+/* add the binding of dynlib for path */
+int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set)
+{
+	return afb_api_so_v4_add_config(path, dynlib, declare_set, call_set, NULL);
 }
 
 #endif
