@@ -1,3 +1,9 @@
+Version 5.3.9
+-------------
+
+  fix
+   - fix include of afb-vcomm
+
 Version 5.3.8
 -------------
 
