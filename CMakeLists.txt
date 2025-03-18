@@ -26,7 +26,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(afb-libafb
-	VERSION 5.3.9
+	VERSION 5.3.10
 	DESCRIPTION "Core library for implementing Application framework Binder"
 	HOMEPAGE_URL "https://github.com/redpesk-core/afb-libafb"
 	LANGUAGES C)
@@ -125,9 +125,14 @@ if(ZEPHYR_BASE)
 		return()
 	endif()
 	if (CONFIG_AFB_RPC_NET)
-		add_compile_definitions(WITH_SOCKETS=1)
+		zephyr_compile_definitions(WITH_SOCKETS=1)
 	else()
-		add_compile_definitions(WITH_SOCKETS=0)
+		zephyr_compile_definitions(WITH_SOCKETS=0)
+	endif()
+	if (CONFIG_AFB_LLEXT_LOADER)
+		zephyr_compile_definitions(WITH_ZEPHYR_LLEXT=1)
+	else()
+		zephyr_compile_definitions(WITH_ZEPHYR_LLEXT=0)
 	endif()
 	SET(WITH_ZEPHYR YES)
 	# almost sure

@@ -67,11 +67,13 @@ afb_v4_itf_setup_shared_object(
 
 	dynlib.handle = handle;
 	afb_v4_connect_dynlib(&dynlib, &info, root);
-#endif
 	return 0;
+#else
+	return X_ENOTSUP;
+#endif
 }
 
-#if WITH_DYNAMIC_BINDING
+#if WITH_DYNAMIC_BINDING || WITH_ZEPHYR_LLEXT
 
 /***********************************************************
  * interface

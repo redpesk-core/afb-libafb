@@ -70,3 +70,16 @@ const char* x_dynlib_error(const x_dynlib_t *dynlib)
 }
 
 #endif
+#if WITH_ZEPHYR_LLEXT
+
+#include "x-dynlib.h"
+#include "x-errno.h"
+
+int x_dynlib_symbol(x_dynlib_t *ext, const char* name, void** ptr)
+{
+	const void *value = llext_find_sym(&ext->exp_tab, name);
+	*ptr = (void*)value;
+	return value != NULL ? 0 : X_ENOENT;
+}
+
+#endif

@@ -26,12 +26,11 @@
 
 #include "../libafb-config.h"
 
-#if WITH_DYNAMIC_BINDING
+#if WITH_DYNAMIC_BINDING || WITH_ZEPHYR_LLEXT
 
 #include "../sys/x-dynlib.h"
 
 struct afb_apiset;
-struct json_object;
 
 /**
  * Inspect the loaded shared object to check if it is a binding V4
@@ -46,6 +45,10 @@ struct json_object;
  *         a negative number if invalid binding V4 or error when initializing.
  */
 extern int afb_api_so_v4_add(const char *path, x_dynlib_t *dynlib, struct afb_apiset *declare_set, struct afb_apiset * call_set);
+
+#if !WITHOUT_JSON_C
+
+struct json_object;
 
 /**
  * Inspect the loaded shared object 'dynlib' to check if it is a binding V4
@@ -71,3 +74,5 @@ afb_api_so_v4_add_config(
 );
 
 #endif
+#endif
+

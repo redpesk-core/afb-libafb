@@ -39,3 +39,12 @@ extern int x_dynlib_symbol(x_dynlib_t *dynlib, const char* name, void** ptr);
 extern const char* x_dynlib_error(const x_dynlib_t *dynlib);
 
 #endif
+#if WITH_ZEPHYR_LLEXT
+
+#include <zephyr/llext/llext.h>
+
+typedef struct llext x_dynlib_t;
+
+extern int x_dynlib_symbol(x_dynlib_t *ext, const char* name, void** ptr);
+
+#endif
