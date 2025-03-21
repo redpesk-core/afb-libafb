@@ -41,10 +41,12 @@
 #include "afb-ws-connect.h"
 
 #include "sys/ev-mgr.h"
-#include "tls/tls.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 #include "misc/afb-verbose.h"
+#if WITH_GNUTLS
+#include "tls/tls-gnu.h"
+#endif
 
 /**************** WebSocket handshake ****************************/
 
@@ -428,7 +430,7 @@ int afb_ws_connect(
 				fcntl(fd, F_SETFL, O_NONBLOCK);
 #if WITH_GNUTLS
 			if (rc == 0 && tls) {
-				rc = tls_upgrade_client(mgr, fd, 0/*host*/);
+				rc = tls_gnu_upgrade_client(mgr, fd, 0/*host*/);
 				if (rc >= 0) {
 					fd = rc;
 					rc = 0;

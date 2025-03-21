@@ -39,7 +39,7 @@ set(LIBAFBCLI_SOURCES
 	${DIR}/utils/websock.c
 	${DIR}/wsapi/afb-proto-ws.c
 	${DIR}/wsj1/afb-wsj1.c
-	${DIR}/tls/tls.c
+	${DIR}/tls/tls-gnu.c
 )
 
 add_library(libafbcli OBJECT ${LIBAFBCLI_SOURCES})

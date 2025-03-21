@@ -119,10 +119,10 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	const char *turi, *uri_no_tls;
 	char *apiname;
 	int rc, fd, websock;
+	enum afb_wrap_rpc_mode mode;
 #if WITH_TLS
 	int tls;
 #endif
-	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_FD;
 
 	/* check the api name */
 	uri_no_tls = prefix_tls_remove(uri);
@@ -153,12 +153,11 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	/* set the correct connection mode */
+	mode = websock ? Wrap_Rpc_Mode_Websocket :
 #if WITH_TLS
-	if (tls)
-		mode = Wrap_Rpc_Mode_FD_Tls_Client;
+	       tls ? Wrap_Rpc_Mode_FD_Tls_Client :
 #endif
-	if (websock)
-		mode = Wrap_Rpc_Mode_Websocket;
+	       Wrap_Rpc_Mode_FD;
 
 	/* open the socket */
 	rc = afb_socket_open(turi, 0);
@@ -219,12 +218,11 @@ static void server_accept(struct server *server, int fd)
 		rc = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 		websock = server->uri != prefix_ws_remove(server->uri);
-		if (websock)
-			mode = Wrap_Rpc_Mode_Websocket;
+		mode = websock ? Wrap_Rpc_Mode_Websocket :
 #if WITH_TLS
-		if (server->tls)
-			mode = Wrap_Rpc_Mode_FD_Tls_Server;
+		       server->tls ? Wrap_Rpc_Mode_FD_Tls_Server :
 #endif
+		       Wrap_Rpc_Mode_FD;
 		apiname = &server->uri[server->offapi];
 		if (apiname[0] == 0)
 			apiname = NULL;

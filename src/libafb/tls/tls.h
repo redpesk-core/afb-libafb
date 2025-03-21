@@ -25,10 +25,10 @@
 
 #include "../libafb-config.h"
 
+#if WITH_TLS
 #if WITH_GNUTLS
 
-struct ev_mgr;
+#include "tls-gnu.h"
 
-extern int tls_upgrade_client(struct ev_mgr *mgr, int sd, const char *hostname);
-
+#endif
 #endif
