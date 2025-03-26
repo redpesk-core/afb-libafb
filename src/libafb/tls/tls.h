@@ -26,9 +26,66 @@
 #include "../libafb-config.h"
 
 #if WITH_TLS
+/*******************************************************************************************/
 #if WITH_GNUTLS
 
 #include "tls-gnu.h"
 
+typedef struct
+	{
+		gnutls_session_t session;
+		gnutls_certificate_credentials_t creds;
+	}
+	tls_session_t;
+
+static inline
+void tls_init(tls_session_t *session)
+{
+	session->session = NULL;
+	session->creds = NULL;
+}
+
+static inline
+void tls_release(tls_session_t *session)
+{
+	if (session->session != NULL)
+		gnutls_deinit(session->session);
+	if (session->creds != NULL)
+		gnutls_certificate_free_credentials(session->creds);
+	tls_init(session);
+}
+
+static inline
+ssize_t tls_recv(tls_session_t *session, void *buffer, size_t length)
+{
+	return tls_gnu_recv(session->session, buffer, length);
+}
+
+static inline
+ssize_t tls_send(tls_session_t *session, const void *buffer, size_t length)
+{
+	return tls_gnu_send(session->session, buffer, length);
+}
+
+static inline
+int tls_creds_init(
+	tls_session_t *session,
+	bool           server,
+	const char    *cert_path,
+	const char    *key_path,
+	const char    *trust_path
+) {
+	(void)server;
+	return tls_gnu_creds_init(&session->creds, cert_path, key_path, trust_path);
+}
+
+static inline
+int tls_session_init(tls_session_t *session, bool server, int fd, const char *host)
+{
+	return tls_gnu_session_init(&session->session, session->creds, server, fd, host);
+}
 #endif
 #endif
+/*******************************************************************************************/
+#endif
+

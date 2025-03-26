@@ -28,6 +28,7 @@
 #if WITH_GNUTLS
 
 #include <stdbool.h>
+#include <errno.h>
 
 #include <gnutls/gnutls.h>
 
@@ -35,6 +36,30 @@ struct ev_mgr;
 
 extern int tls_gnu_upgrade_client(struct ev_mgr *mgr, int sd, const char *hostname);
 
+static inline ssize_t tls_gnu_recv(gnutls_session_t session, void *buffer, size_t length)
+{
+	for (;;) {
+		ssize_t ssz = gnutls_record_recv(session, buffer, length);
+		if (ssz >= 0)
+			return ssz;
+		if (ssz != GNUTLS_E_INTERRUPTED) {
+			if (ssz == GNUTLS_E_AGAIN)
+				errno = EAGAIN;
+			return -1;
+		}
+	}
+}
+
+static inline ssize_t tls_gnu_send(gnutls_session_t session, const void *buffer, size_t length)
+{
+	for (;;) {
+		ssize_t ssz = gnutls_record_send(session, buffer, length);
+		if (ssz >= 0)
+			return ssz;
+		if (ssz != GNUTLS_E_INTERRUPTED && ssz != GNUTLS_E_AGAIN)
+			return -1;
+	}
+}
 
 /**
  * @brief initializes a GnuTLS credentials object
