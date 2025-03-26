@@ -60,7 +60,7 @@ set_target_properties(libafbcliso PROPERTIES
 target_link_libraries(libafbcliso
 	${libsystemd_LDFLAGS}
 	${json-c_LDFLAGS}
-	${gnutls_LDFLAGS}
+	${libtls_LDFLAGS}
 	${librp-utils_LDFLAGS}
 	-lpthread
 	-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/export-libafbcli.map
@@ -68,7 +68,7 @@ target_link_libraries(libafbcliso
 	-Wl,--gc-sections
 )
 
-set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${gnutls_LDFLAGS} ${librp-utils_LDFLAGS} -lpthread)
+set(PCLIBSPRIV ${libsystemd_LDFLAGS} ${json-c_LDFLAGS} ${libtls_LDFLAGS} ${librp-utils_LDFLAGS} -lpthread)
 list(JOIN PCLIBSPRIV " " PCLIBSPRIV)
 
 install(TARGETS libafbclista ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

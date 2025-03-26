@@ -295,7 +295,9 @@ if(WITH_LIBUUID)
 endif()
 
 if(WITH_GNUTLS)
-	PKG_CHECK_MODULES(gnutls REQUIRED gnutls>=3.6.5)
+	PKG_CHECK_MODULES(libtls REQUIRED gnutls>=3.6.5)
+elseif(WITH_MBEDTLS)
+	PKG_CHECK_MODULES(libtls REQUIRED mbedtls>=3 mbedx509>=3 mbedcrypto>=3)
 endif()
 
 add_definitions(-DAFB_VERSION="${PROJECT_VERSION}")
