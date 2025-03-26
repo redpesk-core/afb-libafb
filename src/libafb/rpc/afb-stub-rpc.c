@@ -73,6 +73,7 @@ json_object_to_json_string_length(
 #include "utils/u16id.h"
 #include "core/containerof.h"
 #include "sys/x-errno.h"
+#include "sys/x-spin.h"
 
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
@@ -98,6 +99,9 @@ json_object_to_json_string_length(
 # define RPC_DEBUG 0
 #endif
 #define USE_ALIAS 1
+#if !defined(RPC_POOL)
+# define RPC_POOL 1
+#endif
 
 /**************************************************************************
 * PART - MODULE DECLARATIONS
@@ -242,6 +246,9 @@ struct afb_stub_rpc
 	/** apiset for calling */
 	struct afb_apiset *call_set;
 
+	/** spiner */
+	x_spin_t spinner;
+
 	/***************/
 	/* server side */
 	/***************/
@@ -293,8 +300,10 @@ struct afb_stub_rpc
 	/** sent types */
 	struct u16id2bool *type_flags;
 
+#if RPC_POOL
 	/** free indescs */
 	struct indesc *indesc_pool;
+#endif
 
 	/** waiters for version */
 	struct version_waiter *version_waiters;
@@ -310,8 +319,10 @@ struct afb_stub_rpc
 		/** currently decoded block */
 		struct inblock *current_inblock;
 
+#if RPC_POOL
 		/** bank of free inblocks */
 		struct inblock *pool;
+#endif
 
 		/** dispose in blocks */
 		void (*dispose)(void*, void*, size_t);
@@ -425,11 +436,22 @@ static void json_put_cb(void *closure)
 static int inblock_get(struct afb_stub_rpc *stub, void *data, size_t size, struct inblock **inblock)
 {
 	/* get a fresh */
-	struct inblock *result = stub->receive.pool;
-	if (result)
-		stub->receive.pool = result->data;
-	else
+	struct inblock *result;
+
+#if RPC_POOL
+	x_spin_lock(&stub->spinner);
+	result = stub->receive.pool;
+	if (result) {
+		__atomic_store_n(&stub->receive.pool, result->data, __ATOMIC_RELEASE);
+		x_spin_unlock(&stub->spinner);
+	}
+	else {
+		x_spin_unlock(&stub->spinner);
 		result = malloc(sizeof *result);
+	}
+#else
+	result = malloc(sizeof *result);
+#endif
 	if (result) {
 		result->refcount = 1;
 		result->stub = afb_stub_rpc_addref(stub);
@@ -441,18 +463,24 @@ static int inblock_get(struct afb_stub_rpc *stub, void *data, size_t size, struc
 
 static struct inblock *inblock_addref(struct inblock *inblock)
 {
-	inblock->refcount++;
+	__atomic_add_fetch(&inblock->refcount, 1, __ATOMIC_RELAXED);
 	return inblock;
 }
 
 static void inblock_unref(struct inblock *inblock)
 {
-	if (--inblock->refcount == 0) {
+	if (__atomic_sub_fetch(&inblock->refcount, 1, __ATOMIC_RELAXED) == 0) {
 		struct afb_stub_rpc *stub = inblock->stub;
 		if (stub->receive.dispose)
 			stub->receive.dispose(stub->receive.closure, inblock->data, inblock->size);
+#if RPC_POOL
+		x_spin_lock(&stub->spinner);
 		inblock->data = stub->receive.pool;
-		stub->receive.pool = inblock;
+		__atomic_store_n(&stub->receive.pool, inblock, __ATOMIC_RELEASE);
+		x_spin_unlock(&stub->spinner);
+#else
+		free(inblock);
+#endif
 		afb_stub_rpc_unref(stub);
 	}
 }
@@ -471,11 +499,21 @@ static void inblock_unref_cb(void *closure)
 
 static struct indesc *indesc_get(struct afb_stub_rpc *stub, uint16_t callid)
 {
-	struct indesc *result = stub->indesc_pool;
-	if (result)
+	struct indesc *result;
+#if RPC_POOL
+	x_spin_lock(&stub->spinner);
+	result = stub->indesc_pool;
+	if (result)  {
 		stub->indesc_pool = result->link.next;
-	else
+		x_spin_unlock(&stub->spinner);
+	}
+	else {
+		x_spin_unlock(&stub->spinner);
 		result = malloc(sizeof *result);
+	}
+#else
+	result = malloc(sizeof *result);
+#endif
 	if (result) {
 		result->link.stub = afb_stub_rpc_addref(stub);
 		result->callid = callid;
@@ -486,8 +524,12 @@ static struct indesc *indesc_get(struct afb_stub_rpc *stub, uint16_t callid)
 static void indesc_release(struct indesc *indesc)
 {
 	struct afb_stub_rpc *stub = indesc->link.stub;
+#if RPC_POOL
 	indesc->link.next = stub->indesc_pool;
 	stub->indesc_pool = indesc;
+#else
+	free(indesc);
+#endif
 	afb_stub_rpc_unref(stub);
 }
 
@@ -506,32 +548,52 @@ static void outcall_free(struct afb_stub_rpc *stub, struct outcall *call)
 }
 
 /* get the outcall of the given id */
-static struct outcall *outcall_at(struct afb_stub_rpc *stub, uint16_t id)
+static struct outcall *outcall_search(struct afb_stub_rpc *stub, uint16_t id)
 {
-	struct outcall *it = stub->outcalls;
+	struct outcall *it;
+	it = stub->outcalls;
 	while(it && it->id != id)
 		it = it->next;
 	return it;
 }
 
-/* release the given outcall */
-static void outcall_release(struct afb_stub_rpc *stub, struct outcall *call)
+/* get the outcall of the given id */
+static struct outcall *outcall_at(struct afb_stub_rpc *stub, uint16_t id)
+{
+	struct outcall *call;
+	x_spin_lock(&stub->spinner);
+	call = outcall_search(stub, id);
+	x_spin_unlock(&stub->spinner);
+	return call;
+}
+
+/* extract the outcall of given id */
+static struct outcall *outcall_extract(struct afb_stub_rpc *stub, uint16_t id)
 {
 	/* search */
-	struct outcall **prv = &stub->outcalls;
-	while(*prv) {
-		if (*prv != call)
-			prv = &(*prv)->next;
-		else {
+	struct outcall *call, **prv;
+	x_spin_lock(&stub->spinner);
+	prv = &stub->outcalls;
+	call = *prv;
+	while(call != NULL) {
+		if (call->id == id) {
 			/* unuse */
 			*prv = call->next;
 			stub->idcount--;
-			/* release */
-			outcall_free(stub, call);
-			return;
+			break;
 		}
+		prv = &call->next;
+		call = *prv;
 	}
-	/* TODO: raise an error! */
+	x_spin_unlock(&stub->spinner);
+	return call;
+}
+
+/* release the given outcall */
+static void outcall_release(struct afb_stub_rpc *stub, struct outcall *call)
+{
+	outcall_extract(stub, call->id);
+	outcall_free(stub, call);
 }
 
 /* get a new outcall, allocates its id */
@@ -541,6 +603,7 @@ static int outcall_get(struct afb_stub_rpc *stub, struct outcall **ocall)
 	uint16_t id;
 	int rc;
 
+	x_spin_lock(&stub->spinner);
 	if (stub->idcount >= ACTIVE_ID_MAX)
 		rc = X_ECANCELED;
 	else {
@@ -552,7 +615,7 @@ static int outcall_get(struct afb_stub_rpc *stub, struct outcall **ocall)
 			id = stub->idlast;
 			do {
 				id++;
-			} while(!id || outcall_at(stub, id));
+			} while(!id || outcall_search(stub, id));
 			call->id = stub->idlast = id;
 			call->type = outcall_type_unset;
 			call->next = stub->outcalls;
@@ -560,6 +623,7 @@ static int outcall_get(struct afb_stub_rpc *stub, struct outcall **ocall)
 			rc = 0;
 		}
 	}
+	x_spin_unlock(&stub->spinner);
 	*ocall = call;
 	return rc;
 }
@@ -1761,7 +1825,7 @@ static int receive_call_reply(
 	struct afb_data *data[]
 ) {
 	int rc;
-	struct outcall *outcall = outcall_at(stub, callid);
+	struct outcall *outcall = outcall_extract(stub, callid);
 
 #if RPC_DEBUG
 	RP_DEBUG("RPC receive_call_reply(%p, %d, %d, %d, ...)", stub, (int)callid, (int)status, (int)ndata);
@@ -1782,7 +1846,7 @@ static int receive_call_reply(
 			describe_reply_data(outcall, ndata, data);
 			break;
 		}
-		outcall_release(stub, outcall);
+		outcall_free(stub, outcall);
 		rc = 0;
 	}
 	return rc;
@@ -2018,7 +2082,7 @@ static void describe_reply_data(struct outcall *outcall, unsigned ndata, struct 
 static int receive_describe_reply(struct afb_stub_rpc *stub, const char *description, uint16_t callid)
 {
 	int rc;
-	struct outcall *outcall = outcall_at(stub, callid);
+	struct outcall *outcall = outcall_extract(stub, callid);
 #if RPC_DEBUG
 	RP_DEBUG("RPC receive_describe_reply(%p, %-30s, %d)", stub, description, (int)callid);
 #endif
@@ -2035,7 +2099,7 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 			describe_reply(outcall, description);
 			rc = 0;
 		}
-		outcall_release(stub, outcall);
+		outcall_free(stub, outcall);
 	}
 	return rc;
 }
@@ -2848,6 +2912,7 @@ int afb_stub_rpc_create(struct afb_stub_rpc **pstub, const char *apiname, struct
 	*pstub = stub = calloc(1, sizeof *stub + (apiname == NULL ? 0 : 1 + strlen(apiname)));
 	if (stub == NULL)
 		return X_ENOMEM;
+	x_spin_init(&stub->spinner);
 	afb_rpc_coder_init(&stub->coder);
 
 	/* terminate initialization */
@@ -3022,7 +3087,9 @@ static void disconnect(struct afb_stub_rpc *stub)
 /* sub one reference and free resources if falling to zero */
 void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 {
+#if RPC_POOL
 	struct inblock *iblk;
+#endif
 
 	if (stub && !__atomic_sub_fetch(&stub->refcount, 1, __ATOMIC_RELAXED)) {
 
@@ -3033,10 +3100,13 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 			afb_apiset_unref(stub->declare_set);
 		}
 		afb_apiset_unref(stub->call_set);
+#if RPC_POOL
 		while ((iblk = stub->receive.pool) != NULL) {
 			stub->receive.pool = iblk->data;
 			free(iblk);
 		}
+#endif
+		x_spin_destroy(&stub->spinner);
 		free(stub);
 	}
 }

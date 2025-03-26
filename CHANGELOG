@@ -3,6 +3,11 @@ Version ?
 
   feature
    - support of LLEXT in Zephyr
+   - support of Mbedtls for RPC
+
+  fix
+   - correctly handle NULL listener in afb-stub-rpc
+   - handle correctly concurrent accesses in afb-stub-rpc
 
 Version 5.3.10
 --------------
