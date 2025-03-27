@@ -61,10 +61,8 @@ struct server
 	/** ev_fd handler */
 	struct ev_fd *efd;
 
-#if WITH_TLS
-	/** whether or not the server should do TLS */
-	uint8_t tls;
-#endif
+	/** mode: tls, mtls, ws, plain */
+	enum afb_wrap_rpc_mode mode;
 
 	/** offset in uri of the interface api name */
 	uint16_t offapi;
@@ -77,14 +75,42 @@ struct server
 /***       U R I   PREFIX                                                   ***/
 /******************************************************************************/
 
-static const char *prefix_tls_remove(const char *uri)
+static const char *unprefix(const char *text, const char *prefix)
 {
-    return (uri[0] == 't' && uri[1] == 'l' && uri[2] == 's' && uri[3] == '+') ? &uri[4] : uri;
+	const char *it = text;
+	for(;;) {
+		if (!*prefix)
+			return it; /* prefix found return unprefixed text */
+		if (*prefix != *it)
+			return text; /* prefix not found return original text */
+		prefix++;
+		it++;
+	}
 }
 
-static const char *prefix_ws_remove(const char *uri)
+static const char *remove_prefixes(const char *uri, enum afb_wrap_rpc_mode *mode)
 {
-	return (uri[0] == 'w' && uri[1] == 's' && uri[2] == '+') ? &uri[3] : uri;
+	const char *up;
+
+	up = unprefix(uri, "ws+");
+	if (up != uri) {
+		*mode |= Wrap_Rpc_Mode_WS_Bit;
+		return remove_prefixes(up, mode);
+	}
+
+	up = unprefix(uri, "tls+");
+	if (up != uri) {
+		*mode |= Wrap_Rpc_Mode_Tls_Bit;
+		return remove_prefixes(up, mode);
+	}
+
+	up = unprefix(uri, "mtls+");
+	if (up != uri) {
+		*mode |= Wrap_Rpc_Mode_Mutual_Bit | Wrap_Rpc_Mode_Tls_Bit;
+		return remove_prefixes(up, mode);
+	}
+
+	return uri;
 }
 
 /******************************************************************************/
@@ -116,48 +142,35 @@ static int reopen_client(void *closure)
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
 	struct afb_wrap_rpc *wrap;
-	const char *turi, *uri_no_tls;
+	const char *turi;
 	char *apiname;
-	int rc, fd, websock;
+	int rc, fd;
 	enum afb_wrap_rpc_mode mode;
-#if WITH_TLS
-	int tls;
-#endif
 
-	/* check the api name */
-	uri_no_tls = prefix_tls_remove(uri);
+	/* check prefixes */
+	mode = Wrap_Rpc_Mode_FD;
+	turi = remove_prefixes(uri, &mode);
 #if WITH_TLS
-	tls = uri_no_tls != uri;
+	if (!((~mode) & (Wrap_Rpc_Mode_Tls_Bit | Wrap_Rpc_Mode_WS_Bit))) {
+		RP_ERROR("cannot do both TLS and Websocket, client RPC service to %s won't be created", uri);
+		rc = X_EINVAL;
+		goto error;
+	}
 #else
-	if (uri_no_tls != uri) {
+	if (mode & Wrap_Rpc_Mode_Tls_Bit) {
 		RP_ERROR("TLS is not supported. Can't use %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
 #endif
-	turi = prefix_ws_remove(uri_no_tls);
-	websock = turi != uri_no_tls;
-#if WITH_TLS
-	if (tls && websock) {
-		RP_ERROR("cannot do both TLS and Websocket, client RPC service to %s won't be created", uri);
-		rc = X_EINVAL;
-		goto error;
-	}
-#endif
 
+	/* check the api name */
 	apiname = afb_uri_api_name(turi);
 	if (apiname == NULL) {
 		RP_ERROR("invalid (too long) rpc client uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
-
-	/* set the correct connection mode */
-	mode = websock ? Wrap_Rpc_Mode_Websocket :
-#if WITH_TLS
-	       tls ? Wrap_Rpc_Mode_FD_Tls_Client :
-#endif
-	       Wrap_Rpc_Mode_FD;
 
 	/* open the socket */
 	rc = afb_socket_open(turi, 0);
@@ -203,12 +216,11 @@ static void server_on_hangup(struct afb_wrap_rpc *server)
 
 static void server_accept(struct server *server, int fd)
 {
-	int fdc, rc, websock;
+	int fdc, rc;
 	struct sockaddr addr;
 	socklen_t lenaddr;
 	struct afb_wrap_rpc *wrap;
 	const char *apiname;
-	enum afb_wrap_rpc_mode mode = Wrap_Rpc_Mode_FD;
 
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
@@ -217,16 +229,11 @@ static void server_accept(struct server *server, int fd)
 	} else {
 		rc = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
-		websock = server->uri != prefix_ws_remove(server->uri);
-		mode = websock ? Wrap_Rpc_Mode_Websocket :
-#if WITH_TLS
-		       server->tls ? Wrap_Rpc_Mode_FD_Tls_Server :
-#endif
-		       Wrap_Rpc_Mode_FD;
 		apiname = &server->uri[server->offapi];
 		if (apiname[0] == 0)
 			apiname = NULL;
-		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, mode, server->uri, apiname, server->apiset);
+
+		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, server->mode, server->uri, apiname, server->apiset);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
@@ -278,7 +285,7 @@ static int server_connect(struct server *server)
 	int fd, rc;
 
 	/* request the service object name */
-	rc = afb_socket_open(prefix_ws_remove(server->uri), 1);
+	rc = afb_socket_open(server->uri, 1);
 	if (rc < 0)
 		RP_ERROR("can't create socket %s", server->uri);
 	else {
@@ -297,11 +304,11 @@ static int server_connect(struct server *server)
 int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
 	int rc;
-	const char *uri_no_tls, *uri_no_ws;
+	const char *turi;
 	struct server *server;
 	size_t luri, lapi, extra;
-	ptrdiff_t l_before_api;
 	char *api = NULL;
+	enum afb_wrap_rpc_mode mode;
 
 	/* check the size */
 	luri = strlen(uri);
@@ -312,20 +319,24 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	/* check & remove prefixes */
-	uri_no_tls = prefix_tls_remove(uri);
-	uri_no_ws = prefix_ws_remove(uri_no_tls);
-
+	mode = Wrap_Rpc_Mode_FD | Wrap_Rpc_Mode_Server_Bit;
+	turi = remove_prefixes(uri, &mode);
 #if WITH_TLS
-	/* having both TLS and WS is an error */
-	if (uri_no_tls != uri && uri_no_ws != uri_no_tls) {
-		RP_ERROR("cannot do both TLS and Websocket, server RPC service to %s won't be created", uri);
+	if (!((~mode) & (Wrap_Rpc_Mode_Tls_Bit | Wrap_Rpc_Mode_WS_Bit))) {
+		RP_ERROR("cannot do both TLS and Websocket, client RPC service to %s won't be created", uri);
+		rc = X_EINVAL;
+		goto error;
+	}
+#else
+	if (mode & Wrap_Rpc_Mode_Tls_Bit) {
+		RP_ERROR("TLS is not supported. Can't use %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
 #endif
 
 	/* check the api name */
-	api = afb_uri_api_name(uri_no_ws);
+	api = afb_uri_api_name(turi);
 	if (api == NULL) {
 		RP_ERROR("invalid api name in rpc uri %s", uri);
 		rc = X_EINVAL;
@@ -341,10 +352,9 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 
 	/* make the structure */
 	lapi = strlen(api);
-	luri = strlen(uri_no_tls);
-	l_before_api = strstr(uri, api) - uri_no_tls;
+	luri = strlen(turi);
 	/* if there's something in the uri after the api name, store api name as extra after uri */
-	extra = luri == (size_t)l_before_api + lapi ? 0 : lapi + 1;
+	extra = strcmp(api, &turi[luri - lapi]) ? 1 + lapi : 0;
 	server = malloc(sizeof * server + 1 + luri + extra);
 	if (!server) {
 		RP_ERROR("out of memory");
@@ -353,13 +363,11 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	server->apiset = afb_apiset_addref(call_set);
-#if WITH_TLS
-	server->tls = uri_no_tls != uri;
-#endif
+	server->mode = mode;
 	server->efd = 0;
-	strcpy(server->uri, uri_no_tls);
+	strcpy(server->uri, turi);
 	if (!extra)
-		server->offapi = (uint16_t)l_before_api;
+		server->offapi = (uint16_t)(luri - lapi);
 	else {
 		server->offapi = (uint16_t)(luri + 1);
 		strcpy(&server->uri[server->offapi], api);
