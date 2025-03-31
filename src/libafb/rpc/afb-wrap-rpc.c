@@ -148,9 +148,8 @@ static void hangup(struct afb_wrap_rpc *wrap)
 		afb_vcomm_close(wrap->vcomm);
 #endif
 #if WITH_TLS
-	if (wrap->host != NULL) {
+	if (wrap->host != NULL)
 		free(wrap->host);
-	}
 #endif
 	free(wrap->mem.buffer);
 	free(wrap);
@@ -224,15 +223,17 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 		/* shrink buffer if too big */
 		if (esz > (size_t)ssz) {
 			wrap->mem.size -= esz - (size_t)ssz;
-			buffer = realloc(wrap->mem.buffer, wrap->mem.size);
-			if (buffer != NULL)
-				wrap->mem.buffer = buffer;
+			if (wrap->mem.size > 0) {
+				buffer = realloc(wrap->mem.buffer, wrap->mem.size);
+				if (buffer != NULL)
+					wrap->mem.buffer = buffer;
+			}
 			break;
 		}
 
 #if QUERY_RCV_SIZE
 		/* available data as returned by ioctl were read */
-		if (rc == 0)
+		if (ssz == 0)
 			break; /* no more data */
 #endif
 
@@ -263,19 +264,20 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 		return;
 	}
 
-	/* fully incomplete */
+	/* incomplete message, expects more bytes */
 	if (ssz == 0)
 		return;
 
 	/* check processed size */
 	wrap->mem.size -= (size_t)ssz;
-	if (wrap->mem.size == 0)
+	if (wrap->mem.size == 0) {
 		/* fully complete */
-		buffer = NULL;
-	else if (wrap->mem.dropped) {
-		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
-		wrap->mem.dropped = 0;
+		if (wrap->mem.dropped)
+			free(wrap->mem.buffer);
+		wrap->mem.buffer = NULL;
 	}
+	else if (wrap->mem.dropped)
+		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
 	else {
 		/*
 		* partially incomplete
@@ -285,16 +287,13 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 		*/
 		buffer = malloc(wrap->mem.size);
 		if (buffer == NULL) {
-			if (!wrap->mem.dropped)
-				wrap->mem.buffer = NULL; /* not released yet */
+			wrap->mem.buffer = NULL; /* not released yet */
 			hangup(wrap);
 			return;
 		}
 		memcpy(buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+		wrap->mem.buffer = buffer;
 	}
-	if (wrap->mem.dropped)
-		free(wrap->mem.buffer);
-	wrap->mem.buffer = buffer;
 }
 
 static void notify_fd(void *closure, struct afb_rpc_coder *coder)
