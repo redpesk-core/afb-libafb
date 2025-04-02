@@ -431,19 +431,20 @@ static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*noti
 static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
 {
 	int rc;
-	const char *cert_path, *key_path, *trust, *host, *host_end, *argsstr, **args;
+	const char *cert_path, *key_path, *trust_path, *host, *host_end, *argsstr, **args;
 	size_t host_len;
-	bool server = mode == Wrap_Rpc_Mode_FD_Tls_Server;
+	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
+	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
 
 	/* get cert & key from uri query arguments */
-	cert_path = key_path = trust = NULL;
+	cert_path = key_path = trust_path = NULL;
 	args = NULL;
 	argsstr = strchr(uri, '?');
 	if (argsstr != NULL && *argsstr != 0) {
 		args = rp_unescape_args(argsstr + 1);
 		cert_path = rp_unescaped_args_get(args, "cert");
 		key_path = rp_unescaped_args_get(args, "key");
-		trust = rp_unescaped_args_get(args, "trust");
+		trust_path = rp_unescaped_args_get(args, "trust");
 	}
 	if (server && (cert_path == NULL || key_path == NULL)) {
 		free(args);
@@ -465,18 +466,31 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 	wrap->host[host_len] = '\0';
 
 	/* setup TLS */
-	tls_init(&wrap->tls_session);
-	rc = tls_creds_init(&wrap->tls_session, server, cert_path, key_path, trust);
+#if !WITHOUT_FILESYSTEM
+	if (cert_path != NULL)
+		tls_load_cert(cert_path);
+	if (key_path != NULL)
+		tls_load_key(key_path);
+	if (trust_path != NULL)
+		tls_load_trust(trust_path);
+#endif
+	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
 	if (rc >= 0) {
-		rc = tls_session_init(&wrap->tls_session, server, fd, wrap->host);
+		rc = init_fd(wrap, fd, autoclose, notify_tls);
 		if (rc < 0)
 			tls_release(&wrap->tls_session);
 	}
 
 	if (rc >= 0)
-		rc = init_fd(wrap, fd, autoclose, notify_tls);
-
-	if (rc < 0) {
+		RP_INFO("Created %s %s session for %s",
+					mutual ? "mTLS" : "TLS",
+					server ? "server" : "client",
+					uri);
+	else {
+		RP_ERROR("Can't create %s %s session for %s",
+					mutual ? "mTLS" : "TLS",
+					server ? "server" : "client",
+					uri);
 		free(wrap->host);
 		wrap->host = NULL;
 	}
@@ -514,7 +528,7 @@ static int init(
 		else {
 			wrap->ws = NULL;
 #if WITH_TLS
-			if (mode == Wrap_Rpc_Mode_FD_Tls_Client || mode == Wrap_Rpc_Mode_FD_Tls_Server)
+			if (mode & Wrap_Rpc_Mode_Tls_Bit)
 				rc = init_tls(wrap, uri, mode, fd, autoclose);
 			else
 #endif

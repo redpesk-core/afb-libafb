@@ -61,31 +61,27 @@ static inline ssize_t tls_gnu_send(gnutls_session_t session, const void *buffer,
 	}
 }
 
-/**
- * @brief initializes a GnuTLS credentials object
- *
- * All certificates and keys provided must be in PEM format
- *
- * @param creds pointer where to store the address of the allocated credentials object
- * @param cert_path path to the certificate
- * @param key_path path to the private key matching the certificate
- * @param trust_path path to the directory containing the trusted certificates, NULL to use system trust dir
- *
- * @return 0 if OK, <0 if KO (in which case creds is freed for you)
- */
-extern int tls_gnu_creds_init(gnutls_certificate_credentials_t *creds, const char *cert_path, const char *key_path, const char *trust_path);
+extern
+int tls_gnu_session_create(
+	gnutls_session_t *session,
+	gnutls_certificate_credentials_t *creds,
+	int fd,
+	bool server,
+	bool mtls,
+	const char *host);
 
-/**
- * @brief initializes a GnuTLS session object
- *
- * @param session pointer where to store the address of the allocated session object
- * @param creds credentials to use for the session (see tls_gnu_creds_init)
- * @param server true if server, false if client
- * @param fd socket file descriptor to receive and transmit TLS data
- * @param host hostname or IP address of the peer
- *
- * @return 0 if OK, <0 if KO (in which case session is freed for you)
- */
-extern int tls_gnu_session_init(gnutls_session_t *session, gnutls_certificate_credentials_t creds, bool server, int fd, const char *host);
+extern int tls_gnu_has_cert();
+extern int tls_gnu_has_key();
+extern int tls_gnu_has_trust();
+
+extern int tls_gnu_set_cert(const void *cert, size_t size);
+extern int tls_gnu_set_key(const void *key, size_t size);
+extern int tls_gnu_add_trust(const void *trust, size_t size);
+
+#if !WITHOUT_FILESYSTEM
+extern int tls_gnu_load_cert(const char *path);
+extern int tls_gnu_load_key(const char *path);
+extern int tls_gnu_load_trust(const char *path);
+#endif
 
 #endif

@@ -31,6 +31,7 @@
 #include <errno.h>
 
 #include <mbedtls/ssl.h>
+#include <rp-utils/rp-verbose.h>
 
 static inline ssize_t tls_mbed_recv(mbedtls_ssl_context *sslctx, void *buffer, size_t length)
 {
@@ -48,6 +49,7 @@ static inline ssize_t tls_mbed_recv(mbedtls_ssl_context *sslctx, void *buffer, s
 		errno = EAGAIN;
 		break;
 	default:
+		RP_ERROR("got mbed read error %d", (int)ssz);
 		errno = EINVAL;
 		break;
 	}
@@ -67,6 +69,7 @@ static inline ssize_t tls_mbed_send(mbedtls_ssl_context *sslctx, const void *buf
 		case MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS:
 			break;
 		default:
+			RP_ERROR("got mbed write error %d", (int)ssz);
 			errno = EINVAL;
 			return -1;
 		}
@@ -74,24 +77,26 @@ static inline ssize_t tls_mbed_send(mbedtls_ssl_context *sslctx, const void *buf
 }
 
 extern
-int tls_mbed_session_init(
+int tls_mbed_session_create(
 	mbedtls_ssl_context *context,
 	mbedtls_ssl_config  *config,
-	bool server,
 	int fd,
-	const char *host
-);
+	bool server,
+	bool mtls,
+	const char *host);
 
-extern
-int tls_mbed_creds_init(
-	mbedtls_ssl_config *config,
-	mbedtls_x509_crt   *cacert,
-	mbedtls_x509_crt   *cert,
-	mbedtls_pk_context *key,
-	bool                server,
-	const char         *cert_path,
-	const char         *key_path,
-	const char         *trust_path
-);
+extern int tls_mbed_has_cert();
+extern int tls_mbed_has_key();
+extern int tls_mbed_has_trust();
+
+extern int tls_mbed_set_cert(const void *cert, size_t size);
+extern int tls_mbed_set_key(const void *key, size_t size);
+extern int tls_mbed_add_trust(const void *trust, size_t size);
+
+#if !WITHOUT_FILESYSTEM
+extern int tls_mbed_load_cert(const char *path);
+extern int tls_mbed_load_key(const char *path);
+extern int tls_mbed_load_trust(const char *path);
+#endif
 
 #endif

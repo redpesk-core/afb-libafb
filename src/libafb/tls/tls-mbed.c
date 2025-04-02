@@ -41,20 +41,52 @@
 
 #include "tls-mbed.h"
 
-
 #if __ZEPHYR__
 #else
 #include <unistd.h>
 #include <sys/random.h>
+#include <sys/stat.h>
 #endif
 
 #include <mbedtls/ssl.h>
+
+#include <rp-utils/rp-verbose.h>
+
+#include <sys/x-errno.h>
 
 #ifndef WITH_MBEDTLS_DEBUG
 # define WITH_MBEDTLS_DEBUG 1
 #endif
 
+#ifndef DEFAULT_CA_DIR
+#  define DEFAULT_CA_DIR "/etc/ssl/certs"
+#endif
+
+static bool cert_set  = false;
+static bool key_set   = false;
+static bool trust_set = false;
+
+static mbedtls_x509_crt   cert_data;
+static mbedtls_pk_context key_data;
+static mbedtls_x509_crt   trust_data;
+
 static const int cyphersuites[] = {
+/*
+	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA256,
+	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA384,
+	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA512,
+	MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
+	MBEDTLS_TLS1_3_SIG_ECDSA_SECP384R1_SHA384,
+	MBEDTLS_TLS1_3_SIG_ECDSA_SECP521R1_SHA512,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA256,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA384,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA512,
+	MBEDTLS_TLS1_3_SIG_ED25519,
+	MBEDTLS_TLS1_3_SIG_ED448,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA256,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA384,
+	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA512,
+*/
 	MBEDTLS_TLS1_3_AES_128_GCM_SHA256,
 	MBEDTLS_TLS1_3_AES_256_GCM_SHA384,
 	MBEDTLS_TLS1_3_CHACHA20_POLY1305_SHA256,
@@ -84,6 +116,134 @@ static int get_random_bytes(void *ctx, unsigned char *buf, size_t len)
 #endif
 	return 0;
 }
+
+/* check if a path is a directory */
+static bool isdir(const char *path)
+{
+	struct stat st;
+	int rc = stat(path, &st);
+	return rc >= 0 && S_ISDIR(st.st_mode);
+}
+
+int tls_mbed_has_cert()
+{
+	return cert_set;
+}
+
+int tls_mbed_has_key()
+{
+	return key_set;
+}
+
+int tls_mbed_has_trust()
+{
+	return trust_set;
+}
+
+int tls_mbed_set_cert(const void *cert, size_t size)
+{
+	if (cert_set)
+		return X_EEXIST;
+
+	psa_crypto_init();
+	mbedtls_x509_crt_init(&cert_data);
+	if (mbedtls_x509_crt_parse(&cert_data, cert, size) < 0) {
+		RP_ERROR("can't import certificate");
+		return X_EINVAL;
+	}
+
+	cert_set = true;
+	return 0;
+}
+
+int tls_mbed_set_key(const void *key, size_t size)
+{
+	if (key_set)
+		return X_EEXIST;
+
+	psa_crypto_init();
+	mbedtls_pk_init(&key_data);
+	if (mbedtls_pk_parse_key(&key_data, key, size,
+			NULL, 0, get_random_bytes, NULL) < 0) {
+		RP_ERROR("can't import key");
+		return X_EINVAL;
+	}
+
+	key_set = true;
+	return 0;
+}
+
+int tls_mbed_add_trust(const void *trust, size_t size)
+{
+	if (!trust_set) {
+		psa_crypto_init();
+		mbedtls_x509_crt_init(&trust_data);
+		trust_set = true;
+	}
+	if (mbedtls_x509_crt_parse(&trust_data, trust, size) < 0) {
+		RP_ERROR("can't import trust");
+		return X_EINVAL;
+	}
+	return 0;
+}
+
+#if !WITHOUT_FILESYSTEM
+int tls_mbed_load_cert(const char *path)
+{
+	if (cert_set)
+		return X_EEXIST;
+
+	psa_crypto_init();
+	mbedtls_x509_crt_init(&cert_data);
+	if (mbedtls_x509_crt_parse_file(&cert_data, path) < 0) {
+		RP_ERROR("can't load certificate %s", path);
+		return X_EINVAL;
+	}
+
+	cert_set = true;
+	return 0;
+}
+
+int tls_mbed_load_key(const char *path)
+{
+	if (key_set)
+		return X_EEXIST;
+
+	psa_crypto_init();
+	mbedtls_pk_init(&key_data);
+	if (mbedtls_pk_parse_keyfile(&key_data, path, NULL,
+			get_random_bytes, NULL) < 0) {
+		RP_ERROR("can't load key %s", path);
+		return X_EINVAL;
+	}
+
+	key_set = true;
+	return 0;
+}
+
+int tls_mbed_load_trust(const char *path)
+{
+	int rc;
+	if (!trust_set) {
+		psa_crypto_init();
+		mbedtls_x509_crt_init(&trust_data);
+		trust_set = true;
+	}
+	if (path == NULL)
+		path = DEFAULT_CA_DIR;
+	if (isdir(path))
+		rc = mbedtls_x509_crt_parse_path(&trust_data, path);
+	else
+		rc = mbedtls_x509_crt_parse_file(&trust_data, path);
+
+	if (rc < 0) {
+		RP_ERROR("can't load trust %s", path);
+		return X_EINVAL;
+	}
+
+	return 0;
+}
+#endif
 
 /**
 * callback for MBED to write the physical stream
@@ -117,75 +277,72 @@ static int recv_cb(void *ctx, unsigned char *buf, size_t len)
 	}
 }
 
-int tls_mbed_creds_init(
-	mbedtls_ssl_config *config,
-	mbedtls_x509_crt   *cacert,
-	mbedtls_x509_crt   *cert,
-	mbedtls_pk_context *key,
-	bool                server,
-	const char         *cert_path,
-	const char         *key_path,
-	const char         *trust_path
+int tls_mbed_session_create(
+	mbedtls_ssl_context *context,
+	mbedtls_ssl_config  *config,
+	int fd,
+	bool server,
+	bool mtls,
+	const char *host
 ) {
 	int rc;
 
-	psa_crypto_init();
+	if (!(server ? (cert_set && key_set) : trust_set)
+	  || (mtls && !(cert_set && key_set && trust_set))) {
+		RP_ERROR("Some crypto material misses");
+		return X_ENOENT;
+	}
+
+	mbedtls_ssl_init(context);
+	mbedtls_ssl_config_init(config);
 
 	rc = mbedtls_ssl_config_defaults(
 			config,
 			server ? MBEDTLS_SSL_IS_SERVER : MBEDTLS_SSL_IS_CLIENT,
 			MBEDTLS_SSL_TRANSPORT_STREAM,
 			MBEDTLS_SSL_PRESET_DEFAULT);
-	if (rc != 0)
-		return -1;
+	if (rc != 0) {
+		RP_ERROR("Can't init default config");
+		rc = X_ECANCELED;
+		goto error;
+	}
 
 	mbedtls_ssl_conf_rng(config, get_random_bytes, NULL);
 	mbedtls_ssl_conf_ciphersuites(config, cyphersuites);
-
 #if WITH_MBEDTLS_DEBUG
 	mbedtls_ssl_conf_dbg(config, debug_cb, NULL);
 #endif
 
-	if (trust_path != NULL) {
-		rc = mbedtls_x509_crt_parse_file(cacert, trust_path);
-		if (rc != 0)
-			return -1;
-		mbedtls_ssl_conf_ca_chain(config, cacert, NULL);
+	if (!server || mtls)
+		mbedtls_ssl_conf_ca_chain(config, &trust_data, NULL);
+
+	if (server || mtls) {
+		rc = mbedtls_ssl_conf_own_cert(config, &cert_data, &key_data);
+		if (rc != 0) {
+			RP_ERROR("Can't set key");
+			rc = X_ECANCELED;
+			goto error;
+		}
 	}
 
-	if (cert_path != NULL && key_path != NULL) {
-		rc = mbedtls_x509_crt_parse_file(cert, cert_path);
-		if (rc != 0)
-			return -1;
-		rc = mbedtls_pk_parse_keyfile(key, key_path, NULL, get_random_bytes, NULL);
-		if (rc != 0)
-			return -1;
-		rc = mbedtls_ssl_conf_own_cert(config, cert, key);
-		if (rc != 0)
-			return -1;
+	if (host != NULL) {
+		rc = mbedtls_ssl_set_hostname(context, host);
+		if (rc) {
+			RP_ERROR("Can't set hostname");
+			rc = X_ECANCELED;
+			goto error;
+		}
 	}
-	return 0;
-}
 
-int tls_mbed_session_init(
-	mbedtls_ssl_context *context,
-	mbedtls_ssl_config  *config,
-	bool server,
-	int fd,
-	const char *host
-) {
-	int rc;
-
-	rc = mbedtls_ssl_set_hostname(context, host);
-	if (rc)
-		return -1;
 	mbedtls_ssl_set_bio(context, (void*)(intptr_t)fd, send_cb, recv_cb, NULL );
 	mbedtls_ssl_setup(context, config);
 	return 0;
+
+error:
+	mbedtls_ssl_free(context);
+	mbedtls_ssl_config_free(config);
+	return rc;
 }
 
-
-
-
-
 #endif
+
