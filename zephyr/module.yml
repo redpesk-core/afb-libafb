@@ -4,3 +4,4 @@ build:
   depends:
     - afb-binding
     - rp-lib-utils
+    - mbedtls

@@ -42,11 +42,12 @@
 #include "tls-mbed.h"
 
 #if __ZEPHYR__
+#include <zephyr/random/random.h>
 #else
 #include <unistd.h>
 #include <sys/random.h>
-#include <sys/stat.h>
 #endif
+#include <sys/socket.h>
 
 #include <mbedtls/ssl.h>
 
@@ -70,8 +71,12 @@ static mbedtls_x509_crt   cert_data;
 static mbedtls_pk_context key_data;
 static mbedtls_x509_crt   trust_data;
 
-static const int cyphersuites[] = {
+#if RESTRICT_MBEDTLS_CYPHER_SUITE
 /*
+ * the setup of the cypher suite requires more time
+ * to work properly. so don't set it and use the defaults
+ */
+static const int cyphersuites[] = {
 	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA256,
 	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA384,
 	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA512,
@@ -86,7 +91,6 @@ static const int cyphersuites[] = {
 	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA256,
 	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA384,
 	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA512,
-*/
 	MBEDTLS_TLS1_3_AES_128_GCM_SHA256,
 	MBEDTLS_TLS1_3_AES_256_GCM_SHA384,
 	MBEDTLS_TLS1_3_CHACHA20_POLY1305_SHA256,
@@ -95,14 +99,14 @@ static const int cyphersuites[] = {
 	MBEDTLS_CIPHERSUITE_NODTLS,
 	0
 };
+#endif
 
 #if WITH_MBEDTLS_DEBUG
 #include <mbedtls/debug.h>
 #include <rp-utils/rp-verbose.h>
 static void debug_cb(void *ctx, int level, const char *file, int line, const char *str)
 {
-	int lvl = level;
-
+	int lvl = rp_Log_Level_Error - 1 + level;
 	rp_verbose(lvl, file, line, NULL, "%s", str);
 }
 #endif
@@ -115,14 +119,6 @@ static int get_random_bytes(void *ctx, unsigned char *buf, size_t len)
 	getrandom(buf, len, 0);
 #endif
 	return 0;
-}
-
-/* check if a path is a directory */
-static bool isdir(const char *path)
-{
-	struct stat st;
-	int rc = stat(path, &st);
-	return rc >= 0 && S_ISDIR(st.st_mode);
 }
 
 int tls_mbed_has_cert()
@@ -145,7 +141,7 @@ int tls_mbed_set_cert(const void *cert, size_t size)
 	if (cert_set)
 		return X_EEXIST;
 
-	psa_crypto_init();
+
 	mbedtls_x509_crt_init(&cert_data);
 	if (mbedtls_x509_crt_parse(&cert_data, cert, size) < 0) {
 		RP_ERROR("can't import certificate");
@@ -161,7 +157,6 @@ int tls_mbed_set_key(const void *key, size_t size)
 	if (key_set)
 		return X_EEXIST;
 
-	psa_crypto_init();
 	mbedtls_pk_init(&key_data);
 	if (mbedtls_pk_parse_key(&key_data, key, size,
 			NULL, 0, get_random_bytes, NULL) < 0) {
@@ -175,25 +170,34 @@ int tls_mbed_set_key(const void *key, size_t size)
 
 int tls_mbed_add_trust(const void *trust, size_t size)
 {
+	int rc;
 	if (!trust_set) {
-		psa_crypto_init();
 		mbedtls_x509_crt_init(&trust_data);
 		trust_set = true;
 	}
-	if (mbedtls_x509_crt_parse(&trust_data, trust, size) < 0) {
-		RP_ERROR("can't import trust");
+	rc = mbedtls_x509_crt_parse(&trust_data, trust, size);
+	if (rc < 0) {
+		RP_ERROR("can't import trust: %d", rc);
 		return X_EINVAL;
 	}
 	return 0;
 }
 
 #if !WITHOUT_FILESYSTEM
+#include <sys/stat.h>
+/* check if a path is a directory */
+static bool isdir(const char *path)
+{
+	struct stat st;
+	int rc = stat(path, &st);
+	return rc >= 0 && S_ISDIR(st.st_mode);
+}
+
 int tls_mbed_load_cert(const char *path)
 {
 	if (cert_set)
 		return X_EEXIST;
 
-	psa_crypto_init();
 	mbedtls_x509_crt_init(&cert_data);
 	if (mbedtls_x509_crt_parse_file(&cert_data, path) < 0) {
 		RP_ERROR("can't load certificate %s", path);
@@ -209,7 +213,6 @@ int tls_mbed_load_key(const char *path)
 	if (key_set)
 		return X_EEXIST;
 
-	psa_crypto_init();
 	mbedtls_pk_init(&key_data);
 	if (mbedtls_pk_parse_keyfile(&key_data, path, NULL,
 			get_random_bytes, NULL) < 0) {
@@ -225,7 +228,6 @@ int tls_mbed_load_trust(const char *path)
 {
 	int rc;
 	if (!trust_set) {
-		psa_crypto_init();
 		mbedtls_x509_crt_init(&trust_data);
 		trust_set = true;
 	}
@@ -251,7 +253,7 @@ int tls_mbed_load_trust(const char *path)
 static int send_cb(void *ctx, const unsigned char *buf, size_t len)
 {
 	for (;;) {
-		ssize_t ssz = write((int)(uintptr_t)ctx, buf, len);
+		ssize_t ssz = send((int)(uintptr_t)ctx, buf, len, 0);
 		if (ssz >= 0)
 			return (int)ssz;
 		if (errno == EAGAIN)
@@ -267,7 +269,7 @@ static int send_cb(void *ctx, const unsigned char *buf, size_t len)
 static int recv_cb(void *ctx, unsigned char *buf, size_t len)
 {
 	for (;;) {
-		ssize_t ssz = read((int)(uintptr_t)ctx, buf, len);
+		ssize_t ssz = recv((int)(uintptr_t)ctx, buf, len, 0);
 		if (ssz >= 0)
 			return (int)ssz;
 		if (errno == EAGAIN)
@@ -308,7 +310,9 @@ int tls_mbed_session_create(
 	}
 
 	mbedtls_ssl_conf_rng(config, get_random_bytes, NULL);
+#if RESTRICT_MBEDTLS_CYPHER_SUITE
 	mbedtls_ssl_conf_ciphersuites(config, cyphersuites);
+#endif
 #if WITH_MBEDTLS_DEBUG
 	mbedtls_ssl_conf_dbg(config, debug_cb, NULL);
 #endif
@@ -325,6 +329,12 @@ int tls_mbed_session_create(
 		}
 	}
 
+#if 0
+/*
+ * the control of the host of the certificate is
+ * generally needed. In our case, it has some drawback as the
+ * name is not always known.
+ */
 	if (host != NULL) {
 		rc = mbedtls_ssl_set_hostname(context, host);
 		if (rc) {
@@ -333,7 +343,7 @@ int tls_mbed_session_create(
 			goto error;
 		}
 	}
-
+#endif
 	mbedtls_ssl_set_bio(context, (void*)(intptr_t)fd, send_cb, recv_cb, NULL );
 	mbedtls_ssl_setup(context, config);
 	return 0;

@@ -4,6 +4,8 @@ Version ?
   feature
    - support of LLEXT in Zephyr
    - support of Mbedtls for RPC
+   - support of TLS or mTLS for RPC
+   - allow global setting of TLS material
 
   fix
    - correctly handle NULL listener in afb-stub-rpc

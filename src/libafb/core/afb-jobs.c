@@ -420,7 +420,6 @@ void afb_jobs_run(struct afb_job *job)
 #if WITH_TRACK_JOB_CALL
 	job->caller = x_tls_get_current_job();
 	x_tls_set_current_job(job);
-
 #endif
 #if WITH_JOB_NOT_MONITORED
 	job->callback(0, job->arg1, job->arg2);
