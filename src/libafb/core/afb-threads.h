@@ -110,29 +110,24 @@ typedef int (*afb_threads_job_getter_t)(void *closure, afb_threads_job_desc_t *d
 extern void afb_threads_setup_counts(int normal, int reserve);
 
 /**
- * start a thread with a job getter
- *
- * @param jobget  the getter function @see afb_threads_job_getter_t
- * @param closure closure for the getter
+ * start a thread
  *
  * @return 0 on succes or a negative error code
  */
-extern int afb_threads_start(afb_threads_job_getter_t jobget, void *closure);
+extern int afb_threads_start();
 
 /**
- * start a thread with a job getter but don't start it if
+ * start a thread but don't start it if
  * force == 0 and the normal_count of threads is already active
  *
- * @param jobget  the getter function @see afb_threads_job_getter_t
- * @param closure closure for the getter
  * @param force   enforce starting a thread
  *
  * @return 0 on succes or a negative error code
  */
-extern int afb_threads_start_cond(afb_threads_job_getter_t jobget, void *closure, int force);
+extern int afb_threads_start_cond(int force);
 
 /**
- * dont start a thread but use the current one to run the loop.
+ * enter thread dispatch of jobs
  *
  * @param jobget  the getter function @see afb_threads_job_getter_t
  * @param closure closure for the getter
@@ -142,53 +137,47 @@ extern int afb_threads_start_cond(afb_threads_job_getter_t jobget, void *closure
 extern int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure);
 
 /**
- * Get the count of active threads.
+ * Stop all the managed threads.
  *
- * @return the count found
+ * @param wait if not zero, wait all threads stopped
+ */
+extern void afb_threads_stop_all(int wait);
+
+/**
+ * Wake up all threads
+ */
+extern void afb_threads_wakeup();
+
+/**
+ * wait for expiration, not zero test result
+ * Calls test and if it returns a not zero value, return it
+ * When test returns 0, wait until the state change or expiration
+ *
+ * @param test    function to call
+ * @param closure closure to the function to call
+ * @param expire  the absolute expiration if not NULL
+ *
+ * @return the not zero value returned by test or on expiration X_ETIMEDOUT
+ */
+extern int afb_threads_wait_until(int (*test)(void *clo), void *closure, struct timespec *expire);
+
+/**
+ * Wait until every thread is idle
+ *
+ * @param expire  the absolute expiration if not NULL
+ *
+ * @return the not zero value returned by test or on expiration X_ETIMEDOUT
+ */
+extern int afb_threads_wait_idle(struct timespec *expire);
+
+/**
+ * deprecated, get current active count
  */
 extern int afb_threads_active_count();
 
 /**
- * Get the count of asleep threads.
- *
- * @return the count found
+ * deprecated, get current asleep count
  */
 extern int afb_threads_asleep_count();
 
-/**
- * Wake up one managed threads being sleeping.
- *
- * @return the 1 if one thread awaken or 0 else when none was awake
- */
-extern int afb_threads_wakeup_one();
 
-/**
- * Stop all the managed threads.
- *
- */
-extern void afb_threads_stop_all();
-
-/**
- * Checks if the given thread is managed
- *
- * @param tid  the thread id of the thread to check
- *
- * @return 1 if the thread is managed or 0 else
- */
-extern int afb_threads_has_thread(x_thread_t tid);
-
-/**
- * Checks if the current thread is managed
- *
- * @return 1 if the current thread is managed or 0 else
- */
-extern int afb_threads_has_me();
-
-/**
- * Wait until a new thread become sleep.
- *
- * @param expire an expiration time or NULL
- *
- * @return 0 on success or -1 if error or expiration
- */
-extern int afb_threads_wait_new_asleep(struct timespec *expire);

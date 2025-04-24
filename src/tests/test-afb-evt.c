@@ -308,7 +308,7 @@ void do_test_functional()
         afb_evt_listener_unref(ev_listener[i]);
 
 #if WITH_AFB_HOOK
-   afb_hook_unref_evt(hook_evt);
+    afb_hook_unref_evt(hook_evt);
 #endif
     afb_sched_exit(0, NULL, NULL, 0);
 }

@@ -228,7 +228,11 @@ static void listener_internal_unref_sync(int signum, void *closure, struct afb_s
 	}
 	else
 #endif
-	afb_sched_post_job2(listener->group, 0, 0, listener_internal_unref_job, listener, lock, Afb_Sched_Mode_Start);
+	{
+		afb_sched_post_job2(listener->group, 0, 0,
+				listener_internal_unref_job, listener, lock,
+				Afb_Sched_Mode_Start);
+	}
 }
 
 /**************************************************************************/
