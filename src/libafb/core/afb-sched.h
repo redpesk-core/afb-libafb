@@ -199,33 +199,6 @@ extern int afb_sched_post_job2(
 extern int afb_sched_abort_job(int jobid);
 
 /**
- * Calls synchronously in the current thread the job represented
- * by 'callback' and 'arg'.
- * The advantage of calling this function intead of calling
- *       afb_sig_monitor_run(0, callback, arg)
- * directly is that this function takes care of the fact that
- * it can lock the thread for a while. Consequently, this
- * function release the event loop if it held it and remove
- * the current thread from the thread of threads handling
- * asynchronous jobs.
- *
- * @param timeout  The timeout of achievment in second (0 no timeout)
- * @param callback The function to execute for achieving the job.
- *                 Its first parameter is either 0 on normal flow
- *                 or the signal number that broke the normal flow.
- *                 The remaining parameter is the parameter 'arg'
- *                 given here.
- * @param arg      The second argument for 'callback'
- * @param mode     Scheduling policy
- */
-extern void afb_sched_call(
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg,
-		enum afb_sched_mode mode
-);
-
-/**
  * Wait that every running thread are in waiting state.
  * One of the thread can be in event loop, waiting for some
  * event, while the other threads are just idled.

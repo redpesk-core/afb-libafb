@@ -217,17 +217,6 @@ int afb_sched_abort_job(int jobid)
 	return afb_jobs_abort(jobid);
 }
 
-/* call a monitored routine synchronousely, taking care of releasing event loop */
-void afb_sched_call(
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg,
-		enum afb_sched_mode mode
-) {
-	adapt(mode);
-	afb_sig_monitor_run(timeout, callback, arg);
-}
-
 /**
  * @brief get the sync_job of id, optionaly unlink it, and return it
  *
