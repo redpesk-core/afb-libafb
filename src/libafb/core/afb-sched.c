@@ -45,7 +45,7 @@
 #include "core/afb-sig-monitor.h"
 
 #define AFB_SCHED_WAIT_IDLE_MINIMAL_EXPIRATION	 30 /* thirty seconds */
-#define AFB_SCHED_EXITING_EXPIRATION	         10 /* ten seconds */
+#define AFB_SCHED_EXITING_EXPIRATION	         2 //10 /* ten seconds */
 
 /**
  * Description of synchronous jobs
@@ -157,19 +157,13 @@ static int get_job_cb(void *closure, afb_threads_job_desc_t *desc, x_thread_t ti
 	return AFB_THREADS_IDLE;
 }
 
-static int start_one_thread(enum afb_sched_mode mode)
-{
-	return afb_threads_start_cond(get_job_cb, NULL, mode == Afb_Sched_Mode_Start);
-}
-
 /**
  * Adapt the current threading to current job requirement
  */
 static void adapt(enum afb_sched_mode mode)
 {
 	if (activity & ACTIVE_JOBS)
-		if (!afb_threads_wakeup_one())
-			start_one_thread(mode);
+		afb_threads_start_cond(mode == Afb_Sched_Mode_Start);
 }
 
 /* Schedule the given job */
@@ -215,17 +209,6 @@ int afb_sched_post_job2(
 int afb_sched_abort_job(int jobid)
 {
 	return afb_jobs_abort(jobid);
-}
-
-/* call a monitored routine synchronousely, taking care of releasing event loop */
-void afb_sched_call(
-		int timeout,
-		void (*callback)(int, void*),
-		void *arg,
-		enum afb_sched_mode mode
-) {
-	adapt(mode);
-	afb_sig_monitor_run(timeout, callback, arg);
 }
 
 /**
@@ -392,38 +375,42 @@ int afb_sched_enter(
 }
 #endif
 
+static int wait_no_job_cb(void *closure)
+{
+	if (afb_jobs_get_pending_count() > 0)
+		return 0;
+	activity = 0;
+	afb_ev_mgr_wakeup();
+	return 1;
+}
+
 /* wait that no thread is running jobs */
 int afb_sched_wait_idle(int wait_jobs, int timeout)
 {
 	struct timespec expire;
-	int has_me, result = 0;
-
-	/* release the event loop */
-	afb_ev_mgr_release_for_me();
-
-	/* start a thread for processing */
-	has_me = afb_threads_has_me();
-	if (afb_threads_active_count() <= has_me)
-		start_one_thread(Afb_Sched_Mode_Start);
+	int result = 0;
+	int8_t oldactivity = activity;
 
 	/* compute the expiration */
 	clock_gettime(CLOCK_REALTIME, &expire);
 	expire.tv_sec += timeout > 0 ? timeout : AFB_SCHED_WAIT_IDLE_MINIMAL_EXPIRATION;
 
-	/* wait for job completion */
-	while (result == 0 && wait_jobs != 0 && afb_jobs_get_pending_count() > 0) {
-		adapt(Afb_Sched_Mode_Start); /* ensure someone process the job */
-		result = afb_threads_wait_new_asleep(&expire);
-	}
+	/* release the event loop */
+	activity = ACTIVE_JOBS | ACTIVE_EVMGR;
+	afb_ev_mgr_release_for_me();
 
-	/* wait for idle completion */
-	if (result == 0) {
-		activity = 0;
-		afb_ev_mgr_wakeup();
-		while (result == 0 && afb_threads_active_count() > afb_threads_asleep_count() + has_me)
-			result = afb_threads_wait_new_asleep(&expire);
-		activity = ACTIVE_JOBS | ACTIVE_EVMGR;
-	}
+	/* start 2 threads for processing, one for ev loop, one for jobs */
+	afb_threads_start();
+	afb_threads_start();
+
+	/* wait for job completion */
+	result = afb_threads_wait_until(wait_no_job_cb, NULL, &expire);
+	activity = 0;
+	afb_ev_mgr_wakeup();
+	if (result >= 0)
+		result = afb_threads_wait_idle(&expire);
+
+	activity = oldactivity;
 	return result;
 }
 
@@ -436,17 +423,16 @@ void afb_sched_exit(int force, void (*handler)(void*), void *closure, int exitco
 		pexiting->handler = handler;
 		pexiting->closure = closure;
 		pexiting->code = exitcode;
-		pexiting = 0;
 	}
 	x_mutex_unlock(&mutex);
 
 	/* stop */
+	activity = 0;
 	if (!force)
 		afb_sched_wait_idle(1, AFB_SCHED_EXITING_EXPIRATION);
-	activity = 0;
-	afb_threads_stop_all();
 	afb_ev_mgr_release_for_me();
 	afb_ev_mgr_wakeup();
+	afb_threads_stop_all(0);
 }
 
 /* Enter the jobs processing loop */
@@ -481,9 +467,9 @@ int afb_sched_start(
 	afb_threads_setup_counts(allowed_count, -1);
 	activity = ACTIVE_JOBS | ACTIVE_EVMGR;
 
-	/* start at least one thread: the current one */
-	while (afb_threads_active_count() + 1 < start_count) {
-		exiting.code = start_one_thread(Afb_Sched_Mode_Start);
+	/* At least one thread: the current one, so start the others */
+	for (; start_count > 1 ; start_count--) {
+		exiting.code = afb_threads_start();
 		if (exiting.code != 0) {
 			RP_ERROR("Not all threads can be started");
 			goto error;
@@ -497,6 +483,7 @@ int afb_sched_start(
 
 	/* run until end */
 	x_mutex_unlock(&mutex);
+	afb_threads_wakeup();
 	afb_threads_enter(get_job_cb, NULL);
 	afb_ev_mgr_release_for_me();
 	x_mutex_lock(&mutex);
@@ -504,10 +491,11 @@ error:
 	pexiting = 0;
 	x_mutex_unlock(&mutex);
 	afb_threads_setup_counts(0, -1);
-	afb_threads_stop_all();
+	afb_threads_stop_all(1);
 	if (exiting.handler) {
 		exiting.handler(exiting.closure);
 		exiting.handler = 0;
 	}
 	return exiting.code;
 }
+

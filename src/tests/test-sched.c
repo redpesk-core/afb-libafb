@@ -158,53 +158,6 @@ void test_start_job(int sig, void* arg){
     fprintf(stderr, "threads active %d asleep %d\n", afb_threads_active_count(), afb_threads_asleep_count());
 }
 
-void test_job_sync(int sig, void* arg){
-
-    int i, j;
-
-    fprintf(stderr, "test_job_sync received sig %d with arg %d\n", sig, p2i(arg));
-
-    if(sig == 0){
-        if (arg)
-            for(;;)
-                for(i=0; i<__INT_MAX__; i++)
-                    for(j=0; j<__INT_MAX__; j++);
-        pthread_mutex_lock(&gval.mutex);
-        gval.lastJob = TRUE;
-        pthread_mutex_unlock(&gval.mutex);
-    }
-    // if the job receve a stoping signal, inform the test rotine throw gval
-    else if(sig == SIGALRM ||
-            sig == SIGTERM ||
-            sig == SIGKILL)
-    {
-        // unlock mutex in case the job have been killed while mutex was locked
-        pthread_mutex_lock(&gval.mutex);
-        gval.killedJobs++;
-        pthread_mutex_unlock(&gval.mutex);
-    }
-    fprintf(stderr, "test_job_sync with arg %d terminates !\n", p2i(arg));
-
-}
-
-void test_start_job_sync(int sig, void* arg){
-
-    fprintf(stderr, "start_test_job_sync received sig %d with arg %d\n", sig, p2i(arg));
-
-    if(sig == 0){
-        afb_sched_call(1, test_job_sync, arg, Afb_Sched_Mode_Start);
-        pthread_mutex_lock(&gval.mutex);
-        gval.val *= -1;
-        gval.lastJob = FALSE;
-        pthread_mutex_unlock(&gval.mutex);
-    }
-
-    afb_sched_exit(0, NULL, NULL, 0);
-
-    fprintf(stderr, "leaving test_start_job_sync\n");
-    fflush(stderr);
-}
-
 /*********************************************************************/
 
 START_TEST(test_async){
@@ -236,38 +189,6 @@ START_TEST(test_async){
     ck_assert_int_eq(gval.val, -NBJOBS);
     ck_assert_int_eq(gval.runingJobs, 0);
     ck_assert_int_eq(gval.killedJobs, 0);
-
-}
-END_TEST
-
-START_TEST(test_sync){
-
-    gval.val = 0;
-    gval.lastJob = FALSE;
-    gval.runingJobs = 0;
-
-    fprintf(stderr, "\n************************test_sync************************\n");
-
-    // initialisation of the scheduler
-    ck_assert_int_eq(afb_sig_monitor_init(TRUE), 0);
-
-    afb_jobs_set_max_count(NBJOBS);
-    ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
-
-    // run one sync job
-    ck_assert_int_eq(afb_sched_start(1, 1, 2, test_start_job_sync, i2p(0)), 0);
-
-    ck_assert_int_eq(sched_runing,FALSE);
-    ck_assert_int_eq(gval.runingJobs, 0);
-    ck_assert_int_eq(gval.killedJobs, 0);
-
-    // run a sync job that will reach timeout
-    ck_assert_int_eq(afb_sched_start(3, 3, 4, test_start_job_sync, i2p(1)),0);
-
-    // check everything went alright
-    ck_assert_int_eq(sched_runing,FALSE);
-    ck_assert_int_eq(gval.runingJobs, 0);
-    ck_assert_int_eq(gval.killedJobs, 1);
 
 }
 END_TEST
@@ -514,7 +435,6 @@ int main(int ac, char **av)
 	mksuite("sched");
 		addtcase("sched");
 			addtest(test_async);
-			addtest(test_sync);
 			addtest(test_sched_enter);
 			addtest(test_sched_adapt);
 			addtest(test_evmgr);

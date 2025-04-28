@@ -10,6 +10,7 @@ Version ?
   fix
    - correctly handle NULL listener in afb-stub-rpc
    - handle correctly concurrent accesses in afb-stub-rpc
+   - refactor of afb-thread
 
 Version 5.3.10
 --------------

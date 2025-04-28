@@ -59,17 +59,11 @@ struct thread
 	/** thread id */
 	x_thread_t tid;
 
-	/** is extra */
-	unsigned char extra;
-
 	/** stop request */
 	unsigned char stopped;
 
-	/** job getter */
-	afb_threads_job_getter_t getjob;
-
-	/** closure of the job getter */
-	void *getjobcls;
+	/** next waiter of the waiter list */
+	struct thread *next_asleep;
 
 	/** synchronisation with the thread */
 	x_cond_t  cond;
@@ -83,28 +77,26 @@ struct thread
 /** count of allowed threads */
 static int normal_count = 1;
 
-/** synchronisation of thread's list management */
-static x_mutex_t list_lock = X_MUTEX_INITIALIZER;
-
 /** synchronisation of running threads for job acquisition */
 static x_mutex_t run_lock = X_MUTEX_INITIALIZER;
 
 static x_cond_t *asleep_waiter_cond = 0;
 
-/** list of threads */
+/** list of active threads */
 static struct thread *threads = 0;
 
+/** count of active threads */
 static int active_count = 0;
 
 /***********************************************************************
-* asleep threads will wait for being woken up on the wakeup_cond
+* asleep threads will wait for being woken up
 */
-
-/** signaling condition for waking up threads */
-static x_cond_t wakeup_cond = X_COND_INITIALIZER;
 
 /** synchronisation of wakeup/asleep management */
 static x_mutex_t asleep_lock = X_MUTEX_INITIALIZER;
+
+/** lifo of asleep threads */
+static struct thread *asleep_threads = 0;
 
 /** count of asleep threads */
 static int asleep_count = 0;
@@ -129,24 +121,31 @@ static x_mutex_t reserve_lock = X_MUTEX_INITIALIZER;
 
 /***********************************************************************/
 
+static afb_threads_job_getter_t getjob = NULL;
+static void *getjobcls = NULL;
+
+/***********************************************************************/
+
+typedef int (*afb_threads_job_getter_t)(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid);
+typedef int (*afb_threads_job_getter_t)(void *closure, afb_threads_job_desc_t *desc, x_thread_t tid);
+
 /**
  * Removes @ref thr from the list of active threads.
- * The mutex @ref list_lock must be held when this function is called.
+ * The mutex @ref run_lock must be held when this function is called.
  * The value of active_count is unchanged because it should be done in @ref stop
  */
 static void unlink_thread(struct thread *thr)
 {
-	struct thread *ithr;
-	if (threads == thr)
-		threads = thr->next;
-	else {
-		for (ithr = threads ; ithr && ithr->next != thr ; ithr = ithr->next);
-		if (ithr)
-			ithr->next = thr->next;
+	struct thread *ithr, **pthr;
+	for (pthr = &threads ; (ithr = *pthr) ; pthr = &ithr->next) {
+		if (ithr == thr) {
+			*pthr = thr->next;
+			break;
+		}
 	}
 }
 
-static void thread_run(struct thread *me)
+static void thread_run(struct thread *me, afb_threads_job_getter_t mainjob)
 {
 	int status;
 	afb_threads_job_desc_t jobdesc;
@@ -156,9 +155,14 @@ IFDBG(static unsigned id = 0; me->id = ++id;)
 PRINT("++++++++++++ START[%u] %p\n",me->id,me);
 
 	x_mutex_lock(&run_lock);
-	while (!me->stopped) {
+	me->next = threads;
+	threads = me;
+	active_count++;
+	if (mainjob)
+		getjob = mainjob;
+	do {
 		/* get a job */
-		status = me->getjob(me->getjobcls, &jobdesc, me->tid);
+		status = getjob ? getjob(getjobcls, &jobdesc, me->tid) : AFB_THREADS_IDLE;
 		switch (status) {
 		case AFB_THREADS_CONTINUE:
 			/* continue the loop */
@@ -175,15 +179,17 @@ PRINT("++++++++++++ TR run A[%u]%p\n",me->id,me);
 
 		case AFB_THREADS_IDLE:
 			/* enter idle */
-			if (me->extra)
+			if (!mainjob && active_count > normal_count)
 				goto stopme;
 PRINT("++++++++++++ TRwB[%u]%p\n",me->id,me);
 			x_mutex_lock(&asleep_lock);
+			me->next_asleep = asleep_threads;
+			asleep_threads = me;
+			asleep_count++;
 			x_mutex_unlock(&run_lock);
-			__atomic_add_fetch(&asleep_count, 1, __ATOMIC_ACQ_REL);
 			if (asleep_waiter_cond != NULL)
 				x_cond_signal(asleep_waiter_cond);
-			x_cond_wait(&wakeup_cond, &asleep_lock);
+			x_cond_wait(&me->cond, &asleep_lock);
 			x_mutex_unlock(&asleep_lock);
 			x_mutex_lock(&run_lock);
 PRINT("++++++++++++ TRwA[%u]%p\n",me->id,me);
@@ -193,18 +199,17 @@ PRINT("++++++++++++ TRwA[%u]%p\n",me->id,me);
 			/* stop current thread */
 stopme:
 PRINT("++++++++++++ TR stop B[%u]%p\n",me->id,me);
-			__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
 			me->stopped = 1;
 			break;
 		}
 	}
-	x_mutex_unlock(&run_lock);
-
-	x_mutex_lock(&list_lock);
+	while (!me->stopped);
+	if (mainjob)
+		getjob = NULL;
+	active_count--;
 	unlink_thread(me);
-	x_mutex_unlock(&list_lock);
-
 	x_mutex_lock(&asleep_lock);
+	x_mutex_unlock(&run_lock);
 	if (asleep_waiter_cond != NULL)
 		x_cond_signal(asleep_waiter_cond);
 	x_mutex_unlock(&asleep_lock);
@@ -212,7 +217,6 @@ PRINT("++++++++++++ TR stop B[%u]%p\n",me->id,me);
 	afb_ev_mgr_try_recover_for_me();
 
 	/* terminate */
-	afb_sig_monitor_clean_timeouts();
 
 PRINT("++++++++++++ STOP[%u] %p\n",me->id,me);
 }
@@ -225,15 +229,17 @@ static void *thread_main(void *arg)
 	afb_sig_monitor_init_timeouts();
 
 	for (;;) {
-		thread_run(thr);
+		thread_run(thr, 0);
 		x_mutex_lock(&reserve_lock);
 		if (current_reserve_count >= reserve_count) {
 			x_mutex_unlock(&reserve_lock);
+			afb_sig_monitor_clean_timeouts();
 			x_cond_destroy(&thr->cond);
 			free(thr);
-			return 0;
+			return NULL;
 		}
 		current_reserve_count++;
+		thr->stopped = 0;
 		thr->next = reserve_head;
 		reserve_head = thr;
 		x_cond_wait(&thr->cond, &reserve_lock);
@@ -246,31 +252,17 @@ static void *thread_main(void *arg)
 
 void afb_threads_setup_counts(int normal, int reserve)
 {
+	x_mutex_lock(&run_lock);
 	if (normal >= 0)
 		normal_count = normal;
 	if (reserve >= 0)
 		reserve_count = reserve;
+	x_mutex_unlock(&run_lock);
 }
 
 /***********************************************************************/
 
-int afb_threads_active_count()
-{
-	return __atomic_load_n(&active_count, __ATOMIC_SEQ_CST);
-}
-
-int afb_threads_asleep_count()
-{
-	return __atomic_load_n(&asleep_count, __ATOMIC_SEQ_CST);
-}
-
-int afb_threads_start_cond(afb_threads_job_getter_t jobget, void *closure, int force)
-{
-	return !force && __atomic_load_n(&active_count, __ATOMIC_SEQ_CST) >= normal_count
-		? 0 : afb_threads_start(jobget, closure);
-}
-
-int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
+int afb_threads_start()
 {
 	int rc;
 	struct thread *thr;
@@ -281,15 +273,6 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 
 		reserve_head = thr->next;
 		current_reserve_count--;
-		thr->stopped = 0;
-		thr->getjob = jobget;
-		thr->getjobcls = closure;
-		x_mutex_lock(&list_lock);
-		thr->next = threads;
-		threads = thr;
-		thr->extra = __atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL)
-		           > __atomic_load_n(&normal_count, __ATOMIC_SEQ_CST);
-		x_mutex_unlock(&list_lock);
 		x_cond_signal(&thr->cond);
 		x_mutex_unlock(&reserve_lock);
 		return 0;
@@ -305,25 +288,15 @@ int afb_threads_start(afb_threads_job_getter_t jobget, void *closure)
 	thr->next = 0;
 	thr->stopped = 0;
 	thr->cond = (x_cond_t)X_COND_INITIALIZER;
-	thr->getjob = jobget;
-	thr->getjobcls = closure;
 
-	x_mutex_lock(&list_lock);
-	thr->next = threads;
-	threads = thr;
-	thr->extra = __atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL)
-	           > __atomic_load_n(&normal_count, __ATOMIC_SEQ_CST);
 	rc = x_thread_create(&thr->tid, thread_main, thr, 1);
 	if (rc < 0) {
 		rc = -errno;
-		__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
-		unlink_thread(thr);
 		x_cond_destroy(&thr->cond);
 		free(thr);
 		RP_CRITICAL("not able to start thread: %s", strerror(-rc));
 
 	}
-	x_mutex_unlock(&list_lock);
 	return rc;
 }
 
@@ -331,106 +304,160 @@ int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 {
 	struct thread me;
 
+	if (getjob)
+		return X_EINVAL;
+
 	/* setup the structure for me */
 	me.next = 0;
-	me.tid = x_thread_self();
-	me.extra = 0;
 	me.stopped = 0;
+	me.tid = x_thread_self();
 	me.cond = (x_cond_t)X_COND_INITIALIZER;
-	me.getjob = jobget;
-	me.getjobcls = closure;
 
 	/* initiate thread tempo */
 	afb_sig_monitor_init_timeouts();
 
 	/* enter the thread now */
-	x_mutex_lock(&list_lock);
-	me.next = threads;
-	threads = &me;
-	__atomic_add_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
-	x_mutex_unlock(&list_lock);
+	getjobcls = closure;
+	thread_run(&me, jobget);
 
-	thread_run(&me);
+	afb_sig_monitor_clean_timeouts();
 	x_cond_destroy(&me.cond);
 
 	return 0;
 }
 
-int afb_threads_wakeup_one()
+static int wakeup_one()
 {
-	int result;
-	x_mutex_lock(&asleep_lock);
+	struct thread *thr;
+	int result = 0;
 PRINT("++++++++++++ B-TWU\n");
-	if (__atomic_load_n(&asleep_count, __ATOMIC_SEQ_CST) == 0)
+	x_mutex_lock(&asleep_lock);
+	thr = asleep_threads;
+	if (!thr) {
+		x_mutex_unlock(&asleep_lock);
 		result = 0;
+	}
 	else {
-		__atomic_sub_fetch(&asleep_count, 1, __ATOMIC_ACQ_REL);
-		x_cond_signal(&wakeup_cond);
+		asleep_count--;
+		asleep_threads = thr->next_asleep;
+		x_cond_signal(&thr->cond);
+		x_mutex_unlock(&asleep_lock);
 		result = 1;
 	}
-	x_mutex_unlock(&asleep_lock);
 PRINT("++++++++++++ A-TWU -> %d\n", result);
 	return result;
 }
 
-void afb_threads_stop_all()
+void afb_threads_wakeup()
+{
+	x_mutex_lock(&run_lock);
+	while (wakeup_one());
+	x_mutex_unlock(&run_lock);
+}
+
+int afb_threads_start_cond(int force)
+{
+	int start, result = 0;
+PRINT("++++++++++++ B-TSC\n");
+	x_mutex_lock(&run_lock);
+	start = !wakeup_one() && (force || active_count < normal_count);
+	x_mutex_unlock(&run_lock);
+	if (start)
+		result = afb_threads_start();
+PRINT("++++++++++++ A-TSC -> %d\n", result);
+	return result;
+}
+
+static int has_me()
+{
+	int resu = 0;
+	x_thread_t tid = x_thread_self();
+	struct thread *ithr;
+	x_mutex_lock(&run_lock);
+	for (ithr = threads ; ithr && !resu ; ithr = ithr->next)
+		resu = x_thread_equal(ithr->tid, tid);
+	x_mutex_unlock(&run_lock);
+	return resu;
+}
+
+static int is_stopped(void *closure)
+{
+	int result, hasme = (int)(intptr_t)closure;
+	x_mutex_lock(&run_lock);
+	result = hasme == active_count;
+	x_mutex_unlock(&run_lock);
+	return result;
+}
+
+static int wait_stopped()
+{
+	int hasme = has_me();
+	return afb_threads_wait_until(is_stopped, (void*)(intptr_t)hasme, 0);
+}
+
+void afb_threads_stop_all(int wait)
 {
 	struct thread *ithr;
-	x_mutex_lock(&list_lock);
+	x_mutex_lock(&run_lock);
 	for (ithr = threads ; ithr ; ithr = ithr->next)
-		if (ithr->stopped == 0) {
-			ithr->stopped = 1;
-			__atomic_sub_fetch(&active_count, 1, __ATOMIC_ACQ_REL);
+		ithr->stopped = 1;
+	while(wakeup_one());
+	x_mutex_unlock(&run_lock);
+	if (wait)
+		wait_stopped();
+}
+
+int afb_threads_wait_until(int (*test)(void *clo), void *closure, struct timespec *expire)
+{
+	for(;;) {
+		int rc = test(closure);
+		if (rc != 0)
+			return rc;
+
+		x_mutex_lock(&run_lock);
+		if(wakeup_one() || !expire)
+			x_mutex_unlock(&run_lock);
+		else {
+			x_cond_t *oldcond;
+			x_cond_t cond = X_COND_INITIALIZER;
+
+			x_mutex_lock(&asleep_lock);
+			x_mutex_unlock(&run_lock);
+			oldcond = asleep_waiter_cond;
+			asleep_waiter_cond = &cond;
+			rc = expire
+				? x_cond_timedwait(&cond, &asleep_lock, expire)
+				: x_cond_wait(&cond, &asleep_lock);
+			asleep_waiter_cond = oldcond;
+			x_mutex_unlock(&asleep_lock);
+			if (rc)
+				return X_ETIMEDOUT;
 		}
-	x_mutex_unlock(&list_lock);
-	x_mutex_lock(&asleep_lock);
-	x_cond_broadcast(&wakeup_cond);
-	x_mutex_unlock(&asleep_lock);
+	}
 }
 
-static struct thread *get_thread(x_thread_t tid)
+static int is_idle(void *closure)
 {
-	struct thread *ithr;
-	for (ithr = threads ; ithr && !x_thread_equal(ithr->tid, tid) ; ithr = ithr->next);
-	return ithr;
+	int result, hasme = (int)(intptr_t)closure;
+	x_mutex_lock(&run_lock);
+	result = (asleep_count + hasme) == active_count;
+	x_mutex_unlock(&run_lock);
+	return result;
 }
 
-int afb_threads_has_thread(x_thread_t tid)
+int afb_threads_wait_idle(struct timespec *expire)
 {
-	int resu;
-	struct thread *thr;
-	x_mutex_lock(&list_lock);
-	thr = get_thread(tid);
-	resu = thr != NULL && !thr->stopped;
-	x_mutex_unlock(&list_lock);
-	return resu;
+	int hasme = has_me();
+	return afb_threads_wait_until(is_idle, (void*)(intptr_t)hasme, expire);
 }
 
-int afb_threads_has_me()
+int afb_threads_active_count()
 {
-	return afb_threads_has_thread(x_thread_self());
+       return active_count;
 }
 
-
-int afb_threads_wait_new_asleep(struct timespec *expire)
+int afb_threads_asleep_count()
 {
-	int rc, resu = 0;
-	x_cond_t cond = X_COND_INITIALIZER;
-	x_cond_t *oldcond;
-
-	x_mutex_lock(&asleep_lock);
-	oldcond = asleep_waiter_cond;
-	asleep_waiter_cond = &cond;
-	rc = expire == NULL
-		? x_cond_wait(&cond, &asleep_lock)
-		: x_cond_timedwait(&cond, &asleep_lock, expire);
-	if (rc != 0)
-		resu = X_ETIMEDOUT;
-	if (asleep_waiter_cond == &cond)
-		asleep_waiter_cond = oldcond;
-	if (oldcond != NULL && resu == 0)
-		x_cond_signal(oldcond);
-	x_mutex_unlock(&asleep_lock);
-	return resu;
+       return asleep_count;
 }
 
