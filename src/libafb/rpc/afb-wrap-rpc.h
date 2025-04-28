@@ -30,16 +30,30 @@
  * RPC wrap connection mode, TLS and WebSocket are mutually exclusive
  */
 enum afb_wrap_rpc_mode {
+	/* bits */
+	Wrap_Rpc_Mode_Server_Bit = 1,
+	Wrap_Rpc_Mode_Tls_Bit    = 2,
+	Wrap_Rpc_Mode_Mutual_Bit = 4,
+	Wrap_Rpc_Mode_WS_Bit     = 8,
+
 	/* file descriptor */
-	Wrap_Rpc_Mode_FD,
+	Wrap_Rpc_Mode_FD = 0,
 #if WITH_TLS
 	/* file descriptor for TLS (client) */
-	Wrap_Rpc_Mode_FD_Tls_Client,
+	Wrap_Rpc_Mode_FD_Tls_Client
+		= Wrap_Rpc_Mode_Tls_Bit,
 	/* file descriptor for TLS (server) */
-	Wrap_Rpc_Mode_FD_Tls_Server,
+	Wrap_Rpc_Mode_FD_Tls_Server
+		= Wrap_Rpc_Mode_Tls_Bit | Wrap_Rpc_Mode_Server_Bit,
+	/* file descriptor for Mutual TLS (client) */
+	Wrap_Rpc_Mode_FD_Mutual_Tls_Client
+		= Wrap_Rpc_Mode_Mutual_Bit | Wrap_Rpc_Mode_Tls_Bit,
+	/* file descriptor for Mutal TLS (server) */
+	Wrap_Rpc_Mode_FD_Mutual_Tls_Server
+		= Wrap_Rpc_Mode_Mutual_Bit | Wrap_Rpc_Mode_Tls_Bit | Wrap_Rpc_Mode_Server_Bit,
 #endif
 	/* WebSocket */
-	Wrap_Rpc_Mode_Websocket
+	Wrap_Rpc_Mode_Websocket = Wrap_Rpc_Mode_WS_Bit
 };
 
 struct afb_apiset;

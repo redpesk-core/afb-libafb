@@ -48,10 +48,12 @@
 #if WITH_WSJ1 && !WITHOUT_JSON_C
 #include "wsj1/afb-wsj1.h"
 #endif
-#include "tls/tls.h"
 #include "sys/ev-mgr.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
+#if WITH_GNUTLS
+#include "tls/tls-gnu.h"
+#endif
 
 /*****************************************************************************************************************************/
 
@@ -487,7 +489,7 @@ struct afb_wsj1 *afb_ws_client_connect_wsj1(struct sd_event *eloop, const char *
 				fcntl(fd, F_SETFL, O_NONBLOCK);
 #if WITH_GNUTLS
 			if (rc == 0 && tls) {
-				rc = tls_upgrade_client(afb_ev_mgr_get_for_me(), fd, 0/*host*/);
+				rc = tls_gnu_upgrade_client(afb_ev_mgr_get_for_me(), fd, 0/*host*/);
 				if (rc >= 0) {
 					afb_ev_mgr_prepare();
 					fd = rc;
@@ -545,7 +547,7 @@ static int sockopenpref(const char *uri, int server, const char *prefix, const c
 #if WITH_GNUTLS
 	if (fd > 0 && tls) {
 		mfd = fd;
-		fd = tls_upgrade_client(afb_ev_mgr_get_for_me(), mfd, 0);
+		fd = tls_gnu_upgrade_client(afb_ev_mgr_get_for_me(), mfd, 0);
 		if (fd < 0)
 			close(mfd);
 		else

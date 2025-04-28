@@ -44,8 +44,11 @@
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-wrap-rpc.h"
 
-#if WITH_GNUTLS
-#  include "tls/tls-gnu.h"
+#if WITH_TLS
+#  include "tls/tls.h"
+#  ifndef TLS_SENDBUF_SIZE
+#    define TLS_SENDBUF_SIZE 2048
+#  endif
 #endif
 
 #ifndef RECEIVE_BLOCK_LENGTH
@@ -101,19 +104,12 @@ struct afb_wrap_rpc
 
 	/* FOR TLS */
 #if WITH_TLS
-	/* IP or hostname; necessary for handshakes, so it must live as long as the session lives */
+	/* IP or hostname; necessary for handshakes.
+	   It must live as long as the session lives */
 	char *host;
 
-#if WITH_GNUTLS
-	/** the TLS session handler */
-	gnutls_certificate_credentials_t gnutls_creds;
-
-	/** the TLS session handler */
-	gnutls_session_t gnutls_session;
-#else
-#  error "unimplemented TLS backend"
-#endif
-
+	/** the TLS session data */
+	tls_session_t tls_session;
 #endif
 };
 
@@ -150,6 +146,10 @@ static void hangup(struct afb_wrap_rpc *wrap)
 #if WITH_VCOMM
 	if (wrap->vcomm != NULL)
 		afb_vcomm_close(wrap->vcomm);
+#endif
+#if WITH_TLS
+	if (wrap->host != NULL)
+		free(wrap->host);
 #endif
 	free(wrap->mem.buffer);
 	free(wrap);
@@ -199,8 +199,8 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 	/* read in buffer */
 	for (;;) {
 		ssz =
-#if WITH_GNUTLS
-			wrap->gnutls_session ? gnutls_record_recv(wrap->gnutls_session, buffer, esz) :
+#if WITH_TLS
+			wrap->host ? tls_recv(&wrap->tls_session, buffer, esz) :
 #endif
 #if USE_SND_RCV
 			recv(fd, buffer, esz, MSG_DONTWAIT);
@@ -209,23 +209,31 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 #endif
 		/* read error? */
 		if (ssz < 0) {
-			wrap->mem.size = 0;
-			hangup(wrap);
-			return;
+			if (errno == EINTR)
+				continue;
+			if (errno == EAGAIN)
+				ssz = 0;
+			else {
+				wrap->mem.size = 0;
+				hangup(wrap);
+				return;
+			}
 		}
 
 		/* shrink buffer if too big */
 		if (esz > (size_t)ssz) {
 			wrap->mem.size -= esz - (size_t)ssz;
-			buffer = realloc(wrap->mem.buffer, wrap->mem.size);
-			if (buffer != NULL)
-				wrap->mem.buffer = buffer;
+			if (wrap->mem.size > 0) {
+				buffer = realloc(wrap->mem.buffer, wrap->mem.size);
+				if (buffer != NULL)
+					wrap->mem.buffer = buffer;
+			}
 			break;
 		}
 
 #if QUERY_RCV_SIZE
 		/* available data as returned by ioctl were read */
-		if (rc == 0)
+		if (ssz == 0)
 			break; /* no more data */
 #endif
 
@@ -256,19 +264,20 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 		return;
 	}
 
-	/* fully incomplete */
+	/* incomplete message, expects more bytes */
 	if (ssz == 0)
 		return;
 
 	/* check processed size */
 	wrap->mem.size -= (size_t)ssz;
-	if (wrap->mem.size == 0)
+	if (wrap->mem.size == 0) {
 		/* fully complete */
-		buffer = NULL;
-	else if (wrap->mem.dropped) {
-		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
-		wrap->mem.dropped = 0;
+		if (wrap->mem.dropped)
+			free(wrap->mem.buffer);
+		wrap->mem.buffer = NULL;
 	}
+	else if (wrap->mem.dropped)
+		memmove(wrap->mem.buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
 	else {
 		/*
 		* partially incomplete
@@ -278,16 +287,13 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 		*/
 		buffer = malloc(wrap->mem.size);
 		if (buffer == NULL) {
-			if (!wrap->mem.dropped)
-				wrap->mem.buffer = NULL; /* not released yet */
+			wrap->mem.buffer = NULL; /* not released yet */
 			hangup(wrap);
 			return;
 		}
 		memcpy(buffer, &wrap->mem.buffer[ssz], wrap->mem.size);
+		wrap->mem.buffer = buffer;
 	}
-	if (wrap->mem.dropped)
-		free(wrap->mem.buffer);
-	wrap->mem.buffer = buffer;
 }
 
 static void notify_fd(void *closure, struct afb_rpc_coder *coder)
@@ -330,29 +336,27 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 /***       T L S                                                            ***/
 /******************************************************************************/
 
-#if WITH_GNUTLS
+#if WITH_TLS
 
 static void notify_tls(void *closure, struct afb_rpc_coder *coder)
 {
-	ssize_t rc;
-	uint32_t sz;
 	struct afb_wrap_rpc *wrap = closure;
-	size_t maxsz = gnutls_record_get_max_size(wrap->gnutls_session);
+	ssize_t rc;
+	uint32_t length, sz, off, wrt;
+	char buffer[TLS_SENDBUF_SIZE];
 
-	/* check size of data to send */
-	afb_rpc_coder_output_sizes(coder, &sz);
-	if (sz > maxsz) {
-		RP_ERROR("there's more data (%u) than the maximum TLS record size (%lu), packet won't be sent", sz, maxsz);
+	afb_rpc_coder_output_sizes(coder, &length);
+	for (off = 0 ; off < length ; off += sz) {
+		sz = afb_rpc_coder_output_get_subbuffer(coder, buffer,
+						(uint32_t)sizeof buffer, off);
+		wrt = 0;
+		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)rc) {
+			rc = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
+			if (rc <= 0)
+				goto end;
+		}
 	}
-	else {
-		/* send */
-		char buffer[sz];
-		afb_rpc_coder_output_get_buffer(coder, buffer, sz);
-		do {
-			rc = gnutls_record_send(wrap->gnutls_session, buffer, sz);
-		} while (rc == GNUTLS_E_AGAIN || rc == GNUTLS_E_INTERRUPTED);
-	}
-
+end:
 	afb_rpc_coder_output_dispose(coder);
 }
 
@@ -427,20 +431,22 @@ static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*noti
 static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
 {
 	int rc;
-	const char *cert_path, *key_path, *trust, *host, *host_end, *argsstr, **args;
+	const char *cert_path, *key_path, *trust_path, *host, *host_end, *argsstr, **args;
 	size_t host_len;
+	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
+	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
 
 	/* get cert & key from uri query arguments */
-	cert_path = key_path = trust = NULL;
+	cert_path = key_path = trust_path = NULL;
 	args = NULL;
 	argsstr = strchr(uri, '?');
 	if (argsstr != NULL && *argsstr != 0) {
 		args = rp_unescape_args(argsstr + 1);
 		cert_path = rp_unescaped_args_get(args, "cert");
 		key_path = rp_unescaped_args_get(args, "key");
-		trust = rp_unescaped_args_get(args, "trust");
+		trust_path = rp_unescaped_args_get(args, "trust");
 	}
-	if (cert_path == NULL || key_path == NULL) {
+	if (server && (cert_path == NULL || key_path == NULL)) {
 		free(args);
 		RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
 		return X_EINVAL;
@@ -459,23 +465,32 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 	strncpy(wrap->host, host, host_len);
 	wrap->host[host_len] = '\0';
 
-	/* setup GnuTLS */
-#if WITH_GNUTLS
-	wrap->gnutls_session = NULL;
-	rc = tls_gnu_creds_init(&wrap->gnutls_creds, cert_path, key_path, trust);
-	if (rc >= 0) {
-		rc = tls_gnu_session_init(&wrap->gnutls_session, wrap->gnutls_creds, mode == Wrap_Rpc_Mode_FD_Tls_Server, fd, wrap->host);
-		if (rc < 0)
-			gnutls_certificate_free_credentials(wrap->gnutls_creds);
-	}
-#else
-#  error "unimplemented TLS backend"
+	/* setup TLS */
+#if !WITHOUT_FILESYSTEM
+	if (cert_path != NULL)
+		tls_load_cert(cert_path);
+	if (key_path != NULL)
+		tls_load_key(key_path);
+	if (trust_path != NULL)
+		tls_load_trust(trust_path);
 #endif
+	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
+	if (rc >= 0) {
+		rc = init_fd(wrap, fd, autoclose, notify_tls);
+		if (rc < 0)
+			tls_release(&wrap->tls_session);
+	}
 
 	if (rc >= 0)
-		rc = init_fd(wrap, fd, autoclose, notify_tls);
-
-	if (rc < 0) {
+		RP_INFO("Created %s %s session for %s",
+					mutual ? "mTLS" : "TLS",
+					server ? "server" : "client",
+					uri);
+	else {
+		RP_ERROR("Can't create %s %s session for %s",
+					mutual ? "mTLS" : "TLS",
+					server ? "server" : "client",
+					uri);
 		free(wrap->host);
 		wrap->host = NULL;
 	}
@@ -513,7 +528,7 @@ static int init(
 		else {
 			wrap->ws = NULL;
 #if WITH_TLS
-			if (mode == Wrap_Rpc_Mode_FD_Tls_Client || mode == Wrap_Rpc_Mode_FD_Tls_Server)
+			if (mode & Wrap_Rpc_Mode_Tls_Bit)
 				rc = init_tls(wrap, uri, mode, fd, autoclose);
 			else
 #endif

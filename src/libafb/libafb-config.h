@@ -76,7 +76,6 @@
 #define WITH_CASE_FOLDING 0
 #define WITH_EXTENSION 0
 #define WITH_GNUTLS 0
-#define WITH_MBEDTLS 0
 #define WITH_BINDINGS_V3 0
 #define WITH_WSJ1 0
 #define WITH_WSAPI 0
