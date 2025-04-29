@@ -22,16 +22,16 @@
 # $RP_END_LICENSE$
 ###########################################################################
 
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.18)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(afb-libafb
-	VERSION 5.3.10
+	VERSION 5.4.0
 	DESCRIPTION "Core library for implementing Application framework Binder"
 	HOMEPAGE_URL "https://github.com/redpesk-core/afb-libafb"
 	LANGUAGES C)
 
-set(LIBAFB_VERSION "6.0")
+set(LIBAFB_VERSION "6.1")
 set(LIBAFB_SOVERSION "6")
 
 set(LIBAFBCLI_VERSION "6.0")

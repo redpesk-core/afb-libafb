@@ -1,5 +1,5 @@
-Version ?
---------------
+Version 5.4.0
+-------------
 
   feature
    - support of LLEXT in Zephyr
@@ -11,6 +11,9 @@ Version ?
    - correctly handle NULL listener in afb-stub-rpc
    - handle correctly concurrent accesses in afb-stub-rpc
    - refactor of afb-thread
+
+  change
+   - remove of obsolete function afb_sched_call (use afb_sig_monitor_run)
 
 Version 5.3.10
 --------------
