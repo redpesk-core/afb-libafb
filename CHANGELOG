@@ -1,6 +1,10 @@
 Version next
 -------------
 
+  feature
+   - add 'host=' parameter in RPC URLs for setting or removing
+     host name to check in TLS
+
   fix
    - support of mTLS when mbedTLS is the server
    - memory overflow when broadcasting events

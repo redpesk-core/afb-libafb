@@ -50,7 +50,7 @@ set(libdirs
 
 set(deps
 	json-c
-	librp-utils-core
+	librp-utils-core>=0.2.3
 	librp-utils-file
 	librp-utils-json-c
 )

@@ -24,6 +24,7 @@
 #include "../libafb-config.h"
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -102,10 +103,13 @@ struct afb_wrap_rpc
 	}
 		mem;
 
-	/* FOR TLS */
 #if WITH_TLS
+	/* Is TLS active? */
+	bool use_tls;
+
 	/* IP or hostname; necessary for handshakes.
-	   It must live as long as the session lives */
+	 * It must live as long as the session lives.
+	 * Can be null but in that case no host check is performed */
 	char *host;
 
 	/** the TLS session data */
@@ -148,8 +152,9 @@ static void hangup(struct afb_wrap_rpc *wrap)
 		afb_vcomm_close(wrap->vcomm);
 #endif
 #if WITH_TLS
-	if (wrap->host != NULL)
-		free(wrap->host);
+	if (wrap->use_tls)
+		tls_release(&wrap->tls_session);
+	free(wrap->host);
 #endif
 	free(wrap->mem.buffer);
 	free(wrap);
@@ -200,7 +205,7 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 	for (;;) {
 		ssz =
 #if WITH_TLS
-			wrap->host ? tls_recv(&wrap->tls_session, buffer, esz) :
+			wrap->use_tls ? tls_recv(&wrap->tls_session, buffer, esz) :
 #endif
 #if USE_SND_RCV
 			recv(fd, buffer, esz, MSG_DONTWAIT);
@@ -431,13 +436,15 @@ static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*noti
 static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
 {
 	int rc;
-	const char *cert_path, *key_path, *trust_path, *host, *host_end, *argsstr, **args;
+	const char *cert_path, *key_path, *trust_path, *hostname, *host, *host_end, *argsstr, **args;
 	size_t host_len;
 	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
 	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
 
+	wrap->use_tls = false;
+
 	/* get cert & key from uri query arguments */
-	cert_path = key_path = trust_path = NULL;
+	cert_path = key_path = trust_path = hostname = NULL;
 	args = NULL;
 	argsstr = strchr(uri, '?');
 	if (argsstr != NULL && *argsstr != 0) {
@@ -445,6 +452,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		cert_path = rp_unescaped_args_get(args, "cert");
 		key_path = rp_unescaped_args_get(args, "key");
 		trust_path = rp_unescaped_args_get(args, "trust");
+		hostname = rp_unescaped_args_get(args, "host");
 	}
 	if (server && (cert_path == NULL || key_path == NULL)) {
 		free(args);
@@ -452,18 +460,26 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		return X_EINVAL;
 	}
 
-	/* copy host name */
-	host = strchr(uri, ':') + 1;
-	host_end = strchr(host, ':');
-	host_len = (size_t)(host_end - host);
-	wrap->host = malloc(host_len + 1);
-	if (!wrap->host) {
-		free(args);
-		RP_ERROR("out of memory");
-		return X_ENOMEM;
+	/* get the name of the host */
+	if (hostname != NULL) {
+		if (*hostname == '\0')
+			wrap->host = NULL;
+		else {
+			wrap->host = strdup(hostname);
+			if (wrap->host == NULL)
+				goto oom_host;
+		}
 	}
-	strncpy(wrap->host, host, host_len);
-	wrap->host[host_len] = '\0';
+	else {
+		host = strchr(uri, ':') + 1;
+		host_end = strchr(host, ':');
+		host_len = (size_t)(host_end - host);
+		wrap->host = malloc(host_len + 1);
+		if (wrap->host == NULL)
+			goto oom_host;
+		strncpy(wrap->host, host, host_len);
+		wrap->host[host_len] = '\0';
+	}
 
 	/* setup TLS */
 #if !WITHOUT_FILESYSTEM
@@ -481,11 +497,13 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 			tls_release(&wrap->tls_session);
 	}
 
-	if (rc >= 0)
+	if (rc >= 0) {
+		wrap->use_tls = true;
 		RP_INFO("Created %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
 					uri);
+	}
 	else {
 		RP_ERROR("Can't create %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
@@ -495,9 +513,15 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		wrap->host = NULL;
 	}
 
+end:
 	/* cleanup */
 	free(args);
 	return rc;
+
+oom_host:
+	RP_ERROR("out of memory");
+	rc = X_ENOMEM;
+	goto end;
 }
 #endif
 
