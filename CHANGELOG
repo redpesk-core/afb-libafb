@@ -1,3 +1,9 @@
+Version ?
+-------------
+
+  fix
+  - support of mTLS when mbedTLS is the server
+
 Version 5.4.0
 -------------
 
