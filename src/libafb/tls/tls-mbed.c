@@ -329,6 +329,9 @@ int tls_mbed_session_create(
 		}
 	}
 
+	if (server && mtls)
+		mbedtls_ssl_conf_authmode(config, MBEDTLS_SSL_VERIFY_REQUIRED);
+
 #if 0
 /*
  * the control of the host of the certificate is
