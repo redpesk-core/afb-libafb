@@ -1,8 +1,9 @@
-Version ?
+Version next
 -------------
 
   fix
-  - support of mTLS when mbedTLS is the server
+   - support of mTLS when mbedTLS is the server
+   - memory overflow when broadcasting events
 
 Version 5.4.0
 -------------

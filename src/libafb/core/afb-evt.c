@@ -412,7 +412,7 @@ static int broadcast_name(const char *event, unsigned nparams, struct afb_data *
 		}
 	}
 	iter = uniqueness.base + uniqueness.count;
-	if (iter > EVENT_BROADCAST_MEMORY_COUNT)
+	if (iter >= EVENT_BROADCAST_MEMORY_COUNT)
 		iter -= EVENT_BROADCAST_MEMORY_COUNT;
 	if (uniqueness.count < EVENT_BROADCAST_MEMORY_COUNT)
 		uniqueness.count++;
