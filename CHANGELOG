@@ -5,6 +5,9 @@ Version next
    - support of mTLS when mbedTLS is the server
    - memory overflow when broadcasting events
 
+  change
+   - enforce afb-ev-mgr protection for concurrency
+
 Version 5.4.0
 -------------
 
