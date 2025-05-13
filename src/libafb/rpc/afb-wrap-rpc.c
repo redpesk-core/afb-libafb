@@ -481,7 +481,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		wrap->host[host_len] = '\0';
 	}
 
-	/* setup TLS */
+	/* setup TLS crypto material */
 #if !WITHOUT_FILESYSTEM
 	if (cert_path != NULL)
 		tls_load_cert(cert_path);
@@ -490,6 +490,11 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 	if (trust_path != NULL)
 		tls_load_trust(trust_path);
 #endif
+	if ((!server || mutual) && !tls_has_trust())
+		/* use default system trust */
+		tls_load_trust(NULL);
+
+	/* setup TLS session */
 	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
 	if (rc >= 0) {
 		rc = init_fd(wrap, fd, autoclose, notify_tls);
@@ -497,6 +502,7 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 			tls_release(&wrap->tls_session);
 	}
 
+	/* log status */
 	if (rc >= 0) {
 		wrap->use_tls = true;
 		RP_INFO("Created %s %s session for %s",

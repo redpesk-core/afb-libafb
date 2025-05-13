@@ -4,6 +4,9 @@ Version next
   fix
    - correct dependency to librp-utils-core >= 0.2.3
 
+  change
+   - use system trust chain if no trust chain is already set
+
 Version 5.4.1
 -------------
 
