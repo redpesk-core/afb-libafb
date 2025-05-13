@@ -1,3 +1,9 @@
+Version next
+-------------
+
+  fix
+   - correct dependency to librp-utils-core >= 0.2.3
+
 Version 5.4.1
 -------------
 

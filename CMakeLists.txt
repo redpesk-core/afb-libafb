@@ -247,12 +247,12 @@ else(ZEPHYR_BASE)
 
 	if(WITH_RPUTILS_STATIC)
 		PKG_CHECK_MODULES(librp-utils REQUIRED
-				librp-utils-core-static
+				librp-utils-core-static>=0.2.3
 				librp-utils-file-static
 				librp-utils-json-c-static)
 	else()
 		PKG_CHECK_MODULES(librp-utils REQUIRED
-				librp-utils-core
+				librp-utils-core>=0.2.3
 				librp-utils-file
 				librp-utils-json-c)
 	endif()
