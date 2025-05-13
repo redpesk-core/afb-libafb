@@ -294,16 +294,14 @@ int tls_gnu_load_cert(const char *path)
 		return X_EEXIST;
 
 	rc = rp_file_get(path, &data, &size);
-	if (rc < 0)
-		RP_ERROR("Can't load certificate %s", path);
-	else {
+	if (rc >= 0) {
 		rc = tls_gnu_set_cert(data, size);
 		free(data);
-		if (rc < 0) {
-			TLSERR(rc, "Can't load certificate %s", path);
-			rc = X_EINVAL;
-		}
 	}
+
+	if (rc < 0)
+		TLSERR(rc, "Can't load certificate %s", path);
+
 	return rc;
 }
 
@@ -317,16 +315,14 @@ int tls_gnu_load_key(const char *path)
 		return X_EEXIST;
 
 	rc = rp_file_get(path, &data, &size);
-	if (rc < 0)
-		RP_ERROR("Can't load private key %s", path);
-	else {
+	if (rc >= 0) {
 		rc = tls_gnu_set_key(data, size);
 		free(data);
-		if (rc < 0) {
-			TLSERR(rc, "Can't load private key %s", path);
-			rc = X_EINVAL;
-		}
 	}
+
+	if (rc < 0)
+		TLSERR(rc, "Can't load private key %s", path);
+
 	return rc;
 }
 
@@ -353,9 +349,16 @@ int tls_gnu_load_trust(const char *path)
 	else if (isdir(path))
 		rc = gnutls_x509_trust_list_add_trust_dir(trust_data, path, NULL,
 						GNUTLS_X509_FMT_PEM, 0, 0);
-	else
-		rc = gnutls_x509_trust_list_add_trust_file(trust_data, path, NULL,
-						GNUTLS_X509_FMT_PEM, 0, 0);
+	else {
+		size_t size;
+		char *data;
+
+		rc = rp_file_get(path, &data, &size);
+		if (rc >= 0) {
+			rc = tls_gnu_add_trust(data, size);
+			free(data);
+		}
+	}
 
 	if (rc < 0) {
 		TLSERR(rc, "Can't load trust %s", path ?: "<SYSTEM>");

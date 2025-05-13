@@ -6,6 +6,7 @@ Version next
 
   change
    - use system trust chain if no trust chain is already set
+   - load trust chain file in order to detect encoding PEM or DER
 
 Version 5.4.1
 -------------
