@@ -135,7 +135,7 @@ static int get(x_thread_t tid)
 		struct waithold **piw = &awaiters;
 		while (*piw) piw = &(*piw)->next;
 		*piw = &wait;
-		afb_ev_mgr_wakeup(evmgr);
+		afb_ev_mgr_wakeup();
 		x_cond_wait(&wait.cond, &mutex);
 		awaiters = wait.next;
 	}
