@@ -332,21 +332,15 @@ int tls_mbed_session_create(
 	if (server && mtls)
 		mbedtls_ssl_conf_authmode(config, MBEDTLS_SSL_VERIFY_REQUIRED);
 
-#if 0
-/*
- * the control of the host of the certificate is
- * generally needed. In our case, it has some drawback as the
- * name is not always known.
- */
-	if (host != NULL) {
-		rc = mbedtls_ssl_set_hostname(context, host);
-		if (rc) {
-			RP_ERROR("Can't set hostname");
-			rc = X_ECANCELED;
-			goto error;
-		}
+	/*
+	 * Set the hostname to check, can be NULL for no check.
+	 */
+	rc = mbedtls_ssl_set_hostname(context, host);
+	if (rc) {
+		RP_ERROR("Can't set hostname");
+		rc = X_ECANCELED;
+		goto error;
 	}
-#endif
 	mbedtls_ssl_set_bio(context, (void*)(intptr_t)fd, send_cb, recv_cb, NULL );
 	mbedtls_ssl_setup(context, config);
 	return 0;

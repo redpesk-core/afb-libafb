@@ -26,7 +26,7 @@ cmake_minimum_required(VERSION 3.18)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(afb-libafb
-	VERSION 5.4.0
+	VERSION 5.4.2
 	DESCRIPTION "Core library for implementing Application framework Binder"
 	HOMEPAGE_URL "https://github.com/redpesk-core/afb-libafb"
 	LANGUAGES C)
@@ -247,12 +247,12 @@ else(ZEPHYR_BASE)
 
 	if(WITH_RPUTILS_STATIC)
 		PKG_CHECK_MODULES(librp-utils REQUIRED
-				librp-utils-core-static
+				librp-utils-core-static>=0.2.3
 				librp-utils-file-static
 				librp-utils-json-c-static)
 	else()
 		PKG_CHECK_MODULES(librp-utils REQUIRED
-				librp-utils-core
+				librp-utils-core>=0.2.3
 				librp-utils-file
 				librp-utils-json-c)
 	endif()

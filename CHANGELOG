@@ -1,8 +1,26 @@
-Version ?
+Version 5.4.2
 -------------
 
   fix
-  - support of mTLS when mbedTLS is the server
+   - correct dependency to librp-utils-core >= 0.2.3
+
+  change
+   - use system trust chain if no trust chain is already set
+   - load trust chain file in order to detect encoding PEM or DER
+
+Version 5.4.1
+-------------
+
+  feature
+   - add 'host=' parameter in RPC URLs for setting or removing
+     host name to check in TLS
+
+  fix
+   - support of mTLS when mbedTLS is the server
+   - memory overflow when broadcasting events
+
+  change
+   - enforce afb-ev-mgr protection for concurrency
 
 Version 5.4.0
 -------------
