@@ -75,6 +75,7 @@ option(WITH_RPC_V3                "Activate RPC protocol version 3"        ON)
 option(WITH_TRACK_JOB_CALL        "Track stack of jobs to detect locks"    OFF)
 option(WITH_VCOMM                 "support VCOMM layer"                    ON)
 option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
+option(WITH_PERMISSION_API        "Activates permission API if cynagora is off" OFF)
 ## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
 option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
@@ -285,6 +286,8 @@ endif()
 if(NOT WITHOUT_CYNAGORA)
 	PKG_CHECK_MODULES(cynagora REQUIRED cynagora)
 	add_definitions(-DBACKEND_PERMISSION_IS_CYNAGORA=1)
+elseif(WITH_PERMISSION_API)
+	add_definitions(-DBACKEND_PERMISSION_IS_API_PERM=1)
 endif()
 
 if(WITH_SYSTEMD)

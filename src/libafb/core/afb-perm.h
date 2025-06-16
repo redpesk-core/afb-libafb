@@ -98,6 +98,16 @@ extern void afb_perm_check_async(
 	void *closure
 );
 
+/**
+ * Check if the perm check API 'api' is possible
+ *
+ * @param api the api name to check
+ *
+ * @return 0 if possible or -1 otherwise
+ */
+extern int afb_perm_check_perm_check_api(
+	const char *api
+);
 
 #else /* WITH_CREDS */
 
@@ -123,4 +133,12 @@ void afb_perm_check_async(
 	callback(closure, 1);
 }
 
+static inline
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return 0;
+}
+
 #endif
+

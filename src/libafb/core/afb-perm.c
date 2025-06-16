@@ -204,6 +204,78 @@ void afb_perm_check_async(
 	callback(closure, rc);
 }
 
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return 0;
+}
+
+/*********************************************************************************/
+#elif BACKEND_PERMISSION_IS_API_PERM
+
+#ifndef API_PERM_API_NAME
+#define API_PERM_API_NAME "perm"
+#endif
+
+#ifndef API_PERM_VERB_NAME
+#define API_PERM_VERB_NAME "check"
+#endif
+
+#include <string.h>
+
+#include "core/afb-global.h"
+#include "core/afb-type-predefined.h"
+#include "core/afb-data.h"
+#include "core/afb-calls.h"
+
+static void checkcb(void *closure1, void *closure2, void *closure3, int status, unsigned nvals, struct afb_data * const vals[])
+{
+	/* the called verb should reply 1 to grant, 0 to deny or a negative value for error */
+	void (*callback)(void *_closure, int _status) = closure1;
+	callback(closure2, status);
+}
+
+static int mkstrdata(struct afb_data **result, const char *str)
+{
+	size_t len = str == NULL ? 0 : 1 + strlen(str);
+	return afb_data_create_raw(result,
+			&afb_type_predefined_stringz, str, len, NULL, NULL);
+}
+
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
+	const char *permission,
+	void (*callback)(void *_closure, int _status),
+	void *closure
+) {
+	struct afb_data * params[4];
+
+	mkstrdata(&params[0], client);
+	mkstrdata(&params[1], user);
+	mkstrdata(&params[2], session);
+	mkstrdata(&params[3], permission);
+
+	afb_calls_call(
+		afb_global_api(),
+		API_PERM_API_NAME,
+		API_PERM_VERB_NAME,
+		4,
+		params,
+		checkcb,
+		callback,
+		closure,
+		NULL
+	);
+}
+
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return -!strcmp(api, API_PERM_API_NAME);
+}
+
 /*********************************************************************************/
 #else
 
@@ -217,6 +289,12 @@ void afb_perm_check_async(
 ) {
 	RP_NOTICE("Granting permission %s by default of backend", permission);
 	callback(closure, 1);
+}
+
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return 0;
 }
 
 #endif
