@@ -1,3 +1,9 @@
+Version 5.4.3
+-------------
+
+  fix
+   - RPC blocking (#8016)
+
 Version 5.4.2
 -------------
 
