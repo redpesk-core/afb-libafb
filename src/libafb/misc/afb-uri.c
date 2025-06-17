@@ -43,18 +43,18 @@ const char *afb_uri_api_name(const char *uri)
         args = rp_unescape_args(uri_args + 1);
         as_api = rp_unescaped_args_get(args, "as-api");
         if (as_api != NULL) {
-            apicpy = malloc(strlen(as_api) + 1);
-            strcpy(apicpy, as_api);
+            apicpy = strdup(as_api);
             free(args);
             goto check_return;
         }
+        free(args);
     }
 
     /* look for a '/' or a ':' */
     len = uri_args ? (size_t)(uri_args - uri) : strlen(uri); // stop before the '?' when there's one
     api = memrchr(uri, '/', len);
     if (api == NULL) {
-        api = strchr(uri, ':');
+        api = memrchr(uri, ':', len);
         if (api == NULL || strlen(api) < 2)
             return NULL;
         if (api[1] == '@')
@@ -63,19 +63,14 @@ const char *afb_uri_api_name(const char *uri)
 
     /* at this point api is the char before an api name */
     api++;
-    if (uri_args != NULL)
-        len = (size_t)(uri_args - api);
-    else
-        len = strlen(api);
+    len -= (size_t)(api - uri);
     apicpy = malloc(len + 1);
     strncpy(apicpy, api, len);
     apicpy[len] = '\0';
 
 check_return:
-    if (afb_apiname_is_valid(apicpy))
+    if (apicpy != NULL && afb_apiname_is_valid(apicpy))
         return apicpy;
-    else {
-        free(apicpy);
-        return NULL;
-    }
+    free(apicpy);
+    return NULL;
 }
