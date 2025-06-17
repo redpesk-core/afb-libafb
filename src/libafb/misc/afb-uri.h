@@ -28,8 +28,11 @@
 /**
  * Get API name from a sockspec URI
  *
- * @param uri sockspec URI
+ * @param uri     sockspec URI
+ * @param apiname location for storing copy of the apiname
+ * @param multi   allows multiple names separated by commas
  *
- * @returns API name (must be freed by the user), NULL if not found, invalid name or error
+ * @returns 0 on success or a negative value on error
  */
-extern char *afb_uri_api_name(const char *uri);
+extern int afb_uri_api_name(const char *uri, char **apiname, int multi);
+

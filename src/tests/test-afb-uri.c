@@ -36,12 +36,14 @@
  * @param __uri full sockspec URI from which to extract the API name
  * @param __want correct API name in __uri
  */
-#define CHECK_URI_API(__uri, __want) \
-    res = afb_uri_api_name(__uri);   \
-    ck_assert_str_eq(res, __want);   \
-    free(res)
-
-static char *res;
+#define CHECK_URI_API(__uri, __want)           \
+  do {                                         \
+    char *res;                                 \
+    int rc = afb_uri_api_name(__uri, &res, 0); \
+    ck_assert_int_eq(rc, 0);                   \
+    ck_assert_str_eq(res, __want);             \
+    free(res);                                 \
+  } while(0)
 
 START_TEST(test)
 {
