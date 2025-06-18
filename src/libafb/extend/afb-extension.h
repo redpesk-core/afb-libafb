@@ -131,7 +131,7 @@ extern const struct argp_option *AfbExtensionGetOptionsV1();
  * --------------------
  *
  * If defined and exported, this function is called for configuring the
- * extension. The configuration is given by the js0n object @p config
+ * extension. The configuration is given by the json object @p config
  * that is set for the given @p uid.
  *
  * The extension can store a handle in the given @p data pointer. This
