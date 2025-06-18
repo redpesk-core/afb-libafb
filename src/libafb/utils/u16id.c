@@ -166,8 +166,10 @@ static void *add(flat_t *flat, uint16_t id, void *ptr)
 		grown = realloc(result, size(get_capacity(nupper)));
 		if (grown == NULL)
 			return NULL;
-		result = grown;
-		flatofup(flat, grown, nupper);
+		if (grown != result) {
+			result = grown;
+			flatofup(flat, grown, nupper);
+		}
 		if (oupper) {
 			flatofup(&oflat, grown, oupper);
 			while (oupper) {
