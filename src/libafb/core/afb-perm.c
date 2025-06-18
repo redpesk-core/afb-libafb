@@ -166,8 +166,10 @@ static int cynagora_acquire()
 	return rc;
 }
 
-static void check_req_async(
-	struct afb_req_common *req,
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
 	const char *permission,
 	void (*callback)(void *closure, int status),
 	void *closure
@@ -188,9 +190,9 @@ static void check_req_async(
 			memo->status = -EFAULT;
 			memo->closure = closure;
 			memo->checkcb = callback;
-			key.client = req->credentials->label;
-			key.user = req->credentials->user;
-			key.session = session_of_req(req);
+			key.client = client;
+			key.user = user;
+			key.session = session;
 			key.permission = permission;
 			rc = cynagora_async_check(cynagora, &key, 0, 0, async_check_cb, memo);
 			unlock();
@@ -205,8 +207,10 @@ static void check_req_async(
 /*********************************************************************************/
 #else
 
-static void check_req_async(
-	struct afb_req_common *req,
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
 	const char *permission,
 	void (*callback)(void *_closure, int _status),
 	void *closure
@@ -235,7 +239,13 @@ void afb_perm_check_req_async(
 		callback(closure, 0);
 	}
 	else {
-		check_req_async(req, permission, callback, closure);
+		afb_perm_check_async(
+			req->credentials->label,
+			req->credentials->user,
+			session_of_req(req),
+			permission,
+			callback,
+			closure);
 	}
 }
 
