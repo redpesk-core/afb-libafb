@@ -38,15 +38,6 @@
 #include "core/afb-req-common.h"
 
 /*********************************************************************************/
-
-static inline const char *session_of_req(struct afb_req_common *req)
-{
-	return req->token ? afb_token_string(req->token)
-                : req->session ? afb_session_uuid(req->session)
-                : "";
-}
-
-/*********************************************************************************/
 #if BACKEND_PERMISSION_IS_CYNAGORA
 
 #include <stdint.h>
@@ -301,6 +292,13 @@ int afb_perm_check_perm_check_api(
 
 /*********************************************************************************/
 /* common entry */
+
+static inline const char *session_of_req(struct afb_req_common *req)
+{
+	return req->token ? afb_token_string(req->token)
+                : req->session ? afb_session_uuid(req->session)
+                : "";
+}
 
 void afb_perm_check_req_async(
 	struct afb_req_common *req,
