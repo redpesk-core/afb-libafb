@@ -121,26 +121,6 @@ struct afb_wrap_rpc
 /***       D I R E C T                                                      ***/
 /******************************************************************************/
 
-#if 0 /* TODO manage reopening */
-static void client_on_hangup(struct afb_stub_rpc *client)
-{
-	const char *apiname = afb_stub_rpc_apiname(client);
-	RP_WARNING("Disconnected of API %s", apiname);
-	afb_monitor_api_disconnected(apiname);
-}
-
-static int reopen_client(void *closure)
-{
-	const char *uri = closure;
-	const char *apiname = afb_uri_api_name(uri);
-	int fd = afb_socket_open(uri, 0);
-	if (fd >= 0)
-		RP_INFO("Reconnected to API %s", apiname);
-	return fd;
-}
-#endif
-
-static void hangup(struct afb_wrap_rpc *wrap)
 {
 	afb_stub_rpc_unref(wrap->stub);
 	if (wrap->efd != NULL)
