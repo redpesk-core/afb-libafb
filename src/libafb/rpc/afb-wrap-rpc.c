@@ -467,66 +467,80 @@ static int init_fd(
 }
 
 #if WITH_TLS
-static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
-{
+static int init_tls(
+		struct afb_wrap_rpc *wrap,
+		const char *uri,
+		enum afb_wrap_rpc_mode mode,
+		int fd,
+		int autoclose
+) {
 	int rc;
-	const char *cert_path, *key_path, *trust_path, *hostname, *host, *host_end, *argsstr, **args;
-	size_t host_len;
 	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
 	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
 
 	wrap->use_tls = false;
 
-	/* get cert & key from uri query arguments */
-	cert_path = key_path = trust_path = hostname = NULL;
-	args = NULL;
-	argsstr = strchr(uri, '?');
-	if (argsstr != NULL && *argsstr != 0) {
-		args = rp_unescape_args(argsstr + 1);
-		cert_path = rp_unescaped_args_get(args, "cert");
-		key_path = rp_unescaped_args_get(args, "key");
-		trust_path = rp_unescaped_args_get(args, "trust");
-		hostname = rp_unescaped_args_get(args, "host");
-	}
-	if (server && (cert_path == NULL || key_path == NULL)) {
-		free(args);
-		RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-		return X_EINVAL;
-	}
+	if (uri != NULL) {
+		const char *cert_path, *key_path, *trust_path;
+		const char *hostname, *host, *host_end, *argsstr;
+		const char **args = NULL;
+		size_t host_len;
 
-	/* get the name of the host */
-	if (hostname != NULL) {
-		if (*hostname == '\0')
-			wrap->host = NULL;
+		/* get cert & key from uri query arguments */
+		cert_path = key_path = trust_path = hostname = NULL;
+		argsstr = strchr(uri, '?');
+		if (argsstr != NULL && *argsstr != 0) {
+			args = rp_unescape_args(argsstr + 1);
+			cert_path = rp_unescaped_args_get(args, "cert");
+			key_path = rp_unescaped_args_get(args, "key");
+			trust_path = rp_unescaped_args_get(args, "trust");
+			hostname = rp_unescaped_args_get(args, "host");
+		}
+		if (server && (cert_path == NULL || key_path == NULL)) {
+			free(args);
+			RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
+			return X_EINVAL;
+		}
+
+		/* get the name of the host */
+		if (hostname != NULL) {
+			if (*hostname == '\0')
+				wrap->host = NULL;
+			else {
+				wrap->host = strdup(hostname);
+				if (wrap->host == NULL) {
+oom_host:
+					free(args);
+					RP_ERROR("out of memory");
+					return X_ENOMEM;
+				}
+			}
+		}
 		else {
-			wrap->host = strdup(hostname);
+			host = strchr(uri, ':') + 1;
+			host_end = strchr(host, ':');
+			host_len = (size_t)(host_end - host);
+			wrap->host = malloc(host_len + 1);
 			if (wrap->host == NULL)
 				goto oom_host;
+			strncpy(wrap->host, host, host_len);
+			wrap->host[host_len] = '\0';
 		}
-	}
-	else {
-		host = strchr(uri, ':') + 1;
-		host_end = strchr(host, ':');
-		host_len = (size_t)(host_end - host);
-		wrap->host = malloc(host_len + 1);
-		if (wrap->host == NULL)
-			goto oom_host;
-		strncpy(wrap->host, host, host_len);
-		wrap->host[host_len] = '\0';
-	}
 
-	/* setup TLS crypto material */
+		/* setup TLS crypto material */
 #if !WITHOUT_FILESYSTEM
-	if (cert_path != NULL)
-		tls_load_cert(cert_path);
-	if (key_path != NULL)
-		tls_load_key(key_path);
-	if (trust_path != NULL)
-		tls_load_trust(trust_path);
-	if ((!server || mutual) && !tls_has_trust())
-		/* use default system trust */
-		tls_load_trust(NULL);
+		if (cert_path != NULL)
+			tls_load_cert(cert_path);
+		if (key_path != NULL)
+			tls_load_key(key_path);
+		if (trust_path != NULL)
+			tls_load_trust(trust_path);
+		if ((!server || mutual) && !tls_has_trust())
+			/* use default system trust */
+			tls_load_trust(NULL);
 #endif
+		free(args);
+	}
 
 	/* setup TLS session */
 	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
@@ -542,26 +556,22 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		RP_INFO("Created %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
-					uri);
+					uri ?: "(reopened)");
 	}
 	else {
 		RP_ERROR("Can't create %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
-					uri);
-		free(wrap->host);
-		wrap->host = NULL;
+					uri ?: "(reopened)");
+		if (uri != NULL) {
+			free(wrap->host);
+			wrap->host = NULL;
+		}
 	}
 
-end:
 	/* cleanup */
-	free(args);
 	return rc;
 
-oom_host:
-	RP_ERROR("out of memory");
-	rc = X_ENOMEM;
-	goto end;
 }
 #endif
 
