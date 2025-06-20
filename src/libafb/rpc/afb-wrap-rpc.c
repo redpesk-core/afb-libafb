@@ -103,6 +103,9 @@ struct afb_wrap_rpc
 	}
 		mem;
 
+	/** recorded mode */
+	enum afb_wrap_rpc_mode mode;
+
 #if WITH_TLS
 	/* Is TLS active? */
 	bool use_tls;
@@ -620,6 +623,7 @@ int afb_wrap_rpc_create_fd(
 		else {
 			rc = init(wrap, fd, autoclose, mode, uri);
 			if (rc >= 0) {
+				wrap->mode = mode;
 				*result = wrap;
 				return rc;
 			}
