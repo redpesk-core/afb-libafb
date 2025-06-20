@@ -1,3 +1,16 @@
+Version 5.5.0
+-------------
+
+  feature
+   - added function afb_perm_check_async
+   - added ability to use an api for permission checking
+
+Version 5.4.3
+-------------
+
+  fix
+   - RPC blocking (#8016)
+
 Version 5.4.2
 -------------
 

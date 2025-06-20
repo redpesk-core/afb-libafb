@@ -489,10 +489,10 @@ static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rp
 		tls_load_key(key_path);
 	if (trust_path != NULL)
 		tls_load_trust(trust_path);
-#endif
 	if ((!server || mutual) && !tls_has_trust())
 		/* use default system trust */
 		tls_load_trust(NULL);
+#endif
 
 	/* setup TLS session */
 	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);

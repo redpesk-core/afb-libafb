@@ -38,15 +38,6 @@
 #include "core/afb-req-common.h"
 
 /*********************************************************************************/
-
-static inline const char *session_of_req(struct afb_req_common *req)
-{
-	return req->token ? afb_token_string(req->token)
-                : req->session ? afb_session_uuid(req->session)
-                : "";
-}
-
-/*********************************************************************************/
 #if BACKEND_PERMISSION_IS_CYNAGORA
 
 #include <stdint.h>
@@ -166,8 +157,10 @@ static int cynagora_acquire()
 	return rc;
 }
 
-void afb_perm_check_req_async(
-	struct afb_req_common *req,
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
 	const char *permission,
 	void (*callback)(void *closure, int status),
 	void *closure
@@ -177,43 +170,135 @@ void afb_perm_check_req_async(
 	cynagora_key_t key;
 	struct memo_check *memo;
 
-	if (!req->credentials) {
-		/* case of permission for self */
-		rc = 1;
-	}
-	else if (!permission) {
-		RP_ERROR("Got a null permission!");
-		rc = 0;
-	}
-	else {
-		rc = cynagora_acquire();
-		if (rc >= 0) {
-			memo = malloc(sizeof *memo);
-			if (memo == NULL) {
-				rc = -ENOMEM;
-				RP_ERROR("Can't query cynagora: %s", strerror(-rc));
-			}
-			else {
-				memo->status = -EFAULT;
-				memo->closure = closure;
-				memo->checkcb = callback;
-				key.client = req->credentials->label;
-				key.user = req->credentials->user;
-				key.session = session_of_req(req);
-				key.permission = permission;
-				rc = cynagora_async_check(cynagora, &key, 0, 0, async_check_cb, memo);
-				unlock();
-				if (rc >= 0)
-					return;
-				RP_ERROR("Can't query cynagora: %s", strerror(-rc));
-			}
+	rc = cynagora_acquire();
+	if (rc >= 0) {
+		memo = malloc(sizeof *memo);
+		if (memo == NULL) {
+			rc = -ENOMEM;
+			RP_ERROR("Can't query cynagora: %s", strerror(-rc));
+		}
+		else {
+			memo->status = -EFAULT;
+			memo->closure = closure;
+			memo->checkcb = callback;
+			key.client = client;
+			key.user = user;
+			key.session = session;
+			key.permission = permission;
+			rc = cynagora_async_check(cynagora, &key, 0, 0, async_check_cb, memo);
+			unlock();
+			if (rc >= 0)
+				return;
+			RP_ERROR("Can't query cynagora: %s", strerror(-rc));
 		}
 	}
 	callback(closure, rc);
 }
 
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return 0;
+}
+
+/*********************************************************************************/
+#elif BACKEND_PERMISSION_IS_API_PERM
+
+#ifndef API_PERM_API_NAME
+#define API_PERM_API_NAME "perm"
+#endif
+
+#ifndef API_PERM_VERB_NAME
+#define API_PERM_VERB_NAME "check"
+#endif
+
+#include <string.h>
+
+#include "core/afb-global.h"
+#include "core/afb-type-predefined.h"
+#include "core/afb-data.h"
+#include "core/afb-calls.h"
+
+static void checkcb(void *closure1, void *closure2, void *closure3, int status, unsigned nvals, struct afb_data * const vals[])
+{
+	/* the called verb should reply 1 to grant, 0 to deny or a negative value for error */
+	void (*callback)(void *_closure, int _status) = closure1;
+	callback(closure2, status);
+}
+
+static int mkstrdata(struct afb_data **result, const char *str)
+{
+	size_t len = str == NULL ? 0 : 1 + strlen(str);
+	return afb_data_create_raw(result,
+			&afb_type_predefined_stringz, str, len, NULL, NULL);
+}
+
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
+	const char *permission,
+	void (*callback)(void *_closure, int _status),
+	void *closure
+) {
+	struct afb_data * params[4];
+
+	mkstrdata(&params[0], client);
+	mkstrdata(&params[1], user);
+	mkstrdata(&params[2], session);
+	mkstrdata(&params[3], permission);
+
+	afb_calls_call(
+		afb_global_api(),
+		API_PERM_API_NAME,
+		API_PERM_VERB_NAME,
+		4,
+		params,
+		checkcb,
+		callback,
+		closure,
+		NULL
+	);
+}
+
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return -!strcmp(api, API_PERM_API_NAME);
+}
+
 /*********************************************************************************/
 #else
+
+void afb_perm_check_async(
+	const char *client,
+	const char *user,
+	const char *session,
+	const char *permission,
+	void (*callback)(void *_closure, int _status),
+	void *closure
+) {
+	RP_NOTICE("Granting permission %s by default of backend", permission);
+	callback(closure, 1);
+}
+
+int afb_perm_check_perm_check_api(
+	const char *api
+) {
+	return 0;
+}
+
+#endif
+
+/*********************************************************************************/
+/* common entry */
+
+static inline const char *session_of_req(struct afb_req_common *req)
+{
+	return req->token ? afb_token_string(req->token)
+                : req->session ? afb_session_uuid(req->session)
+                : "";
+}
 
 void afb_perm_check_req_async(
 	struct afb_req_common *req,
@@ -221,10 +306,23 @@ void afb_perm_check_req_async(
 	void (*callback)(void *_closure, int _status),
 	void *closure
 ) {
-	RP_NOTICE("Granting permission %s by default of backend", permission ?: "(null)");
-	callback(closure, !!permission);
+	if (!req->credentials) {
+		/* case of permission for self */
+		callback(closure, 1);
+	}
+	else if (!permission) {
+		RP_ERROR("Got a null permission!");
+		callback(closure, 0);
+	}
+	else {
+		afb_perm_check_async(
+			req->credentials->label,
+			req->credentials->user,
+			session_of_req(req),
+			permission,
+			callback,
+			closure);
+	}
 }
-
-#endif
 
 #endif /* WITH_CRED */

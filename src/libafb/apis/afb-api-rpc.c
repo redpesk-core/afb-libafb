@@ -227,8 +227,9 @@ static void server_accept(struct server *server, int fd)
 	if (fdc < 0) {
 		RP_ERROR("can't accept connection to %s: %m", server->uri);
 	} else {
+		fcntl(fdc, F_SETFL, O_NONBLOCK);
 		rc = 1;
-		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
+		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 		apiname = &server->uri[server->offapi];
 		if (apiname[0] == 0)
 			apiname = NULL;
