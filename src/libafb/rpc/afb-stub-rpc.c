@@ -335,7 +335,7 @@ struct afb_stub_rpc
 	/** group for emiter */
 	struct {
 		/** notify callback */
-		void (*notify)(void*, struct afb_rpc_coder*);
+		int (*notify)(void*, struct afb_rpc_coder*);
 
 		/** closure of the notify callback */
 		void *closure;
@@ -666,10 +666,11 @@ static int incall_get(struct afb_stub_rpc *stub, struct incall **ocall)
 
 /******************* notify *****************/
 
-static void emit(struct afb_stub_rpc *stub)
+static int emit(struct afb_stub_rpc *stub)
 {
 	if (stub->emit.notify)
-		stub->emit.notify(stub->emit.closure, &stub->coder);
+		return stub->emit.notify(stub->emit.closure, &stub->coder);
+	return X_ECANCELED;
 }
 
 #if WITH_RPC_V1
@@ -1562,9 +1563,10 @@ static int incall_subscribe_cb(struct afb_req_common *comreq, struct afb_evt *ev
 		rc = add_event(stub, afb_evt_fullname(evt), afb_evt_id(evt));
 	if (rc >= 0)
 		rc = send_event_subscribe(stub, req->callid, afb_evt_id(evt));
+	if (rc >= 0)
+		rc = emit(stub);
 	if (rc < 0)
 		RP_ERROR("error while subscribing event");
-	emit(stub);
 	return rc;
 }
 
@@ -1579,9 +1581,10 @@ static int incall_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *
 		rc2 = remove_event(stub, afb_evt_fullname(evt), afb_evt_id(evt));
 	if (rc >= 0 && rc2 < 0)
 		rc = rc2;
+	if (rc >= 0)
+		rc = emit(stub);
 	if (rc < 0)
 		RP_ERROR("error while unsubscribing event");
-	emit(stub);
 	return rc;
 }
 
@@ -1615,7 +1618,7 @@ static int make_session_id(struct afb_stub_rpc *stub, struct afb_session *sessio
 		else if (rc2 == 0) {
 			rc = send_session_create(stub, sid, afb_session_uuid(session));
 			if (rc >= 0 && stub->unpack)
-				emit(stub);
+				rc = emit(stub);
 		}
 	}
 
@@ -1641,7 +1644,7 @@ static int make_token_id(struct afb_stub_rpc *stub, struct afb_token *token, uin
 		else if (rc2 == 0) {
 			rc = send_token_create(stub, tid, afb_token_string(token));
 			if (rc >= 0 && stub->unpack)
-				emit(stub);
+				rc = emit(stub);
 		}
 	}
 
@@ -1676,7 +1679,8 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 			rc = send_call_request(stub, call->id, sessionid, tokenid,
 					comreq->apiname, comreq->verbname, ucreds,
 					comreq->params.ndata, comreq->params.data);
-			emit(stub);
+			if (rc >= 0)
+				rc = emit(stub);
 		}
 		if (rc < 0)
 			outcall_release(stub, call);
@@ -1701,7 +1705,8 @@ static void api_describe_cb(void * closure, void (*describecb)(void *, struct js
 		rc = send_describe_request(stub, call->id);
 		if (rc < 0)
 			outcall_release(stub, call);
-		emit(stub);
+		else
+			rc = emit(stub);
 	}
 	if (rc < 0)
 		describecb(clocb, NULL);
@@ -2132,7 +2137,8 @@ static int reply_description(struct afb_stub_rpc *stub, struct json_object *obje
 #else
 	int rc = send_describe_reply(stub, callid, json_object_to_json_string(object));
 	afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, object);
-	emit(stub);
+	if (rc >= 0)
+		rc = emit(stub);
 	return rc;
 #endif
 }
@@ -2806,8 +2812,10 @@ static int decode_v0(struct afb_stub_rpc *stub)
 				}
 			}
 			rc = afb_rpc_v0_code_version_set(&stub->coder, stub->version);
-			emit(stub);
-			wait_version_done(stub);
+			if (rc >= 0)
+				rc = emit(stub);
+			if (rc >= 0)
+				wait_version_done(stub);
 			break;
 		case afb_rpc_v0_msg_type_version_set:
 			stub->version = m0.version_set.version;
@@ -2908,8 +2916,11 @@ afb_rpc_coder_t *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub)
 	return &stub->coder;
 }
 
-void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_rpc_coder*), void *closure)
-{
+void afb_stub_rpc_emit_set_notify(
+		struct afb_stub_rpc *stub,
+		int (*notify)(void*, struct afb_rpc_coder*),
+		void *closure
+) {
 	stub->emit.notify = notify;
 	stub->emit.closure = closure;
 }
@@ -3004,7 +3015,8 @@ int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub)
 #endif
 		};
 		rc = afb_rpc_v0_code_version_offer(&stub->coder, (uint8_t)(sizeof versions / sizeof *versions), versions);
-		emit(stub);
+		if (rc >= 0)
+			rc = emit(stub);
 	}
 	return rc;
 }

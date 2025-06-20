@@ -301,7 +301,7 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 	}
 }
 
-static void notify_fd(void *closure, struct afb_rpc_coder *coder)
+static int notify_fd(void *closure, struct afb_rpc_coder *coder)
 {
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
@@ -319,13 +319,22 @@ static void notify_fd(void *closure, struct afb_rpc_coder *coder)
 			.msg_controllen = 0,
 			.msg_flags      = 0
 		};
-		ssz = sendmsg(fd, &msg, 0);
+		do {
+			ssz = sendmsg(fd, &msg, 0);
+		} while (ssz < 0 && errno == EINTR);
 #else
-		ssz = writev(fd, iovs, rc);
+		do {
+			ssz = writev(fd, iovs, rc);
+		} while (ssz < 0 && errno == EINTR);
 #endif
-		(void)ssz; /* TODO: hold the write error !!! */
+		if (ssz < 0) {
+			if (errno == EPIPE)
+				hangup(wrap);
+			rc = -1;
+		}
 		afb_rpc_coder_output_dispose(coder);
 	}
+	return rc;
 }
 
 static void disposebufs(void *closure, void *buffer, size_t size)
@@ -343,10 +352,10 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 
 #if WITH_TLS
 
-static void notify_tls(void *closure, struct afb_rpc_coder *coder)
+static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
-	ssize_t rc;
+	ssize_t ssz;
 	uint32_t length, sz, off, wrt;
 	char buffer[TLS_SENDBUF_SIZE];
 
@@ -354,15 +363,16 @@ static void notify_tls(void *closure, struct afb_rpc_coder *coder)
 	for (off = 0 ; off < length ; off += sz) {
 		sz = afb_rpc_coder_output_get_subbuffer(coder, buffer,
 						(uint32_t)sizeof buffer, off);
-		wrt = 0;
-		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)rc) {
-			rc = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
-			if (rc <= 0)
-				goto end;
+		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)ssz) {
+			ssz = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
+			if (ssz <= 0) {
+				afb_rpc_coder_output_dispose(coder);
+				return -1;
+			}
 		}
 	}
-end:
 	afb_rpc_coder_output_dispose(coder);
+	return 0;
 }
 
 #endif
@@ -371,7 +381,7 @@ end:
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
-static void notify_ws(void *closure, struct afb_rpc_coder *coder)
+static int notify_ws(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
@@ -380,6 +390,7 @@ static void notify_ws(void *closure, struct afb_rpc_coder *coder)
 		afb_ws_binary_v(wrap->ws, iovs, rc);
 		afb_rpc_coder_output_dispose(coder);
 	}
+	return rc;
 }
 
 static void on_ws_binary(void *closure, char *buffer, size_t size)
@@ -422,8 +433,12 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 	return 0;
 }
 
-static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*notify_cb)(void*, struct afb_rpc_coder*))
-{
+static int init_fd(
+		struct afb_wrap_rpc *wrap,
+		int fd,
+		int autoclose,
+		int (*notify_cb)(void*, struct afb_rpc_coder*)
+) {
 	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_fd, wrap, 0, autoclose);
 	if (rc >= 0)
 		/* callback for emission */
@@ -723,7 +738,7 @@ static void onevent_vcomm(void *closure, const void *data, size_t size)
 /**
 * Send the content to the connection
 */
-static void notify_vcomm(void *closure, struct afb_rpc_coder *coder)
+static int notify_vcomm(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	struct afb_vcomm *vcomm = wrap->vcomm;
@@ -744,6 +759,7 @@ static void notify_vcomm(void *closure, struct afb_rpc_coder *coder)
 		}
 		afb_rpc_coder_output_dispose(coder);
 	}
+	return rc;
 }
 
 /**
