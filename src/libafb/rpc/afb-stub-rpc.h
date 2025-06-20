@@ -199,3 +199,10 @@ extern void afb_stub_rpc_emit_set_notify(
  * @return 0 in case of success or else a negative error code
  */
 extern int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub);
+
+/**
+ * Tell the stub it has been disconnected
+ *
+ * @param stub the stub object
+ */
+extern void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub);

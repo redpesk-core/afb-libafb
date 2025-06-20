@@ -74,6 +74,7 @@ json_object_to_json_string_length(
 #include "core/containerof.h"
 #include "sys/x-errno.h"
 #include "sys/x-spin.h"
+#include "misc/afb-monitor.h"
 
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
@@ -306,6 +307,7 @@ struct afb_stub_rpc
 #endif
 
 	/** waiters for version */
+	/* TODO: access to version_waiters no thread safe protected by mutex */
 	struct version_waiter *version_waiters;
 
 	/** frames decoder */
@@ -411,6 +413,7 @@ static void wait_version_unlock(struct version_waiter *waiter)
 	}
 }
 
+/* unlock any thread waiting the version */
 static void wait_version_done(struct afb_stub_rpc *stub)
 {
 	struct version_waiter *head = stub->version_waiters;
@@ -3087,13 +3090,15 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 	}
 }
 
-/* disconnect */
-static void disconnect(struct afb_stub_rpc *stub)
+/* disconnected */
+void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 {
 	struct u16id2ptr *i2p;
 	struct u16id2bool *i2b;
 
+	stub->version = AFBRPC_PROTO_VERSION_UNSET;
 	wait_version_done(stub);
+
 	release_all_outcalls(stub);
 
 	i2p = __atomic_exchange_n(&stub->event_proxies, NULL, __ATOMIC_RELAXED);
@@ -3127,6 +3132,15 @@ static void disconnect(struct afb_stub_rpc *stub)
 	i2p = __atomic_exchange_n(&stub->type_proxies, NULL, __ATOMIC_RELAXED);
 	u16id2bool_destroy(&i2b);
 	u16id2ptr_destroy(&i2p);
+
+	/* send events */
+	if (stub->declare_set) {
+		const char *name = stub->apinames;
+		while (*name) {
+			afb_monitor_api_disconnected(name);
+			while(*name++);
+		}
+	}
 }
 
 /* sub one reference and free resources if falling to zero */
@@ -3139,7 +3153,7 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 	if (stub && !__atomic_sub_fetch(&stub->refcount, 1, __ATOMIC_RELAXED)) {
 
 		/* cleanup */
-		disconnect(stub);
+		afb_stub_rpc_disconnected(stub);
 		if (stub->declare_set) {
 			const char *name = stub->apinames;
 			while (*name) {
