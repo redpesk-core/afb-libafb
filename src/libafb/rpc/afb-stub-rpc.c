@@ -230,7 +230,10 @@ struct afb_stub_rpc
 	uint8_t version;
 
 	/** flag disallowing packing, packing allows to group messages before sending */
-	uint8_t unpack;
+	uint8_t unpack: 1;
+
+	/** flag telling a version offer was sent and is pending */
+	uint8_t version_offer_pending: 1;
 
 	/** count of ids */
 	uint16_t idcount;
@@ -362,7 +365,16 @@ static int queue_job(void *group, void (*callback)(int signum, void* arg), void 
 	return afb_sched_post_job(group, 0, 0, callback, arg, Afb_Sched_Mode_Normal);
 }
 
-/******************* wait version *****************/
+/******************* notify *****************/
+
+static int emit(struct afb_stub_rpc *stub)
+{
+	if (stub->emit.notify)
+		return stub->emit.notify(stub->emit.closure, &stub->coder);
+	return X_ECANCELED;
+}
+
+/******************* offer and wait version *****************/
 /* TODO: this is not a thread safe implementation */
 static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lock)
 {
@@ -388,18 +400,45 @@ static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lo
 	}
 }
 
+/* offer the version */
+static int offer_version(struct afb_stub_rpc *stub)
+{
+	int rc;
+	uint8_t versions[] = {
+#if WITH_RPC_V3
+		AFBRPC_PROTO_VERSION_3,
+#endif
+#if WITH_RPC_V1
+		AFBRPC_PROTO_VERSION_1,
+#endif
+	};
+
+	stub->version_offer_pending = 1;
+	rc = afb_rpc_v0_code_version_offer(&stub->coder, (uint8_t)(sizeof versions / sizeof *versions), versions);
+	if (rc >= 0) {
+		rc = emit(stub);
+		if (rc < 0)
+			stub->version_offer_pending = 0;
+	}
+	return rc;
+}
+
 static int wait_version(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
 
 	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
 		struct version_waiter awaiter;
-		awaiter.stub = stub;
-		awaiter.next = NULL;
-		awaiter.lock = NULL;
-		rc = afb_sched_sync(0, wait_version_cb, &awaiter);
-		if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
-			rc = X_EBUSY;
+		if (!stub->version_offer_pending)
+			rc = offer_version(stub);
+		if (rc >= 0) {
+			awaiter.stub = stub;
+			awaiter.next = NULL;
+			awaiter.lock = NULL;
+			rc = afb_sched_sync(0, wait_version_cb, &awaiter);
+			if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
+				rc = X_EBUSY;
+		}
 	}
 	return rc;
 }
@@ -665,15 +704,6 @@ static int incall_get(struct afb_stub_rpc *stub, struct incall **ocall)
 	}
 	*ocall = call;
 	return rc;
-}
-
-/******************* notify *****************/
-
-static int emit(struct afb_stub_rpc *stub)
-{
-	if (stub->emit.notify)
-		return stub->emit.notify(stub->emit.closure, &stub->coder);
-	return X_ECANCELED;
 }
 
 #if WITH_RPC_V1
@@ -3007,21 +3037,7 @@ struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub)
 /* offer the version */
 int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub)
 {
-	int rc = 0;
-	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
-		uint8_t versions[] = {
-#if WITH_RPC_V3
-			AFBRPC_PROTO_VERSION_3,
-#endif
-#if WITH_RPC_V1
-			AFBRPC_PROTO_VERSION_1,
-#endif
-		};
-		rc = afb_rpc_v0_code_version_offer(&stub->coder, (uint8_t)(sizeof versions / sizeof *versions), versions);
-		if (rc >= 0)
-			rc = emit(stub);
-	}
-	return rc;
+	return stub->version == AFBRPC_PROTO_VERSION_UNSET ? offer_version(stub) : 0;
 }
 
 void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack)
@@ -3096,9 +3112,9 @@ void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 	struct u16id2ptr *i2p;
 	struct u16id2bool *i2b;
 
+	stub->version_offer_pending = 0;
 	stub->version = AFBRPC_PROTO_VERSION_UNSET;
 	wait_version_done(stub);
-
 	release_all_outcalls(stub);
 
 	i2p = __atomic_exchange_n(&stub->event_proxies, NULL, __ATOMIC_RELAXED);
