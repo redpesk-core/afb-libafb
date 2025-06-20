@@ -121,23 +121,51 @@ struct afb_wrap_rpc
 /***       D I R E C T                                                      ***/
 /******************************************************************************/
 
+static void disconnect(struct afb_wrap_rpc *wrap)
 {
-	afb_stub_rpc_unref(wrap->stub);
-	if (wrap->efd != NULL)
-		ev_fd_unref(wrap->efd);
-	if (wrap->ws != NULL)
-		{/*TODO*/}
-#if WITH_VCOMM
-	if (wrap->vcomm != NULL)
-		afb_vcomm_close(wrap->vcomm);
-#endif
+	bool was_connected = false;
 #if WITH_TLS
-	if (wrap->use_tls)
+	if (wrap->use_tls) {
 		tls_release(&wrap->tls_session);
+		wrap->use_tls = false;
+		was_connected = true;
+	}
+#endif
+	if (wrap->efd != NULL) {
+		ev_fd_unref(wrap->efd);
+		wrap->efd = NULL;
+		was_connected = true;
+	}
+	if (wrap->ws != NULL) {
+		afb_ws_destroy(wrap->ws);
+		wrap->ws = NULL;
+		was_connected = true;
+	}
+#if WITH_VCOMM
+	if (wrap->vcomm != NULL) {
+		afb_vcomm_close(wrap->vcomm);
+		wrap->vcomm = NULL;
+		was_connected = true;
+	}
+#endif
+	if (was_connected && wrap->stub != NULL)
+		afb_stub_rpc_disconnected(wrap->stub);
+}
+
+static void destroy(struct afb_wrap_rpc *wrap)
+{
+	disconnect(wrap);
+	afb_stub_rpc_unref(wrap->stub);
+#if WITH_TLS
 	free(wrap->host);
 #endif
 	free(wrap->mem.buffer);
 	free(wrap);
+}
+
+static void hangup(struct afb_wrap_rpc *wrap)
+{
+	destroy(wrap);
 }
 
 static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
@@ -286,33 +314,39 @@ static int notify_fd(void *closure, struct afb_rpc_coder *coder)
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 	struct afb_wrap_rpc *wrap = closure;
-	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-	if (rc > 0) {
-		int fd = ev_fd_fd(wrap->efd);
+	int rc;
+
+	if (wrap->efd == NULL)
+		rc = X_EPIPE;
+	else {
+		rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+		if (rc > 0) {
+			int fd = ev_fd_fd(wrap->efd);
 #if USE_SND_RCV
-		struct msghdr msg = {
-			.msg_name       = NULL,
-			.msg_namelen    = 0,
-			.msg_iov        = iovs,
-			.msg_iovlen     = (unsigned)rc,
-			.msg_control    = NULL,
-			.msg_controllen = 0,
-			.msg_flags      = 0
-		};
-		do {
-			ssz = sendmsg(fd, &msg, 0);
-		} while (ssz < 0 && errno == EINTR);
+			struct msghdr msg = {
+				.msg_name       = NULL,
+				.msg_namelen    = 0,
+				.msg_iov        = iovs,
+				.msg_iovlen     = (unsigned)rc,
+				.msg_control    = NULL,
+				.msg_controllen = 0,
+				.msg_flags      = 0
+			};
+			do {
+				ssz = sendmsg(fd, &msg, 0);
+			} while (ssz < 0 && errno == EINTR);
 #else
-		do {
-			ssz = writev(fd, iovs, rc);
-		} while (ssz < 0 && errno == EINTR);
+			do {
+				ssz = writev(fd, iovs, rc);
+			} while (ssz < 0 && errno == EINTR);
 #endif
-		if (ssz < 0) {
-			if (errno == EPIPE)
-				hangup(wrap);
-			rc = -1;
+			if (ssz < 0) {
+				if (errno == EPIPE)
+					hangup(wrap);
+				rc = X_EPIPE;
+			}
+			afb_rpc_coder_output_dispose(coder);
 		}
-		afb_rpc_coder_output_dispose(coder);
 	}
 	return rc;
 }
@@ -339,6 +373,8 @@ static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 	uint32_t length, sz, off, wrt;
 	char buffer[TLS_SENDBUF_SIZE];
 
+	if (!wrap->use_tls)
+		return X_EPIPE;
 	afb_rpc_coder_output_sizes(coder, &length);
 	for (off = 0 ; off < length ; off += sz) {
 		sz = afb_rpc_coder_output_get_subbuffer(coder, buffer,
