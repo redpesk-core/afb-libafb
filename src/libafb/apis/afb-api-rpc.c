@@ -42,10 +42,8 @@
 #include "misc/afb-socket.h"
 #include "misc/afb-uri.h"
 #include "misc/afb-ws.h"
-#include "misc/afb-monitor.h"
 #include "core/afb-ev-mgr.h"
 #include "rpc/afb-wrap-rpc.h"
-#include "rpc/afb-rpc-coder.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
 #include "sys/x-uio.h"
@@ -117,28 +115,6 @@ static const char *remove_prefixes(const char *uri, enum afb_wrap_rpc_mode *mode
 /***       C L I E N T                                                      ***/
 /******************************************************************************/
 
-#if 0
-static void client_on_hangup(struct afb_wrap_rpc *client)
-{
-	const char *apiname = afb_wrap_rpc_apiname(client);
-	RP_WARNING("Disconnected of API %s", apiname);
-	afb_monitor_api_disconnected(apiname);
-}
-#endif
-
-#if 0 /* TODO manage reopening */
-static int reopen_client(void *closure)
-{
-	const char *uri = closure;
-	const char *apiname = afb_uri_api_name(uri);
-	int fd = afb_socket_open(uri, 0);
-	if (fd >= 0)
-		RP_INFO("Reconnected to API %s", apiname);
-	free(apiname);
-	return fd;
-}
-#endif
-
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
 	struct afb_wrap_rpc *wrap;
@@ -165,12 +141,11 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 #endif
 
 	/* check the api name */
-	rc = afb_uri_api_name(uri, &apinames, 1);
+	rc = afb_uri_api_name(turi, &apinames, 1);
 	if (rc < 0 || !*apinames) {
 		RP_ERROR("invalid api name in rpc uri %s", uri);
-		free(apinames);
 		rc = X_EINVAL;
-		goto error;
+		goto error2;
 	}
 
 	/* open the socket */
@@ -178,7 +153,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0) {
 		/* create the client wrap */
 		fd = rc;
-		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, uri, apinames, call_set);
+		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, turi, apinames, call_set);
 		if (rc >= 0) {
 			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
@@ -187,6 +162,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 		if (rc < 0 && strong)
 			RP_ERROR("can't create client rpc service to %s", uri);
 	}
+error2:
 	free(apinames);
 error:
 	return strong ? rc : 0;
@@ -205,15 +181,6 @@ int afb_api_rpc_add_client_weak(const char *uri, struct afb_apiset *declare_set,
 /*****************************************************************************/
 /***       S E R V E R                                                      ***/
 /******************************************************************************/
-
-#if 0
-static void server_on_hangup(struct afb_wrap_rpc *server)
-{
-	const char *apiname = afb_wrap_rpc_apiname(server);
-	RP_INFO("Disconnection of client of API %s", apiname ?: "*");
-	afb_wrap_rpc_unref(server);
-}
-#endif
 
 static void server_accept(struct server *server, int fd)
 {
