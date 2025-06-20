@@ -570,36 +570,23 @@ static int init(
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
-		const char *uri,
-		const char *apiname,
-		struct afb_apiset *callset
+		const char *uri
 ) {
-
-	/* create the stub */
-	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
-	if (rc < 0) {
-		if (autoclose)
-			close(fd);
+	int rc;
+	if (mode == Wrap_Rpc_Mode_Websocket) {
+		wrap->efd = NULL;
+		rc = init_ws(wrap, fd, autoclose);
 	}
 	else {
-		if (mode == Wrap_Rpc_Mode_Websocket) {
-			wrap->efd = NULL;
-			rc = init_ws(wrap, fd, autoclose);
-		}
-		else {
-			wrap->ws = NULL;
+		wrap->ws = NULL;
 #if WITH_TLS
-			if (mode & Wrap_Rpc_Mode_Tls_Bit)
-				rc = init_tls(wrap, uri, mode, fd, autoclose);
-			else
+		if (mode & Wrap_Rpc_Mode_Tls_Bit)
+			rc = init_tls(wrap, uri, mode, fd, autoclose);
+		else
 #endif
-				rc = init_fd(wrap, fd, autoclose, notify_fd);
-		}
-		if (rc >= 0) {
+			rc = init_fd(wrap, fd, autoclose, notify_fd);
+		if (rc >= 0)
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
-			return 0;
-		}
-		afb_stub_rpc_unref(wrap->stub);
 	}
 
 	return rc;
@@ -607,7 +594,7 @@ static int init(
 
 /* creation of the wrapper */
 int afb_wrap_rpc_create_fd(
-		struct afb_wrap_rpc **wrap,
+		struct afb_wrap_rpc **result,
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
@@ -616,19 +603,31 @@ int afb_wrap_rpc_create_fd(
 		struct afb_apiset *callset
 ) {
 	int rc;
-	*wrap = calloc(1, sizeof **wrap);
-	if (*wrap == NULL) {
+	struct afb_wrap_rpc *wrap;
+
+	wrap = calloc(1, sizeof *wrap);
+	if (wrap == NULL) {
 		if (autoclose)
 			close(fd);
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = init(*wrap, fd, autoclose, mode, uri, apiname, callset);
+		rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
 		if (rc < 0) {
-			free(*wrap);
-			*wrap = NULL;
+			if (autoclose)
+				close(fd);
 		}
+		else {
+			rc = init(wrap, fd, autoclose, mode, uri);
+			if (rc >= 0) {
+				*result = wrap;
+				return rc;
+			}
+			afb_stub_rpc_unref(wrap->stub);
+		}
+		free(wrap);
 	}
+	*result = NULL;
 	return rc;
 }
 
