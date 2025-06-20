@@ -114,6 +114,21 @@ int afb_wrap_rpc_websocket_upgrade(
 		void *cleanup_closure,
 		int websock);
 
+/**
+ * Function for automatic reconnection in case of disconnection
+ *
+ * @param wrap    the wrapper to robustify
+ * @param reopen  function called with closure for reopening the fd
+ * @param closure closure for reopen
+ * @param release function for releasing the closure at end
+ */
+extern
+void afb_wrap_rpc_fd_robustify(
+		struct afb_wrap_rpc *wrap,
+		int (*reopen)(void*),
+		void *closure,
+		void (*release)(void*));
+
 #if WITH_CRED
 struct afb_cred;
 

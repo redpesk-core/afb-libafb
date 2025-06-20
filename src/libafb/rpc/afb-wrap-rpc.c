@@ -118,7 +118,17 @@ struct afb_wrap_rpc
 	/** the TLS session data */
 	tls_session_t tls_session;
 #endif
+
+	/* robustify */
+	struct {
+		int (*reopen)(void*);
+		void *closure;
+		void (*release)(void*);
+	} robust;
 };
+
+/* for reconnection */
+static int reconnect(struct afb_wrap_rpc *wrap);
 
 /******************************************************************************/
 /***       D I R E C T                                                      ***/
@@ -159,6 +169,8 @@ static void destroy(struct afb_wrap_rpc *wrap)
 {
 	disconnect(wrap);
 	afb_stub_rpc_unref(wrap->stub);
+	if (wrap->robust.release != NULL)
+		wrap->robust.release(wrap->robust.closure);
 #if WITH_TLS
 	free(wrap->host);
 #endif
@@ -168,7 +180,10 @@ static void destroy(struct afb_wrap_rpc *wrap)
 
 static void hangup(struct afb_wrap_rpc *wrap)
 {
-	destroy(wrap);
+	if (wrap->robust.reopen == NULL)
+		destroy(wrap);
+	else
+		disconnect(wrap);
 }
 
 static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
@@ -317,11 +332,11 @@ static int notify_fd(void *closure, struct afb_rpc_coder *coder)
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 	struct afb_wrap_rpc *wrap = closure;
-	int rc;
+	int rc = 0;
 
 	if (wrap->efd == NULL)
-		rc = X_EPIPE;
-	else {
+		rc = reconnect(wrap);
+	if (rc >= 0) {
 		rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
 		if (rc > 0) {
 			int fd = ev_fd_fd(wrap->efd);
@@ -375,9 +390,18 @@ static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 	ssize_t ssz;
 	uint32_t length, sz, off, wrt;
 	char buffer[TLS_SENDBUF_SIZE];
+	int rc = 0;
 
-	if (!wrap->use_tls)
-		return X_EPIPE;
+	if (!wrap->use_tls) {
+		rc = reconnect(wrap);
+		if (rc >= 0 && !wrap->use_tls) {
+			hangup(wrap);
+			rc = X_ENOTSUP;
+		}
+		if (rc < 0)
+			return rc;
+	}
+
 	afb_rpc_coder_output_sizes(coder, &length);
 	for (off = 0 ; off < length ; off += sz) {
 		sz = afb_rpc_coder_output_get_subbuffer(coder, buffer,
@@ -601,7 +625,19 @@ static int init(
 		if (rc >= 0)
 			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
 	}
+	return rc;
+}
 
+static int reconnect(struct afb_wrap_rpc *wrap)
+{
+	int rc;
+	if (wrap->robust.reopen == NULL)
+		rc = X_EPIPE;
+	else {
+		rc = wrap->robust.reopen(wrap->robust.closure);
+		if (rc >= 0)
+			rc = init(wrap, rc, 1, wrap->mode, NULL);
+	}
 	return rc;
 }
 
@@ -674,6 +710,21 @@ int afb_wrap_rpc_websocket_upgrade(
 		afb_stub_rpc_set_token(wrap->stub, token);
 	}
 	return rc;
+}
+
+/* set robustification functions */
+void afb_wrap_rpc_fd_robustify(
+	struct afb_wrap_rpc *wrap,
+	int (*reopen)(void*),
+	void *closure,
+	void (*release)(void*)
+) {
+	if (wrap->robust.release)
+		wrap->robust.release(wrap->robust.closure);
+
+	wrap->robust.reopen = reopen;
+	wrap->robust.closure = closure;
+	wrap->robust.release = release;
 }
 
 #if WITH_CRED
