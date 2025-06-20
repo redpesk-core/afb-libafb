@@ -115,6 +115,15 @@ static const char *remove_prefixes(const char *uri, enum afb_wrap_rpc_mode *mode
 /***       C L I E N T                                                      ***/
 /******************************************************************************/
 
+static int reopen_client(void *closure)
+{
+	const char *uri = closure;
+	int fd = afb_socket_open(uri, 0);
+	if (fd >= 0)
+		RP_INFO("Reconnected to %s", uri);
+	return fd;
+}
+
 int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
 {
 	struct afb_wrap_rpc *wrap;
@@ -158,6 +167,15 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
 				{/*TODO afb_wrap_rpc_unref(wrap); */}
+				afb_wrap_rpc_fd_robustify(wrap, reopen_client,
+#if WITH_WSCLIENT_URI_COPY
+				                          /* use a copy */
+				                          strdup(turi), free
+#else
+				                          /* assume never released */
+				                          (void*)turi, NULL
+#endif
+				);
 		}
 		if (rc < 0 && strong)
 			RP_ERROR("can't create client rpc service to %s", uri);
