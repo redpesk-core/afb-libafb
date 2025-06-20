@@ -369,9 +369,12 @@ static int queue_job(void *group, void (*callback)(int signum, void* arg), void 
 
 static int emit(struct afb_stub_rpc *stub)
 {
+	int rc = X_ECANCELED;
 	if (stub->emit.notify)
-		return stub->emit.notify(stub->emit.closure, &stub->coder);
-	return X_ECANCELED;
+		rc = stub->emit.notify(stub->emit.closure, &stub->coder);
+	if (rc < 0)
+		afb_rpc_coder_output_dispose(&stub->coder);
+	return rc;
 }
 
 /******************* offer and wait version *****************/
