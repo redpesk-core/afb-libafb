@@ -100,12 +100,6 @@ int afb_wrap_rpc_start_client(
 		struct afb_apiset *declare_set);
 
 /**
- * Get the apiname as set at creation
- */
-extern
-const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap);
-
-/**
  * Function for implementing upgrade from HTTP to RPC on Websocket over HTTP.
  */
 extern

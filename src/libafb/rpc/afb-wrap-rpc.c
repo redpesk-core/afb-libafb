@@ -632,12 +632,6 @@ int afb_wrap_rpc_websocket_upgrade(
 	return rc;
 }
 
-/* get apiname or NULL */
-const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap)
-{
-	return afb_stub_rpc_apiname(wrap->stub);
-}
-
 #if WITH_CRED
 /* attach credentials to the wrapper */
 void afb_wrap_rpc_set_cred(struct afb_wrap_rpc *wrap, struct afb_cred *cred)
