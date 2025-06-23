@@ -501,6 +501,9 @@ static int init_fd(
 
 	/* attach file desriptor */
 	wrap->ws = NULL;
+	wrap->efd = NULL;
+	if (fd < 0) /* case of lazy init */
+		return 0;
 	return afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN,
 	                         onevent_fd, wrap, 0, autoclose);
 }
@@ -516,8 +519,6 @@ static int init_tls(
 	int rc;
 	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
 	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
-
-	wrap->use_tls = false;
 
 	if (uri != NULL) {
 		const char *cert_path, *key_path, *trust_path;
@@ -582,16 +583,23 @@ oom_host:
 	}
 
 	/* setup TLS session */
-	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
+	if (fd < 0)
+		rc = 0;
+	else {
+		rc = tls_session_create(&wrap->tls_session, fd,
+		                        server, mutual, wrap->host);
+		wrap->use_tls = rc >= 0;
+	}
 	if (rc >= 0) {
 		rc = init_fd(wrap, fd, autoclose, notify_tls);
-		if (rc < 0)
+		if (rc < 0 && wrap->use_tls) {
+			wrap->use_tls = false;
 			tls_release(&wrap->tls_session);
+		}
 	}
 
 	/* log status */
 	if (rc >= 0) {
-		wrap->use_tls = true;
 		RP_INFO("Created %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
