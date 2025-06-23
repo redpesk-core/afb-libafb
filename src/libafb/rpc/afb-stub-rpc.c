@@ -2823,6 +2823,9 @@ static int decode_v0(struct afb_stub_rpc *stub)
 	/* decode the received input */
 	rc = afb_rpc_v0_decode(&stub->decoder, &m0);
 	if (rc < 0) {
+#if RPC_DEBUG
+		RP_DEBUG("decode error of version offer");
+#endif
 		if (rc == X_EPROTO) {
 			stub->version = AFBRPC_PROTO_VERSION_1;
 			rc = 0;
@@ -2831,6 +2834,9 @@ static int decode_v0(struct afb_stub_rpc *stub)
 	else {
 		switch(m0.type) {
 		case afb_rpc_v0_msg_type_version_offer:
+#if RPC_DEBUG
+			RP_DEBUG("receiving version offer");
+#endif
 			for (rc = 0 ; rc < (int)m0.version_offer.count ; rc++) {
 				uint8_t offer = m0.version_offer.versions[rc];
 				switch(offer) {
@@ -2854,14 +2860,23 @@ static int decode_v0(struct afb_stub_rpc *stub)
 				wait_version_done(stub);
 			break;
 		case afb_rpc_v0_msg_type_version_set:
+#if RPC_DEBUG
+			RP_DEBUG("receiving version set");
+#endif
 			stub->version = m0.version_set.version;
 			wait_version_done(stub);
 			break;
 		default:
+#if RPC_DEBUG
+			RP_DEBUG("receiving ????");
+#endif
 			break;
 		}
 
 	}
+#if RPC_DEBUG
+	RP_DEBUG("status of decode_v0: version %d rc %d",stub->version,rc);
+#endif
 	return rc;
 }
 
