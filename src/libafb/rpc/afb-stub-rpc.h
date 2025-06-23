@@ -151,7 +151,10 @@ extern ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_
  * @param dispose the disposal function
  * @param closure closure to the disposal function
  */
-extern void afb_stub_rpc_receive_set_dispose(struct afb_stub_rpc *stub, void (*dispose)(void*, void*, size_t), void *closure);
+extern void afb_stub_rpc_receive_set_dispose(
+		struct afb_stub_rpc *stub,
+		void (*dispose)(void*, void*, size_t),
+		void *closure);
 
 /**
  * Test if the stub has data to be emitted
@@ -183,7 +186,10 @@ extern struct afb_rpc_coder *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub);
  * @param closure closure to the notify function
  */
 
-extern void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notify)(void*, struct afb_rpc_coder*), void *closure);
+extern void afb_stub_rpc_emit_set_notify(
+		struct afb_stub_rpc *stub,
+		int (*notify)(void*, struct afb_rpc_coder*),
+		void *closure);
 
 /**
  * Sends version offering.
@@ -193,3 +199,10 @@ extern void afb_stub_rpc_emit_set_notify(struct afb_stub_rpc *stub, void (*notif
  * @return 0 in case of success or else a negative error code
  */
 extern int afb_stub_rpc_offer_version(struct afb_stub_rpc *stub);
+
+/**
+ * Tell the stub it has been disconnected
+ *
+ * @param stub the stub object
+ */
+extern void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub);

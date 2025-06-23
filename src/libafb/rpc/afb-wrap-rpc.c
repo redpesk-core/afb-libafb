@@ -103,6 +103,9 @@ struct afb_wrap_rpc
 	}
 		mem;
 
+	/** recorded mode */
+	enum afb_wrap_rpc_mode mode;
+
 #if WITH_TLS
 	/* Is TLS active? */
 	bool use_tls;
@@ -115,49 +118,72 @@ struct afb_wrap_rpc
 	/** the TLS session data */
 	tls_session_t tls_session;
 #endif
+
+	/* robustify */
+	struct {
+		int (*reopen)(void*);
+		void *closure;
+		void (*release)(void*);
+	} robust;
 };
+
+/* for reconnection */
+static int reconnect(struct afb_wrap_rpc *wrap);
 
 /******************************************************************************/
 /***       D I R E C T                                                      ***/
 /******************************************************************************/
 
-#if 0 /* TODO manage reopening */
-static void client_on_hangup(struct afb_stub_rpc *client)
+static void disconnect(struct afb_wrap_rpc *wrap)
 {
-	const char *apiname = afb_stub_rpc_apiname(client);
-	RP_WARNING("Disconnected of API %s", apiname);
-	afb_monitor_api_disconnected(apiname);
-}
-
-static int reopen_client(void *closure)
-{
-	const char *uri = closure;
-	const char *apiname = afb_uri_api_name(uri);
-	int fd = afb_socket_open(uri, 0);
-	if (fd >= 0)
-		RP_INFO("Reconnected to API %s", apiname);
-	return fd;
-}
-#endif
-
-static void hangup(struct afb_wrap_rpc *wrap)
-{
-	afb_stub_rpc_unref(wrap->stub);
-	if (wrap->efd != NULL)
-		ev_fd_unref(wrap->efd);
-	if (wrap->ws != NULL)
-		{/*TODO*/}
-#if WITH_VCOMM
-	if (wrap->vcomm != NULL)
-		afb_vcomm_close(wrap->vcomm);
-#endif
+	bool was_connected = false;
 #if WITH_TLS
-	if (wrap->use_tls)
+	if (wrap->use_tls) {
 		tls_release(&wrap->tls_session);
+		wrap->use_tls = false;
+		was_connected = true;
+	}
+#endif
+	if (wrap->efd != NULL) {
+		ev_fd_unref(wrap->efd);
+		wrap->efd = NULL;
+		was_connected = true;
+	}
+	if (wrap->ws != NULL) {
+		afb_ws_destroy(wrap->ws);
+		wrap->ws = NULL;
+		was_connected = true;
+	}
+#if WITH_VCOMM
+	if (wrap->vcomm != NULL) {
+		afb_vcomm_close(wrap->vcomm);
+		wrap->vcomm = NULL;
+		was_connected = true;
+	}
+#endif
+	if (was_connected && wrap->stub != NULL)
+		afb_stub_rpc_disconnected(wrap->stub);
+}
+
+static void destroy(struct afb_wrap_rpc *wrap)
+{
+	disconnect(wrap);
+	afb_stub_rpc_unref(wrap->stub);
+	if (wrap->robust.release != NULL)
+		wrap->robust.release(wrap->robust.closure);
+#if WITH_TLS
 	free(wrap->host);
 #endif
 	free(wrap->mem.buffer);
 	free(wrap);
+}
+
+static void hangup(struct afb_wrap_rpc *wrap)
+{
+	if (wrap->robust.reopen == NULL)
+		destroy(wrap);
+	else
+		disconnect(wrap);
 }
 
 static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closure)
@@ -301,31 +327,46 @@ static void onevent_fd(struct ev_fd *efd, int fd, uint32_t revents, void *closur
 	}
 }
 
-static void notify_fd(void *closure, struct afb_rpc_coder *coder)
+static int notify_fd(void *closure, struct afb_rpc_coder *coder)
 {
 	ssize_t ssz;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 	struct afb_wrap_rpc *wrap = closure;
-	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-	if (rc > 0) {
-		int fd = ev_fd_fd(wrap->efd);
+	int rc = 0;
+
+	if (wrap->efd == NULL)
+		rc = reconnect(wrap);
+	if (rc >= 0) {
+		rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+		if (rc > 0) {
+			int fd = ev_fd_fd(wrap->efd);
 #if USE_SND_RCV
-		struct msghdr msg = {
-			.msg_name       = NULL,
-			.msg_namelen    = 0,
-			.msg_iov        = iovs,
-			.msg_iovlen     = (unsigned)rc,
-			.msg_control    = NULL,
-			.msg_controllen = 0,
-			.msg_flags      = 0
-		};
-		ssz = sendmsg(fd, &msg, 0);
+			struct msghdr msg = {
+				.msg_name       = NULL,
+				.msg_namelen    = 0,
+				.msg_iov        = iovs,
+				.msg_iovlen     = (unsigned)rc,
+				.msg_control    = NULL,
+				.msg_controllen = 0,
+				.msg_flags      = 0
+			};
+			do {
+				ssz = sendmsg(fd, &msg, 0);
+			} while (ssz < 0 && errno == EINTR);
 #else
-		ssz = writev(fd, iovs, rc);
+			do {
+				ssz = writev(fd, iovs, rc);
+			} while (ssz < 0 && errno == EINTR);
 #endif
-		(void)ssz; /* TODO: hold the write error !!! */
-		afb_rpc_coder_output_dispose(coder);
+			if (ssz < 0) {
+				if (errno == EPIPE)
+					hangup(wrap);
+				rc = X_EPIPE;
+			}
+			afb_rpc_coder_output_dispose(coder);
+		}
 	}
+	return rc;
 }
 
 static void disposebufs(void *closure, void *buffer, size_t size)
@@ -343,26 +384,40 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 
 #if WITH_TLS
 
-static void notify_tls(void *closure, struct afb_rpc_coder *coder)
+static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
-	ssize_t rc;
+	ssize_t ssz;
 	uint32_t length, sz, off, wrt;
 	char buffer[TLS_SENDBUF_SIZE];
+	int rc = 0;
+
+	/* detect deconnection */
+	if (wrap->efd == NULL) {
+		/* try reconnection */
+		rc = reconnect(wrap);
+		if (rc >= 0 && wrap->efd == NULL) {
+			hangup(wrap);
+			rc = X_ENOTSUP;
+		}
+		if (rc < 0)
+			return rc;
+	}
 
 	afb_rpc_coder_output_sizes(coder, &length);
 	for (off = 0 ; off < length ; off += sz) {
 		sz = afb_rpc_coder_output_get_subbuffer(coder, buffer,
 						(uint32_t)sizeof buffer, off);
-		wrt = 0;
-		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)rc) {
-			rc = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
-			if (rc <= 0)
-				goto end;
+		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)ssz) {
+			ssz = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
+			if (ssz <= 0) {
+				afb_rpc_coder_output_dispose(coder);
+				return -1;
+			}
 		}
 	}
-end:
 	afb_rpc_coder_output_dispose(coder);
+	return 0;
 }
 
 #endif
@@ -371,7 +426,12 @@ end:
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
-static void notify_ws(void *closure, struct afb_rpc_coder *coder)
+static void disposews(void *closure, void *buffer, size_t size)
+{
+	free(buffer);
+}
+
+static int notify_ws(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
@@ -380,6 +440,7 @@ static void notify_ws(void *closure, struct afb_rpc_coder *coder)
 		afb_ws_binary_v(wrap->ws, iovs, rc);
 		afb_rpc_coder_output_dispose(coder);
 	}
+	return rc;
 }
 
 static void on_ws_binary(void *closure, char *buffer, size_t size)
@@ -405,129 +466,159 @@ static struct afb_ws_itf wsitf =
 };
 
 /******************************************************************************/
-/***       W E B S O C K E T                                                ***/
+/***       I N I T I A L I Z A T I O N                                      ***/
 /******************************************************************************/
 
 /* websocket initialisation */
 static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 {
-	wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
-	if (wrap->ws == NULL)
-		return X_ENOMEM;
-
 	/* unpacking is required for websockets */
 	afb_stub_rpc_set_unpack(wrap->stub, 1);
 	/* callback for emission */
 	afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
-	return 0;
+	/* callback for releasing reception */
+	afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
+
+	/* attach WebSocket */
+	wrap->efd = NULL;
+	wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
+	return wrap->ws == NULL ? X_ENOMEM : 0;
 }
 
-static int init_fd(struct afb_wrap_rpc *wrap, int fd, int autoclose, void (*notify_cb)(void*, struct afb_rpc_coder*))
-{
-	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_fd, wrap, 0, autoclose);
-	if (rc >= 0)
-		/* callback for emission */
-		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+/* file descriptor initialisation */
+static int init_fd(
+		struct afb_wrap_rpc *wrap,
+		int fd,
+		int autoclose,
+		int (*notify_cb)(void*, struct afb_rpc_coder*)
+) {
+	/* packing is possible */
+	afb_stub_rpc_set_unpack(wrap->stub, 0);
+	/* callback for emission */
+	afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+	/* callback for releasing reception */
+	afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
 
-	return rc;
+	/* attach file desriptor */
+	wrap->ws = NULL;
+	wrap->efd = NULL;
+	if (fd < 0) /* case of lazy init */
+		return 0;
+	return afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN,
+	                         onevent_fd, wrap, 0, autoclose);
 }
 
 #if WITH_TLS
-static int init_tls(struct afb_wrap_rpc *wrap, const char *uri, enum afb_wrap_rpc_mode mode, int fd, int autoclose)
-{
+static int init_tls(
+		struct afb_wrap_rpc *wrap,
+		int fd,
+		int autoclose,
+		enum afb_wrap_rpc_mode mode,
+		const char *uri
+) {
 	int rc;
-	const char *cert_path, *key_path, *trust_path, *hostname, *host, *host_end, *argsstr, **args;
-	size_t host_len;
 	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
 	bool mutual = !!(mode & Wrap_Rpc_Mode_Mutual_Bit);
 
-	wrap->use_tls = false;
+	if (uri != NULL) {
+		const char *cert_path, *key_path, *trust_path;
+		const char *hostname, *host, *host_end, *argsstr;
+		const char **args = NULL;
+		size_t host_len;
 
-	/* get cert & key from uri query arguments */
-	cert_path = key_path = trust_path = hostname = NULL;
-	args = NULL;
-	argsstr = strchr(uri, '?');
-	if (argsstr != NULL && *argsstr != 0) {
-		args = rp_unescape_args(argsstr + 1);
-		cert_path = rp_unescaped_args_get(args, "cert");
-		key_path = rp_unescaped_args_get(args, "key");
-		trust_path = rp_unescaped_args_get(args, "trust");
-		hostname = rp_unescaped_args_get(args, "host");
-	}
-	if (server && (cert_path == NULL || key_path == NULL)) {
-		free(args);
-		RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-		return X_EINVAL;
-	}
+		/* get cert & key from uri query arguments */
+		cert_path = key_path = trust_path = hostname = NULL;
+		argsstr = strchr(uri, '?');
+		if (argsstr != NULL && *argsstr != 0) {
+			args = rp_unescape_args(argsstr + 1);
+			cert_path = rp_unescaped_args_get(args, "cert");
+			key_path = rp_unescaped_args_get(args, "key");
+			trust_path = rp_unescaped_args_get(args, "trust");
+			hostname = rp_unescaped_args_get(args, "host");
+		}
+		if (server && (cert_path == NULL || key_path == NULL)) {
+			free(args);
+			RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
+			return X_EINVAL;
+		}
 
-	/* get the name of the host */
-	if (hostname != NULL) {
-		if (*hostname == '\0')
-			wrap->host = NULL;
+		/* get the name of the host */
+		if (hostname != NULL) {
+			if (*hostname == '\0')
+				wrap->host = NULL;
+			else {
+				wrap->host = strdup(hostname);
+				if (wrap->host == NULL) {
+oom_host:
+					free(args);
+					RP_ERROR("out of memory");
+					return X_ENOMEM;
+				}
+			}
+		}
 		else {
-			wrap->host = strdup(hostname);
+			host = strchr(uri, ':') + 1;
+			host_end = strchr(host, ':');
+			host_len = (size_t)(host_end - host);
+			wrap->host = malloc(host_len + 1);
 			if (wrap->host == NULL)
 				goto oom_host;
+			strncpy(wrap->host, host, host_len);
+			wrap->host[host_len] = '\0';
 		}
-	}
-	else {
-		host = strchr(uri, ':') + 1;
-		host_end = strchr(host, ':');
-		host_len = (size_t)(host_end - host);
-		wrap->host = malloc(host_len + 1);
-		if (wrap->host == NULL)
-			goto oom_host;
-		strncpy(wrap->host, host, host_len);
-		wrap->host[host_len] = '\0';
-	}
 
-	/* setup TLS crypto material */
+		/* setup TLS crypto material */
 #if !WITHOUT_FILESYSTEM
-	if (cert_path != NULL)
-		tls_load_cert(cert_path);
-	if (key_path != NULL)
-		tls_load_key(key_path);
-	if (trust_path != NULL)
-		tls_load_trust(trust_path);
-	if ((!server || mutual) && !tls_has_trust())
-		/* use default system trust */
-		tls_load_trust(NULL);
+		if (cert_path != NULL)
+			tls_load_cert(cert_path);
+		if (key_path != NULL)
+			tls_load_key(key_path);
+		if (trust_path != NULL)
+			tls_load_trust(trust_path);
+		if ((!server || mutual) && !tls_has_trust())
+			/* use default system trust */
+			tls_load_trust(NULL);
 #endif
+		free(args);
+	}
 
 	/* setup TLS session */
-	rc = tls_session_create(&wrap->tls_session, fd, server, mutual, wrap->host);
+	if (fd < 0)
+		rc = 0;
+	else {
+		rc = tls_session_create(&wrap->tls_session, fd,
+		                        server, mutual, wrap->host);
+		wrap->use_tls = rc >= 0;
+	}
 	if (rc >= 0) {
 		rc = init_fd(wrap, fd, autoclose, notify_tls);
-		if (rc < 0)
+		if (rc < 0 && wrap->use_tls) {
+			wrap->use_tls = false;
 			tls_release(&wrap->tls_session);
+		}
 	}
 
 	/* log status */
 	if (rc >= 0) {
-		wrap->use_tls = true;
 		RP_INFO("Created %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
-					uri);
+					uri ?: "(reopened)");
 	}
 	else {
 		RP_ERROR("Can't create %s %s session for %s",
 					mutual ? "mTLS" : "TLS",
 					server ? "server" : "client",
-					uri);
-		free(wrap->host);
-		wrap->host = NULL;
+					uri ?: "(reopened)");
+		if (uri != NULL) {
+			free(wrap->host);
+			wrap->host = NULL;
+		}
 	}
 
-end:
 	/* cleanup */
-	free(args);
 	return rc;
 
-oom_host:
-	RP_ERROR("out of memory");
-	rc = X_ENOMEM;
-	goto end;
 }
 #endif
 
@@ -539,44 +630,38 @@ static int init(
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
-		const char *uri,
-		const char *apiname,
-		struct afb_apiset *callset
+		const char *uri
 ) {
-
-	/* create the stub */
-	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
-	if (rc < 0) {
-		if (autoclose)
-			close(fd);
-	}
+	int rc;
+	if (mode == Wrap_Rpc_Mode_Websocket)
+		rc = init_ws(wrap, fd, autoclose);
 	else {
-		if (mode == Wrap_Rpc_Mode_Websocket) {
-			wrap->efd = NULL;
-			rc = init_ws(wrap, fd, autoclose);
-		}
-		else {
-			wrap->ws = NULL;
 #if WITH_TLS
-			if (mode & Wrap_Rpc_Mode_Tls_Bit)
-				rc = init_tls(wrap, uri, mode, fd, autoclose);
-			else
+		if (mode & Wrap_Rpc_Mode_Tls_Bit)
+			rc = init_tls(wrap, fd, autoclose, mode, uri);
+		else
 #endif
-				rc = init_fd(wrap, fd, autoclose, notify_fd);
-		}
-		if (rc >= 0) {
-			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
-			return 0;
-		}
-		afb_stub_rpc_unref(wrap->stub);
+			rc = init_fd(wrap, fd, autoclose, notify_fd);
 	}
+	return rc;
+}
 
+static int reconnect(struct afb_wrap_rpc *wrap)
+{
+	int rc;
+	if (wrap->robust.reopen == NULL)
+		rc = X_EPIPE;
+	else {
+		rc = wrap->robust.reopen(wrap->robust.closure);
+		if (rc >= 0)
+			rc = init(wrap, rc, 1, wrap->mode, NULL);
+	}
 	return rc;
 }
 
 /* creation of the wrapper */
 int afb_wrap_rpc_create_fd(
-		struct afb_wrap_rpc **wrap,
+		struct afb_wrap_rpc **result,
 		int fd,
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
@@ -585,19 +670,32 @@ int afb_wrap_rpc_create_fd(
 		struct afb_apiset *callset
 ) {
 	int rc;
-	*wrap = calloc(1, sizeof **wrap);
-	if (*wrap == NULL) {
+	struct afb_wrap_rpc *wrap;
+
+	wrap = calloc(1, sizeof *wrap);
+	if (wrap == NULL) {
 		if (autoclose)
 			close(fd);
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = init(*wrap, fd, autoclose, mode, uri, apiname, callset);
+		rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
 		if (rc < 0) {
-			free(*wrap);
-			*wrap = NULL;
+			if (autoclose)
+				close(fd);
 		}
+		else {
+			rc = init(wrap, fd, autoclose, mode, uri);
+			if (rc >= 0) {
+				wrap->mode = mode;
+				*result = wrap;
+				return rc;
+			}
+			afb_stub_rpc_unref(wrap->stub);
+		}
+		free(wrap);
 	}
+	*result = NULL;
 	return rc;
 }
 
@@ -632,10 +730,19 @@ int afb_wrap_rpc_websocket_upgrade(
 	return rc;
 }
 
-/* get apiname or NULL */
-const char *afb_wrap_rpc_apiname(struct afb_wrap_rpc *wrap)
-{
-	return afb_stub_rpc_apiname(wrap->stub);
+/* set robustification functions */
+void afb_wrap_rpc_fd_robustify(
+	struct afb_wrap_rpc *wrap,
+	int (*reopen)(void*),
+	void *closure,
+	void (*release)(void*)
+) {
+	if (wrap->robust.release)
+		wrap->robust.release(wrap->robust.closure);
+
+	wrap->robust.reopen = reopen;
+	wrap->robust.closure = closure;
+	wrap->robust.release = release;
 }
 
 #if WITH_CRED
@@ -729,7 +836,7 @@ static void onevent_vcomm(void *closure, const void *data, size_t size)
 /**
 * Send the content to the connection
 */
-static void notify_vcomm(void *closure, struct afb_rpc_coder *coder)
+static int notify_vcomm(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
 	struct afb_vcomm *vcomm = wrap->vcomm;
@@ -750,6 +857,7 @@ static void notify_vcomm(void *closure, struct afb_rpc_coder *coder)
 		}
 		afb_rpc_coder_output_dispose(coder);
 	}
+	return rc;
 }
 
 /**

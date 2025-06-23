@@ -50,13 +50,18 @@
 
 int afb_rpc_v0_code_version_offer(afb_rpc_coder_t *coder, uint8_t count, const uint8_t *versions)
 {
+	uint8_t cntalign = count + (7 & (3 - count)); /* (count + 5 + x) % 8 = 0) */
 	int rc = afb_rpc_coder_write_uint8(coder, CHAR_FOR_VERSION_OFFER);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_uint32le(coder, AFBRPC_PROTO_IDENTIFIER);
 	if (rc >= 0)
-		rc = afb_rpc_coder_write_uint8(coder, count);
+		rc = afb_rpc_coder_write_uint8(coder, cntalign);
 	if (rc >= 0)
 		rc = afb_rpc_coder_write_copy(coder, versions, count);
+	while (rc >= 0 && count < cntalign) {
+		rc = afb_rpc_coder_write_uint8(coder, AFBRPC_PROTO_VERSION_UNSET);
+		count++;
+	}
 	return rc;
 }
 
