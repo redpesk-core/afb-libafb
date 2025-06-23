@@ -159,7 +159,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 
 	/* open the socket */
 	rc = afb_socket_open(turi, 0);
-	if (rc >= 0) {
+	if (rc >= 0 || !strong) {
 		/* create the client wrap */
 		fd = rc;
 		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, turi, apinames, call_set);
