@@ -392,9 +392,11 @@ static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 	char buffer[TLS_SENDBUF_SIZE];
 	int rc = 0;
 
-	if (!wrap->use_tls) {
+	/* detect deconnection */
+	if (wrap->efd == NULL) {
+		/* try reconnection */
 		rc = reconnect(wrap);
-		if (rc >= 0 && !wrap->use_tls) {
+		if (rc >= 0 && wrap->efd == NULL) {
 			hangup(wrap);
 			rc = X_ENOTSUP;
 		}
