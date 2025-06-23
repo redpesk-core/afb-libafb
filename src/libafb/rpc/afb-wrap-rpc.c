@@ -472,29 +472,37 @@ static struct afb_ws_itf wsitf =
 /* websocket initialisation */
 static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 {
-	wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
-	if (wrap->ws == NULL)
-		return X_ENOMEM;
-
 	/* unpacking is required for websockets */
 	afb_stub_rpc_set_unpack(wrap->stub, 1);
 	/* callback for emission */
 	afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
-	return 0;
+	/* callback for releasing reception */
+	afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
+
+	/* attach WebSocket */
+	wrap->efd = NULL;
+	wrap->ws = afb_ws_create(fd, autoclose, &wsitf, wrap);
+	return wrap->ws == NULL ? X_ENOMEM : 0;
 }
 
+/* file descriptor initialisation */
 static int init_fd(
 		struct afb_wrap_rpc *wrap,
 		int fd,
 		int autoclose,
 		int (*notify_cb)(void*, struct afb_rpc_coder*)
 ) {
-	int rc = afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN, onevent_fd, wrap, 0, autoclose);
-	if (rc >= 0)
-		/* callback for emission */
-		afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+	/* packing is possible */
+	afb_stub_rpc_set_unpack(wrap->stub, 0);
+	/* callback for emission */
+	afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
+	/* callback for releasing reception */
+	afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
 
-	return rc;
+	/* attach file desriptor */
+	wrap->ws = NULL;
+	return afb_ev_mgr_add_fd(&wrap->efd, fd, EV_FD_IN,
+	                         onevent_fd, wrap, 0, autoclose);
 }
 
 #if WITH_TLS
@@ -617,22 +625,15 @@ static int init(
 		const char *uri
 ) {
 	int rc;
-	if (mode == Wrap_Rpc_Mode_Websocket) {
-		wrap->efd = NULL;
+	if (mode == Wrap_Rpc_Mode_Websocket)
 		rc = init_ws(wrap, fd, autoclose);
-		if (rc >= 0)
-			afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
-	}
 	else {
-		wrap->ws = NULL;
 #if WITH_TLS
 		if (mode & Wrap_Rpc_Mode_Tls_Bit)
 			rc = init_tls(wrap, fd, autoclose, mode, uri);
 		else
 #endif
 			rc = init_fd(wrap, fd, autoclose, notify_fd);
-		if (rc >= 0)
-			afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
 	}
 	return rc;
 }
