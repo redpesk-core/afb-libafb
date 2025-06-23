@@ -424,6 +424,11 @@ static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 /***       W E B S O C K E T                                                ***/
 /******************************************************************************/
 
+static void disposews(void *closure, void *buffer, size_t size)
+{
+	free(buffer);
+}
+
 static int notify_ws(void *closure, struct afb_rpc_coder *coder)
 {
 	struct afb_wrap_rpc *wrap = closure;
@@ -459,7 +464,7 @@ static struct afb_ws_itf wsitf =
 };
 
 /******************************************************************************/
-/***       W E B S O C K E T                                                ***/
+/***       I N I T I A L I Z A T I O N                                      ***/
 /******************************************************************************/
 
 /* websocket initialisation */
@@ -613,6 +618,8 @@ static int init(
 	if (mode == Wrap_Rpc_Mode_Websocket) {
 		wrap->efd = NULL;
 		rc = init_ws(wrap, fd, autoclose);
+		if (rc >= 0)
+			afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
 	}
 	else {
 		wrap->ws = NULL;
