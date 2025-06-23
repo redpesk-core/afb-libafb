@@ -1,3 +1,16 @@
+Version next
+------------
+
+  feature
+   - automatic reconnection of RPCs
+   - lazy connection of RPC
+   - fix memory leak of RPC on WebSockets
+   - Allows multiple API names for RPC
+   - send version offer lazyly
+
+  fix
+   - compilation with WITHOUT_FILESYSTEM
+
 Version 5.5.0
 -------------
 
