@@ -493,10 +493,10 @@ static int init_fd(
 #if WITH_TLS
 static int init_tls(
 		struct afb_wrap_rpc *wrap,
-		const char *uri,
-		enum afb_wrap_rpc_mode mode,
 		int fd,
-		int autoclose
+		int autoclose,
+		enum afb_wrap_rpc_mode mode,
+		const char *uri
 ) {
 	int rc;
 	bool server = !!(mode & Wrap_Rpc_Mode_Server_Bit);
@@ -618,7 +618,7 @@ static int init(
 		wrap->ws = NULL;
 #if WITH_TLS
 		if (mode & Wrap_Rpc_Mode_Tls_Bit)
-			rc = init_tls(wrap, uri, mode, fd, autoclose);
+			rc = init_tls(wrap, fd, autoclose, mode, uri);
 		else
 #endif
 			rc = init_fd(wrap, fd, autoclose, notify_fd);
