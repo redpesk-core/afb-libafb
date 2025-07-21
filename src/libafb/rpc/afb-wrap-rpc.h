@@ -60,6 +60,7 @@ struct afb_apiset;
 struct afb_session;
 struct afb_token;
 struct afb_wrap_rpc;
+struct afb_rpc_spec;
 
 /**
  * Creates an RPC wrapper for the socket 'fd'.
@@ -70,7 +71,7 @@ struct afb_wrap_rpc;
  * @param autoclose if not zero, the socket is closed at end
  * @param websock   if not zero, initiate a websocket upgrading process
  * @param uri       sockspec URI specified by the user
- * @param apiname   the default API name, can be NULL except for clients
+ * @param spec      the API names spec, can be NULL except for clients
  * @param callset   the call set for received calls
  *
  * @returns 0 on success or a negative error code
@@ -82,7 +83,7 @@ int afb_wrap_rpc_create_fd(
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
 		const char *uri,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset);
 
 /**
@@ -152,7 +153,7 @@ struct afb_vcomm;
  *
  * @param wrap      pointer receiving the created wrapper
  * @param com       communication object
- * @param apiname   the default API name, can be NULL except for clients
+ * @param spec      the API names spec, can be NULL except for clients
  * @param callset   the call set for received calls
  *
  * @returns 0 on success or a negative error code
@@ -161,7 +162,7 @@ extern
 int afb_wrap_rpc_create_vcomm(
 		struct afb_wrap_rpc **wrap,
 		struct afb_vcomm *vcomm,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 );
 #endif

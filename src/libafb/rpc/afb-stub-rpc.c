@@ -76,6 +76,7 @@ json_object_to_json_string_length(
 #include "sys/x-spin.h"
 #include "misc/afb-monitor.h"
 
+#include "rpc/afb-rpc-spec.h"
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
 #include "rpc/afb-rpc-decoder.h"
@@ -244,6 +245,9 @@ struct afb_stub_rpc
 	/** last given data id */
 	uint16_t dataidlast;
 
+	/** spec */
+	struct afb_rpc_spec *spec;
+
 	/** apiset for declaration */
 	struct afb_apiset *declare_set;
 
@@ -346,9 +350,6 @@ struct afb_stub_rpc
 		void *closure;
 	}
 		emit;
-
-	/** api names terminated with an empty name */
-	char apinames[];
 };
 
 /**************************************************************************
@@ -1713,9 +1714,12 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 	const char *ucreds;
 	uint16_t sessionid;
 	uint16_t tokenid;
+	const char *apiname;
 	int rc;
 
-	rc = outcall_get(stub, &call);
+	rc = afb_rpc_spec_search(stub->spec, comreq->apiname, true, &apiname);
+	if (rc >= 0)
+		rc = outcall_get(stub, &call);
 	if (rc >= 0) {
 		call->type = outcall_type_call;
 		call->item.comreq = afb_req_common_addref(comreq);
@@ -1723,7 +1727,7 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 		if (rc >= 0) {
 			ucreds = afb_req_common_on_behalf_cred_export(comreq);
 			rc = send_call_request(stub, call->id, sessionid, tokenid,
-					comreq->apiname, comreq->verbname, ucreds,
+					apiname, comreq->verbname, ucreds,
 					comreq->params.ndata, comreq->params.data);
 			if (rc >= 0)
 				rc = emit(stub);
@@ -1805,7 +1809,7 @@ static int receive_call_request(
 	struct incall *incall;
 	struct afb_session *session;
 	struct afb_token *token;
-	const char *apinames;
+	const char *apiname;
 	int rc;
 	int err;
 
@@ -1816,23 +1820,11 @@ static int receive_call_request(
 	afb_stub_rpc_addref(stub);
 
 	/* check api */
-	apinames = stub->apinames;
-	if (api == NULL) {
-		/* default api is the first */
-		if (!*apinames)
-			goto invalid;
-		api = apinames;
-	}
-	else if (*apinames) {
-		/* search the list of authorized apis */
-		while (strcmp(api, apinames) != 0) {
-			while(*++apinames);
-			if (!*++apinames) {
-				RP_ERROR("Unauthorized API %s", api);
-				err = AFB_ERRNO_UNAUTHORIZED;
-				goto error;
-			}
-		}
+	rc = afb_rpc_spec_search(stub->spec, api, false, &apiname);
+	if (rc < 0) {
+		RP_ERROR("Unauthorized API %s", api);
+		err = AFB_ERRNO_UNAUTHORIZED;
+		goto error;
 	}
 
 	/* get session */
@@ -1867,7 +1859,7 @@ static int receive_call_request(
 	/* initialise */
 	incall->inblock = inblock_addref(stub->receive.current_inblock);
 	incall->callid = callid;
-	afb_req_common_init(&incall->comreq, &incall_common_itf, api, verb, ndata, data, stub);
+	afb_req_common_init(&incall->comreq, &incall_common_itf, apiname, verb, ndata, data, stub);
 	afb_req_common_set_session(&incall->comreq, session);
 	afb_req_common_set_token(&incall->comreq, token);
 #if WITH_CRED
@@ -2176,6 +2168,7 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 }
 #endif
 
+#if 0
 static int reply_description(struct afb_stub_rpc *stub, struct json_object *object, uint16_t callid)
 {
 #if WITHOUT_JSON_C
@@ -2233,6 +2226,12 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	}
 	return rc;
 }
+#else
+static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
+{
+	return send_describe_reply(stub, callid, NULL);
+}
+#endif
 
 #if WITH_RPC_V1
 /**************************************************************************
@@ -2991,67 +2990,71 @@ void afb_stub_rpc_emit_set_notify(
 /**
  * Creation of an api stub either client or server for an api
  *
- * @param apinames name of the api stubbed
+ * @param spec names of the api stubbed
  * @param call_set apiset for calling
  *
  * @return a handle on the created stub object
  */
-int afb_stub_rpc_create(struct afb_stub_rpc **pstub, const char *apinames, struct afb_apiset *call_set)
+int afb_stub_rpc_create(struct afb_stub_rpc **pstub, struct afb_rpc_spec *spec, struct afb_apiset *call_set)
 {
 	struct afb_stub_rpc *stub;
 
 	/* allocation */
-	*pstub = stub = calloc(1, sizeof *stub + (apinames == NULL ? 1 : 2 + strlen(apinames)));
+	*pstub = stub = calloc(1, sizeof *stub);
 	if (stub == NULL)
 		return X_ENOMEM;
 	x_spin_init(&stub->spinner);
 	afb_rpc_coder_init(&stub->coder);
 
-	/* terminate initialization by copying apinames */
+	/* terminate initialization by copying */
 	stub->refcount = 1;
-	if (apinames != NULL) {
-		char *name = strcpy(stub->apinames, apinames);
-		while (*name) {
-			if (*name == ',')
-				*name = 0;
-			name++;
-		}
-	}
+	stub->spec = afb_rpc_spec_addref(spec);
 	stub->call_set = afb_apiset_addref(call_set);
 	return 0;
 }
 
-/* return the default api name */
-const char *afb_stub_rpc_apiname(struct afb_stub_rpc *stub)
+/* return the api spec */
+struct afb_rpc_spec *afb_stub_rpc_spec(struct afb_stub_rpc *stub)
 {
-	return *stub->apinames ? stub->apinames : NULL;
+	return stub->spec;
+}
+
+/* helper callback for declaring client apis in apiset */
+static int declare_client_apis(void *closure, const char *locname, const char *remname)
+{
+	struct afb_stub_rpc *stub = closure;
+	struct afb_api_item api;
+	int rc = 0;
+
+	if (locname != NULL) {
+		api.closure = stub;
+		api.itf = &stub_api_itf;
+		api.group = stub; /* serialize */
+		rc = afb_apiset_add(stub->declare_set, locname, api);
+		if (rc < 0)
+			RP_ERROR("failed to declare API %s", locname);
+	}
+	return rc;
 }
 
 /* declares the client api in apiset */
 int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset *declare_set)
 {
-	struct afb_api_item api;
-	const char *name;
+	struct afb_rpc_spec *spec;
 	int rc;
 
-	name = stub->apinames;
-	if (!*name)
+	spec = stub->spec;
+	if (spec == NULL)
 		return X_EINVAL;
 	if (stub->declare_set)
 		return X_EEXIST;
 
-	api.closure = stub;
-	api.itf = &stub_api_itf;
-	api.group = stub; /* serialize */
-
 	stub->declare_set = afb_apiset_addref(declare_set);
-	do {
-		rc = afb_apiset_add(declare_set, name, api);
-		if (rc < 0)
-			RP_ERROR("failed to declare API %s", name);
-		while(*name++);
+	rc = afb_rpc_spec_for_each(spec, true, declare_client_apis, stub);
+	if (rc < 0) {
+		afb_apiset_unref(stub->declare_set);
+		stub->declare_set = NULL;
 	}
-	while (rc >= 0 && *name);
 	return rc;
 }
 
@@ -3134,6 +3137,14 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 	}
 }
 
+/* helper callback for disconnection events */
+static int disconnect_client_apis(void *closure, const char *locname, const char *remname)
+{
+	if (locname != NULL)
+		afb_monitor_api_disconnected(locname);
+	return 0;
+}
+
 /* disconnected */
 void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 {
@@ -3178,13 +3189,17 @@ void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 	u16id2ptr_destroy(&i2p);
 
 	/* send events */
-	if (stub->declare_set) {
-		const char *name = stub->apinames;
-		while (*name) {
-			afb_monitor_api_disconnected(name);
-			while(*name++);
-		}
-	}
+	if (stub->declare_set)
+		afb_rpc_spec_for_each(stub->spec, true, disconnect_client_apis, stub);
+}
+
+/* helper callback for removing */
+static int remove_client_apis(void *closure, const char *locname, const char *remname)
+{
+	struct afb_stub_rpc *stub = closure;
+	if (locname != NULL)
+		afb_apiset_del(stub->declare_set, locname);
+	return 0;
 }
 
 /* sub one reference and free resources if falling to zero */
@@ -3199,14 +3214,11 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 		/* cleanup */
 		afb_stub_rpc_disconnected(stub);
 		if (stub->declare_set) {
-			const char *name = stub->apinames;
-			while (*name) {
-				afb_apiset_del(stub->declare_set, name);
-				while(*name++);
-			}
+			afb_rpc_spec_for_each(stub->spec, true, remove_client_apis, stub);
 			afb_apiset_unref(stub->declare_set);
 		}
 		afb_apiset_unref(stub->call_set);
+		afb_rpc_spec_unref(stub->spec);
 #if RPC_POOL
 		while ((iblk = stub->receive.pool) != NULL) {
 			stub->receive.pool = iblk->data;

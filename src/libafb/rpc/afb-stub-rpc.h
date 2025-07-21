@@ -31,18 +31,19 @@ struct afb_apiset;
 struct afb_session;
 struct afb_token;
 struct afb_rpc_coder;
+struct afb_rpc_spec;
 
 /**
  * Creates a stub rpc object dispatching incoming requests
  * to the given call set, for the given apiname by default
  *
  * @param stub pointer for storing the created stub
- * @param apiname default apiname, NULL if none
+ * @param spec specification of apis
  * @param callset the apiset for serving requests
  *
  * @return 0 on success, a negative error code on failure
  */
-extern int afb_stub_rpc_create(struct afb_stub_rpc **stub, const char *apiname, struct afb_apiset *callset);
+extern int afb_stub_rpc_create(struct afb_stub_rpc **stub, struct afb_rpc_spec *spec, struct afb_apiset *callset);
 
 /**
  * Decrement the count of reference to the stub and drop its used resources
@@ -60,13 +61,13 @@ extern void afb_stub_rpc_unref(struct afb_stub_rpc *stub);
 extern struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub);
 
 /**
- * Apiname of the stub
+ * Spec of the stub
  *
  * @param stub the stub object
  *
- * @return the apiname of the stub, might be NULL
+ * @return the spec of the stub, might be NULL
  */
-extern const char *afb_stub_rpc_apiname(struct afb_stub_rpc *stub);
+extern struct afb_rpc_spec *afb_stub_rpc_spec(struct afb_stub_rpc *stub);
 
 /**
  * Set the default pair session of the stub
@@ -113,7 +114,7 @@ extern void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cr
 extern void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack);
 
 /**
- * Adds in the declare_set the api of the stub apiname that is calling the API
+ * Adds in the declare_set the api of the stub apinames that is calling the API
  * will invoke the remote
  *
  * @param stub the stub object

@@ -40,6 +40,7 @@
 #include "misc/afb-ws.h"
 #include "misc/afb-vcomm.h"
 #include "rpc/afb-rpc-coder.h"
+#include "rpc/afb-rpc-spec.h"
 #include "core/afb-ev-mgr.h"
 #include "core/afb-cred.h"
 #include "rpc/afb-stub-rpc.h"
@@ -666,7 +667,7 @@ int afb_wrap_rpc_create_fd(
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
 		const char *uri,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	int rc;
@@ -679,7 +680,7 @@ int afb_wrap_rpc_create_fd(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+		rc = afb_stub_rpc_create(&wrap->stub, spec, callset);
 		if (rc < 0) {
 			if (autoclose)
 				close(fd);
@@ -867,11 +868,11 @@ static int init_vcomm(
 		struct afb_wrap_rpc *wrap,
 		struct afb_vcomm *vcomm,
 		enum afb_wrap_rpc_mode mode,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	/* create the stub */
-	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+	int rc = afb_stub_rpc_create(&wrap->stub, spec, callset);
 	if (rc >= 0) {
 		wrap->vcomm = vcomm;
 		rc = afb_vcomm_on_message(vcomm, onevent_vcomm, wrap);
@@ -886,7 +887,7 @@ static int init_vcomm(
 int afb_wrap_rpc_create_vcomm(
 		struct afb_wrap_rpc **wrap,
 		struct afb_vcomm *vcomm,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	int rc;
@@ -894,7 +895,7 @@ int afb_wrap_rpc_create_vcomm(
 	if (*wrap == NULL)
 		rc = X_ENOMEM;
 	else {
-		rc = init_vcomm(*wrap, vcomm, 0, apiname, callset);
+		rc = init_vcomm(*wrap, vcomm, 0, spec, callset);
 		if (rc < 0) {
 			free(*wrap);
 			*wrap = NULL;

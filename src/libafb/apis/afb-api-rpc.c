@@ -43,6 +43,7 @@
 #include "misc/afb-uri.h"
 #include "misc/afb-ws.h"
 #include "core/afb-ev-mgr.h"
+#include "rpc/afb-rpc-spec.h"
 #include "rpc/afb-wrap-rpc.h"
 #include "sys/x-socket.h"
 #include "sys/x-errno.h"
@@ -59,11 +60,11 @@ struct server
 	/** ev_fd handler */
 	struct ev_fd *efd;
 
+	/** spec of the server */
+	struct afb_rpc_spec *spec;
+
 	/** mode: tls, mtls, ws, plain */
 	enum afb_wrap_rpc_mode mode;
-
-	/** offset in uri of the interface api name */
-	uint16_t offapi;
 
 	/** full uri of the server socket and api name only, separated by a \0  */
 	char uri[];
@@ -124,11 +125,15 @@ static int reopen_client(void *closure)
 	return fd;
 }
 
-int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set, int strong)
-{
+int afb_api_rpc_add_client(
+		const char *uri,
+		struct afb_apiset *declare_set,
+		struct afb_apiset *call_set,
+		int strong
+) {
 	struct afb_wrap_rpc *wrap;
 	const char *turi;
-	char *apinames;
+	struct afb_rpc_spec *spec;
 	int rc, fd;
 	enum afb_wrap_rpc_mode mode;
 
@@ -149,9 +154,9 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	}
 #endif
 
-	/* check the api name */
-	rc = afb_uri_api_name(turi, &apinames, 1);
-	if (rc < 0 || !*apinames) {
+	/* check the spec */
+	rc = afb_rpc_spec_from_uri(&spec, turi, true);
+	if (rc < 0) {
 		RP_ERROR("invalid api name in rpc uri %s", uri);
 		rc = X_EINVAL;
 		goto error2;
@@ -162,7 +167,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0 || !strong) {
 		/* create the client wrap */
 		fd = rc;
-		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, turi, apinames, call_set);
+		rc = afb_wrap_rpc_create_fd(&wrap, fd, 1, mode, turi, spec, call_set);
 		if (rc >= 0) {
 			rc = afb_wrap_rpc_start_client(wrap, declare_set);
 			if (rc < 0)
@@ -181,7 +186,7 @@ int afb_api_rpc_add_client(const char *uri, struct afb_apiset *declare_set, stru
 			RP_ERROR("can't create client rpc service to %s", uri);
 	}
 error2:
-	free(apinames);
+	afb_rpc_spec_unref(spec);
 error:
 	return strong ? rc : 0;
 }
@@ -206,7 +211,6 @@ static void server_accept(struct server *server, int fd)
 	struct sockaddr addr;
 	socklen_t lenaddr;
 	struct afb_wrap_rpc *wrap;
-	const char *apinames;
 
 	lenaddr = (socklen_t)sizeof addr;
 	fdc = accept(fd, &addr, &lenaddr);
@@ -216,11 +220,9 @@ static void server_accept(struct server *server, int fd)
 		fcntl(fdc, F_SETFL, O_NONBLOCK);
 		rc = 1;
 		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
-		apinames = &server->uri[server->offapi];
-		if (apinames[0] == 0)
-			apinames = NULL;
 
-		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, server->mode, server->uri, apinames, server->apiset);
+		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, server->mode, server->uri,
+				server->spec, server->apiset);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
@@ -287,14 +289,28 @@ static int server_connect(struct server *server)
 	return rc;
 }
 
+static int check_api_exist(void *closure, const char *locname, const char *remname)
+{
+	struct afb_apiset *call_set = closure;
+	int rc = 0;
+	const char *name = locname != NULL? locname : remname != NULL ? remname : NULL;
+
+	if (name != NULL) {
+		rc = afb_apiset_get_api(call_set, name, 1, 0, NULL);
+		if (rc < 0)
+			RP_ERROR("Can't provide rpc-server for API %s", name);
+	}
+	return rc;
+}
+
 /* create the service */
 int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, struct afb_apiset *call_set)
 {
 	int rc;
 	const char *turi;
 	struct server *server;
-	size_t luri, lapi, extra;
-	char *apinames = NULL;
+	size_t luri;
+	struct afb_rpc_spec *spec = NULL;
 	enum afb_wrap_rpc_mode mode;
 
 	/* check the size */
@@ -322,41 +338,24 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	}
 #endif
 
-	/* check the api name */
-	rc = afb_uri_api_name(turi, &apinames, 1);
+	/* get the spec */
+	rc = afb_rpc_spec_from_uri(&spec, turi, false);
 	if (rc < 0) {
-		RP_ERROR("invalid api name in rpc uri %s", uri);
+		RP_ERROR("invalid spec in rpc uri %s", uri);
 		rc = X_EINVAL;
 		goto error;
 	}
 
 	/* check api existence */
-	if (*apinames) {
-		char *iter = apinames;
-		for (;;) {
-			char *end = strchr(iter, ',');
-			if (end != NULL)
-				*end = '\0';
-			rc = afb_apiset_get_api(call_set, iter, 1, 0, NULL);
-			if (rc < 0) {
-				RP_ERROR("Can't provide rpc-server for URI %s API %s", uri, iter);
-				if (end)
-					*end = ',';
-				goto error;
-			}
-			if (end == NULL)
-				break;
-			*end = ',';
-			iter = &end[1];
-		}
+	rc = afb_rpc_spec_for_each(spec, false, check_api_exist, call_set);
+	if (rc < 0) {
+		RP_ERROR("Can't provide rpc-server for URI %s", uri);
+		goto error;
 	}
 
 	/* make the structure */
-	lapi = strlen(apinames);
 	luri = strlen(turi);
-	/* if there's something in the uri after the api name, store api name as extra after uri */
-	extra = strcmp(apinames, &turi[luri - lapi]) ? 1 + lapi : 0;
-	server = malloc(sizeof * server + 1 + luri + extra);
+	server = malloc(sizeof * server + 1 + luri);
 	if (!server) {
 		RP_ERROR("out of memory");
 		rc = X_ENOMEM;
@@ -364,26 +363,19 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	}
 
 	server->apiset = afb_apiset_addref(call_set);
+	server->spec = spec;
 	server->mode = mode;
 	server->efd = 0;
 	strcpy(server->uri, turi);
-	if (!extra)
-		server->offapi = (uint16_t)(luri - lapi);
-	else {
-		server->offapi = (uint16_t)(luri + 1);
-		strcpy(&server->uri[server->offapi], apinames);
-	}
 
 	/* connect for serving */
 	rc = server_connect(server);
-	if (rc >= 0) {
-		free(apinames);
+	if (rc >= 0)
 		return 0;
-	}
 
 	afb_apiset_unref(server->apiset);
 	free(server);
 error:
-	free(apinames);
+	afb_rpc_spec_unref(spec);
 	return rc;
 }
