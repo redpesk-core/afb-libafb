@@ -537,11 +537,6 @@ static int init_tls(
 			trust_path = rp_unescaped_args_get(args, "trust");
 			hostname = rp_unescaped_args_get(args, "host");
 		}
-		if (server && (cert_path == NULL || key_path == NULL)) {
-			free(args);
-			RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-			return X_EINVAL;
-		}
 
 		/* get the name of the host */
 		if (hostname != NULL) {

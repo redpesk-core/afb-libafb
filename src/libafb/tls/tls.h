@@ -98,46 +98,38 @@ Group of functions taking path (if !WITHOUT_FILESYSTEM)
 
 #include "tls-gnu.h"
 
-typedef struct
-	{
-		gnutls_session_t session;
-		gnutls_certificate_credentials_t creds;
-	}
-	tls_session_t;
+typedef gnutls_session_t tls_session_t;
 
 static inline
 void tls_init(tls_session_t *session)
 {
-	session->session = NULL;
-	session->creds = NULL;
+	*session = NULL;
 }
 
 static inline
 void tls_release(tls_session_t *session)
 {
-	if (session->session != NULL)
-		gnutls_deinit(session->session);
-	if (session->creds != NULL)
-		gnutls_certificate_free_credentials(session->creds);
+	if (*session != NULL)
+		gnutls_deinit(*session);
 	tls_init(session);
 }
 
 static inline
 ssize_t tls_recv(tls_session_t *session, void *buffer, size_t length)
 {
-	return tls_gnu_recv(session->session, buffer, length);
+	return tls_gnu_recv(*session, buffer, length);
 }
 
 static inline
 ssize_t tls_send(tls_session_t *session, const void *buffer, size_t length)
 {
-	return tls_gnu_send(session->session, buffer, length);
+	return tls_gnu_send(*session, buffer, length);
 }
 
 static inline
 int tls_session_create(tls_session_t *session, int fd, bool server, bool mtls, const char *host)
 {
-	return tls_gnu_session_create(&session->session, &session->creds, fd, server, mtls, host);
+	return tls_gnu_session_create(session, fd, server, mtls, host);
 }
 
 static inline
