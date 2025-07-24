@@ -93,8 +93,15 @@ static gnutls_x509_privkey_t            key_data;
 static gnutls_x509_trust_list_t         trust_data;
 static gnutls_certificate_credentials_t xcreds;
 
-/* disable DTLS and all TLS versions before TLS 1.3 */
-#define CIPHER_PRIORITY "SECURE128:-VERS-DTLS-ALL:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2"
+/*
+ * enables the same ciphersuites which are enabled in the MbedTLS implementation,
+ * plus some others stronger and/or more appropriate for more powerful devices
+ */
+#define CIPHER_PRIORITY "SECURE128" \
+                        ":-SHA1" \
+                        ":-VERS-DTLS-ALL:-VERS-TLS1.0:-VERS-TLS1.1" \
+                        ":-AES-256-CBC:-AES-128-CBC" \
+                        ":+AES-256-CCM-8:+AES-128-CCM-8"
 
 
 

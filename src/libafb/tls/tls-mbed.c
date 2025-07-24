@@ -63,6 +63,10 @@
 #  define DEFAULT_CA_DIR "/etc/ssl/certs"
 #endif
 
+#ifndef RESTRICT_MBEDTLS_CYPHER_SUITE
+#  define RESTRICT_MBEDTLS_CYPHER_SUITE 1
+#endif
+
 static bool cert_set  = false;
 static bool key_set   = false;
 static bool trust_set = false;
@@ -72,33 +76,20 @@ static mbedtls_pk_context key_data;
 static mbedtls_x509_crt   trust_data;
 
 #if RESTRICT_MBEDTLS_CYPHER_SUITE
-/*
- * the setup of the cypher suite requires more time
- * to work properly. so don't set it and use the defaults
- */
+/* ciphersuites with hardware acceleration on STM B-U585I-IOT02A */
 static const int cyphersuites[] = {
-	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA256,
-	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA384,
-	MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA512,
-	MBEDTLS_TLS1_3_SIG_ECDSA_SECP256R1_SHA256,
-	MBEDTLS_TLS1_3_SIG_ECDSA_SECP384R1_SHA384,
-	MBEDTLS_TLS1_3_SIG_ECDSA_SECP521R1_SHA512,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA256,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA384,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_RSAE_SHA512,
-	MBEDTLS_TLS1_3_SIG_ED25519,
-	MBEDTLS_TLS1_3_SIG_ED448,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA256,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA384,
-	MBEDTLS_TLS1_3_SIG_RSA_PSS_PSS_SHA512,
 	MBEDTLS_TLS1_3_AES_128_GCM_SHA256,
-	MBEDTLS_TLS1_3_AES_256_GCM_SHA384,
-	MBEDTLS_TLS1_3_CHACHA20_POLY1305_SHA256,
 	MBEDTLS_TLS1_3_AES_128_CCM_SHA256,
 	MBEDTLS_TLS1_3_AES_128_CCM_8_SHA256,
+	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM,
+	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CCM_8,
+	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM,
+	MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
 	MBEDTLS_CIPHERSUITE_NODTLS,
 	0
 };
+static const int tls13_key_exchange_modes = MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL;
 #endif
 
 #if WITH_MBEDTLS_DEBUG
@@ -312,6 +303,7 @@ int tls_mbed_session_create(
 	mbedtls_ssl_conf_rng(config, get_random_bytes, NULL);
 #if RESTRICT_MBEDTLS_CYPHER_SUITE
 	mbedtls_ssl_conf_ciphersuites(config, cyphersuites);
+	mbedtls_ssl_conf_tls13_key_exchange_modes(config, tls13_key_exchange_modes);
 #endif
 #if WITH_MBEDTLS_DEBUG
 	mbedtls_ssl_conf_dbg(config, debug_cb, NULL);
