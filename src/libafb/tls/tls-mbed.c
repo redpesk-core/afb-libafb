@@ -236,6 +236,10 @@ int tls_mbed_load_trust(const char *path)
 
 	return 0;
 }
+
+int tls_load_cert(const char *path)  __attribute__ ((alias ("tls_mbed_load_cert")));
+int tls_load_key(const char *path)   __attribute__ ((alias ("tls_mbed_load_key")));
+int tls_load_trust(const char *path) __attribute__ ((alias ("tls_mbed_load_trust")));
 #endif
 
 /**
