@@ -671,7 +671,7 @@ int tls_gnu_session_create(
 		gnutls_certificate_server_set_request(*session, GNUTLS_CERT_REQUIRE);
 
 	/* check server certificate */
-	gnutls_session_set_verify_cert(*session, server ? NULL : host, 0);
+	gnutls_session_set_verify_cert(*session, host, 0);
 
 	/* set transport */
 	gnutls_transport_set_int(*session, fd);
