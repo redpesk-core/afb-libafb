@@ -404,6 +404,7 @@ static int offer_version(struct afb_stub_rpc *stub)
 	return rc;
 }
 
+/* unlock threads list in reverse order */
 static void wait_version_unlock(struct version_waiter *waiter)
 {
 	if (waiter != NULL) {
@@ -454,19 +455,24 @@ static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lo
 	}
 }
 
+static int wait_version_sched(struct afb_stub_rpc *stub)
+{
+	struct version_waiter awaiter;
+	awaiter.stub = stub;
+	awaiter.next = NULL;
+	awaiter.lock = NULL;
+	return afb_sched_sync(0, wait_version_cb, &awaiter);
+}
+
 static int wait_version(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
 
 	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
-		struct version_waiter awaiter;
 		if (!stub->version_offer_pending)
 			rc = offer_version(stub);
 		if (rc >= 0) {
-			awaiter.stub = stub;
-			awaiter.next = NULL;
-			awaiter.lock = NULL;
-			rc = afb_sched_sync(0, wait_version_cb, &awaiter);
+			rc = wait_version_sched(stub);
 			if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
 				rc = X_EBUSY;
 		}
