@@ -105,6 +105,10 @@ json_object_to_json_string_length(
 # define RPC_POOL 1
 #endif
 
+#if !defined(RPC_VERSION_WAIT_TIMEOUT)
+# define RPC_VERSION_WAIT_TIMEOUT 10
+#endif
+
 /**************************************************************************
 * PART - MODULE DECLARATIONS
 **************************************************************************/
@@ -350,6 +354,16 @@ struct afb_stub_rpc
 		void *closure;
 	}
 		emit;
+
+	/** group for waiter */
+	struct {
+		/** waiter callback */
+		int (*waiter)(void*, int);
+
+		/** closure of the waiter callback */
+		void *closure;
+	}
+		wait;
 };
 
 /**************************************************************************
@@ -464,6 +478,18 @@ static int wait_version_sched(struct afb_stub_rpc *stub)
 	return afb_sched_sync(0, wait_version_cb, &awaiter);
 }
 
+static int wait_version_waiter(struct afb_stub_rpc *stub)
+{
+	time_t t = time(NULL);
+	for (;;) {
+		int rc = stub->wait.waiter(stub->wait.closure, 1000);
+		if (rc < 0 || stub->version != AFBRPC_PROTO_VERSION_UNSET)
+			return rc;
+		if ((time(NULL) - t) > RPC_VERSION_WAIT_TIMEOUT)
+			return X_ETIMEDOUT;
+	}
+}
+
 static int wait_version(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
@@ -472,12 +498,25 @@ static int wait_version(struct afb_stub_rpc *stub)
 		if (!stub->version_offer_pending)
 			rc = offer_version(stub);
 		if (rc >= 0) {
-			rc = wait_version_sched(stub);
+			if (stub->wait.waiter == NULL)
+				rc = wait_version_sched(stub);
+			else
+				rc = wait_version_waiter(stub);
 			if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
 				rc = X_EBUSY;
 		}
 	}
 	return rc;
+}
+
+/* Tells the stub that it should call function 'wait' */
+void afb_stub_rpc_set_waiter(
+		struct afb_stub_rpc *stub,
+		int (*waiter)(void*,int),
+		void *closure
+) {
+	stub->wait.waiter = waiter;
+	stub->wait.closure = closure;
 }
 
 /******************* memory *****************/
