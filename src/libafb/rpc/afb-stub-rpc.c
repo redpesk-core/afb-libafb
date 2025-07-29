@@ -380,6 +380,49 @@ static int emit(struct afb_stub_rpc *stub)
 
 /******************* offer and wait version *****************/
 
+/* offer the version */
+static int offer_version(struct afb_stub_rpc *stub)
+{
+	int rc;
+	uint8_t versions[] = {
+#if WITH_RPC_V3
+		AFBRPC_PROTO_VERSION_3,
+#endif
+#if WITH_RPC_V1
+		AFBRPC_PROTO_VERSION_1,
+#endif
+	};
+
+	stub->version_offer_pending = 1;
+	rc = afb_rpc_v0_code_version_offer(&stub->coder,
+	             (uint8_t)(sizeof versions / sizeof *versions), versions);
+	if (rc >= 0) {
+		rc = emit(stub);
+		if (rc < 0)
+			stub->version_offer_pending = 0;
+	}
+	return rc;
+}
+
+static void wait_version_unlock(struct version_waiter *waiter)
+{
+	if (waiter != NULL) {
+		wait_version_unlock(waiter->next);
+		if (waiter->lock != NULL)
+			afb_sched_leave(waiter->lock);
+	}
+}
+
+/* unlock any thread waiting the version */
+static void wait_version_done(struct afb_stub_rpc *stub)
+{
+	struct version_waiter *head;
+	x_spin_lock(&stub->spinner);
+	head = __atomic_exchange_n(&stub->version_waiters, NULL, __ATOMIC_RELAXED);
+	x_spin_unlock(&stub->spinner);
+	wait_version_unlock(head);
+}
+
 /* TODO: this is not a thread safe implementation */
 static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lock)
 {
@@ -411,30 +454,6 @@ static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lo
 	}
 }
 
-/* offer the version */
-static int offer_version(struct afb_stub_rpc *stub)
-{
-	int rc;
-	uint8_t versions[] = {
-#if WITH_RPC_V3
-		AFBRPC_PROTO_VERSION_3,
-#endif
-#if WITH_RPC_V1
-		AFBRPC_PROTO_VERSION_1,
-#endif
-	};
-
-	stub->version_offer_pending = 1;
-	rc = afb_rpc_v0_code_version_offer(&stub->coder,
-	             (uint8_t)(sizeof versions / sizeof *versions), versions);
-	if (rc >= 0) {
-		rc = emit(stub);
-		if (rc < 0)
-			stub->version_offer_pending = 0;
-	}
-	return rc;
-}
-
 static int wait_version(struct afb_stub_rpc *stub)
 {
 	int rc = 0;
@@ -453,25 +472,6 @@ static int wait_version(struct afb_stub_rpc *stub)
 		}
 	}
 	return rc;
-}
-
-static void wait_version_unlock(struct version_waiter *waiter)
-{
-	if (waiter != NULL) {
-		wait_version_unlock(waiter->next);
-		if (waiter->lock != NULL)
-			afb_sched_leave(waiter->lock);
-	}
-}
-
-/* unlock any thread waiting the version */
-static void wait_version_done(struct afb_stub_rpc *stub)
-{
-	struct version_waiter *head;
-	x_spin_lock(&stub->spinner);
-	head = __atomic_exchange_n(&stub->version_waiters, NULL, __ATOMIC_RELAXED);
-	x_spin_unlock(&stub->spinner);
-	wait_version_unlock(head);
 }
 
 /******************* memory *****************/
