@@ -379,6 +379,16 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 		free(buffer);
 }
 
+#if __ZEPHYR__
+static int zephyr_waiter_cb(void *closure, int delayms)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	if (wrap->efd == NULL)
+		return X_EPIPE;
+	afb_ev_mgr_prepare_wait_dispatch(delayms, 0);
+	return 0;
+}
+#endif
 /******************************************************************************/
 /***       T L S                                                            ***/
 /******************************************************************************/
@@ -499,6 +509,10 @@ static int init_fd(
 	afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
 	/* callback for releasing reception */
 	afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
+#if __ZEPHYR__
+	/* callback for waiting */
+	afb_stub_rpc_set_waiter(wrap->stub, zephyr_waiter_cb, wrap);
+#endif
 
 	/* attach file desriptor */
 	wrap->ws = NULL;
