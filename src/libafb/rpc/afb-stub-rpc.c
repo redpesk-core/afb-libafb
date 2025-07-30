@@ -1711,6 +1711,8 @@ static int make_session_id(struct afb_stub_rpc *stub, struct afb_session *sessio
 			rc = send_session_create(stub, sid, afb_session_uuid(session));
 			if (rc >= 0 && stub->unpack)
 				rc = emit(stub);
+			if (rc < 0)
+				u16id2bool_set(&stub->session_flags, sid, 0);
 		}
 	}
 
@@ -1737,6 +1739,8 @@ static int make_token_id(struct afb_stub_rpc *stub, struct afb_token *token, uin
 			rc = send_token_create(stub, tid, afb_token_string(token));
 			if (rc >= 0 && stub->unpack)
 				rc = emit(stub);
+			if (rc < 0)
+				u16id2bool_set(&stub->token_flags, tid, 0);
 		}
 	}
 
