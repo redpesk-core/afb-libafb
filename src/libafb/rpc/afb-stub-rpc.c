@@ -76,6 +76,7 @@ json_object_to_json_string_length(
 #include "sys/x-spin.h"
 #include "misc/afb-monitor.h"
 
+#include "rpc/afb-rpc-spec.h"
 #include "rpc/afb-stub-rpc.h"
 #include "rpc/afb-rpc-coder.h"
 #include "rpc/afb-rpc-decoder.h"
@@ -102,6 +103,10 @@ json_object_to_json_string_length(
 #define USE_ALIAS 1
 #if !defined(RPC_POOL)
 # define RPC_POOL 1
+#endif
+
+#if !defined(RPC_VERSION_WAIT_TIMEOUT)
+# define RPC_VERSION_WAIT_TIMEOUT 10
 #endif
 
 /**************************************************************************
@@ -244,6 +249,9 @@ struct afb_stub_rpc
 	/** last given data id */
 	uint16_t dataidlast;
 
+	/** spec */
+	struct afb_rpc_spec *spec;
+
 	/** apiset for declaration */
 	struct afb_apiset *declare_set;
 
@@ -328,27 +336,24 @@ struct afb_stub_rpc
 		/** bank of free inblocks */
 		struct inblock *pool;
 #endif
-
-		/** dispose in blocks */
-		void (*dispose)(void*, void*, size_t);
-
-		/** closure of the dispose function */
-		void *closure;
 	}
 		receive;
 
-	/** group for emiter */
+	/** group of callbacks */
 	struct {
 		/** notify callback */
 		int (*notify)(void*, struct afb_rpc_coder*);
 
-		/** closure of the notify callback */
+		/** dispose in blocks */
+		void (*dispose)(void*, void*, size_t);
+
+		/** waiter callback */
+		int (*waiter)(void*, int);
+
+		/** closure of the dispose function */
 		void *closure;
 	}
-		emit;
-
-	/** api names terminated with an empty name */
-	char apinames[];
+		callbacks;
 };
 
 /**************************************************************************
@@ -370,38 +375,14 @@ static int queue_job(void *group, void (*callback)(int signum, void* arg), void 
 static int emit(struct afb_stub_rpc *stub)
 {
 	int rc = X_ECANCELED;
-	if (stub->emit.notify)
-		rc = stub->emit.notify(stub->emit.closure, &stub->coder);
+	if (stub->callbacks.notify)
+		rc = stub->callbacks.notify(stub->callbacks.closure, &stub->coder);
 	if (rc < 0)
 		afb_rpc_coder_output_dispose(&stub->coder);
 	return rc;
 }
 
 /******************* offer and wait version *****************/
-/* TODO: this is not a thread safe implementation */
-static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lock)
-{
-	struct version_waiter *awaiter = closure;
-	struct afb_stub_rpc *stub = awaiter->stub;
-	if (signum != 0) {
-		struct version_waiter **prv = &stub->version_waiters;
-		while (*prv != NULL)
-			if ((*prv) != awaiter)
-				prv = &(*prv)->next;
-			else {
-				*prv = awaiter->next;
-				break;
-			}
-		afb_sched_leave(lock);
-	}
-	else if (stub->version != AFBRPC_PROTO_VERSION_UNSET)
-		afb_sched_leave(lock);
-	else {
-		awaiter->lock = lock;
-		awaiter->next = stub->version_waiters;
-		stub->version_waiters = awaiter;
-	}
-}
 
 /* offer the version */
 static int offer_version(struct afb_stub_rpc *stub)
@@ -417,7 +398,8 @@ static int offer_version(struct afb_stub_rpc *stub)
 	};
 
 	stub->version_offer_pending = 1;
-	rc = afb_rpc_v0_code_version_offer(&stub->coder, (uint8_t)(sizeof versions / sizeof *versions), versions);
+	rc = afb_rpc_v0_code_version_offer(&stub->coder,
+	             (uint8_t)(sizeof versions / sizeof *versions), versions);
 	if (rc >= 0) {
 		rc = emit(stub);
 		if (rc < 0)
@@ -426,26 +408,7 @@ static int offer_version(struct afb_stub_rpc *stub)
 	return rc;
 }
 
-static int wait_version(struct afb_stub_rpc *stub)
-{
-	int rc = 0;
-
-	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
-		struct version_waiter awaiter;
-		if (!stub->version_offer_pending)
-			rc = offer_version(stub);
-		if (rc >= 0) {
-			awaiter.stub = stub;
-			awaiter.next = NULL;
-			awaiter.lock = NULL;
-			rc = afb_sched_sync(0, wait_version_cb, &awaiter);
-			if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
-				rc = X_EBUSY;
-		}
-	}
-	return rc;
-}
-
+/* unlock threads list in reverse order */
 static void wait_version_unlock(struct version_waiter *waiter)
 {
 	if (waiter != NULL) {
@@ -458,9 +421,82 @@ static void wait_version_unlock(struct version_waiter *waiter)
 /* unlock any thread waiting the version */
 static void wait_version_done(struct afb_stub_rpc *stub)
 {
-	struct version_waiter *head = stub->version_waiters;
-	stub->version_waiters = NULL;
+	struct version_waiter *head;
+	x_spin_lock(&stub->spinner);
+	head = __atomic_exchange_n(&stub->version_waiters, NULL, __ATOMIC_RELAXED);
+	x_spin_unlock(&stub->spinner);
 	wait_version_unlock(head);
+}
+
+/* TODO: this is not a thread safe implementation */
+static void wait_version_cb(int signum, void *closure, struct afb_sched_lock *lock)
+{
+	struct version_waiter *awaiter = closure;
+	struct afb_stub_rpc *stub = awaiter->stub;
+
+	x_spin_lock(&stub->spinner);
+	if (signum != 0) {
+		struct version_waiter **prv = &stub->version_waiters;
+		while (*prv != NULL)
+			if ((*prv) != awaiter)
+				prv = &(*prv)->next;
+			else {
+				*prv = awaiter->next;
+				break;
+			}
+		x_spin_unlock(&stub->spinner);
+		afb_sched_leave(lock);
+	}
+	else if (stub->version != AFBRPC_PROTO_VERSION_UNSET) {
+		x_spin_unlock(&stub->spinner);
+		afb_sched_leave(lock);
+	}
+	else {
+		awaiter->lock = lock;
+		awaiter->next = stub->version_waiters;
+		stub->version_waiters = awaiter;
+		x_spin_unlock(&stub->spinner);
+	}
+}
+
+static int wait_version_sched(struct afb_stub_rpc *stub)
+{
+	struct version_waiter awaiter;
+	awaiter.stub = stub;
+	awaiter.next = NULL;
+	awaiter.lock = NULL;
+	return afb_sched_sync(0, wait_version_cb, &awaiter);
+}
+
+static int wait_version_waiter(struct afb_stub_rpc *stub)
+{
+	time_t t = time(NULL);
+	for (;;) {
+		int rc = stub->callbacks.waiter(stub->callbacks.closure, 1000);
+		if (rc < 0 || stub->version != AFBRPC_PROTO_VERSION_UNSET)
+			return rc;
+		if ((time(NULL) - t) > RPC_VERSION_WAIT_TIMEOUT)
+			return X_ETIMEDOUT;
+	}
+}
+
+static int wait_version(struct afb_stub_rpc *stub)
+{
+	int rc = 0;
+
+	if (stub->version == AFBRPC_PROTO_VERSION_UNSET) {
+		if (!stub->version_offer_pending)
+			rc = offer_version(stub);
+		if (rc >= 0) {
+			if (stub->callbacks.waiter == NULL)
+				rc = wait_version_sched(stub);
+			else
+				rc = wait_version_waiter(stub);
+			if (rc >= 0 && stub->version == AFBRPC_PROTO_VERSION_UNSET)
+				rc = X_EBUSY;
+		}
+	}
+	return rc;
 }
 
 /******************* memory *****************/
@@ -516,8 +552,8 @@ static void inblock_unref(struct inblock *inblock)
 {
 	if (__atomic_sub_fetch(&inblock->refcount, 1, __ATOMIC_RELAXED) == 0) {
 		struct afb_stub_rpc *stub = inblock->stub;
-		if (stub->receive.dispose)
-			stub->receive.dispose(stub->receive.closure, inblock->data, inblock->size);
+		if (stub->callbacks.dispose)
+			stub->callbacks.dispose(stub->callbacks.closure, inblock->data, inblock->size);
 #if RPC_POOL
 		x_spin_lock(&stub->spinner);
 		inblock->data = stub->receive.pool;
@@ -1655,6 +1691,8 @@ static int make_session_id(struct afb_stub_rpc *stub, struct afb_session *sessio
 			rc = send_session_create(stub, sid, afb_session_uuid(session));
 			if (rc >= 0 && stub->unpack)
 				rc = emit(stub);
+			if (rc < 0)
+				u16id2bool_set(&stub->session_flags, sid, 0);
 		}
 	}
 
@@ -1681,6 +1719,8 @@ static int make_token_id(struct afb_stub_rpc *stub, struct afb_token *token, uin
 			rc = send_token_create(stub, tid, afb_token_string(token));
 			if (rc >= 0 && stub->unpack)
 				rc = emit(stub);
+			if (rc < 0)
+				u16id2bool_set(&stub->token_flags, tid, 0);
 		}
 	}
 
@@ -1703,9 +1743,12 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 	const char *ucreds;
 	uint16_t sessionid;
 	uint16_t tokenid;
+	const char *apiname;
 	int rc;
 
-	rc = outcall_get(stub, &call);
+	rc = afb_rpc_spec_search(stub->spec, comreq->apiname, true, &apiname);
+	if (rc >= 0)
+		rc = outcall_get(stub, &call);
 	if (rc >= 0) {
 		call->type = outcall_type_call;
 		call->item.comreq = afb_req_common_addref(comreq);
@@ -1713,7 +1756,7 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 		if (rc >= 0) {
 			ucreds = afb_req_common_on_behalf_cred_export(comreq);
 			rc = send_call_request(stub, call->id, sessionid, tokenid,
-					comreq->apiname, comreq->verbname, ucreds,
+					apiname, comreq->verbname, ucreds,
 					comreq->params.ndata, comreq->params.data);
 			if (rc >= 0)
 				rc = emit(stub);
@@ -1795,7 +1838,7 @@ static int receive_call_request(
 	struct incall *incall;
 	struct afb_session *session;
 	struct afb_token *token;
-	const char *apinames;
+	const char *apiname;
 	int rc;
 	int err;
 
@@ -1806,23 +1849,11 @@ static int receive_call_request(
 	afb_stub_rpc_addref(stub);
 
 	/* check api */
-	apinames = stub->apinames;
-	if (api == NULL) {
-		/* default api is the first */
-		if (!*apinames)
-			goto invalid;
-		api = apinames;
-	}
-	else if (*apinames) {
-		/* search the list of authorized apis */
-		while (strcmp(api, apinames) != 0) {
-			while(*++apinames);
-			if (!*++apinames) {
-				RP_ERROR("Unauthorized API %s", api);
-				err = AFB_ERRNO_UNAUTHORIZED;
-				goto error;
-			}
-		}
+	rc = afb_rpc_spec_search(stub->spec, api, false, &apiname);
+	if (rc < 0) {
+		RP_ERROR("Unauthorized API %s", api);
+		err = AFB_ERRNO_UNAUTHORIZED;
+		goto error;
 	}
 
 	/* get session */
@@ -1857,7 +1888,7 @@ static int receive_call_request(
 	/* initialise */
 	incall->inblock = inblock_addref(stub->receive.current_inblock);
 	incall->callid = callid;
-	afb_req_common_init(&incall->comreq, &incall_common_itf, api, verb, ndata, data, stub);
+	afb_req_common_init(&incall->comreq, &incall_common_itf, apiname, verb, ndata, data, stub);
 	afb_req_common_set_session(&incall->comreq, session);
 	afb_req_common_set_token(&incall->comreq, token);
 #if WITH_CRED
@@ -2166,6 +2197,7 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 }
 #endif
 
+#if 0
 static int reply_description(struct afb_stub_rpc *stub, struct json_object *object, uint16_t callid)
 {
 #if WITHOUT_JSON_C
@@ -2223,6 +2255,12 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	}
 	return rc;
 }
+#else
+static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
+{
+	return send_describe_reply(stub, callid, NULL);
+}
+#endif
 
 #if WITH_RPC_V1
 /**************************************************************************
@@ -2946,12 +2984,6 @@ ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size)
 	return res;
 }
 
-void afb_stub_rpc_receive_set_dispose(struct afb_stub_rpc *stub, void (*dispose)(void*, void*, size_t), void *closure)
-{
-	stub->receive.dispose = dispose;
-	stub->receive.closure = closure;
-}
-
 /**************************************************************************
 * PART - SENDING BUFFERS
 **************************************************************************/
@@ -2967,81 +2999,89 @@ afb_rpc_coder_t *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub)
 	return &stub->coder;
 }
 
-void afb_stub_rpc_emit_set_notify(
-		struct afb_stub_rpc *stub,
-		int (*notify)(void*, struct afb_rpc_coder*),
-		void *closure
-) {
-	stub->emit.notify = notify;
-	stub->emit.closure = closure;
-}
-
 /*****************************************************/
 
 /**
  * Creation of an api stub either client or server for an api
  *
- * @param apinames name of the api stubbed
+ * @param spec names of the api stubbed
  * @param call_set apiset for calling
  *
  * @return a handle on the created stub object
  */
-int afb_stub_rpc_create(struct afb_stub_rpc **pstub, const char *apinames, struct afb_apiset *call_set)
+int afb_stub_rpc_create(struct afb_stub_rpc **pstub, struct afb_rpc_spec *spec, struct afb_apiset *call_set)
 {
 	struct afb_stub_rpc *stub;
 
 	/* allocation */
-	*pstub = stub = calloc(1, sizeof *stub + (apinames == NULL ? 1 : 2 + strlen(apinames)));
+	*pstub = stub = calloc(1, sizeof *stub);
 	if (stub == NULL)
 		return X_ENOMEM;
 	x_spin_init(&stub->spinner);
 	afb_rpc_coder_init(&stub->coder);
 
-	/* terminate initialization by copying apinames */
+	/* terminate initialization by copying */
 	stub->refcount = 1;
-	if (apinames != NULL) {
-		char *name = strcpy(stub->apinames, apinames);
-		while (*name) {
-			if (*name == ',')
-				*name = 0;
-			name++;
-		}
-	}
+	stub->spec = afb_rpc_spec_addref(spec);
 	stub->call_set = afb_apiset_addref(call_set);
 	return 0;
 }
 
-/* return the default api name */
-const char *afb_stub_rpc_apiname(struct afb_stub_rpc *stub)
+void afb_stub_rpc_set_callbacks(
+	struct afb_stub_rpc *stub,
+	int (*notify)(void*, struct afb_rpc_coder*),
+	void (*dispose)(void*, void*, size_t),
+	int (*waiter)(void* closure, int delayms),
+	void *closure
+) {
+	stub->callbacks.notify = notify;
+	stub->callbacks.dispose = dispose;
+	stub->callbacks.waiter = waiter;
+	stub->callbacks.closure = closure;
+}
+
+/* return the api spec */
+struct afb_rpc_spec *afb_stub_rpc_spec(struct afb_stub_rpc *stub)
 {
-	return *stub->apinames ? stub->apinames : NULL;
+	return stub->spec;
+}
+
+/* helper callback for declaring client apis in apiset */
+static int declare_client_apis(void *closure, const char *locname, const char *remname)
+{
+	struct afb_stub_rpc *stub = closure;
+	struct afb_api_item api;
+	int rc = 0;
+
+	if (locname != NULL) {
+		api.closure = stub;
+		api.itf = &stub_api_itf;
+		api.group = stub; /* serialize */
+		rc = afb_apiset_add(stub->declare_set, locname, api);
+		if (rc < 0)
+			RP_ERROR("failed to declare API %s", locname);
+	}
+	return rc;
 }
 
 /* declares the client api in apiset */
 int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset *declare_set)
 {
-	struct afb_api_item api;
-	const char *name;
+	struct afb_rpc_spec *spec;
 	int rc;
 
-	name = stub->apinames;
-	if (!*name)
+	spec = stub->spec;
+	if (spec == NULL)
 		return X_EINVAL;
 	if (stub->declare_set)
 		return X_EEXIST;
 
-	api.closure = stub;
-	api.itf = &stub_api_itf;
-	api.group = stub; /* serialize */
-
 	stub->declare_set = afb_apiset_addref(declare_set);
-	do {
-		rc = afb_apiset_add(declare_set, name, api);
-		if (rc < 0)
-			RP_ERROR("failed to declare API %s", name);
-		while(*name++);
+	rc = afb_rpc_spec_for_each(spec, true, declare_client_apis, stub);
+	if (rc < 0) {
+		afb_apiset_unref(stub->declare_set);
+		stub->declare_set = NULL;
 	}
-	while (rc >= 0 && *name);
 	return rc;
 }
 
@@ -3124,6 +3164,14 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 	}
 }
 
+/* helper callback for disconnection events */
+static int disconnect_client_apis(void *closure, const char *locname, const char *remname)
+{
+	if (locname != NULL)
+		afb_monitor_api_disconnected(locname);
+	return 0;
+}
+
 /* disconnected */
 void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 {
@@ -3168,13 +3216,17 @@ void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 	u16id2ptr_destroy(&i2p);
 
 	/* send events */
-	if (stub->declare_set) {
-		const char *name = stub->apinames;
-		while (*name) {
-			afb_monitor_api_disconnected(name);
-			while(*name++);
-		}
-	}
+	if (stub->declare_set)
+		afb_rpc_spec_for_each(stub->spec, true, disconnect_client_apis, stub);
+}
+
+/* helper callback for removing */
+static int remove_client_apis(void *closure, const char *locname, const char *remname)
+{
+	struct afb_stub_rpc *stub = closure;
+	if (locname != NULL)
+		afb_apiset_del(stub->declare_set, locname);
+	return 0;
 }
 
 /* sub one reference and free resources if falling to zero */
@@ -3189,14 +3241,11 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 		/* cleanup */
 		afb_stub_rpc_disconnected(stub);
 		if (stub->declare_set) {
-			const char *name = stub->apinames;
-			while (*name) {
-				afb_apiset_del(stub->declare_set, name);
-				while(*name++);
-			}
+			afb_rpc_spec_for_each(stub->spec, true, remove_client_apis, stub);
 			afb_apiset_unref(stub->declare_set);
 		}
 		afb_apiset_unref(stub->call_set);
+		afb_rpc_spec_unref(stub->spec);
 #if RPC_POOL
 		while ((iblk = stub->receive.pool) != NULL) {
 			stub->receive.pool = iblk->data;

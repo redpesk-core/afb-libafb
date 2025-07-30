@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015-2025 IoT.bzh Company
  * Author: Louis-Baptiste Sobolewski <lb.sobolewski@iot.bzh>
+ * Author: José Bollo <jose.bollo@iot.bzh>
  *
  * $RP_BEGIN_LICENSE$
  * Commercial License Usage
@@ -46,6 +47,11 @@ int afb_uri_api_name(const char *uri, char **apiname, int multi)
 		if (as_api != NULL) {
 			apicpy = strdup(as_api);
 			free(args);
+			if (apicpy == NULL) {
+				/* out of memory */
+				*apiname = NULL;
+				return X_ENOMEM;
+			}
 			goto check_return;
 		}
 		free(args);
@@ -69,15 +75,15 @@ int afb_uri_api_name(const char *uri, char **apiname, int multi)
 	api++;
 	len -= (size_t)(api - uri);
 	apicpy = malloc(len + 1);
-	strncpy(apicpy, api, len);
-	apicpy[len] = '\0';
-
-check_return:
 	if (apicpy == NULL) {
 		/* out of memory */
 		*apiname = NULL;
 		return X_ENOMEM;
 	}
+	strncpy(apicpy, api, len);
+	apicpy[len] = '\0';
+
+check_return:
 	if ((!*apicpy && multi) || afb_apiname_is_valid(apicpy)) {
 		*apiname = apicpy;
 		return 0;

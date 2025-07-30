@@ -81,7 +81,6 @@ static void handshake_cb(struct ev_fd *efd, int fd, uint32_t revents, void *clos
 
 static int initialized;
 
-static gnutls_certificate_credentials_t xcred;
 
 static gnutls_priority_t priority_cache;
 
@@ -92,9 +91,17 @@ static bool trust_set = false;
 static gnutls_x509_crt_t                cert_data;
 static gnutls_x509_privkey_t            key_data;
 static gnutls_x509_trust_list_t         trust_data;
+static gnutls_certificate_credentials_t xcreds;
 
-/* disable DTLS and all TLS versions before TLS 1.3 */
-#define CIPHER_PRIORITY "SECURE128:-VERS-DTLS-ALL:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:-VERS-TLS1.2"
+/*
+ * enables the same ciphersuites which are enabled in the MbedTLS implementation,
+ * plus some others stronger and/or more appropriate for more powerful devices
+ */
+#define CIPHER_PRIORITY "SECURE128" \
+                        ":-SHA1" \
+                        ":-VERS-DTLS-ALL:-VERS-TLS1.0:-VERS-TLS1.1" \
+                        ":-AES-256-CBC:-AES-128-CBC" \
+                        ":+AES-256-CCM-8:+AES-128-CCM-8"
 
 
 
@@ -121,26 +128,6 @@ static int initialize()
 		TLSERR(rc, "failed to set cipher preferences at %s", erp);
 		return initialized = X_ECANCELED;
 	}
-
-	/* X509 stuff */
-	rc = gnutls_certificate_allocate_credentials(&xcred);
-	if (rc < 0) {
-		TLSERR(rc, "Can't allocate certificate");
-		return initialized = X_ENOMEM;
-	}
-
-	/* sets the system trusted CAs for Internet PKI */
-	rc = gnutls_certificate_set_x509_system_trust(xcred);
-	if (rc < 0) {
-		TLSERR(rc, "Can't import system trust");
-		return initialized = X_ECANCELED;
-	}
-
-	/* If client holds a certificate it can be set using the following:
-	 *
-	 gnutls_certificate_set_x509_key_file (xcred, "cert.pem", "key.pem",
-	 GNUTLS_X509_FMT_PEM);
-	 */
 
 	return initialized = 1;
 }
@@ -366,6 +353,10 @@ int tls_gnu_load_trust(const char *path)
 	}
 	return 0;
 }
+
+int tls_load_cert(const char *path)  __attribute__ ((alias ("tls_gnu_load_cert")));
+int tls_load_key(const char *path)   __attribute__ ((alias ("tls_gnu_load_key")));
+int tls_load_trust(const char *path) __attribute__ ((alias ("tls_gnu_load_trust")));
 #endif
 
 static void terminate(struct tls *tls, const char *error)
@@ -532,13 +523,37 @@ static void handshake_cb(struct ev_fd *efd, int fd, uint32_t revents, void *clos
 	gnutls_handshake(tls->session);
 }
 
+/* set cert/key */
+static int init_creds()
+{
+	int rc = initialize();
+
+	if (rc >= 0 && xcreds == NULL) {
+		rc = gnutls_certificate_allocate_credentials(&xcreds);
+		if (rc < 0) {
+			TLSERR(rc, "Can't allocate certificate");
+			rc = X_ENOMEM;
+		}
+		else {
+			if (cert_set && key_set) {
+				rc = gnutls_certificate_set_x509_key(xcreds, &cert_data, 1, key_data);
+				if (rc < 0)
+					TLSERR(rc, "can't set cert+key");
+			}
+			if (rc >= 0 && trust_set)
+				gnutls_certificate_set_trust_list(xcreds, trust_data, 0);
+		}
+	}
+	return rc;
+}
+
 int tls_gnu_upgrade_client(struct ev_mgr *mgr, int sd, const char *hostname)
 {
 	int rc, pairfd[2];
 	struct tls *tls;
 
 	/* initialization */
-	rc = initialize();
+	rc = init_creds();
 	if (rc < 0)
 		goto error;
 
@@ -564,7 +579,7 @@ int tls_gnu_upgrade_client(struct ev_mgr *mgr, int sd, const char *hostname)
 	}
 	rc = gnutls_set_default_priority(tls->session);
 	if (rc == GNUTLS_E_SUCCESS) {
-		rc = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, xcred);
+		rc = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, xcreds);
 		if (rc == GNUTLS_E_SUCCESS && hostname) {
 			strcpy(tls->hostname, hostname);
 			gnutls_session_set_verify_cert(tls->session, tls->hostname, 0);
@@ -609,7 +624,6 @@ error:
 
 int tls_gnu_session_create(
 	gnutls_session_t *session,
-	gnutls_certificate_credentials_t *creds,
 	int fd,
 	bool server,
 	bool mtls,
@@ -624,29 +638,9 @@ int tls_gnu_session_create(
 	}
 
 	/* initialize module */
-	rc = initialize();
+	rc = init_creds();
 	if (rc < 0)
 		return rc;
-
-	/* X509 stuff */
-	rc = gnutls_certificate_allocate_credentials(creds);
-	if (rc < 0) {
-		TLSERR(rc, "can't allocate credentials");
-		return X_ENOMEM;
-	}
-
-	/* set cert/key */
-	if (server || mtls) {
-		rc = gnutls_certificate_set_x509_key(*creds, &cert_data, 1, key_data);
-		if (rc < 0) {
-			TLSERR(rc, "can't set key");
-			goto error2;
-		}
-	}
-
-	/* set trust */
-	if (!server || mtls)
-		gnutls_certificate_set_trust_list(*creds, trust_data, 0);
 
 	/* initialize session */
 	rc = gnutls_init(session, server ? GNUTLS_SERVER : GNUTLS_CLIENT);
@@ -665,7 +659,7 @@ int tls_gnu_session_create(
 	}
 
 	/* set the credentials */
-	rc = gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, *creds);
+	rc = gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, xcreds);
 	if (rc != GNUTLS_E_SUCCESS) {
 		TLSERR(rc, "can't set GnuTLS credentials");
 		rc = X_ECANCELED;
@@ -677,7 +671,7 @@ int tls_gnu_session_create(
 		gnutls_certificate_server_set_request(*session, GNUTLS_CERT_REQUIRE);
 
 	/* check server certificate */
-	gnutls_session_set_verify_cert(*session, server ? NULL : host, 0);
+	gnutls_session_set_verify_cert(*session, host, 0);
 
 	/* set transport */
 	gnutls_transport_set_int(*session, fd);
@@ -695,8 +689,6 @@ int tls_gnu_session_create(
 
 error3:
 	gnutls_deinit(*session);
-error2:
-	gnutls_certificate_free_credentials(*creds);
 	return rc;
 }
 

@@ -40,6 +40,7 @@
 #include "misc/afb-ws.h"
 #include "misc/afb-vcomm.h"
 #include "rpc/afb-rpc-coder.h"
+#include "rpc/afb-rpc-spec.h"
 #include "core/afb-ev-mgr.h"
 #include "core/afb-cred.h"
 #include "rpc/afb-stub-rpc.h"
@@ -378,6 +379,16 @@ static void disposebufs(void *closure, void *buffer, size_t size)
 		free(buffer);
 }
 
+#if __ZEPHYR__
+static int zephyr_waiter_cb(void *closure, int delayms)
+{
+	struct afb_wrap_rpc *wrap = closure;
+	if (wrap->efd == NULL)
+		return X_EPIPE;
+	afb_ev_mgr_prepare_wait_dispatch(delayms, 0);
+	return 0;
+}
+#endif
 /******************************************************************************/
 /***       T L S                                                            ***/
 /******************************************************************************/
@@ -474,10 +485,8 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 {
 	/* unpacking is required for websockets */
 	afb_stub_rpc_set_unpack(wrap->stub, 1);
-	/* callback for emission */
-	afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
-	/* callback for releasing reception */
-	afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
+	/* set callbacks */
+	afb_stub_rpc_set_callbacks(wrap->stub, notify_ws, disposews, NULL, wrap);
 
 	/* attach WebSocket */
 	wrap->efd = NULL;
@@ -494,10 +503,14 @@ static int init_fd(
 ) {
 	/* packing is possible */
 	afb_stub_rpc_set_unpack(wrap->stub, 0);
-	/* callback for emission */
-	afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
-	/* callback for releasing reception */
-	afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
+	/* set callbacks */
+	afb_stub_rpc_set_callbacks(wrap->stub, notify_cb, disposebufs,
+#if __ZEPHYR__
+		       zephyr_waiter_cb,
+#else
+		       NULL,
+#endif
+		       wrap);
 
 	/* attach file desriptor */
 	wrap->ws = NULL;
@@ -535,11 +548,6 @@ static int init_tls(
 			key_path = rp_unescaped_args_get(args, "key");
 			trust_path = rp_unescaped_args_get(args, "trust");
 			hostname = rp_unescaped_args_get(args, "host");
-		}
-		if (server && (cert_path == NULL || key_path == NULL)) {
-			free(args);
-			RP_ERROR("RPC server sockspec %s should have both cert and key parameter", uri);
-			return X_EINVAL;
 		}
 
 		/* get the name of the host */
@@ -666,7 +674,7 @@ int afb_wrap_rpc_create_fd(
 		int autoclose,
 		enum afb_wrap_rpc_mode mode,
 		const char *uri,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	int rc;
@@ -679,7 +687,7 @@ int afb_wrap_rpc_create_fd(
 		rc = X_ENOMEM;
 	}
 	else {
-		rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+		rc = afb_stub_rpc_create(&wrap->stub, spec, callset);
 		if (rc < 0) {
 			if (autoclose)
 				close(fd);
@@ -867,17 +875,18 @@ static int init_vcomm(
 		struct afb_wrap_rpc *wrap,
 		struct afb_vcomm *vcomm,
 		enum afb_wrap_rpc_mode mode,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	/* create the stub */
-	int rc = afb_stub_rpc_create(&wrap->stub, apiname, callset);
+	int rc = afb_stub_rpc_create(&wrap->stub, spec, callset);
 	if (rc >= 0) {
 		wrap->vcomm = vcomm;
 		rc = afb_vcomm_on_message(vcomm, onevent_vcomm, wrap);
 		if (rc >= 0)
 			/* callback for emission */
-			afb_stub_rpc_emit_set_notify(wrap->stub, notify_vcomm, wrap);
+			afb_stub_rpc_set_callbacks(wrap->stub, notify_vcomm,
+					NULL, NULL, wrap);
 	}
 	return rc;
 }
@@ -886,7 +895,7 @@ static int init_vcomm(
 int afb_wrap_rpc_create_vcomm(
 		struct afb_wrap_rpc **wrap,
 		struct afb_vcomm *vcomm,
-		const char *apiname,
+		struct afb_rpc_spec *spec,
 		struct afb_apiset *callset
 ) {
 	int rc;
@@ -894,7 +903,7 @@ int afb_wrap_rpc_create_vcomm(
 	if (*wrap == NULL)
 		rc = X_ENOMEM;
 	else {
-		rc = init_vcomm(*wrap, vcomm, 0, apiname, callset);
+		rc = init_vcomm(*wrap, vcomm, 0, spec, callset);
 		if (rc < 0) {
 			free(*wrap);
 			*wrap = NULL;

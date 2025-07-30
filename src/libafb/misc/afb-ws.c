@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <poll.h>
+#include <alloca.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

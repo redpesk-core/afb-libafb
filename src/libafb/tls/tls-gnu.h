@@ -64,7 +64,6 @@ static inline ssize_t tls_gnu_send(gnutls_session_t session, const void *buffer,
 extern
 int tls_gnu_session_create(
 	gnutls_session_t *session,
-	gnutls_certificate_credentials_t *creds,
 	int fd,
 	bool server,
 	bool mtls,

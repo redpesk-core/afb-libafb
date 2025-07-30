@@ -30,6 +30,37 @@
 /*
 This file make abstraction of the TLS backend used by afb-libafb.
 
+The group of functions taking path (if !WITHOUT_FILESYSTEM) is public
+
+  - int tls_load_cert(const char *)
+
+	Set the certificate (DER or PEM, auto detect) if not already set
+	from the file of given path
+
+  - int tls_load_key(const char *)
+
+	Set the private key (DER or PEM, auto detect) if not already set
+	from the file of given path
+
+  - int tls_load_trust(const char *)
+
+	Add one or more certificate (DER or PEM, auto detect)
+	to the list of trust from the file of given path (directory
+        or file, auto detect)
+
+*/
+
+#if !WITHOUT_FILESYSTEM
+extern int tls_load_cert(const char *path);
+extern int tls_load_key(const char *path);
+extern int tls_load_trust(const char *path);
+#endif
+/*****************************************************************************************/
+/*
+
+   The other functions should be used with caution as it might introduce
+   a dependency to the backend library and so should be private.
+
 It declares the abstract type `tls_session_t` that holds a TLS sockect.
 
 For that type, `tls_session_t`, the following methods are to be defined
@@ -74,70 +105,44 @@ Group of functions taking buffer:
 	Add one or more certificate (DER or PEM, auto detect)
 	to the list of trust
 
-Group of functions taking path (if !WITHOUT_FILESYSTEM)
-
-  - int tls_load_cert(const char *)
-
-	Set the certificate (DER or PEM, auto detect) if not already set
-	from the file of given path
-
-  - int tls_load_key(const char *)
-
-	Set the private key (DER or PEM, auto detect) if not already set
-	from the file of given path
-
-  - int tls_load_trust(const char *)
-
-	Add one or more certificate (DER or PEM, auto detect)
-	to the list of trust from the file of given path (directory
-        or file, auto detect)
-
 */
 /*****************************************************************************************/
 #if WITH_GNUTLS
 
 #include "tls-gnu.h"
 
-typedef struct
-	{
-		gnutls_session_t session;
-		gnutls_certificate_credentials_t creds;
-	}
-	tls_session_t;
+typedef gnutls_session_t tls_session_t;
 
 static inline
 void tls_init(tls_session_t *session)
 {
-	session->session = NULL;
-	session->creds = NULL;
+	*session = NULL;
 }
 
 static inline
 void tls_release(tls_session_t *session)
 {
-	if (session->session != NULL)
-		gnutls_deinit(session->session);
-	if (session->creds != NULL)
-		gnutls_certificate_free_credentials(session->creds);
+	if (*session != NULL)
+		gnutls_deinit(*session);
 	tls_init(session);
 }
 
 static inline
 ssize_t tls_recv(tls_session_t *session, void *buffer, size_t length)
 {
-	return tls_gnu_recv(session->session, buffer, length);
+	return tls_gnu_recv(*session, buffer, length);
 }
 
 static inline
 ssize_t tls_send(tls_session_t *session, const void *buffer, size_t length)
 {
-	return tls_gnu_send(session->session, buffer, length);
+	return tls_gnu_send(*session, buffer, length);
 }
 
 static inline
 int tls_session_create(tls_session_t *session, int fd, bool server, bool mtls, const char *host)
 {
-	return tls_gnu_session_create(&session->session, &session->creds, fd, server, mtls, host);
+	return tls_gnu_session_create(session, fd, server, mtls, host);
 }
 
 static inline
@@ -176,25 +181,6 @@ int tls_add_trust(const void *trust, size_t size)
 	return tls_gnu_add_trust(trust, size);
 }
 
-#if !WITHOUT_FILESYSTEM
-static inline
-int tls_load_cert(const char *path)
-{
-	return tls_gnu_load_cert(path);
-}
-
-static inline
-int tls_load_key(const char *path)
-{
-	return tls_gnu_load_key(path);
-}
-
-static inline
-int tls_load_trust(const char *path)
-{
-	return tls_gnu_load_trust(path);
-}
-#endif
 #endif
 /*****************************************************************************************/
 #if WITH_MBEDTLS
@@ -276,27 +262,6 @@ int tls_add_trust(const void *trust, size_t size)
 {
 	return tls_mbed_add_trust(trust, size);
 }
-
-#if !WITHOUT_FILESYSTEM
-static inline
-int tls_load_cert(const char *path)
-{
-	return tls_mbed_load_cert(path);
-}
-
-static inline
-int tls_load_key(const char *path)
-{
-	return tls_mbed_load_key(path);
-}
-
-static inline
-int tls_load_trust(const char *path)
-{
-	return tls_mbed_load_trust(path);
-}
-#endif
-
 
 #endif
 /*****************************************************************************************/

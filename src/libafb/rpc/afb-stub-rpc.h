@@ -31,18 +31,19 @@ struct afb_apiset;
 struct afb_session;
 struct afb_token;
 struct afb_rpc_coder;
+struct afb_rpc_spec;
 
 /**
  * Creates a stub rpc object dispatching incoming requests
  * to the given call set, for the given apiname by default
  *
  * @param stub pointer for storing the created stub
- * @param apiname default apiname, NULL if none
+ * @param spec specification of apis
  * @param callset the apiset for serving requests
  *
  * @return 0 on success, a negative error code on failure
  */
-extern int afb_stub_rpc_create(struct afb_stub_rpc **stub, const char *apiname, struct afb_apiset *callset);
+extern int afb_stub_rpc_create(struct afb_stub_rpc **stub, struct afb_rpc_spec *spec, struct afb_apiset *callset);
 
 /**
  * Decrement the count of reference to the stub and drop its used resources
@@ -60,13 +61,13 @@ extern void afb_stub_rpc_unref(struct afb_stub_rpc *stub);
 extern struct afb_stub_rpc *afb_stub_rpc_addref(struct afb_stub_rpc *stub);
 
 /**
- * Apiname of the stub
+ * Spec of the stub
  *
  * @param stub the stub object
  *
- * @return the apiname of the stub, might be NULL
+ * @return the spec of the stub, might be NULL
  */
-extern const char *afb_stub_rpc_apiname(struct afb_stub_rpc *stub);
+extern struct afb_rpc_spec *afb_stub_rpc_spec(struct afb_stub_rpc *stub);
 
 /**
  * Set the default pair session of the stub
@@ -113,7 +114,7 @@ extern void afb_stub_rpc_set_cred(struct afb_stub_rpc *stub, struct afb_cred *cr
 extern void afb_stub_rpc_set_unpack(struct afb_stub_rpc *stub, int unpack);
 
 /**
- * Adds in the declare_set the api of the stub apiname that is calling the API
+ * Adds in the declare_set the api of the stub apinames that is calling the API
  * will invoke the remote
  *
  * @param stub the stub object
@@ -140,20 +141,36 @@ extern int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset 
 extern ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size);
 
 /**
- * Record the function to call for disposing of received buffers
+ * Set the callbacks to be used by the stub.
+ *
+ * notify is called when the stub has some encoded data to send
+ * dispose is called for releasing memory received by function afb_stub_rpc_receive
+ * waiter is called for waiting some input and processing it for a given account of time
+ *
+ * The function 'notify' receives 2 parameters:
+ *  - the closure given here
+ *  - the stub object
  *
  * The function 'dispose' receives 3 parameters:
  *  - the closure given here
  *  - the data buffer to release
  *  - the size to release
  *
- * @param stub the stub object
- * @param dispose the disposal function
- * @param closure closure to the disposal function
+ * The function 'waiter' receives 2 parameters:
+ *  - the closure given here
+ *  - a time to wait in milliseconds
+ *
+ * @param stub    the stub object
+ * @param notify  the notify callback
+ * @param dispose the dispose callback
+ * @param waiter  the waiter callback
+ * @param closure data to pass to callbacks
  */
-extern void afb_stub_rpc_receive_set_dispose(
+extern void afb_stub_rpc_set_callbacks(
 		struct afb_stub_rpc *stub,
+		int (*notify)(void*, struct afb_rpc_coder*),
 		void (*dispose)(void*, void*, size_t),
+		int (*waiter)(void* closure, int delayms),
 		void *closure);
 
 /**
@@ -173,23 +190,6 @@ extern int afb_stub_rpc_emit_is_ready(struct afb_stub_rpc *stub);
  * @return the encoder of the stub
  */
 extern struct afb_rpc_coder *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub);
-
-/**
- * Record the function to call for sending available data
- *
- * The function 'notify' receives 2 parameters:
- *  - the closure given here
- *  - the stub object
- *
- * @param stub the stub object
- * @param notify the notify function
- * @param closure closure to the notify function
- */
-
-extern void afb_stub_rpc_emit_set_notify(
-		struct afb_stub_rpc *stub,
-		int (*notify)(void*, struct afb_rpc_coder*),
-		void *closure);
 
 /**
  * Sends version offering.
