@@ -141,32 +141,36 @@ extern int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset 
 extern ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size);
 
 /**
- * Tells the stub that it should call function 'wait' for waiting to version setting transaction
+ * Set the callbacks to be used by the stub.
  *
- * @param stub    the stub object
- * @param waiter  the function to call for waiting a version set
- * @param closure data to pass to the callback function
- */
-extern void afb_stub_rpc_set_waiter(
-		struct afb_stub_rpc *stub,
-		int (*waiter)(void* closure, int delayms),
-		void *closure);
-
-/**
- * Record the function to call for disposing of received buffers
+ * notify is called when the stub has some encoded data to send
+ * dispose is called for releasing memory received by function afb_stub_rpc_receive
+ * waiter is called for waiting some input and processing it for a given account of time
+ *
+ * The function 'notify' receives 2 parameters:
+ *  - the closure given here
+ *  - the stub object
  *
  * The function 'dispose' receives 3 parameters:
  *  - the closure given here
  *  - the data buffer to release
  *  - the size to release
  *
- * @param stub the stub object
- * @param dispose the disposal function
- * @param closure closure to the disposal function
+ * The function 'waiter' receives 2 parameters:
+ *  - the closure given here
+ *  - a time to wait in milliseconds
+ *
+ * @param stub    the stub object
+ * @param notify  the notify callback
+ * @param dispose the dispose callback
+ * @param waiter  the waiter callback
+ * @param closure data to pass to callbacks
  */
-extern void afb_stub_rpc_receive_set_dispose(
+extern void afb_stub_rpc_set_callbacks(
 		struct afb_stub_rpc *stub,
+		int (*notify)(void*, struct afb_rpc_coder*),
 		void (*dispose)(void*, void*, size_t),
+		int (*waiter)(void* closure, int delayms),
 		void *closure);
 
 /**
@@ -186,22 +190,6 @@ extern int afb_stub_rpc_emit_is_ready(struct afb_stub_rpc *stub);
  * @return the encoder of the stub
  */
 extern struct afb_rpc_coder *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub);
-
-/**
- * Record the function to call for sending available data
- *
- * The function 'notify' receives 2 parameters:
- *  - the closure given here
- *  - the stub object
- *
- * @param stub the stub object
- * @param notify the notify function
- * @param closure closure to the notify function
- */
-extern void afb_stub_rpc_emit_set_notify(
-		struct afb_stub_rpc *stub,
-		int (*notify)(void*, struct afb_rpc_coder*),
-		void *closure);
 
 /**
  * Sends version offering.

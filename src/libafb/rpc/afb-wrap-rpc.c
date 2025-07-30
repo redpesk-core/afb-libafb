@@ -485,10 +485,8 @@ static int init_ws(struct afb_wrap_rpc *wrap, int fd, int autoclose)
 {
 	/* unpacking is required for websockets */
 	afb_stub_rpc_set_unpack(wrap->stub, 1);
-	/* callback for emission */
-	afb_stub_rpc_emit_set_notify(wrap->stub, notify_ws, wrap);
-	/* callback for releasing reception */
-	afb_stub_rpc_receive_set_dispose(wrap->stub, disposews, wrap);
+	/* set callbacks */
+	afb_stub_rpc_set_callbacks(wrap->stub, notify_ws, disposews, NULL, wrap);
 
 	/* attach WebSocket */
 	wrap->efd = NULL;
@@ -505,14 +503,14 @@ static int init_fd(
 ) {
 	/* packing is possible */
 	afb_stub_rpc_set_unpack(wrap->stub, 0);
-	/* callback for emission */
-	afb_stub_rpc_emit_set_notify(wrap->stub, notify_cb, wrap);
-	/* callback for releasing reception */
-	afb_stub_rpc_receive_set_dispose(wrap->stub, disposebufs, wrap);
+	/* set callbacks */
+	afb_stub_rpc_set_callbacks(wrap->stub, notify_cb, disposebufs,
 #if __ZEPHYR__
-	/* callback for waiting */
-	afb_stub_rpc_set_waiter(wrap->stub, zephyr_waiter_cb, wrap);
+		       zephyr_waiter_cb,
+#else
+		       NULL,
 #endif
+		       wrap);
 
 	/* attach file desriptor */
 	wrap->ws = NULL;
@@ -887,7 +885,8 @@ static int init_vcomm(
 		rc = afb_vcomm_on_message(vcomm, onevent_vcomm, wrap);
 		if (rc >= 0)
 			/* callback for emission */
-			afb_stub_rpc_emit_set_notify(wrap->stub, notify_vcomm, wrap);
+			afb_stub_rpc_set_callbacks(wrap->stub, notify_vcomm,
+					NULL, NULL, wrap);
 	}
 	return rc;
 }

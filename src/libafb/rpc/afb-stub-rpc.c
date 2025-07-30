@@ -336,34 +336,24 @@ struct afb_stub_rpc
 		/** bank of free inblocks */
 		struct inblock *pool;
 #endif
-
-		/** dispose in blocks */
-		void (*dispose)(void*, void*, size_t);
-
-		/** closure of the dispose function */
-		void *closure;
 	}
 		receive;
 
-	/** group for emiter */
+	/** group of callbacks */
 	struct {
 		/** notify callback */
 		int (*notify)(void*, struct afb_rpc_coder*);
 
-		/** closure of the notify callback */
-		void *closure;
-	}
-		emit;
+		/** dispose in blocks */
+		void (*dispose)(void*, void*, size_t);
 
-	/** group for waiter */
-	struct {
 		/** waiter callback */
 		int (*waiter)(void*, int);
 
-		/** closure of the waiter callback */
+		/** closure of the dispose function */
 		void *closure;
 	}
-		wait;
+		callbacks;
 };
 
 /**************************************************************************
@@ -385,8 +375,8 @@ static int queue_job(void *group, void (*callback)(int signum, void* arg), void 
 static int emit(struct afb_stub_rpc *stub)
 {
 	int rc = X_ECANCELED;
-	if (stub->emit.notify)
-		rc = stub->emit.notify(stub->emit.closure, &stub->coder);
+	if (stub->callbacks.notify)
+		rc = stub->callbacks.notify(stub->callbacks.closure, &stub->coder);
 	if (rc < 0)
 		afb_rpc_coder_output_dispose(&stub->coder);
 	return rc;
@@ -482,7 +472,7 @@ static int wait_version_waiter(struct afb_stub_rpc *stub)
 {
 	time_t t = time(NULL);
 	for (;;) {
-		int rc = stub->wait.waiter(stub->wait.closure, 1000);
+		int rc = stub->callbacks.waiter(stub->callbacks.closure, 1000);
 		if (rc < 0 || stub->version != AFBRPC_PROTO_VERSION_UNSET)
 			return rc;
 		if ((time(NULL) - t) > RPC_VERSION_WAIT_TIMEOUT)
@@ -498,7 +488,7 @@ static int wait_version(struct afb_stub_rpc *stub)
 		if (!stub->version_offer_pending)
 			rc = offer_version(stub);
 		if (rc >= 0) {
-			if (stub->wait.waiter == NULL)
+			if (stub->callbacks.waiter == NULL)
 				rc = wait_version_sched(stub);
 			else
 				rc = wait_version_waiter(stub);
@@ -507,16 +497,6 @@ static int wait_version(struct afb_stub_rpc *stub)
 		}
 	}
 	return rc;
-}
-
-/* Tells the stub that it should call function 'wait' */
-void afb_stub_rpc_set_waiter(
-		struct afb_stub_rpc *stub,
-		int (*waiter)(void*,int),
-		void *closure
-) {
-	stub->wait.waiter = waiter;
-	stub->wait.closure = closure;
 }
 
 /******************* memory *****************/
@@ -572,8 +552,8 @@ static void inblock_unref(struct inblock *inblock)
 {
 	if (__atomic_sub_fetch(&inblock->refcount, 1, __ATOMIC_RELAXED) == 0) {
 		struct afb_stub_rpc *stub = inblock->stub;
-		if (stub->receive.dispose)
-			stub->receive.dispose(stub->receive.closure, inblock->data, inblock->size);
+		if (stub->callbacks.dispose)
+			stub->callbacks.dispose(stub->callbacks.closure, inblock->data, inblock->size);
 #if RPC_POOL
 		x_spin_lock(&stub->spinner);
 		inblock->data = stub->receive.pool;
@@ -3004,12 +2984,6 @@ ssize_t afb_stub_rpc_receive(struct afb_stub_rpc *stub, void *data, size_t size)
 	return res;
 }
 
-void afb_stub_rpc_receive_set_dispose(struct afb_stub_rpc *stub, void (*dispose)(void*, void*, size_t), void *closure)
-{
-	stub->receive.dispose = dispose;
-	stub->receive.closure = closure;
-}
-
 /**************************************************************************
 * PART - SENDING BUFFERS
 **************************************************************************/
@@ -3023,15 +2997,6 @@ int afb_stub_rpc_emit_is_ready(struct afb_stub_rpc *stub)
 afb_rpc_coder_t *afb_stub_rpc_emit_coder(struct afb_stub_rpc *stub)
 {
 	return &stub->coder;
-}
-
-void afb_stub_rpc_emit_set_notify(
-		struct afb_stub_rpc *stub,
-		int (*notify)(void*, struct afb_rpc_coder*),
-		void *closure
-) {
-	stub->emit.notify = notify;
-	stub->emit.closure = closure;
 }
 
 /*****************************************************/
@@ -3060,6 +3025,19 @@ int afb_stub_rpc_create(struct afb_stub_rpc **pstub, struct afb_rpc_spec *spec, 
 	stub->spec = afb_rpc_spec_addref(spec);
 	stub->call_set = afb_apiset_addref(call_set);
 	return 0;
+}
+
+void afb_stub_rpc_set_callbacks(
+	struct afb_stub_rpc *stub,
+	int (*notify)(void*, struct afb_rpc_coder*),
+	void (*dispose)(void*, void*, size_t),
+	int (*waiter)(void* closure, int delayms),
+	void *closure
+) {
+	stub->callbacks.notify = notify;
+	stub->callbacks.dispose = dispose;
+	stub->callbacks.waiter = waiter;
+	stub->callbacks.closure = closure;
 }
 
 /* return the api spec */
