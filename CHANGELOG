@@ -1,3 +1,9 @@
+Version next
+-------------
+
+  fix
+   - improved detection of hostname from URI
+
 Version 5.5.1
 -------------
 
