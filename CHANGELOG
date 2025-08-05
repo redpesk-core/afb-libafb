@@ -1,5 +1,5 @@
-Version next
-------------
+Version 5.5.1
+-------------
 
   feature
    - automatic reconnection of RPCs
@@ -7,6 +7,7 @@ Version next
    - fix memory leak of RPC on WebSockets
    - Allows multiple API names for RPC
    - send version offer lazyly
+   - Compatibility between GNUTLS and MBEDTLS
 
   fix
    - compilation with WITHOUT_FILESYSTEM
