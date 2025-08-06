@@ -2,14 +2,14 @@
 # initial database for cynagora
 # format: space/tab separated fields
 # fields:
-#   CLIENT  SESSION     USER    PERMISSION          ACTION  EXPIRATION
-#--------------------------------------------------------------------
-    *       *           *       *                   no      forever     # explicit default rule: NO
-    *       *           @ADMIN  *                   yes     forever     # users of group @ADMIN can do anything
-    *       *           @NONE   *                   no      forever     # users of group @NONE can do nothing
-    *       *           1       perm                yes     forever
-    *       goodToken   *       urn:AGL:token:valid yes     forever     # for testing token in perm test
-    *       testSession *       urn:AGL:token:valid yes     forever     # for testing session in perm test
+#   CLIENT  SESSION     USER    PERMISSION              ACTION  EXPIRATION
+#------------------------------------------------------------------------
+    *       *           *       *                       no      forever     # explicit default rule: NO
+    *       *           @ADMIN  *                       yes     forever     # users of group @ADMIN can do anything
+    *       *           @NONE   *                       no      forever     # users of group @NONE can do nothing
+    *       *           1       perm                    yes     forever
+    *       goodToken   *       urn:redpesk:token:valid yes     forever     # for testing token in perm test
+    *       testSession *       urn:redpesk:token:valid yes     forever     # for testing session in perm test
 
 #--------------------------------------------------------------------
 # User "0" and clients "System" is in the group "@ADMIN"

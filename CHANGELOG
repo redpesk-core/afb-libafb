@@ -1,6 +1,12 @@
 Version next
 -------------
 
+  change
+   - use urn:redpesk:token:valid
+     (instead of urn:AGL:token:valid)
+   - use urn:redpesk:permission:*:partner:on-behalf-credentials
+     (instead of urn:AGL:permission:*:partner:on-behalf-credentials)
+
   fix
    - improved detection of hostname from URI
 

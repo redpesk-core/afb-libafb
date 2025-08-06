@@ -25,11 +25,11 @@
 #include "afb-permission-text.h"
 
 #if !defined(AFB_PERM_TEXT_ON_BEHALF)
-#  define AFB_PERM_TEXT_ON_BEHALF "urn:AGL:permission:*:partner:on-behalf-credentials"
+#  define AFB_PERM_TEXT_ON_BEHALF "urn:redpesk:permission:*:partner:on-behalf-credentials"
 #endif
 
 #if !defined(AFB_PERM_TEXT_TOKEN)
-#  define AFB_PERM_TEXT_TOKEN "urn:AGL:token:valid"
+#  define AFB_PERM_TEXT_TOKEN "urn:redpesk:token:valid"
 #endif
 
 const char afb_permission_on_behalf_credential[] = AFB_PERM_TEXT_ON_BEHALF;
