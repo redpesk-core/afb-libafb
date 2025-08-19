@@ -25,6 +25,11 @@
 
 #include "afb-v4-itf.h"
 
+/* for afb-binding before 4.2.0 */
+#if !defined(AFB_BINDING_X4R1_ITF_FULL_REVISION)
+#  define AFB_BINDING_X4R1_ITF_FULL_REVISION AFB_BINDING_X4R1_ITF_CURRENT_REVISION
+#endif
+
 #include "core/afb-data.h"
 #include "core/afb-req-v4.h"
 #include "core/afb-evt.h"
@@ -215,40 +220,40 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 	.req_cookie_drop = afb_req_v4_cookie_drop_hookable,
 
 /*-- BEGIN OF VERSION 4r1  REVISION  2 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 2
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 2
 
 	.type_bytearray = &afb_type_predefined_bytearray,
 	.req_param_convert = afb_req_v4_param_convert,
 
 #endif
 /*-- BEGIN OF VERSION 4r1  REVISION  3 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 3
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 3
 
 	.req_interface_by_id = afb_req_v4_interface_by_id_hookable,
 	.req_interface_by_name = afb_req_v4_interface_by_name_hookable,
 
 #endif
 /*-- BEGIN OF VERSION 4r1  REVISION  4 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 4
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 4
 
 	.req_get_userdata = afb_req_v4_get_userdata_hookable,
 	.req_set_userdata = afb_req_v4_set_userdata_hookable,
 
 #endif
 /*-- BEGIN OF VERSION 4r1  REVISION  5 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 5
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 5
 
 	.job_abort = afb_api_v4_abort_job_hookable,
 
 #endif
 /*-- BEGIN OF VERSION 4r1  REVISION  6 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 6
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 6
 
 	.api_unshare_session = afb_api_v4_unshare_session_hookable,
 
 #endif
 /*-- BEGIN OF VERSION 4r1  REVISION  7 --------------------*/
-#if AFB_BINDING_X4R1_ITF_CURRENT_REVISION >= 7
+#if AFB_BINDING_X4R1_ITF_FULL_REVISION >= 7
 
 	.timer_modify_period = ev_timer_modify_period,
 
