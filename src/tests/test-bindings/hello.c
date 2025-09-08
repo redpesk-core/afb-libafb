@@ -25,6 +25,7 @@
 #include <stdio.h>
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding-v4.h>
 
 #if !defined(APINAME)
