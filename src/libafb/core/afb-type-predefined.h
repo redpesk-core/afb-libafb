@@ -52,6 +52,7 @@ extern struct afb_type afb_type_predefined_u32;
 extern struct afb_type afb_type_predefined_i64;
 extern struct afb_type afb_type_predefined_u64;
 extern struct afb_type afb_type_predefined_double;
+extern struct afb_type afb_type_predefined_UUID;
 
 /*****************************************************************************/
 
@@ -74,7 +75,8 @@ enum afb_typeids
 	Afb_Typeid_Predefined_U64,
 	Afb_Typeid_Predefined_Float,
 	Afb_Typeid_Predefined_Double,
-	Afb_Typeid_Last_Predefined = Afb_Typeid_Predefined_Double,
+	Afb_Typeid_Predefined_UUID,
+	Afb_Typeid_Last_Predefined = Afb_Typeid_Predefined_UUID,
 	Afb_Typeid_First_Userid
 };
 
