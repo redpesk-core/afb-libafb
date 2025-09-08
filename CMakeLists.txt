@@ -240,7 +240,7 @@ else(ZEPHYR_BASE)
 	find_package(Threads)
 	include(CTest)
 
-	PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.1.0)
+	PKG_CHECK_MODULES(afb-binding REQUIRED afb-binding>=4.2.0)
 
 	if (NOT WITHOUT_JSON_C)
 		PKG_CHECK_MODULES(json-c REQUIRED json-c)
