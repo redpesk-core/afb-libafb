@@ -1,5 +1,8 @@
-Version next
+Version 5.5.2
 -------------
+
+  feature
+   - new afb_type: afb_type_predefined_UUID
 
   change
    - use urn:redpesk:token:valid
