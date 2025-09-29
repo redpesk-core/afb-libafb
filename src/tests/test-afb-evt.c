@@ -110,7 +110,7 @@ void check_mask(int * tab, int mask){
 
 /******************************* tests *******************************/
 
-void do_test_init()
+void do_test_init(int, void*)
 {
     struct afb_evt * evt;
     struct afb_evt * ev;
@@ -186,7 +186,7 @@ START_TEST (test_init)
 }
 END_TEST
 
-void do_test_functional()
+void do_test_functional(int, void*)
 {
     // struct afb_evt * evt;
     struct afb_evt_itf ev_itf = {
@@ -319,7 +319,7 @@ START_TEST (test_functional)
 }
 END_TEST
 
-void do_test_afb_event_x2()
+void do_test_afb_event_x2(int, void*)
 {
     struct afb_evt * evt;
     struct afb_event_x2 * evt_x2;
