@@ -606,6 +606,7 @@ int afb_hreq_reply_file(struct afb_hreq *hreq, const char *filename, int relax)
 	return try_reply_file(hreq, filename, relax, open_file, 0);
 }
 
+#if WITH_LOCALE_ROOT
 static int open_locale_file(void *closure, const char *filename)
 {
 	struct locale_search *search = closure;
@@ -622,9 +623,9 @@ int afb_hreq_reply_locale_file(struct afb_hreq *hreq, struct locale_search *sear
 {
 	return try_reply_file(hreq, filename, 0, open_locale_file, search);
 }
+#endif
 
 #if WITH_OPENAT
-
 static int open_file_at(void *closure, const char *filename)
 {
 	int dirfd = (int)(intptr_t)closure;
@@ -642,7 +643,6 @@ int afb_hreq_reply_file_at(struct afb_hreq *hreq, int dirfd, const char *filenam
 {
 	return try_reply_file(hreq, filename, 0, open_file_at, (void*)(intptr_t)dirfd);
 }
-
 #endif
 
 struct _mkq_ {

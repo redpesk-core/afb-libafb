@@ -62,8 +62,6 @@
 #cmakedefine01 WITH_OPENAT
 #cmakedefine01 WITH_DIRENT
 #cmakedefine01 WITH_SYS_UIO
-#cmakedefine01 WITH_LOCALE_FOLDER
-#cmakedefine01 WITH_LOCALE_SEARCH_NODE
 #cmakedefine01 WITH_WSCLIENT_URI_COPY
 #cmakedefine01 WITH_REALPATH
 #cmakedefine01 WITH_CRED
@@ -87,6 +85,9 @@
 #cmakedefine01 WITH_TRACK_JOB_CALL
 #cmakedefine01 WITH_VCOMM
 #cmakedefine01 WITHOUT_JSON_C
+#cmakedefine01 WITH_LOCALE_ROOT
+#cmakedefine01 WITH_LOCALE_FOLDER
+#cmakedefine01 WITH_LOCALE_SEARCH_NODE
 #cmakedefine01 MINIMAL_LOCALE_ROOT
 
 #if WITH_LIBMICROHTTPD

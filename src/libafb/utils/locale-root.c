@@ -24,6 +24,11 @@
 
 #include "../libafb-config.h"
 
+
+#if WITH_LOCALE_ROOT
+
+#include "utils/locale-root.h"
+
 #if MINIMAL_LOCALE_ROOT
 
 #include <stdlib.h>
@@ -37,7 +42,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "utils/locale-root.h"
 #include "sys/subpath.h"
 #include "sys/x-errno.h"
 
@@ -824,7 +828,7 @@ int main(int ac,char**av)
 }
 #endif
 
-#else
+#else /* MINIMAL_LOCALE_ROOT */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -954,4 +958,5 @@ int locale_root_get_dirfd(struct locale_root *root)
 }
 #endif
 
-#endif
+#endif /* MINIMAL_LOCAL_ROOT */
+#endif /* WITH_LOCALE_ROOT */

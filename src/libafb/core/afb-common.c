@@ -23,16 +23,11 @@
 
 #include "../libafb-config.h"
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-
 #include "core/afb-common.h"
-#include "utils/locale-root.h"
+
+#include <stdlib.h>
 
 static const char *default_locale = NULL;
-static struct locale_root *rootdir = NULL;
 
 void afb_common_default_locale_set(const char *locale)
 {
@@ -43,6 +38,15 @@ const char *afb_common_default_locale_get()
 {
 	return default_locale;
 }
+
+/****************************************************/
+/** WHEN locale-root IS ENABLED                     */
+/****************************************************/
+#if WITH_LOCALE_ROOT
+
+#include "utils/locale-root.h"
+
+static struct locale_root *rootdir = NULL;
 
 int afb_common_rootdir_set(const char *dirname)
 {
@@ -88,4 +92,68 @@ int afb_common_rootdir_open_locale(const char *filename, int flags, const char *
 	return locale_root_open(rootdir, filename, flags, locale);
 }
 
+/****************************************************/
+/** WHEN locale-root IS DISABLED                    */
+/****************************************************/
+#else
+
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <limits.h>
+
+#if WITH_OPENAT
+static int rootfd = 0;
+#endif
+static char *rootdir = NULL;
+
+int afb_common_rootdir_set(const char *dirname)
+{
+	char *str = strdup(dirname);
+	if (str == NULL)
+		return -1;
+	free(rootdir);
+	rootdir = str;
+#if WITH_OPENAT
+	if (rootfd >= 0)
+		close(rootfd);
+	rootfd = -1;
+#endif
+	return 0;
+}
+
+#if WITH_OPENAT
+int afb_common_rootdir_get_fd()
+{
+	if (rootfd > 0)
+		return rootfd;
+
+	if (rootdir != NULL) {
+		rootfd = open(rootdir, O_PATH|O_DIRECTORY);
+		if (rootfd == 0) {
+			rootfd = dup(0);
+			close(0);
+		}
+		if (rootfd > 0)
+			return rootfd;
+	}
+	rootfd = -1;
+	return -1;
+}
+#endif
+
+const char *afb_common_rootdir_get_path()
+{
+	return rootdir;
+}
+
+int afb_common_rootdir_open_locale(const char *filename, int flags, const char *locale)
+{
+	char buffer[PATH_MAX];
+	snprintf(buffer, sizeof buffer, "%s/%s", rootdir ?: ".", filename);
+	return open(buffer, flags);
+}
+
+#endif
 

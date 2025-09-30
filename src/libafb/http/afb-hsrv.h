@@ -32,7 +32,6 @@
 
 struct afb_hsrv;
 struct afb_hreq;
-struct locale_root;
 
 extern struct afb_hsrv *afb_hsrv_create();
 extern void afb_hsrv_put(struct afb_hsrv *hsrv);
@@ -41,15 +40,21 @@ extern void afb_hsrv_stop(struct afb_hsrv *hsrv);
 extern int afb_hsrv_start(struct afb_hsrv *hsrv, unsigned int connection_timeout);
 extern int afb_hsrv_start_tls(struct afb_hsrv *hsrv, unsigned int connection_timeout, const char *cert, const char *key);
 extern int afb_hsrv_set_cache_timeout(struct afb_hsrv *hsrv, int duration);
+extern int afb_hsrv_add_simple_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax);
 #if WITH_OPENAT
+extern int afb_hsrv_add_simple_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, const char *alias, int priority, int relax);
 extern int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, const char *alias, int priority, int relax);
 #endif
 extern int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax);
-extern int afb_hsrv_add_alias_root(struct afb_hsrv *hsrv, const char *prefix, struct locale_root *root, int priority, int relax);
 extern int afb_hsrv_add_alias_dirname(struct afb_hsrv *hsrv, const char *prefix, const char *dirname, int priority, int relax);
 extern int afb_hsrv_add_handler(struct afb_hsrv *hsrv, const char *prefix, int (*handler) (struct afb_hreq *, void *), void *data, int priority);
 extern int afb_hsrv_add_interface(struct afb_hsrv *hsrv, const char *uri);
 extern int afb_hsrv_add_interface_tcp(struct afb_hsrv *hsrv, const char *itf, uint16_t port);
+
+#if WITH_LOCALE_ROOT
+struct locale_root;
+extern int afb_hsrv_add_alias_root(struct afb_hsrv *hsrv, const char *prefix, struct locale_root *root, int priority, int relax);
+#endif
 
 extern void afb_hsrv_run(struct afb_hsrv *hsrv);
 

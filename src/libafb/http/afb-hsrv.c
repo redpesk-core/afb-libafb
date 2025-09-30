@@ -81,10 +81,20 @@ struct hsrv_handler {
 	int priority;
 };
 
+struct hsrv_simple_alias {
+	int relax;
+#if WITH_OPENAT
+	int dfd;
+#endif
+	char path[];
+};
+
+#if WITH_LOCALE_ROOT
 struct hsrv_alias_locale_root {
 	struct locale_root *root;
 	int relax;
 };
+#endif
 
 struct afb_hsrv {
 	unsigned refcount;
@@ -385,6 +395,82 @@ int afb_hsrv_add_handler(
 	return 1;
 }
 
+static int handle_simple_alias(struct afb_hreq *hreq, void *data)
+{
+	int rc;
+	struct hsrv_simple_alias *sa = data;
+	char buffer[PATH_MAX];
+
+	if (hreq->method != afb_method_get) {
+		if (sa->relax)
+			return 0;
+		afb_hreq_reply_error(hreq, MHD_HTTP_METHOD_NOT_ALLOWED);
+		return 1;
+	}
+
+	snprintf(buffer, sizeof buffer, "%s%s", sa->path, hreq->tail);
+#if WITH_OPENAT
+	if (sa->dfd >= 0)
+		rc = afb_hreq_reply_file_at_if_exist(hreq, sa->dfd, buffer);
+	else
+#endif
+		rc = afb_hreq_reply_file(hreq, buffer, 1);
+	if (rc == 0) {
+		if (sa->relax)
+			return 0;
+		afb_hreq_reply_error(hreq, MHD_HTTP_NOT_FOUND);
+	}
+	return 1;
+}
+
+static int add_simple_alias(struct afb_hsrv *hsrv, const char *prefix, int dfd, const char *path, int priority, int relax)
+{
+	struct hsrv_simple_alias *sa;
+
+	sa = malloc(strlen(path) + 1 + sizeof *sa);
+	if (sa != NULL) {
+		sa->relax = relax;
+#if WITH_OPENAT
+		sa->dfd = dfd;
+#endif
+		strcpy(sa->path, path);
+		if (afb_hsrv_add_handler(hsrv, prefix, handle_simple_alias, sa, priority))
+			return 1;
+		free(sa);
+	}
+	return 0;
+}
+
+#if WITH_OPENAT
+int afb_hsrv_add_simple_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, const char *alias, int priority, int relax)
+{
+	return add_simple_alias(hsrv, prefix, dirfd, alias, priority, relax);
+}
+#endif
+
+int afb_hsrv_add_simple_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax)
+{
+	char buffer[PATH_MAX];
+	const char *target;
+	int rc = 0;
+
+	if (basepath == NULL)
+		target = alias;
+	else {
+		rc = snprintf(buffer, sizeof buffer, "%s/%s", basepath, alias);
+		if (rc > 0 && rc < (int)(sizeof buffer))
+			target = buffer;
+		else {
+			RP_ERROR("can't make path %s/%s", basepath, alias);
+			target = NULL;
+		}
+	}
+	if (target != NULL)
+		rc = add_simple_alias(hsrv, prefix, -1, target, priority, relax);
+	return rc;
+}
+
+#if WITH_LOCALE_ROOT
 static int handle_alias_locale_root(struct afb_hreq *hreq, void *data)
 {
 	int rc;
@@ -473,6 +559,13 @@ int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const cha
 	}
 	return rc;
 }
+
+#else
+#if WITH_OPENAT
+int afb_hsrv_add_alias(struct afb_hsrv *hsrv, const char *prefix, int dirfd, const char *alias, int priority, int relax) __attribute__((alias("afb_hsrv_add_simple_alias")));
+#endif
+int afb_hsrv_add_alias_path(struct afb_hsrv *hsrv, const char *prefix, const char *basepath, const char *alias, int priority, int relax) __attribute__((alias("afb_hsrv_add_simple_alias_path")));
+#endif
 
 /*****************************************************************************/
 

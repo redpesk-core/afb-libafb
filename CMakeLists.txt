@@ -78,8 +78,6 @@ option(WITHOUT_JSON_C             "Remove use of json-c library"           OFF)
 option(WITH_PERMISSION_API        "Activates permission API if cynagora is off" OFF)
 ## tune options
 option(WITH_SIG_MONITOR_DUMPSTACK "Activate dump stack on error"           ON)
-option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
-option(WITH_LOCALE_SEARCH_NODE    "Use folder in searchs in locale-root"   ON) # TODO: set to OFF
 option(WITH_WSCLIENT_URI_COPY     "Copy URI of ws-client specification"    OFF)
 ## system adaptation
 option(WITH_FNMATCH               "Use fnmatch where possible"             ON)
@@ -100,6 +98,9 @@ option(WITH_TCP_SOCKET            "support TCP sockets"                    ON)
 option(WITH_SYSD_SOCKET           "support SystemD sockets"                ON)
 option(WITH_THREAD_LOCAL          "Allow to use _Thread_Local"             ON)
 option(WITH_LIBMAGIC              "Activates use of libmagic"              ON)
+option(WITH_LOCALE_ROOT           "Implement locale-root"                  ON)
+option(WITH_LOCALE_FOLDER         "Use folder image in locale-root"        ON) # TODO: set to OFF
+option(WITH_LOCALE_SEARCH_NODE    "Use folder in searchs in locale-root"   ON) # TODO: set to OFF
 option(MINIMAL_LOCALE_ROOT        "Use minimal locale-root"                OFF)
 ###########################################################################
 if(WITHOUT_JSON_C)
@@ -163,6 +164,7 @@ if(ZEPHYR_BASE)
 	set(WITH_LIBMAGIC OFF)
 	set(WITH_LIBMICROHTTPD OFF)
 	set(WITH_LIBUUID OFF)
+	set(WITH_LOCALE_ROOT OFF)
 	set(WITH_LOCALE_FOLDER OFF)
 	set(WITH_LOCALE_SEARCH_NODE OFF)
 	set(WITH_OPENAT OFF)
