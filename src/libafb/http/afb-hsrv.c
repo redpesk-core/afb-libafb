@@ -369,6 +369,22 @@ static struct hsrv_handler *new_handler(
 	return head;
 }
 
+int afb_hsrv_add_handler(
+		struct afb_hsrv *hsrv,
+		const char *prefix,
+		int (*handler) (struct afb_hreq *, void *),
+		void *data,
+		int priority)
+{
+	struct hsrv_handler *head;
+
+	head = new_handler(hsrv->handlers, prefix, handler, data, priority);
+	if (head == NULL)
+		return 0;
+	hsrv->handlers = head;
+	return 1;
+}
+
 static int handle_alias_locale_root(struct afb_hreq *hreq, void *data)
 {
 	int rc;
@@ -390,22 +406,6 @@ static int handle_alias_locale_root(struct afb_hreq *hreq, void *data)
 			return 0;
 		afb_hreq_reply_error(hreq, MHD_HTTP_NOT_FOUND);
 	}
-	return 1;
-}
-
-int afb_hsrv_add_handler(
-		struct afb_hsrv *hsrv,
-		const char *prefix,
-		int (*handler) (struct afb_hreq *, void *),
-		void *data,
-		int priority)
-{
-	struct hsrv_handler *head;
-
-	head = new_handler(hsrv->handlers, prefix, handler, data, priority);
-	if (head == NULL)
-		return 0;
-	hsrv->handlers = head;
 	return 1;
 }
 
