@@ -131,13 +131,23 @@ void startDemonCynagora(){
 
 	if(gpid == 0){
 		int i, r;
+		char uid[30];
+		char gid[30];
 		char path[1024];
 		char cynagoraInitF[1024];
 		getpath(path, "cynagoraTest.initial");
 		r = snprintf(cynagoraInitF, sizeof cynagoraInitF, "%s/%s", cwd, path);
 		ck_assert_int_lt(r, (int)(sizeof cynagoraInitF));
+		r = snprintf(uid, sizeof uid, "%llu", (long long unsigned)geteuid());
+		ck_assert_int_lt(r, (int)(sizeof uid));
+		r = snprintf(gid, sizeof gid, "%llu", (long long unsigned)getegid());
+		ck_assert_int_lt(r, (int)(sizeof gid));
 		char * argv[] = {
 			"cynagorad",
+			"--user",
+			uid,
+			"--group",
+			gid,
 			"--dbdir",
 			gpath,
 			"--make-db-dir",
