@@ -535,7 +535,7 @@ static int init_tls(
 
 	if (uri != NULL) {
 		const char *cert_path, *key_path, *trust_path;
-		const char *hostname, *host, *host_end, *argsstr;
+		const char *hostname, *host, *argsstr;
 		const char **args = NULL;
 		size_t host_len;
 
@@ -565,13 +565,22 @@ oom_host:
 			}
 		}
 		else {
-			host = strchr(uri, ':') + 1;
-			host_end = strchr(host, ':');
-			host_len = (size_t)(host_end - host);
+			/* uri is supposed to be like "[^:]*:[/]*HOST[:?/]*.*" */
+			host = strchr(uri, ':');
+			if (host == NULL) {
+bad_uri:
+				free(args);
+				RP_ERROR("can't find host in URI %s", uri);
+				return X_EINVAL;
+			}
+			while(*++host == '/');
+			host_len = strcspn(host, ":?/");
+			if (host_len == 0)
+				goto bad_uri;
 			wrap->host = malloc(host_len + 1);
 			if (wrap->host == NULL)
 				goto oom_host;
-			strncpy(wrap->host, host, host_len);
+			memcpy(wrap->host, host, host_len);
 			wrap->host[host_len] = '\0';
 		}
 

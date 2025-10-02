@@ -33,6 +33,7 @@
 #if defined(BUG11) /* make a SEGV */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 int afbBindingEntry(afb_api_t api, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
 {
@@ -60,6 +61,7 @@ int afbBindingV4entry(struct afb_api_x4 *rootapi) { return 0; }
 #if defined(BUG14) /* no api name */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 const afb_binding_t afbBindingExport;
@@ -69,6 +71,7 @@ const afb_binding_t afbBindingExport;
 #if defined(BUG15) /* bad api name */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 const afb_binding_t afbBindingExport = {
@@ -80,6 +83,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG16) /* both entry and preinit but the same, not more a bug! */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
@@ -97,6 +101,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG17) /* entry fails */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)
@@ -108,6 +113,7 @@ int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, v
 #if defined(BUG18) /* preinit fails */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 static int err()
@@ -125,6 +131,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG19) /* preinit SEGV */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 static int bug()
@@ -142,6 +149,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG20) /* init fails */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 static int err()
@@ -159,6 +167,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG21) /* init SEGV */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 static int bug()
@@ -179,6 +188,7 @@ const afb_binding_t afbBindingExport = {
 #if defined(BUG22) /* both entry and preinit but not the same */
 
 #define AFB_BINDING_VERSION 4
+#define AFB_BINDING_X4R1_ITF_REVISION 1
 #include <afb/afb-binding.h>
 
 int afbBindingEntry(afb_api_t rootapi, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata)

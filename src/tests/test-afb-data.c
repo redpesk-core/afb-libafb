@@ -289,6 +289,45 @@ START_TEST (check_cache)
 }
 END_TEST
 
+START_TEST(convert_uuid)
+{
+	const char org[] = "a76561dd-cdc8-4046-be4a-1060914751cb";
+	struct afb_data *str1, *uuid1, *bytarr, *uuid2, *str2;
+	int rc;
+
+	fprintf(stderr, "\nconversion UUID\n");
+	fprintf(stderr, "UUID before %s\n", org);
+	rc = afb_data_create_raw(&str1, &afb_type_predefined_stringz, org, sizeof org, NULL, NULL);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_data_convert(str1, &afb_type_predefined_UUID, &uuid1);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_data_convert(uuid1, &afb_type_predefined_bytearray, &bytarr);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_data_convert(bytarr, &afb_type_predefined_UUID, &uuid2);
+	ck_assert_int_eq(rc, 0);
+
+	rc = afb_data_convert(uuid2, &afb_type_predefined_stringz, &str2);
+	ck_assert_int_eq(rc, 0);
+
+	fprintf(stderr, "UUID after  %s\n", (char*)afb_data_ro_pointer(str2));
+
+	ck_assert_uint_eq(afb_data_size(str1), afb_data_size(str2));
+	ck_assert_uint_eq(afb_data_size(uuid1), afb_data_size(bytarr));
+	ck_assert_uint_eq(afb_data_size(uuid1), afb_data_size(uuid2));
+	ck_assert_str_eq(afb_data_ro_pointer(str1), org);
+	ck_assert_str_eq(afb_data_ro_pointer(str1), afb_data_ro_pointer(str2));
+
+	afb_data_unref(str1);
+	afb_data_unref(uuid1);
+	afb_data_unref(bytarr);
+	afb_data_unref(uuid2);
+	afb_data_unref(str2);
+}
+END_TEST
+
 void data_dispose(void * closure){
 	fprintf(stderr, "went through data_dispose with closure %d\n", p2i(closure));
 	gmask += p2i(closure);
@@ -463,5 +502,6 @@ int main(int ac, char **av)
 			addtest(check_cache);
 			addtest(test_predefine_types);
 			addtest(check_depend);
+			addtest(convert_uuid);
 	return !!srun();
 }

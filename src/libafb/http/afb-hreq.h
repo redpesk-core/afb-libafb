@@ -37,7 +37,6 @@ struct json_tokener;
 struct afb_session;
 struct hreq_data;
 struct afb_hsrv;
-struct locale_search;
 
 /**
  * Record of an HTTP query
@@ -78,9 +77,13 @@ extern int afb_hreq_reply_file_at_if_exist(struct afb_hreq *request, int dirfd, 
 extern int afb_hreq_reply_file_at(struct afb_hreq *request, int dirfd, const char *filename);
 #endif
 
+#if WITH_LOCALE_ROOT
+struct locale_search;
+
 extern int afb_hreq_reply_locale_file_if_exist(struct afb_hreq *hreq, struct locale_search *search, const char *filename);
 
 extern int afb_hreq_reply_locale_file(struct afb_hreq *hreq, struct locale_search *search, const char *filename);
+#endif
 
 /**
  * Send a REDIRECT HTTP response

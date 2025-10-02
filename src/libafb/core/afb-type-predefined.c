@@ -38,6 +38,7 @@
 #include <stdio.h>
 
 #include <rp-utils/rp-jsonstr.h>
+#include <rp-utils/rp-uuid.h>
 
 #include "afb-type.h"
 #include "afb-type-internal.h"
@@ -1066,5 +1067,75 @@ PREDEFINED_OPERATION(double)
 PREDEFINED_TYPE(double, Afb_Typeid_Predefined_Double, FLAG_IS_SHAREABLE, 0, &PREDEF(u64));
 
 /*****************************************************************************/
+/* PREDEFINED UUID */
 
-EXPORT_AS(double,_afb_type_head_of_predefineds_);
+CONVERT(UUID,stringz)
+{
+	int rc;
+	char *strz;
+	const unsigned char *uuid;
+	size_t sz;
+
+	rc = afb_data_get_constant(in, (void**)&uuid, &sz);
+	if (rc >= 0) {
+		if (sz != RP_UUID_BINARY_LENGTH)
+			rc = X_EINVAL;
+		else {
+			rc = afb_data_create_alloc0(out, &PREDEF(stringz),
+					(void**)&strz, RP_UUID_STRINGZ_LENGTH, 0);
+			if (rc >= 0)
+				rp_uuid_bin_to_text(uuid, strz);
+		}
+	}
+	return rc;
+}
+
+CONVERT(stringz,UUID)
+{
+	int rc;
+	const char *strz;
+	rp_uuid_binary_t uuid;
+	size_t sz;
+
+	rc = afb_data_get_constant(in, (void**)&strz, &sz);
+	if (rc >= 0) {
+		if (sz != RP_UUID_STRINGZ_LENGTH
+		 || !rp_uuid_text_to_bin(strz, uuid))
+			rc = X_EINVAL;
+		else
+			rc = afb_data_create_copy(out, &PREDEF(UUID),
+					uuid, RP_UUID_BINARY_LENGTH);
+	}
+	return rc;
+}
+
+CONVERT(bytearray,UUID)
+{
+	int rc;
+	const unsigned char *uuid;
+	size_t sz;
+
+	rc = afb_data_get_constant(in, (void**)&uuid, &sz);
+	if (rc >= 0) {
+		if (sz != RP_UUID_BINARY_LENGTH)
+			rc = X_EINVAL;
+		else
+			rc = afb_data_create_copy(out, &PREDEF(UUID),
+					uuid, RP_UUID_BINARY_LENGTH);
+	}
+	return rc;
+}
+
+
+PREDEFINED_OPERATION(UUID)
+	{
+		CONVERT_TO(UUID, stringz),
+		CONVERT_FROM(stringz, UUID),
+		CONVERT_FROM(bytearray, UUID)
+	};
+
+PREDEFINED_TYPE(UUID, Afb_Typeid_Predefined_UUID, FLAG_IS_SHAREABLE | FLAG_IS_STREAMABLE, &PREDEF(bytearray), &PREDEF(double));
+
+/*****************************************************************************/
+
+EXPORT_AS(UUID,_afb_type_head_of_predefineds_);

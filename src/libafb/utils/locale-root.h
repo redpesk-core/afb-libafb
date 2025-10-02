@@ -25,6 +25,8 @@
 
 #include "../libafb-config.h"
 
+#if WITH_LOCALE_ROOT
+
 struct locale_root;
 struct locale_search;
 
@@ -51,3 +53,6 @@ extern char *locale_root_resolve(struct locale_root *root, const char *filename,
 
 extern int locale_search_open(struct locale_search *search, const char *filename, int flags);
 extern char *locale_search_resolve(struct locale_search *search, const char *filename);
+
+#endif
+

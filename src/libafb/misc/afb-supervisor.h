@@ -34,15 +34,15 @@
  * supervisor.
  */
 #if !defined(AFB_SUPERVISOR_SOCKET)
-#  define AFB_SUPERVISOR_SOCKET "@urn:AGL:afs:supervision:socket" /* abstract */
+#  define AFB_SUPERVISOR_SOCKET "@urn:redpesk:afs:supervision:socket" /* abstract */
 #endif
 
 /*
  * generated using
- * uuid -v 5 ns:URL urn:AGL:afb:supervisor:interface:1
+ *   uuidgen -n @url -N urn:redpesk:afb:supervisor:interface:1 -s
+ *   uuid -v 5 ns:URL urn:redpesk:afb:supervisor:interface:1
  */
-#define AFB_SUPERVISOR_INTERFACE_1 "ba348c19-6f81-51a1-a032-93408252e6cf"
-
+#define AFB_SUPERVISOR_INTERFACE_1 "39622acf-8f19-516c-b216-b0ad4d643ba2"
 
 /**
  * packet initially sent by monitor at start
