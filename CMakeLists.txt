@@ -190,6 +190,7 @@ if(ZEPHYR_BASE)
 	set(WITH_VCOMM ON)
 
 	# tunable
+	set(WITH_PERMISSION_API ON)
 	set(ARCH32 OFF)
 	set(WITH_AFB_HOOK OFF)
 	set(WITH_CRED OFF)
