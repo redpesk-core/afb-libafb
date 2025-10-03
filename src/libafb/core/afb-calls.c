@@ -226,10 +226,10 @@ make_call_req(
 			: caller->session;
 	afb_req_common_set_session(&req->comreq, session);
 
-		/*
-		** TODO: for token and credentials, try to use items from the commen apiname
-		** (but first make it available)
-		*/
+	/*
+	** TODO: for token and credentials, try to use items from the commen apiname
+	** (but first make it available)
+	*/
 
 	/* set the token of the request */
 	token = (flags & afb_req_subcall_on_behalf) ? caller->token : NULL;
