@@ -27,8 +27,6 @@
 
 struct afb_req_common;
 
-#if WITH_CRED
-
 /**
  * Check if the credential associated with the request 'req'
  * are including a granted access to the permission.
@@ -109,36 +107,4 @@ extern int afb_perm_check_perm_check_api(
 	const char *api
 );
 
-#else /* WITH_CREDS */
-
-static inline
-void afb_perm_check_req_async(
-	struct afb_req_common *req,
-	const char *permission,
-	void (*callback)(void *_closure, int _status),
-	void *closure
-) {
-	callback(closure, 1);
-}
-
-static inline
-void afb_perm_check_async(
-	const char *client,
-	const char *user,
-	const char *session,
-	const char *permission,
-	void (*callback)(void *_closure, int _status),
-	void *closure
-) {
-	callback(closure, 1);
-}
-
-static inline
-int afb_perm_check_perm_check_api(
-	const char *api
-) {
-	return 0;
-}
-
-#endif
 

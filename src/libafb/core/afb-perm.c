@@ -23,8 +23,6 @@
 
 #include "../libafb-config.h"
 
-#if WITH_CRED
-
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -306,6 +304,7 @@ void afb_perm_check_req_async(
 	void (*callback)(void *_closure, int _status),
 	void *closure
 ) {
+#if WITH_CRED
 	if (!req->credentials) {
 		/* case of permission for self */
 		callback(closure, 1);
@@ -323,6 +322,14 @@ void afb_perm_check_req_async(
 			callback,
 			closure);
 	}
+#else
+	afb_perm_check_async(
+		"NoLabel",
+		"99",
+		session_of_req(req),
+		permission,
+		callback,
+		closure);
+#endif
 }
 
-#endif /* WITH_CRED */
