@@ -416,6 +416,7 @@ afb_api_v4_process_call(
 	struct afb_req_common *req
 );
 
+#if DESCRIBE
 /**
  * Return an openAPIv3 json description of the api
  * @param apiv4 the api
@@ -426,6 +427,7 @@ struct json_object *
 afb_api_v4_make_description_openAPIv3(
 	struct afb_api_v4 *api
 );
+#endif
 
 /**
  * Return the count of verbs

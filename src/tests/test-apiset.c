@@ -92,7 +92,9 @@ struct afb_api_itf api_itf_null = {
 #endif
 	.get_logmask = NULL,
 	.set_logmask = NULL,
+#if DESCRIBE
 	.describe = NULL,
+#endif
 	.unref = NULL
 };
 
@@ -463,7 +465,9 @@ struct afb_api_itf set_api_itf = {
 #endif
 	.get_logmask = set_cb_getmask,
 	.set_logmask = set_cb_setmask,
+#if DESCRIBE
 	.describe = NULL,
+#endif
 	.unref = set_cb0
 };
 
@@ -577,7 +581,9 @@ struct afb_api_itf clitf = {
 #endif
 	.get_logmask = NULL,
 	.set_logmask = NULL,
+#if DESCRIBE
 	.describe = NULL,
+#endif
 	.unref = NULL
 };
 

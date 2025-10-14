@@ -151,6 +151,7 @@ struct incall
 	uint16_t callid;
 };
 
+#if DESCRIBE
 /**
  * structure for a describe request
  */
@@ -167,6 +168,7 @@ struct indesc
 	/** id of the call */
 	uint16_t callid;
 };
+#endif
 
 /**
  * Type of out going call
@@ -177,8 +179,10 @@ enum outcall_type
 	outcall_type_unset,
 	/** standard call */
 	outcall_type_call,
+#if DESCRIBE
 	/** call for describe */
 	outcall_type_describe
+#endif
 };
 
 /**
@@ -199,11 +203,13 @@ struct outcall
 		/** related request */
 		struct afb_req_common *comreq;
 
+#if DESCRIBE
 		/** related describe request */
 		struct {
 			void (*callback)(void *, struct json_object *);
 			void *closure;
 		} describe;
+#endif
 	} item;
 };
 
@@ -291,7 +297,7 @@ struct afb_stub_rpc
 	/** transmitted types */
 	struct u16id2ptr *type_proxies;
 
-	/** outgoing calls (and describes) */
+	/** outgoing calls */
 	struct outcall *outcalls;
 
 	/***************/
@@ -312,9 +318,11 @@ struct afb_stub_rpc
 	/** sent types */
 	struct u16id2bool *type_flags;
 
+#if DESCRIBE
 #if RPC_POOL
 	/** free indescs */
 	struct indesc *indesc_pool;
+#endif
 #endif
 
 	/** waiters for version */
@@ -576,6 +584,7 @@ static void inblock_unref_cb(void *closure)
 }
 #endif
 
+#if DESCRIBE
 /******************* indesc *****************/
 
 static struct indesc *indesc_get(struct afb_stub_rpc *stub, uint16_t callid)
@@ -613,6 +622,7 @@ static void indesc_release(struct indesc *indesc)
 #endif
 	afb_stub_rpc_unref(stub);
 }
+#endif
 
 /******************* outcalls *****************/
 
@@ -923,10 +933,12 @@ static int send_call_request_v1(
 	return rc < 0 ? rc : rd.rc;
 }
 
+#if DESCRIBE
 static int send_describe_request_v1(struct afb_stub_rpc *stub, uint16_t callid)
 {
 	return afb_rpc_v1_code_describe(&stub->coder, callid);
 }
+#endif
 
 static int send_describe_reply_v1(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
 {
@@ -1114,7 +1126,7 @@ static int send_event_push_v3(struct afb_stub_rpc *stub, uint16_t eventid, unsig
 {
 	afb_rpc_v3_msg_event_push_t push;
 	afb_rpc_v3_value_t values[nparams];
-	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
+	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };
 
 	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
@@ -1153,7 +1165,7 @@ static int send_call_reply_v3(struct afb_stub_rpc *stub, int status, unsigned np
 {
 	afb_rpc_v3_msg_call_reply_t reply;
 	afb_rpc_v3_value_t values[nparams];
-	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
+	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };
 
 	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
@@ -1181,7 +1193,7 @@ static int send_call_request_v3(
 {
 	afb_rpc_v3_msg_call_request_t request;
 	afb_rpc_v3_value_t values[nparams];
-	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };;
+	afb_rpc_v3_value_array_t valarr = { .count = (uint16_t)nparams, .values = values };
 
 	int rc = datas_to_values_v3(stub, nparams, params, values);
 	if (rc >= 0) {
@@ -1205,6 +1217,7 @@ static int send_call_request_v3(
 	return rc;
 }
 
+#if DESCRIBE
 static int send_describe_request_v3(struct afb_stub_rpc *stub, uint16_t callid)
 {
 	afb_rpc_v3_msg_call_request_t request;
@@ -1214,11 +1227,12 @@ static int send_describe_request_v3(struct afb_stub_rpc *stub, uint16_t callid)
 	request.verb.id = AFB_RPC_V3_ID_VERB_DESCRIBE;
 	return afb_rpc_v3_code_call_request(&stub->coder, &request, NULL);
 }
+#endif
 
 static int send_describe_reply_v3(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
 {
 	afb_rpc_v3_value_t value;
-	afb_rpc_v3_value_array_t valarr = { .count = 1, .values = &value };;
+	afb_rpc_v3_value_array_t valarr = { .count = 1, .values = &value };
 	afb_rpc_v3_msg_call_reply_t reply;
 
 	value.id = 0;
@@ -1476,6 +1490,7 @@ static int send_call_request(
 	}
 }
 
+#if DESCRIBE
 static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 {
 #if RPC_DEBUG
@@ -1496,6 +1511,7 @@ static int send_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 		return X_ENOTSUP;
 	}
 }
+#endif
 
 static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
 {
@@ -1505,11 +1521,11 @@ static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const
 	switch (stub->version) {
 #if WITH_RPC_V1
 	case AFBRPC_PROTO_VERSION_1:
-		return send_describe_reply_v1(stub, callid, description);;
+		return send_describe_reply_v1(stub, callid, description);
 #endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
-		return send_describe_reply_v3(stub, callid, description);;
+		return send_describe_reply_v3(stub, callid, description);
 #endif
 	case AFBRPC_PROTO_VERSION_UNSET:
 		return wait_version(stub) ?: send_describe_reply(stub, callid, description);
@@ -1768,6 +1784,7 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 		afb_req_common_reply_unavailable_error_hookable(comreq);
 }
 
+#if DESCRIBE
 /* get the description */
 static void api_describe_cb(void * closure, void (*describecb)(void *, struct json_object *), void *clocb)
 {
@@ -1790,17 +1807,22 @@ static void api_describe_cb(void * closure, void (*describecb)(void *, struct js
 	if (rc < 0)
 		describecb(clocb, NULL);
 }
+#endif
 
 static struct afb_api_itf stub_api_itf = {
 	.process = api_process_cb,
+#if DESCRIBE
 	.describe = api_describe_cb
+#endif
 };
 
 /**************************************************************************
 * PART - PROCESS INCOMING MESSAGES FROM ANY VERSION
 **************************************************************************/
 
+#if DESCRIBE
 static void describe_reply_data(struct outcall *outcall, unsigned ndata, struct afb_data *data[]);
+#endif
 
 static int add_session(struct afb_stub_rpc *stub, uint16_t sessionid, const char *sessionstr, struct afb_session **psess)
 {
@@ -1934,9 +1956,11 @@ static int receive_call_reply(
 			afb_req_common_reply_hookable(outcall->item.comreq, status, ndata, data);
 			afb_req_common_unref(outcall->item.comreq);
 			break;
+#if DESCRIBE
 		case outcall_type_describe:
 			describe_reply_data(outcall, ndata, data);
 			break;
+#endif
 		}
 		outcall_free(stub, outcall);
 		rc = 0;
@@ -2154,6 +2178,7 @@ static int receive_event_broadcast(
 	return afb_evt_rebroadcast_name_hookable(event_name, ndata, data, uuid, hop);
 }
 
+#if DESCRIBE
 static void describe_reply(struct outcall *outcall, const char *description)
 {
 #if WITHOUT_JSON_C
@@ -2195,6 +2220,7 @@ static int receive_describe_reply(struct afb_stub_rpc *stub, const char *descrip
 	}
 	return rc;
 }
+#endif
 #endif
 
 #if 0
@@ -2383,10 +2409,12 @@ static int decode_describe_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_describe
 	return receive_describe_request(stub, msg->descid);
 }
 
+#if DESCRIBE
 static int decode_description_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_description_t *msg)
 {
 	return receive_describe_reply(stub, msg->data, msg->descid);
 }
+#endif
 
 static int decode_v1(struct afb_stub_rpc *stub)
 {
@@ -2438,9 +2466,11 @@ static int decode_v1(struct afb_stub_rpc *stub)
 		case afb_rpc_v1_msg_type_describe:
 			rc = decode_describe_v1(stub, &msg.describe);
 			break;
+#if DESCRIBE
 		case afb_rpc_v1_msg_type_description:
 			rc = decode_description_v1(stub, &msg.description);
 			break;
+#endif
 		default:
 			rc = X_EPROTO;
 			break;
@@ -3187,9 +3217,11 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 			afb_req_common_reply_hookable(ocall->item.comreq, AFB_ERRNO_DISCONNECTED, 0, NULL);
 			afb_req_common_unref(ocall->item.comreq);
 			break;
+#if DESCRIBE
 		case outcall_type_describe:
 			describe_reply(ocall, NULL);
 			break;
+#endif
 		}
 		outcall_free(stub, ocall);
 	}

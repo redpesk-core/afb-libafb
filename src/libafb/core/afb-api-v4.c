@@ -552,81 +552,7 @@ static int api_get_logmask_cb(void *closure)
 static void api_set_logmask_cb(void *closure, int level)
 	__attribute__((alias("afb_api_v4_logmask_set")));
 
-static void api_describe_cb(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
-{
-	struct afb_api_v4 *apiv4 = closure;
-	describecb(clocb, afb_api_v4_make_description_openAPIv3(apiv4));
-}
-
-static void api_unref_cb(void *closure)
-{
-	struct afb_api_v4 *apiv4 = closure;
-	if (apiv4 && afb_api_common_decref(&apiv4->comapi))
-		destroy_api_v4(apiv4);
-}
-
-
-
-
-static struct afb_api_itf export_api_itf =
-{
-	.process = api_process_cb,
-	.service_start = api_service_start_cb,
-	.service_exit = api_service_exit_cb,
-#if WITH_AFB_HOOK
-	.update_hooks = api_update_hooks_cb,
-#endif
-	.get_logmask = api_get_logmask_cb,
-	.set_logmask = api_set_logmask_cb,
-	.describe = api_describe_cb,
-	.unref = api_unref_cb
-};
-
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                          I N T E R F A C E    A P I S E T
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
-int
-afb_api_v4_event_handler_add(
-	struct afb_api_v4 *api,
-	const char *pattern,
-	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
-	void *closure
-) {
-	return afb_api_common_event_handler_add(&api->comapi, pattern, callback, closure);
-}
-
-int
-afb_api_v4_event_handler_del(
-	struct afb_api_v4 *api,
-	const char *pattern,
-	void **closure
-) {
-	return afb_api_common_event_handler_del(&api->comapi, pattern, closure);
-}
-
-void
-afb_api_v4_process_call(
-	struct afb_api_v4 *api,
-	struct afb_req_common *req
-) {
-	const struct afb_verb_v4 *verb;
-
-	verb = afb_api_v4_verb_matching(api, req->verbname);
-	if (verb)
-		/* verb found */
-		afb_req_v4_process(req, api, verb);
-	else
-		/* error no verb found */
-		afb_req_common_reply_verb_unknown_error_hookable(req);
-}
-
+#if DESCRIBE
 #if WITHOUT_JSON_C
 struct json_object *
 afb_api_v4_make_description_openAPIv3(
@@ -737,6 +663,84 @@ afb_api_v4_make_description_openAPIv3(
 	return r;
 }
 #endif
+
+static void api_describe_cb(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
+{
+	struct afb_api_v4 *apiv4 = closure;
+	describecb(clocb, afb_api_v4_make_description_openAPIv3(apiv4));
+}
+#endif
+
+static void api_unref_cb(void *closure)
+{
+	struct afb_api_v4 *apiv4 = closure;
+	if (apiv4 && afb_api_common_decref(&apiv4->comapi))
+		destroy_api_v4(apiv4);
+}
+
+
+
+
+static struct afb_api_itf export_api_itf =
+{
+	.process = api_process_cb,
+	.service_start = api_service_start_cb,
+	.service_exit = api_service_exit_cb,
+#if WITH_AFB_HOOK
+	.update_hooks = api_update_hooks_cb,
+#endif
+	.get_logmask = api_get_logmask_cb,
+	.set_logmask = api_set_logmask_cb,
+#if DESCRIBE
+	.describe = api_describe_cb,
+#endif
+	.unref = api_unref_cb
+};
+
+/******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+                                          I N T E R F A C E    A P I S E T
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************/
+
+int
+afb_api_v4_event_handler_add(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void (*callback)(void *, const char*, unsigned, struct afb_data * const[], struct afb_api_v4*),
+	void *closure
+) {
+	return afb_api_common_event_handler_add(&api->comapi, pattern, callback, closure);
+}
+
+int
+afb_api_v4_event_handler_del(
+	struct afb_api_v4 *api,
+	const char *pattern,
+	void **closure
+) {
+	return afb_api_common_event_handler_del(&api->comapi, pattern, closure);
+}
+
+void
+afb_api_v4_process_call(
+	struct afb_api_v4 *api,
+	struct afb_req_common *req
+) {
+	const struct afb_verb_v4 *verb;
+
+	verb = afb_api_v4_verb_matching(api, req->verbname);
+	if (verb)
+		/* verb found */
+		afb_req_v4_process(req, api, verb);
+	else
+		/* error no verb found */
+		afb_req_common_reply_verb_unknown_error_hookable(req);
+}
 
 
 /******************************************************************************

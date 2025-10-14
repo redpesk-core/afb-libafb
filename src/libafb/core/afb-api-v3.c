@@ -900,110 +900,7 @@ static int api_get_logmask_cb(void *closure)
 static void api_set_logmask_cb(void *closure, int level)
 	__attribute__((alias("afb_api_v3_logmask_set")));
 
-static void api_describe_cb(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
-{
-	struct afb_api_v3 *apiv3 = closure;
-	describecb(clocb, afb_api_v3_make_description_openAPIv3(apiv3));
-}
-
-static
-void
-destroy_api_v3(
-	struct afb_api_v3 *apiv3
-) {
-	afb_api_common_cleanup(&apiv3->comapi);
-	while (apiv3->dyn_verb_count)
-		free(apiv3->verbs.dynamics[--apiv3->dyn_verb_count]);
-	free(apiv3->verbs.dynamics);
-	free(apiv3);
-}
-
-static void api_unref_cb(void *closure)
-{
-	struct afb_api_v3 *apiv3 = closure;
-	if (apiv3 && afb_api_common_decref(&apiv3->comapi))
-		destroy_api_v3(apiv3);
-}
-
-static struct afb_api_itf export_api_itf =
-{
-	.process = api_process_cb,
-	.service_start = api_service_start_cb,
-#if WITH_AFB_HOOK
-	.update_hooks = api_update_hooks_cb,
-#endif
-	.get_logmask = api_get_logmask_cb,
-	.set_logmask = api_set_logmask_cb,
-	.describe = api_describe_cb,
-	.unref = api_unref_cb
-};
-
-/******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
-                                          I N T E R F A C E    A P I S E T
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************
- ******************************************************************************/
-
-static int verb_name_compare(const struct afb_verb_v3 *verb, const char *name)
-{
-	return verb->glob
-		? fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM)
-		: namecmp(verb->verb, name);
-}
-
-static struct afb_verb_v3 *search_dynamic_verb(struct afb_api_v3 *api, const char *name)
-{
-	struct afb_verb_v3 **v, **e, *i;
-
-	v = api->verbs.dynamics;
-	e = &v[api->dyn_verb_count];
-	while (v != e) {
-		i = *v;
-		if (!verb_name_compare(i, name))
-			return i;
-		v++;
-	}
-	return 0;
-}
-
-void
-afb_api_v3_process_call(
-	struct afb_api_v3 *api,
-	struct afb_req_common *req
-) {
-	const struct afb_verb_v3 *verbsv3;
-	const char *name;
-
-	name = req->verbname;
-
-	/* look first in dynamic set */
-	verbsv3 = search_dynamic_verb(api, name);
-	if (!verbsv3) {
-		/* look then in static set */
-		verbsv3 = api->verbs.statics;
-		while (verbsv3) {
-			if (!verbsv3->verb)
-				verbsv3 = 0;
-			else if (!verb_name_compare(verbsv3, name))
-				break;
-			else
-				verbsv3++;
-		}
-	}
-	/* is it a v3 verb ? */
-	if (verbsv3) {
-		/* yes */
-		afb_req_v3_process(req, api, api_v3_to_api_x3(api), verbsv3);
-		return;
-	}
-
-	afb_req_common_reply_verb_unknown_error_hookable(req);
-}
-
+#if DESCRIBE
 #if WITHOUT_JSON_C
 struct json_object *
 afb_api_v3_make_description_openAPIv3(
@@ -1114,6 +1011,113 @@ afb_api_v3_make_description_openAPIv3(
 	return r;
 }
 #endif
+
+static void api_describe_cb(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
+{
+	struct afb_api_v3 *apiv3 = closure;
+	describecb(clocb, afb_api_v3_make_description_openAPIv3(apiv3));
+}
+#endif
+
+static
+void
+destroy_api_v3(
+	struct afb_api_v3 *apiv3
+) {
+	afb_api_common_cleanup(&apiv3->comapi);
+	while (apiv3->dyn_verb_count)
+		free(apiv3->verbs.dynamics[--apiv3->dyn_verb_count]);
+	free(apiv3->verbs.dynamics);
+	free(apiv3);
+}
+
+static void api_unref_cb(void *closure)
+{
+	struct afb_api_v3 *apiv3 = closure;
+	if (apiv3 && afb_api_common_decref(&apiv3->comapi))
+		destroy_api_v3(apiv3);
+}
+
+static struct afb_api_itf export_api_itf =
+{
+	.process = api_process_cb,
+	.service_start = api_service_start_cb,
+#if WITH_AFB_HOOK
+	.update_hooks = api_update_hooks_cb,
+#endif
+	.get_logmask = api_get_logmask_cb,
+	.set_logmask = api_set_logmask_cb,
+#if DESCRIBE
+	.describe = api_describe_cb,
+#endif
+	.unref = api_unref_cb
+};
+
+/******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+                                          I N T E R F A C E    A P I S E T
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************
+ ******************************************************************************/
+
+static int verb_name_compare(const struct afb_verb_v3 *verb, const char *name)
+{
+	return verb->glob
+		? fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM)
+		: namecmp(verb->verb, name);
+}
+
+static struct afb_verb_v3 *search_dynamic_verb(struct afb_api_v3 *api, const char *name)
+{
+	struct afb_verb_v3 **v, **e, *i;
+
+	v = api->verbs.dynamics;
+	e = &v[api->dyn_verb_count];
+	while (v != e) {
+		i = *v;
+		if (!verb_name_compare(i, name))
+			return i;
+		v++;
+	}
+	return 0;
+}
+
+void
+afb_api_v3_process_call(
+	struct afb_api_v3 *api,
+	struct afb_req_common *req
+) {
+	const struct afb_verb_v3 *verbsv3;
+	const char *name;
+
+	name = req->verbname;
+
+	/* look first in dynamic set */
+	verbsv3 = search_dynamic_verb(api, name);
+	if (!verbsv3) {
+		/* look then in static set */
+		verbsv3 = api->verbs.statics;
+		while (verbsv3) {
+			if (!verbsv3->verb)
+				verbsv3 = 0;
+			else if (!verb_name_compare(verbsv3, name))
+				break;
+			else
+				verbsv3++;
+		}
+	}
+	/* is it a v3 verb ? */
+	if (verbsv3) {
+		/* yes */
+		afb_req_v3_process(req, api, api_v3_to_api_x3(api), verbsv3);
+		return;
+	}
+
+	afb_req_common_reply_verb_unknown_error_hookable(req);
+}
 
 struct afb_api_v3 *
 afb_api_v3_addref(
