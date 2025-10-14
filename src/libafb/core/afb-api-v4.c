@@ -54,6 +54,7 @@
 #include "core/afb-type.h"
 #include "core/afb-calls.h"
 #include "core/afb-string-mode.h"
+#include "core/afb-info.h"
 
 #if WITH_SYSTEMD
 #include "sys/systemd.h"
@@ -726,6 +727,40 @@ afb_api_v4_event_handler_del(
 	return afb_api_common_event_handler_del(&api->comapi, pattern, closure);
 }
 
+static
+void
+auto_info_req(
+	struct afb_api_v4 *api,
+	struct afb_req_common *req
+) {
+	int rc;
+	struct afb_data *data = NULL;
+	struct afb_info info;
+	struct afb_verb_v4 **iter, **end;
+	const struct afb_verb_v4 *verb;
+
+	afb_info_init(&info);
+	do {
+		rc = afb_info_set_api(&info, api->comapi.name, api->comapi.info, NULL);
+		iter = api->verbs.dynamics;
+		end = iter + api->dyn_verb_count;
+		while (rc >= 0 && iter != end) {
+			verb = *iter++;
+			rc = afb_info_add_verb(&info, verb->verb, verb->info,
+					verb->session, verb->auth, verb->glob);
+		}
+		for (verb = api->verbs.statics ; rc >= 0 && verb && verb->verb ; verb++) {
+			rc = afb_info_add_verb(&info, verb->verb, verb->info,
+					verb->session, verb->auth, verb->glob);
+		}
+		rc = afb_info_end(&info, &data);
+	} while(rc > 0);
+	if (rc < 0)
+		afb_req_common_reply_internal_error_hookable(req, rc);
+	else
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+}
+
 void
 afb_api_v4_process_call(
 	struct afb_api_v4 *api,
@@ -737,6 +772,8 @@ afb_api_v4_process_call(
 	if (verb)
 		/* verb found */
 		afb_req_v4_process(req, api, verb);
+	else if (strcmp(req->verbname, afb_info_verbname) == 0)
+		auto_info_req(api, req);
 	else
 		/* error no verb found */
 		afb_req_common_reply_verb_unknown_error_hookable(req);
