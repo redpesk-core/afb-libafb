@@ -42,10 +42,15 @@
 #include "tls-mbed.h"
 
 #if __ZEPHYR__
-#include <zephyr/random/random.h>
+#  include <zephyr/random/random.h>
+#  include <zephyr/version.h>
+#  if ZEPHYR_VERSION_CODE < ZEPHYR_VERSION(4,0,0)
+#     undef RESTRICT_MBEDTLS_CYPHER_SUITE
+#     define RESTRICT_MBEDTLS_CYPHER_SUITE 0
+#  endif
 #else
-#include <unistd.h>
-#include <sys/random.h>
+#  include <unistd.h>
+#  include <sys/random.h>
 #endif
 #include <sys/socket.h>
 

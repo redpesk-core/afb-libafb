@@ -27,10 +27,20 @@
 
 #if __ZEPHYR__
 
+#if WITH_SOCKETS
 #include <zephyr/net/socket.h>
 
 #define poll(x,y,z)    zsock_poll(x,y,z)
 #define pollfd         zsock_pollfd
+#else
+#include <time.h>
+#define poll(x,y,z)    (usleep((useconds_t)(1000 * (z))), 0)
+struct pollfd {int fd, events, revents; };
+#define POLLHUP 0
+#define POLLIN  0
+#define POLLOUT 0
+#define POLLERR 0
+#endif
 
 #else
 
