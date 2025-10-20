@@ -38,14 +38,15 @@
 
 #include "core/afb-apiset.h"
 #include "core/afb-api-common.h"
+#include "core/afb-data.h"
 #include "core/afb-evt.h"
+#include "core/afb-info.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-req-common.h"
+#include "core/afb-session.h"
 #if WITH_AFB_TRACE
 #include "misc/afb-trace.h"
 #endif
-#include "core/afb-session.h"
-#include "core/afb-json-legacy.h"
-#include "core/afb-data.h"
 #include "core/afb-type-predefined.h"
 #include "sys/x-errno.h"
 
@@ -739,6 +740,36 @@ static void f_trace(struct afb_req_common *req)
 }
 #endif
 
+/*** INFO ****************************************************************/
+
+static void f_info(struct afb_req_common *req)
+{
+	int rc;
+	struct afb_data *data = NULL;
+	struct afb_info info;
+
+	afb_info_init(&info);
+	do {
+		afb_info_set_api(&info, _monitor_, NULL, NULL);
+		afb_info_add_verb(&info, _apis_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _session_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _subscribe_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _unsubscribe_, NULL, 0, NULL, 0);
+#if !WITHOUT_JSON_C
+		afb_info_add_verb(&info, _get_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _set_, NULL, 0, NULL, 0);
+#endif
+#if WITH_AFB_TRACE
+		afb_info_add_verb(&info, _trace_, NULL, 0, NULL, 0);
+#endif
+		rc = afb_info_end(&info, &data);
+	} while(rc > 0);
+	if (rc < 0)
+		afb_req_common_reply_internal_error_hookable(req, rc);
+	else
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+}
+
 /*** DISPATCH ****************************************************************/
 void checkcb(void *closure, int status)
 {
@@ -784,6 +815,8 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	default:
 		break;
 	}
+	if (fun == NULL && strcmp(req->verbname, afb_info_verbname) == 0)
+		fun = f_info;
 	if (fun == NULL) {
 		afb_req_common_reply_verb_unknown_error_hookable(req);
 	}
