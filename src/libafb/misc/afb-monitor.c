@@ -67,6 +67,7 @@
 #define verbosity_get()      verbosity_from_mask(rp_logmask)
 
 
+static const char _apis_[] = "apis";
 static const char _disconnected_[] = "disconnected";
 static const char _get_[] = "get";
 static const char _monitor_[] = "monitor";
@@ -78,7 +79,6 @@ static const char _unsubscribe_[] = "unsubscribe";
 
 #if !WITHOUT_JSON_C
 
-static const char _apis_[] = "apis";
 static const char _verbosity_[] = "verbosity";
 
 static const char _debug_[] = "debug";
@@ -499,6 +499,7 @@ static void get_apis(struct afb_req_common *req, struct json_object *resu, struc
 **** Implementation monitoring verbs
 ******************************************************************************/
 
+/*** GET *********************************************************************/
 static void f_get_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
@@ -531,6 +532,7 @@ static void f_get(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_get_cb, req);
 }
 
+/*** SET *********************************************************************/
 static void f_set_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
@@ -555,6 +557,7 @@ static void f_set(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_set_cb, req);
 }
 
+/*** SUBSCRIBE ***************************************************************/
 static void f_subscribe_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
@@ -568,6 +571,7 @@ static void f_subscribe(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_subscribe_cb, req);
 }
 
+/*** UNSUBSCRIBE *************************************************************/
 static void f_unsubscribe_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
@@ -581,6 +585,7 @@ static void f_unsubscribe(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_unsubscribe_cb, req);
 }
 
+/*** SESSION *****************************************************************/
 static void f_session(struct afb_req_common *req)
 {
 	struct json_object *r = NULL;
@@ -593,6 +598,7 @@ static void f_session(struct afb_req_common *req)
 	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
 }
 #else
+/*** WITHOUT JSON-C **********************************************************/
 static void f_set(struct afb_req_common *req)
 {
 	afb_req_common_reply_unavailable_error_hookable(req);
@@ -631,6 +637,48 @@ static void f_unsubscribe(struct afb_req_common *req)
 }
 #endif
 
+/*** NEW GET APIS ************************************************************/
+
+struct apilist
+{
+	size_t pos;
+	char *buffer;
+};
+
+static void get_apilist_size(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
+{
+	struct apilist *al = closure;
+	al->pos += strlen(name) + 1;
+}
+
+static void get_apilist_name(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
+{
+	struct apilist *al = closure;
+	size_t sz = strlen(name);
+	if (al->pos != 0)
+		al->buffer[al->pos++] = ' ';
+	memcpy(&al->buffer[al->pos], name, sz + 1);
+	al->pos += sz;
+}
+
+static void f_apis(struct afb_req_common *req)
+{
+	struct apilist al;
+	struct afb_data *data;
+
+	al.pos = 0;
+	afb_apiset_enum(monitor_api->call_set, 1, get_apilist_size, &al);
+	if (0 > afb_data_create_alloc(&data, &afb_type_predefined_stringz,
+			(void**)&al.buffer, al.pos))
+		afb_req_common_reply_out_of_memory_error_hookable(req);
+	else {
+		al.pos = 0;
+		afb_apiset_enum(monitor_api->call_set, 1, get_apilist_name, &al);
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+	}
+}
+
+/*** TRACE *******************************************************************/
 #if WITH_AFB_TRACE
 static void context_destroy(void *pointer)
 {
@@ -689,6 +737,7 @@ static void f_trace(struct afb_req_common *req)
 }
 #endif
 
+/*** DISPATCH ****************************************************************/
 void checkcb(void *closure, int status)
 {
 	struct afb_req_common *req = closure;
@@ -706,6 +755,10 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	struct afb_auth *auth = NULL;
 
 	switch (req->verbname[0]) {
+	case 'a':
+		if (0 == strcmp(req->verbname, _apis_))
+			fun = f_apis;
+		break;
 	case 'g':
 		if (0 == strcmp(req->verbname, _get_))
 			fun = f_get;
