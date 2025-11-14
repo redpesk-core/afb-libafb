@@ -44,6 +44,23 @@
 #define CHAR_FOR_VERSION_OFFER		'V'	/* client -> server */
 #define CHAR_FOR_VERSION_SET		'v'	/* server -> client */
 
+/*
+about the identifier
+
+id: in octal 02723012011
+    in hexa   0x174c1409
+
+explanation:
+
+binary  00010111010011000001010000001001
+hexa       1   7   4   c   1   4   0   9
+binary  00010111010011000001010000001001
+octal    0  2  7  2  3  0  1  2  0  1  1
+binary  00010111010011000001010000001001
+base64   0    23    19     1    16     9
+char           w     s     a     p     i
+*/
+
 /*************************************************************************************
 * coding protocol
 *************************************************************************************/
