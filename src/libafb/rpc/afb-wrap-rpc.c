@@ -743,12 +743,17 @@ int afb_wrap_rpc_websocket_upgrade(
 		void *cleanup_closure,
 		int websock
 ) {
+	struct afb_rpc_spec *spec;
 	struct afb_wrap_rpc *wrap;
 	enum afb_wrap_rpc_mode mode = websock ? Wrap_Rpc_Mode_Websocket : Wrap_Rpc_Mode_FD;
-	int rc = afb_wrap_rpc_create_fd(&wrap, fd, autoclose, mode, NULL, NULL, callset);
+	int rc = afb_rpc_spec_make_export_all(&spec);
 	if (rc >= 0) {
-		afb_stub_rpc_set_session(wrap->stub, session);
-		afb_stub_rpc_set_token(wrap->stub, token);
+		rc = afb_wrap_rpc_create_fd(&wrap, fd, autoclose, mode, NULL, spec, callset);
+		if (rc >= 0) {
+			afb_stub_rpc_set_session(wrap->stub, session);
+			afb_stub_rpc_set_token(wrap->stub, token);
+		}
+		afb_rpc_spec_unref(spec);
 	}
 	return rc;
 }
