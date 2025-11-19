@@ -55,6 +55,145 @@ static struct waithold *awaiters;
 
 #define SAME_TID(x,y) ((x) == (y))  /* x_thread_equal? */
 
+#if !defined WITH_EVMGR_SPIN
+#define WITH_EVMGR_SPIN 1
+#endif
+
+#if WITH_EVMGR_SPIN
+
+/**********************************************************************
+ * VERSION WITH SPINLOCKS
+ *********************************************************************/
+
+#include "sys/x-spin.h"
+
+static x_spin_t spin;
+
+
+static int init()
+{
+	int rc = 0;
+	x_mutex_lock(&mutex);
+	if (evmgr == NULL) {
+		x_spin_init(&spin);
+		rc = ev_mgr_create(&evmgr);
+		if (rc < 0) {
+			x_spin_destroy(&spin);
+			evmgr = NULL;
+		}
+	}
+	x_mutex_unlock(&mutex);
+	return rc;
+}
+
+static void wakeup_spinlocked()
+{
+	struct waithold *waiter = awaiters;
+	holder = waiter->tid;
+	awaiters = waiter->next;
+	x_spin_unlock(&spin);
+	x_mutex_lock(&mutex);
+	x_cond_signal(&waiter->cond);
+	x_mutex_unlock(&mutex);
+}
+
+/**
+ * try to get the evmgr for the thread tid.
+ * return 1 if gotten or 0 otherwise
+ * or a negative value on error
+ */
+static int try_get(x_thread_t tid)
+{
+	x_spin_lock(&spin);
+
+	/* is locking it? */
+	if (SAME_TID(holder, tid)) {
+		if (awaiters == NULL) {
+			x_spin_unlock(&spin);
+			return 1;
+		}
+		wakeup_spinlocked();
+		return 0;
+	}
+
+	/* check if not used */
+	if (!SAME_TID(holder, INVALID_THREAD_ID) || awaiters != NULL || evmgr == NULL) {
+		x_spin_unlock(&spin);
+		return 0;
+	}
+
+	holder = tid;
+	x_spin_unlock(&spin);
+	return 1;
+}
+
+/**
+ * get the evmgr for the thread tid.
+ * return 1 if gotten or 0 if the thread already got the evmgr
+ */
+static int get(x_thread_t tid)
+{
+	struct waithold wait, **piw;
+	int rc;
+
+	if (evmgr == NULL) {
+		rc = init();
+		if (rc < 0)
+			return rc;
+	}
+
+	x_spin_lock(&spin);
+	if (SAME_TID(holder, tid)) {
+		x_spin_unlock(&spin);
+		return 0;
+	}
+
+	if (SAME_TID(holder, INVALID_THREAD_ID)) {
+		holder = tid;
+		x_spin_unlock(&spin);
+		return 1;
+	}
+
+	/* lock until attributed */
+	wait = (struct waithold){ 0, X_COND_INITIALIZER, tid };
+	piw = &awaiters;
+	while (*piw) piw = &(*piw)->next;
+	*piw = &wait;
+	x_spin_unlock(&spin);
+	x_mutex_lock(&mutex);
+	afb_ev_mgr_wakeup();
+	x_cond_wait(&wait.cond, &mutex);
+	x_mutex_unlock(&mutex);
+	return 1;
+}
+
+int afb_ev_mgr_init()
+{
+	return evmgr != NULL ? 0 : init();
+}
+
+int afb_ev_mgr_release(x_thread_t tid)
+{
+	x_spin_lock(&spin);
+	if (!SAME_TID(holder, tid)) {
+		x_spin_unlock(&spin);
+		return 0;
+	}
+
+	if (awaiters == NULL)
+		x_spin_unlock(&spin);
+	else
+		wakeup_spinlocked();
+
+	return 1;
+}
+
+#else
+
+/**********************************************************************
+ * VERSION WITH MUTEX
+ *********************************************************************/
+
 static int ensure_evmgr()
 {
 	return evmgr ? 0 : ev_mgr_create(&evmgr);
@@ -165,6 +304,11 @@ int afb_ev_mgr_release(x_thread_t tid)
 	release_unlocked();
 	return 1;
 }
+#endif
+
+/**********************************************************************
+ * COMMON PART
+ *********************************************************************/
 
 struct ev_mgr *afb_ev_mgr_try_get(x_thread_t tid)
 {
