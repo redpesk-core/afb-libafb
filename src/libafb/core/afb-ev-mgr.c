@@ -49,6 +49,7 @@ struct waithold
 {
 	struct waithold *next;
 	x_cond_t  cond;
+	x_thread_t tid;
 };
 static struct waithold *awaiters;
 
@@ -61,9 +62,12 @@ static int ensure_evmgr()
 
 static void release_locked()
 {
-	holder = INVALID_THREAD_ID;
-	if (awaiters != NULL)
+	if (awaiters == NULL)
+		holder = INVALID_THREAD_ID;
+	else {
+		holder = awaiters->tid;
 		x_cond_signal(&awaiters->cond);
+	}
 }
 
 static void release_unlocked()
@@ -131,7 +135,7 @@ static int get(x_thread_t tid)
 	/* lock */
 	x_mutex_lock(&mutex);
 	if (!SAME_TID(holder, INVALID_THREAD_ID)) {
-		struct waithold wait = { 0, X_COND_INITIALIZER };
+		struct waithold wait = { 0, X_COND_INITIALIZER, tid };
 		struct waithold **piw = &awaiters;
 		while (*piw) piw = &(*piw)->next;
 		*piw = &wait;
