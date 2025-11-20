@@ -177,7 +177,7 @@ START_TEST(test_async){
     ck_assert_int_eq(afb_jobs_get_max_count(), NBJOBS);
 
     // queue N jobs
-    for(i=0; i<NBJOBS; i++) afb_sched_post_job(NULL, 0, 1, test_job, i2p(i+1), Afb_Sched_Mode_Normal);
+    for(i=0; i<NBJOBS; i++) afb_jobs_post(NULL, 0, 1, test_job, i2p(i+1));
 
     // run them asynchronously
     sched_runing = TRUE;
