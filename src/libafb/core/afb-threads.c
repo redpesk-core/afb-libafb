@@ -180,8 +180,10 @@ PRINT("++++++++++++ START[%u] %p\n",me->id,me);
 	me->next = threads;
 	threads = me;
 	active_count++;
-	if (mainjob)
+	if (mainjob) {
 		getjob = mainjob;
+		while (wakeup_one());
+	}
 	do {
 		/* get a job */
 		status = getjob ? getjob(getjobcls, &jobdesc, me->tid) : AFB_THREADS_IDLE;
