@@ -145,6 +145,28 @@ static void unlink_thread(struct thread *thr)
 	}
 }
 
+static int wakeup_one()
+{
+	struct thread *thr;
+	int result = 0;
+PRINT("++++++++++++ B-TWU\n");
+	x_mutex_lock(&asleep_lock);
+	thr = asleep_threads;
+	if (!thr) {
+		x_mutex_unlock(&asleep_lock);
+		result = 0;
+	}
+	else {
+		asleep_count--;
+		asleep_threads = thr->next_asleep;
+		x_cond_signal(&thr->cond);
+		x_mutex_unlock(&asleep_lock);
+		result = 1;
+	}
+PRINT("++++++++++++ A-TWU -> %d\n", result);
+	return result;
+}
+
 static void thread_run(struct thread *me, afb_threads_job_getter_t mainjob)
 {
 	int status;
@@ -324,28 +346,6 @@ int afb_threads_enter(afb_threads_job_getter_t jobget, void *closure)
 	x_cond_destroy(&me.cond);
 
 	return 0;
-}
-
-static int wakeup_one()
-{
-	struct thread *thr;
-	int result = 0;
-PRINT("++++++++++++ B-TWU\n");
-	x_mutex_lock(&asleep_lock);
-	thr = asleep_threads;
-	if (!thr) {
-		x_mutex_unlock(&asleep_lock);
-		result = 0;
-	}
-	else {
-		asleep_count--;
-		asleep_threads = thr->next_asleep;
-		x_cond_signal(&thr->cond);
-		x_mutex_unlock(&asleep_lock);
-		result = 1;
-	}
-PRINT("++++++++++++ A-TWU -> %d\n", result);
-	return result;
 }
 
 void afb_threads_wakeup()
