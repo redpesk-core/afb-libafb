@@ -25,6 +25,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
 
 #include <rp-utils/rp-verbose.h>
 
@@ -34,6 +36,51 @@
 #include "core/afb-sched.h"
 #include "core/afb-session.h"
 #include "core/afb-req-common.h"
+
+/*********************************************************************************
+* When NO_PERMISSION_BYPASS is 0 or undefined, then permission bypassing
+* is allowed.
+* ATM permission bypass only works with cynagora backend: when the
+* permission backend fails to connect/contact to cynagora, it checks
+* if the file PERMISSION_BYPASS_FILE (default as /etc/afb-perm-bypass)
+* exists or not. If it exists, the permission is granted. Otherwise, the
+* permission is refused.
+* This behaviour has good properties:
+*  - it is dynamic because the file existance is checked every time
+*  - because connection to cynagora are also dynamic, cynagora can
+*    be activated or deactivated at any time
+*  - no malicious code can change this behaviour by writing a flag
+*  - cynagora if available takes precedence
+*/
+#if !NO_PERMISSION_BYPASS && BACKEND_PERMISSION_IS_CYNAGORA
+#  ifndef PERMISSION_BYPASS_FILE
+#    define PERMISSION_BYPASS_FILE "/etc/afb-perm-bypass"
+#  endif
+
+static const char permission_bypass_file[] = PERMISSION_BYPASS_FILE;
+
+static void try_bypass(
+	const char *client,
+	const char *user,
+	const char *session,
+	const char *permission,
+	void (*callback)(void *_closure, int _status),
+	void *closure
+) {
+	if (access(permission_bypass_file, F_OK) != 0)
+		callback(closure, 0);
+	else {
+		RP_WARNING("Granting permission %s when %s", permission, permission_bypass_file);
+		callback(closure, 1);
+	}
+}
+
+static void warn_if_bypass()
+{
+	if (access(permission_bypass_file, F_OK) == 0)
+		RP_WARNING("Bypass of permissions active: %s", permission_bypass_file);
+}
+#endif
 
 /*********************************************************************************/
 #if BACKEND_PERMISSION_IS_CYNAGORA
@@ -56,6 +103,7 @@ struct memo_check
 	void (*checkcb)(void *closure, int status);
 };
 
+static bool mute_errors = false;
 static cynagora_t *cynagora;
 static struct ev_fd *evfd;
 static pthread_mutex_t mutex;
@@ -136,16 +184,21 @@ static int cynagora_acquire()
 	if (cynagora)
 		rc = 0;
 	else {
+#if !NO_PERMISSION_BYPASS
+		warn_if_bypass();
+#endif
 		/* lazy initialisation */
 		rc = cynagora_create(&cynagora, cynagora_Check, 1000, NULL);
 		if (rc < 0) {
 			cynagora = NULL;
-			RP_ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
+			if (!mute_errors)
+				RP_ERROR("cynagora initialisation failed with code %d, %s", rc, strerror(-rc));
 			unlock();
 		} else {
 			rc = cynagora_async_setup(cynagora, cynagora_async_ctl_cb, NULL);
 			if (rc < 0) {
-				RP_ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
+				if (!mute_errors)
+					RP_ERROR("cynagora initialisation of async failed with code %d, %s", rc, strerror(-rc));
 				cynagora_destroy(cynagora);
 				cynagora = NULL;
 				unlock();
@@ -185,12 +238,20 @@ void afb_perm_check_async(
 			key.permission = permission;
 			rc = cynagora_async_check(cynagora, &key, 0, 0, async_check_cb, memo);
 			unlock();
-			if (rc >= 0)
+			if (rc >= 0) {
+				mute_errors = false;
 				return;
-			RP_ERROR("Can't query cynagora: %s", strerror(-rc));
+			}
+			if (!mute_errors)
+				RP_ERROR("Can't query cynagora: %s", strerror(-rc));
 		}
 	}
+#if NO_PERMISSION_BYPASS
 	callback(closure, rc);
+#else
+	mute_errors = true;
+	try_bypass(client, user, session, permission, callback, closure);
+#endif
 }
 
 int afb_perm_check_perm_check_api(
