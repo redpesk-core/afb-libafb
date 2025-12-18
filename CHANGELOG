@@ -1,3 +1,14 @@
+Version 5.6.1
+-------------
+
+  feature
+   - add bypass of cynagora checks if cynagorad not started
+     and file /etc/afb-perm-bypass exists.
+
+  fix
+   - fix scheduling start (enqued jobs are really started
+     when starting main thead)
+
 Version 5.6.0
 -------------
 

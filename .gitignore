@@ -6,4 +6,4 @@ doxygen-output/
 *.swp
 analyze.output
 tags
-
+.gdb_history
