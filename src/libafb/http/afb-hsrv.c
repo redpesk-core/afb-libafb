@@ -63,7 +63,7 @@ typedef enum MHD_Result mhd_result_t;
 #include "http/afb-websock.h"
 
 #define JSON_CONTENT  "application/json"
-#define FORM_CONTENT  MHD_HTTP_POST_ENCODING_MULTIPART_FORMDATA
+#define FORM_CONTENT  MHD_HTTP_POST_ENCODING_FORM_URLENCODED
 
 struct hsrv_itf {
 	struct hsrv_itf *next;

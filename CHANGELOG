@@ -1,3 +1,9 @@
+Version next
+------------
+
+  fix
+   - understand POST data encoding
+
 Version 5.6.1
 -------------
 
