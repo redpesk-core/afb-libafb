@@ -3,6 +3,7 @@ Version next
 
   fix
    - understand POST data encoding
+   - api name resolution of RPC specification on server
 
 Version 5.6.1
 -------------

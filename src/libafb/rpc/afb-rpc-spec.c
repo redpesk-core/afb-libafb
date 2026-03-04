@@ -454,52 +454,74 @@ int afb_rpc_spec_search(
 	const char **result
 ) {
 	const char *strings = (const char*)&spec->offsets[spec->exports.upper];
-	const struct desc *desc = client ? &spec->imports : &spec->exports;
-	const struct off *iter = &spec->offsets[client ? 0 : spec->imports.upper];
-	const struct off *end = &spec->offsets[desc->upper];
+	const struct desc *desc;
+	const struct off *iter, *end;
 
 #define STR(idx) ((idx) ? &strings[idx] : NULL)
-	/* it is asserted that client implies api != NULL */
-	if (api == NULL || *api == 0) {
-		/* search for the default api */
-		for( ; iter != end ; iter++)
-			if (iter->remote == 0) { /* empty string */
-				*result = STR(iter->local); /* found */
-				return 0;
-			}
 
-		switch (desc->star_mode) {
-		case STAR_AS:
-			*result = STR(desc->star_arg);
-			return 0;
-		case STAR_YES:
+	if (client) {
+
+		/* it is asserted that client implies api != NULL */
+		if (api == NULL || *api == 0) {
 			*result = NULL;
 			return X_EINVAL;
-		default:
-			*result = NULL;
-			return X_ENOENT;
 		}
-	}
-	else {
+
+		desc = &spec->imports;
+		iter = &spec->offsets[0];
+		end = &spec->offsets[spec->imports.upper];
+
 		/* search for the given api */
 		for( ; iter != end ; iter++)
 			if (strcmp(api, &strings[iter->local]) == 0) {
 				*result = STR(iter->remote); /* found */
 				return 0;
 			}
+	}
+	else {
+		desc = &spec->exports;
+		iter = &spec->offsets[spec->imports.upper];
+		end = &spec->offsets[spec->exports.upper];
 
-		/* not found in the list */
-		switch (desc->star_mode) {
-		case STAR_YES:
-			*result = api;
-			return 0;
-		case STAR_AS:
-			*result = STR(desc->star_arg);
-			return 0;
-		default:
-			*result = NULL;
-			return X_ENOENT;
+		if (api == NULL || *api == 0) {
+			/* search for the default api */
+			for( ; iter != end ; iter++)
+				if (iter->remote == 0) { /* empty string */
+					*result = STR(iter->local); /* found */
+					return 0;
+				}
+
+			switch (desc->star_mode) {
+			case STAR_AS:
+				*result = STR(desc->star_arg);
+				return 0;
+			case STAR_YES:
+				*result = NULL;
+				return X_EINVAL;
+			default:
+				*result = NULL;
+				return X_ENOENT;
+			}
 		}
+		/* search for the given api */
+		for( ; iter != end ; iter++)
+			if (strcmp(api, &strings[iter->remote]) == 0) {
+				*result = STR(iter->local); /* found */
+				return 0;
+			}
+	}
+
+	/* not explicitely in the list */
+	switch (desc->star_mode) {
+	case STAR_YES:
+		*result = api;
+		return 0;
+	case STAR_AS:
+		*result = STR(desc->star_arg);
+		return 0;
+	default:
+		*result = NULL;
+		return X_ENOENT;
 	}
 #undef STR
 }
