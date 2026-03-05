@@ -43,8 +43,12 @@
 #include "sys/x-errno.h"
 #include "sys/ev-mgr.h"
 
+#define TLSERR0(rc, txt) \
+		 RP_ERROR(txt " (%s: %s)", \
+			gnutls_strerror_name(rc), gnutls_strerror(rc))
+
 #define TLSERR(rc, txt, ...) \
-		 RP_ERROR(txt " (%s: %s)" __VA_OPT__(,) __VA_ARGS__, \
+		 RP_ERROR(txt " (%s: %s)", __VA_ARGS__, \
 			gnutls_strerror_name(rc), gnutls_strerror(rc))
 
 enum state
@@ -185,7 +189,7 @@ int tls_gnu_set_cert(const void *cert, size_t size)
 
 	rc = gnutls_x509_crt_init(&cert_data);
 	if (rc < 0) {
-		TLSERR(rc, "Can't init certificate");
+		TLSERR0(rc, "Can't init certificate");
 		return X_ENOMEM;
 	}
 
@@ -193,7 +197,7 @@ int tls_gnu_set_cert(const void *cert, size_t size)
 	datum.size = (unsigned)size;
 	rc = gnutls_x509_crt_import(cert_data, &datum, detect_fmt(cert, size));
 	if (rc < 0) {
-		TLSERR(rc, "Can't import certificate");
+		TLSERR0(rc, "Can't import certificate");
 		gnutls_x509_crt_deinit(cert_data);
 		return X_EINVAL;
 	}
@@ -216,7 +220,7 @@ int tls_gnu_set_key(const void *key, size_t size)
 
 	rc = gnutls_x509_privkey_init(&key_data);
 	if (rc < 0) {
-		TLSERR(rc, "Can't init privkey");
+		TLSERR0(rc, "Can't init privkey");
 		return X_ENOMEM;
 	}
 
@@ -224,7 +228,7 @@ int tls_gnu_set_key(const void *key, size_t size)
 	datum.size = (unsigned)size;
 	rc = gnutls_x509_privkey_import(key_data, &datum, detect_fmt(key, size));
 	if (rc < 0) {
-		TLSERR(rc, "Can't import privkey");
+		TLSERR0(rc, "Can't import privkey");
 		gnutls_x509_privkey_deinit(key_data);
 		return X_EINVAL;
 	}
@@ -245,7 +249,7 @@ int tls_gnu_add_trust(const void *trust, size_t size)
 
 		rc = gnutls_x509_trust_list_init(&trust_data, 0);
 		if (rc < 0) {
-			TLSERR(rc, "Can't init trust");
+			TLSERR0(rc, "Can't init trust");
 			return X_ENOMEM;
 		}
 
@@ -261,7 +265,7 @@ int tls_gnu_add_trust(const void *trust, size_t size)
 					NULL, detect_fmt(trust, size), 0, 0);
 	}
 	if (rc < 0) {
-		TLSERR(rc, "Can't add trust");
+		TLSERR0(rc, "Can't add trust");
 		return X_EINVAL;
 	}
 	return 0;
@@ -324,7 +328,7 @@ int tls_gnu_load_trust(const char *path)
 
 		rc = gnutls_x509_trust_list_init(&trust_data, 0);
 		if (rc < 0) {
-			TLSERR(rc, "Can't init trust");
+			TLSERR0(rc, "Can't init trust");
 			return X_ENOMEM;
 		}
 
@@ -531,14 +535,14 @@ static int init_creds()
 	if (rc >= 0 && xcreds == NULL) {
 		rc = gnutls_certificate_allocate_credentials(&xcreds);
 		if (rc < 0) {
-			TLSERR(rc, "Can't allocate certificate");
+			TLSERR0(rc, "Can't allocate certificate");
 			rc = X_ENOMEM;
 		}
 		else {
 			if (cert_set && key_set) {
 				rc = gnutls_certificate_set_x509_key(xcreds, &cert_data, 1, key_data);
 				if (rc < 0)
-					TLSERR(rc, "can't set cert+key");
+					TLSERR0(rc, "can't set cert+key");
 			}
 			if (rc >= 0 && trust_set)
 				gnutls_certificate_set_trust_list(xcreds, trust_data, 0);
@@ -645,7 +649,7 @@ int tls_gnu_session_create(
 	/* initialize session */
 	rc = gnutls_init(session, server ? GNUTLS_SERVER : GNUTLS_CLIENT);
 	if (rc != GNUTLS_E_SUCCESS) {
-		TLSERR(rc, "can't init session");
+		TLSERR0(rc, "can't init session");
 		rc = X_ENOMEM;
 		goto error3;
 	}
@@ -653,7 +657,7 @@ int tls_gnu_session_create(
 	/* set cipher priority */
 	rc = gnutls_priority_set(*session, priority_cache);
 	if (rc != GNUTLS_E_SUCCESS) {
-		TLSERR(rc, "can't set GnuTLS cipher priority");
+		TLSERR0(rc, "can't set GnuTLS cipher priority");
 		rc = X_ECANCELED;
 		goto error3;
 	}
@@ -661,7 +665,7 @@ int tls_gnu_session_create(
 	/* set the credentials */
 	rc = gnutls_credentials_set(*session, GNUTLS_CRD_CERTIFICATE, xcreds);
 	if (rc != GNUTLS_E_SUCCESS) {
-		TLSERR(rc, "can't set GnuTLS credentials");
+		TLSERR0(rc, "can't set GnuTLS credentials");
 		rc = X_ECANCELED;
 		goto error3;
 	}
@@ -681,7 +685,7 @@ int tls_gnu_session_create(
 	do {
 		rc = gnutls_handshake(*session);
 		if (gnutls_error_is_fatal(rc)) {
-			TLSERR(rc, "GnuTLS handshake failed");
+			TLSERR0(rc, "GnuTLS handshake failed");
 			goto error3;
 		}
 	} while (rc != GNUTLS_E_SUCCESS);
