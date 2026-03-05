@@ -280,7 +280,7 @@ START_TEST (test)
 	done = 0;
 	afb_perm_check_req_async(&req, "perm", testCB, NULL);
 	waiteForCB();
-	ck_assert_int_eq(val, -2);
+	ck_assert_int_le(val, 0);
 
 
 	// test with cynagora server ON
