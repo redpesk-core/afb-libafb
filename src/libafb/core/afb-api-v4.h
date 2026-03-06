@@ -454,8 +454,27 @@ afb_api_v4_verb_at(
 
 /**
  * Return the desciptor of the verb matching the given name
+ *
  * @param apiv4 the api
  * @param the name to match
+ * @param glob if 0, search literal, otherwise search patternly
+ *
+ * @return the description or zero if no verb matches
+ */
+const struct afb_verb_v4 *
+afb_api_v4_verb_search(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int glob
+);
+
+/**
+ * Return the desciptor of the verb matching the given name.
+ * Same that afb_api_v4_verb_search with glob=1.
+ *
+ * @param apiv4 the api
+ * @param the name to match
+ *
  * @return the description or zero if no verb matches
  */
 const struct afb_verb_v4 *

@@ -275,7 +275,7 @@ static int match_glob_pattern(const struct afb_verb_v4 *verb, const char *name)
 	return fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM);
 }
 
-static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const char *name)
+static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const char *name, int glob)
 {
 	struct afb_verb_v4 **base, *verb;
 	unsigned low, up, mid;
@@ -291,7 +291,7 @@ static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const cha
 	while(low < up) {
 		mid = (low + up) >> 1;
 		verb = base[mid];
-		if (verb->glob && match_glob_pattern(verb, name) == 0)
+		if (glob && verb->glob && match_glob_pattern(verb, name) == 0)
 			return verb;
 		cmp = namecmp(verb->verb, name);
 		if (cmp == 0)
@@ -309,20 +309,34 @@ afb_api_v4_verb_matching(
 	struct afb_api_v4 *apiv4,
 	const char *name
 ) {
+	return afb_api_v4_verb_search(apiv4, name, 1);
+}
+
+const struct afb_verb_v4 *
+afb_api_v4_verb_search(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int glob
+) {
 	const struct afb_verb_v4 *verb;
 
 	/* look first in dynamic set */
-	verb = search_dynamic_verb(apiv4, name);
-	if (!verb) {
+	verb = search_dynamic_verb(apiv4, name, glob);
+	if (verb == NULL) {
 		/* look then in static set */
-		verb = apiv4->verbs.statics;
-		while (verb) {
-			if (!verb->verb)
-				verb = 0;
-			else if ((verb->glob ? match_glob_pattern(verb, name) : namecmp(verb->verb, name)) == 0)
+		for (verb = apiv4->verbs.statics ; verb != NULL ; verb++) {
+			if (!verb->verb) {
+				verb = NULL;
 				break;
-			else
-				verb++;
+			}
+			if (verb->glob) {
+				if (glob && match_glob_pattern(verb, name) == 0)
+					break;
+			}
+			else {
+				if (namecmp(verb->verb, name) == 0)
+					break;
+			}
 		}
 	}
 	return verb;
