@@ -1,5 +1,12 @@
-Version 5.6.2
+Version next
 ------------
+
+  change
+   - improved afb-ev-mgr (use spinlock)
+   - removal of single json_tokener in afb-wsj1
+
+Version 5.6.2
+-------------
 
   fix
    - understand POST data encoding
