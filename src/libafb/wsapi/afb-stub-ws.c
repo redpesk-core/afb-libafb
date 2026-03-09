@@ -606,7 +606,7 @@ server_on_call_cb(
 #if WITH_CRED
 	afb_req_common_set_cred(&wreq->comreq, stubws->cred);
 #endif
-	afb_req_common_process_on_behalf(&wreq->comreq, wreq->stubws->apiset, user_creds);
+	afb_req_common_process_on_behalf_hookable(&wreq->comreq, wreq->stubws->apiset, user_creds);
 	return;
 
 no_session:

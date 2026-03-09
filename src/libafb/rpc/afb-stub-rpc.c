@@ -1916,7 +1916,7 @@ static int receive_call_request(
 #if WITH_CRED
 	afb_req_common_set_cred(&incall->comreq, stub->cred);
 #endif
-	afb_req_common_process_on_behalf(&incall->comreq, incall->stub->call_set, user_creds);
+	afb_req_common_process_on_behalf_hookable(&incall->comreq, incall->stub->call_set, user_creds);
 	return 0;
 
 out_of_memory:
