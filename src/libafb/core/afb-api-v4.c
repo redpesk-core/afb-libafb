@@ -760,12 +760,14 @@ auto_info_req(
 		end = iter + api->dyn_verb_count;
 		while (rc >= 0 && iter != end) {
 			verb = *iter++;
-			rc = afb_info_add_verb(&info, verb->verb, verb->info,
-					verb->session, verb->auth, verb->glob);
+			if (verb == afb_api_v4_verb_search(api, verb->verb, 0))
+				rc = afb_info_add_verb(&info, verb->verb, verb->info,
+						verb->session, verb->auth, verb->glob);
 		}
 		for (verb = api->verbs.statics ; rc >= 0 && verb && verb->verb ; verb++) {
-			rc = afb_info_add_verb(&info, verb->verb, verb->info,
-					verb->session, verb->auth, verb->glob);
+			if (verb == afb_api_v4_verb_search(api, verb->verb, 0))
+				rc = afb_info_add_verb(&info, verb->verb, verb->info,
+						verb->session, verb->auth, verb->glob);
 		}
 		rc = afb_info_end(&info, &data);
 	} while(rc > 0);
