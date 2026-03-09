@@ -269,7 +269,7 @@ static struct json_object *encode_verbosity(int level)
 	case rp_Log_Level_Error:	return json_object_new_string(_error_);
 	case rp_Log_Level_Warning:	return json_object_new_string(_warning_);
 	case rp_Log_Level_Notice:	return json_object_new_string(_notice_);
-	case rp_Log_Level_Info:	return json_object_new_string(_info_);
+	case rp_Log_Level_Info:		return json_object_new_string(_info_);
 	case rp_Log_Level_Debug:	return json_object_new_string(_debug_);
 	default: return json_object_new_int(level);
 	}
@@ -750,17 +750,17 @@ static void f_info(struct afb_req_common *req)
 
 	afb_info_init(&info);
 	do {
-		afb_info_set_api(&info, _monitor_, NULL, NULL);
-		afb_info_add_verb(&info, _apis_, NULL, 0, NULL, 0);
-		afb_info_add_verb(&info, _session_, NULL, 0, NULL, 0);
-		afb_info_add_verb(&info, _subscribe_, NULL, 0, NULL, 0);
-		afb_info_add_verb(&info, _unsubscribe_, NULL, 0, NULL, 0);
+		afb_info_set_api(&info, _monitor_, "Monitoring API", NULL);
+		afb_info_add_verb(&info, _apis_, "List apis", 0, NULL, 0);
+		afb_info_add_verb(&info, _session_, "Get session info", 0, NULL, 0);
+		afb_info_add_verb(&info, _subscribe_, "Subscribe to monitoring events", 0, NULL, 0);
+		afb_info_add_verb(&info, _unsubscribe_, "Unsubscribe from monitoring events", 0, NULL, 0);
 #if !WITHOUT_JSON_C
-		afb_info_add_verb(&info, _get_, NULL, 0, NULL, 0);
-		afb_info_add_verb(&info, _set_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _get_, "Get apis and/or verbosity", 0, NULL, 0);
+		afb_info_add_verb(&info, _set_, "Set verbosities and/or subscriptions", 0, NULL, 0);
 #endif
 #if WITH_AFB_TRACE
-		afb_info_add_verb(&info, _trace_, NULL, 0, NULL, 0);
+		afb_info_add_verb(&info, _trace_, "Trace internal activity", 0, NULL, 0);
 #endif
 		rc = afb_info_end(&info, &data);
 	} while(rc > 0);
