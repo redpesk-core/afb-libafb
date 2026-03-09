@@ -99,6 +99,9 @@ struct afb_api_v4
 	/** mask of loging */
 	int16_t logmask;
 
+	/* specification */
+	const char *specification;
+
 	/* strings */
 	char strings[];
 };
@@ -359,6 +362,18 @@ afb_api_v4_verb_at(
 	index -= apiv4->dyn_verb_count;
 	if (apiv4->sta_verb_count > index)
 		return &apiv4->verbs.statics[index];
+	return 0;
+}
+
+int
+afb_api_v4_set_specification(
+	struct afb_api_v4 *apiv4,
+	const char *specification
+) {
+	if (is_sealed(apiv4))
+		return X_EPERM;
+
+	apiv4->specification = specification;
 	return 0;
 }
 
@@ -755,7 +770,7 @@ auto_info_req(
 
 	afb_info_init(&info);
 	do {
-		rc = afb_info_set_api(&info, api->comapi.name, api->comapi.info, NULL);
+		rc = afb_info_set_api(&info, api->comapi.name, api->comapi.info, api->specification);
 		iter = api->verbs.dynamics;
 		end = iter + api->dyn_verb_count;
 		while (rc >= 0 && iter != end) {

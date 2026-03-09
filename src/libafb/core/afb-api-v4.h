@@ -320,6 +320,21 @@ afb_api_v4_verbose(
 );
 
 /**
+ * Set the specification string of the API.
+ *
+ * @param apiv4 the api to specify
+ * @param specification the specification of the api
+ *
+ * @return 0 on success or a negative code if the api is sealed
+ */
+extern
+int
+afb_api_v4_set_specification(
+	struct afb_api_v4 *apiv4,
+	const char *specification
+);
+
+/**
  * set the array of verbs
  * @param apiv4 the api
  * @param verbs the set of verbs
