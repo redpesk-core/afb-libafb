@@ -716,13 +716,19 @@ int afb_wrap_rpc_create_fd(
 	return rc;
 }
 
-/* use the wrapper as client API */
+/* start the wrapper as client API */
 int afb_wrap_rpc_start_client(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set)
 {
 	int rc = afb_stub_rpc_client_add(wrap->stub, declare_set);
 	if (rc >= 0)
 		afb_stub_rpc_offer_version(wrap->stub);
 	return rc;
+}
+
+/* start the wrapper as server API */
+int afb_wrap_rpc_start_server(struct afb_wrap_rpc *wrap, struct afb_apiset *declare_set)
+{
+	return afb_stub_rpc_client_add(wrap->stub, declare_set);
 }
 
 /* HTTP upgrade of the connection 'fd' to RPC/WS */

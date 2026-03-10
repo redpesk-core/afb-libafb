@@ -55,7 +55,10 @@
 struct server
 {
 	/** the apiset for calling */
-	struct afb_apiset *apiset;
+	struct afb_apiset *call_set;
+
+	/** the apiset for declaring */
+	struct afb_apiset *declare_set;
 
 	/** ev_fd handler */
 	struct ev_fd *efd;
@@ -222,21 +225,29 @@ static void server_accept(struct server *server, int fd)
 		setsockopt(fdc, IPPROTO_TCP, TCP_NODELAY, &rc, (socklen_t)sizeof rc);
 
 		rc = afb_wrap_rpc_create_fd(&wrap, fdc, 1, server->mode, server->uri,
-				server->spec, server->apiset);
+				server->spec, server->call_set);
 		if (rc < 0) {
 			RP_ERROR("can't serve accepted connection to %s", server->uri);
 			close(fdc);
 		}
 		else {
+			rc = afb_wrap_rpc_start_server(wrap, server->declare_set);
+			if (rc < 0) {
+				RP_ERROR("can't start server connection %s", server->uri);
+				close(fdc);
+				/* TODO: afb_wrap_rpc_unref(wrap); */
+			}
 #if WITH_CRED
-			/*
-			* creds of the peer are not changing
-			* except if passed to other processes
-			* TODO check how to track changes if needed
-			*/
-			struct afb_cred *cred;
-			afb_cred_create_for_socket(&cred, fdc); /* TODO: check retcode */
-			afb_wrap_rpc_set_cred(wrap, cred);
+			else {
+				/*
+				* creds of the peer are not changing
+				* except if passed to other processes
+				* TODO check how to track changes if needed
+				*/
+				struct afb_cred *cred;
+				afb_cred_create_for_socket(&cred, fdc); /* TODO: check retcode */
+				afb_wrap_rpc_set_cred(wrap, cred);
+			}
 #endif
 		}
 	}
@@ -362,7 +373,8 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 		goto error;
 	}
 
-	server->apiset = afb_apiset_addref(call_set);
+	server->call_set = afb_apiset_addref(call_set);
+	server->declare_set = afb_apiset_addref(declare_set);
 	server->spec = spec;
 	server->mode = mode;
 	server->efd = 0;
@@ -373,7 +385,8 @@ int afb_api_rpc_add_server(const char *uri, struct afb_apiset *declare_set, stru
 	if (rc >= 0)
 		return 0;
 
-	afb_apiset_unref(server->apiset);
+	afb_apiset_unref(server->call_set);
+	afb_apiset_unref(server->declare_set);
 	free(server);
 error:
 	afb_rpc_spec_unref(spec);

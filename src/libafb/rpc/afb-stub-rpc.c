@@ -3046,6 +3046,36 @@ struct afb_rpc_spec *afb_stub_rpc_spec(struct afb_stub_rpc *stub)
 	return stub->spec;
 }
 
+/* helper callback for disconnection events */
+static int disconnect_client_apis_cb(void *closure, const char *locname, const char *remname)
+{
+	if (locname != NULL)
+		afb_monitor_api_disconnected(locname);
+	return 0;
+}
+
+/* send disconnected event to clients */
+static void disconnect_client_apis(struct afb_stub_rpc *stub)
+{
+	if (stub->declare_set)
+		afb_rpc_spec_for_each(stub->spec, true, disconnect_client_apis_cb, stub);
+}
+
+/* helper callback for removing */
+static int remove_client_apis_cb(void *closure, const char *locname, const char *remname)
+{
+	struct afb_stub_rpc *stub = closure;
+	if (locname != NULL)
+		afb_apiset_del(stub->declare_set, locname);
+	return 0;
+}
+
+static void remove_client_apis(struct afb_stub_rpc *stub)
+{
+	if (stub->declare_set)
+		afb_rpc_spec_for_each(stub->spec, true, remove_client_apis_cb, stub);
+}
+
 /* helper callback for declaring client apis in apiset */
 static int declare_client_apis(void *closure, const char *locname, const char *remname)
 {
@@ -3079,6 +3109,7 @@ int afb_stub_rpc_client_add(struct afb_stub_rpc *stub, struct afb_apiset *declar
 	stub->declare_set = afb_apiset_addref(declare_set);
 	rc = afb_rpc_spec_for_each(spec, true, declare_client_apis, stub);
 	if (rc < 0) {
+		remove_client_apis(stub);
 		afb_apiset_unref(stub->declare_set);
 		stub->declare_set = NULL;
 	}
@@ -3164,14 +3195,6 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 	}
 }
 
-/* helper callback for disconnection events */
-static int disconnect_client_apis(void *closure, const char *locname, const char *remname)
-{
-	if (locname != NULL)
-		afb_monitor_api_disconnected(locname);
-	return 0;
-}
-
 /* disconnected */
 void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 {
@@ -3216,17 +3239,7 @@ void afb_stub_rpc_disconnected(struct afb_stub_rpc *stub)
 	u16id2ptr_destroy(&i2p);
 
 	/* send events */
-	if (stub->declare_set)
-		afb_rpc_spec_for_each(stub->spec, true, disconnect_client_apis, stub);
-}
-
-/* helper callback for removing */
-static int remove_client_apis(void *closure, const char *locname, const char *remname)
-{
-	struct afb_stub_rpc *stub = closure;
-	if (locname != NULL)
-		afb_apiset_del(stub->declare_set, locname);
-	return 0;
+	disconnect_client_apis(stub);
 }
 
 /* sub one reference and free resources if falling to zero */
@@ -3241,7 +3254,7 @@ void afb_stub_rpc_unref(struct afb_stub_rpc *stub)
 		/* cleanup */
 		afb_stub_rpc_disconnected(stub);
 		if (stub->declare_set) {
-			afb_rpc_spec_for_each(stub->spec, true, remove_client_apis, stub);
+			remove_client_apis(stub);
 			afb_apiset_unref(stub->declare_set);
 		}
 		afb_apiset_unref(stub->call_set);
