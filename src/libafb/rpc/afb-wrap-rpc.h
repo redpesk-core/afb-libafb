@@ -87,7 +87,7 @@ int afb_wrap_rpc_create_fd(
 		struct afb_apiset *callset);
 
 /**
- * Declare the wrapper as serving a remote api
+ * Start the wrapper as client
  *
  * @param wrap the wrapper
  * @param declare_set the set where api is exported
@@ -97,6 +97,20 @@ int afb_wrap_rpc_create_fd(
  */
 extern
 int afb_wrap_rpc_start_client(
+		struct afb_wrap_rpc *wrap,
+		struct afb_apiset *declare_set);
+
+/**
+ * Start the wrapper as server
+ *
+ * @param wrap the wrapper
+ * @param declare_set the set where api is exported
+ *
+ * @return 0 on success, X_EINVAL when apiname wasn't set,
+ *         X_EEXIST when already registered to a set
+ */
+extern
+int afb_wrap_rpc_start_server(
 		struct afb_wrap_rpc *wrap,
 		struct afb_apiset *declare_set);
 
