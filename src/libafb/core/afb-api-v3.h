@@ -171,13 +171,5 @@ afb_api_v3_process_call(
 	struct afb_req_common *req
 );
 
-#if DESCRIBE
-extern
-struct json_object *
-afb_api_v3_make_description_openAPIv3(
-	struct afb_api_v3 *api
-);
-#endif
-
 #endif
 

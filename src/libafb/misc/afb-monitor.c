@@ -446,11 +446,7 @@ static void describe_first_api(struct desc_apis *desc)
 	struct namelist *head = desc->names;
 
 	if (head)
-#if DESCRIBE		
-		afb_apiset_describe(monitor_api->call_set, head->name, on_api_description, desc);
-#else
 		on_api_description(desc, NULL);
-#endif
 	else {
 		afb_json_legacy_req_reply_hookable(desc->req, desc->resu, NULL, NULL);
 		afb_req_common_unref(desc->req);

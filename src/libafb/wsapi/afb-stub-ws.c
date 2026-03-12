@@ -319,21 +319,6 @@ static void client_api_process_cb(void * closure, struct afb_req_common *comreq)
 		process_cb, closure, comreq);
 }
 
-#if DESCRIBE
-/* get the description */
-static void client_api_describe_cb(void * closure, void (*describecb)(void *, struct json_object *), void *clocb)
-{
-	struct afb_stub_ws *stubws = closure;
-	struct afb_proto_ws *proto;
-
-	proto = client_get_proto(stubws);
-	if (proto)
-		afb_proto_ws_client_describe(proto, describecb, clocb);
-	else
-		describecb(clocb, NULL);
-}
-#endif
-
 /******************* server part: manage events **********************************/
 
 static void server_event_add_cb(void *closure, const char *event, uint16_t eventid)
@@ -619,28 +604,10 @@ out_of_memory2:
 	afb_proto_ws_call_unref(call);
 }
 
-#if DESCRIBE
-static void server_on_description_cb(void *closure, struct json_object *description)
-{
-	struct afb_proto_ws_describe *describe = closure;
-	afb_proto_ws_describe_put(describe, description);
-	json_object_put(description);
-}
-
-
-static void server_on_describe_cb(void *closure, struct afb_proto_ws_describe *describe)
-{
-	struct afb_stub_ws *stubws = closure;
-
-	afb_apiset_describe(stubws->apiset, stubws->apiname, server_on_description_cb, describe);
-	server_on_description_cb(void *closure, struct json_object *description)
-}
-#else
 static void server_on_describe_cb(void *closure, struct afb_proto_ws_describe *describe)
 {
 	afb_proto_ws_describe_put(describe, NULL);
 }
-#endif
 
 /*****************************************************/
 
@@ -657,9 +624,6 @@ static const struct afb_proto_ws_client_itf client_itf =
 
 static struct afb_api_itf client_api_itf = {
 	.process = client_api_process_cb,
-#if DESCRIBE
-	.describe = client_api_describe_cb
-#endif
 };
 
 static const struct afb_proto_ws_server_itf server_itf =

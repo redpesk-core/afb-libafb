@@ -983,30 +983,6 @@ int afb_apiset_get_logmask(struct afb_apiset *set, const char *name)
 	return i->api.itf->get_logmask(i->api.closure);
 }
 
-#if DESCRIBE
-void afb_apiset_describe(struct afb_apiset *set, const char *name, void (*describecb)(void *, struct json_object *), void *closure)
-{
-#if 1
-	describecb(closure, NULL);
-#else
-	const struct api_desc *i;
-	struct json_object *r;
-
-	r = NULL;
-	if (name) {
-		i = searchrec(set, name);
-		if (i) {
-			if (i->api.itf->describe) {
-				i->api.itf->describe(i->api.closure, describecb, closure);
-				return;
-			}
-		}
-	}
-	describecb(closure, r);
-#endif
-}
-#endif
-
 struct get_names {
 	union  {
 		struct {

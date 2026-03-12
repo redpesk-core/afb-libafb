@@ -4,6 +4,8 @@ Version next
   change
    - improved afb-ev-mgr (use spinlock)
    - removal of single json_tokener in afb-wsj1
+   - removal of legacy describe
+   - handling of the new info verb
 
 Version 5.6.2
 -------------
