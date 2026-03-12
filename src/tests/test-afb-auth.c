@@ -30,374 +30,191 @@
 
 #include <check.h>
 
-#include <json-c/json.h>
-
 #include <afb/afb-auth.h>
 #include <afb/afb-session.h>
-#include <rp-utils/rp-jsonc.h>
 #include <rp-utils/rp-verbose.h>
 
 #include "core/afb-auth.h"
 
+typedef struct ps
+{
+	size_t alloc, count;
+	char *buffer;
+}
+	ps_t;
+
+void ps_ini(ps_t *ps)
+{
+	memset(ps, 0, sizeof *ps);
+}
+
+char *ps_fin(ps_t *ps)
+{
+	char *resu = NULL;
+	if (ps->alloc > ps->count) {
+		resu = ps->buffer;
+		resu[ps->count] = 0;
+		ps_ini(ps);
+	}
+	else {
+		void *p = realloc(ps->buffer, ps->count + 1);
+		if (p != NULL) {
+			ps->buffer = p;
+			ps->alloc = ps->count + 1;
+			ps->count = 0;
+		}
+	}
+	return resu;
+}
+
+void ps_put(ps_t *ps, const char *text)
+{
+	while(*text) {
+		if (ps->count < ps->alloc)
+			ps->buffer[ps->count] = *text;
+		ps->count++;
+		text++;
+	}
+}
+
+char *auth2str(
+	const struct afb_auth *auth,
+	unsigned session
+) {
+	char *result;
+	ps_t ps;
+	ps_ini(&ps);
+	do {
+		afb_auth_put_string(auth, session, (void*)ps_put, &ps);
+		result = ps_fin(&ps);
+	}
+	while (result == NULL);
+	return result;
+}
+
 START_TEST (test)
 {
-    const char * supposed_result[][8] = {
-        {
-		    "false",
-		    "{ \"session\": \"check\" }",
-		    "{ \"LOA\": 2 }",
-		    "{ \"permission\": \"urn:test\" }",
-		    "{ \"anyOf\": [ true, false ] }",
-		    "{ \"allOf\": [ true, false ] }",
-		    "{ \"not\": true }",
-		    "true"
+	const char * expected_results[][8] = {
+		{ /* session = 0 */
+		    "no",
+		    "check-token",
+		    "loa>=2",
+		    "check-token and urn:test",
+		    "yes or no",
+		    "yes and no",
+		    "not yes",
+		    "yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, true ] }"
+		{ /* session = 1 */
+		    "loa>=1 and no",
+		    "loa>=1 and check-token",
+		    "loa>=2",
+		    "loa>=1 and check-token and urn:test",
+		    "loa>=1 and (yes or no)",
+		    "loa>=1 and yes and no",
+		    "loa>=1 and not yes",
+		    "loa>=1 and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, true ] }"
+		{ /* session = 2 */
+		    "loa>=2 and no",
+		    "loa>=2 and check-token",
+		    "loa>=2",
+		    "loa>=2 and check-token and urn:test",
+		    "loa>=2 and (yes or no)",
+		    "loa>=2 and yes and no",
+		    "loa>=2 and not yes",
+		    "loa>=2 and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, true ] }"
+		{ /* session = 3 */
+		    "loa>=3 and no",
+		    "loa>=3 and check-token",
+		    "loa>=3",
+		    "loa>=3 and check-token and urn:test",
+		    "loa>=3 and (yes or no)",
+		    "loa>=3 and yes and no",
+		    "loa>=3 and not yes",
+		    "loa>=3 and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, true ] }"
+		{ /* session = 4 */
+		    "check-token and no",
+		    "check-token",
+		    "loa>=2 and check-token",
+		    "check-token and urn:test",
+		    "check-token and (yes or no)",
+		    "check-token and yes and no",
+		    "check-token and not yes",
+		    "check-token and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
+		{ /* session = 5 */
+		    "loa>=1 and check-token and no",
+		    "loa>=1 and check-token",
+		    "loa>=2 and check-token",
+		    "loa>=1 and check-token and urn:test",
+		    "loa>=1 and check-token and (yes or no)",
+		    "loa>=1 and check-token and yes and no",
+		    "loa>=1 and check-token and not yes",
+		    "loa>=1 and check-token and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
+		{ /* session = 6 */
+		    "loa>=2 and check-token and no",
+		    "loa>=2 and check-token",
+		    "loa>=2 and check-token",
+		    "loa>=2 and check-token and urn:test",
+		    "loa>=2 and check-token and (yes or no)",
+		    "loa>=2 and check-token and yes and no",
+		    "loa>=2 and check-token and not yes",
+		    "loa>=2 and check-token and yes"
 		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "false",
-		    "{ \"session\": \"check\" }",
-		    "{ \"LOA\": 2 }",
-		    "{ \"permission\": \"urn:test\" }",
-		    "{ \"anyOf\": [ true, false ] }",
-		    "{ \"allOf\": [ true, false ] }",
-		    "{ \"not\": true }",
-		    "true"
-		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"LOA\": 3 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 1 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 2 }, true ] }"
-		},
-		{
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"session\": \"check\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"LOA\": 2 } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"permission\": \"urn:test\" } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"anyOf\": [ true, false ] } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true, false ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, { \"not\": true } ] }",
-		    "{ \"allOf\": [ { \"session\": \"close\" }, { \"session\": \"check\" }, { \"LOA\": 3 }, true ] }"
+		{ /* session = 7 */
+		    "loa>=3 and check-token and no",
+		    "loa>=3 and check-token",
+		    "loa>=3 and check-token",
+		    "loa>=3 and check-token and urn:test",
+		    "loa>=3 and check-token and (yes or no)",
+		    "loa>=3 and check-token and yes and no",
+		    "loa>=3 and check-token and not yes",
+		    "loa>=3 and check-token and yes"
 		}
-    };
+	};
 
-    int i;
-    struct afb_auth auth, first, next;
-    struct json_object * result , * expected_result;
-    uint32_t session;
+	int i;
+	struct afb_auth auth, first, next;
+	char *result;
+	const char *expected;
+	uint32_t session;
+	static const char prefix[] = "\t\t";
 
-    auth.next = &next;
-    first.type = afb_auth_Yes;
-    next.type = afb_auth_No;
+	auth.next = &next;
+	first.type = afb_auth_Yes;
+	next.type = afb_auth_No;
 
-    // Compare generated result to expected result
-    for (session=0; session<32; session++){
-        fprintf(stderr, "{\n");
-        for(i=0; i<=7; i++){
-            auth.type = i;
-            switch(i){
-	        case afb_auth_LOA:
-                auth.loa = 2;
-                break;
-            case afb_auth_Permission:
-                auth.text = "urn:test";
-                break;
-            default:
-                auth.first = &first;
-                break;
-            }
-            result = afb_auth_json_x2(&auth, session);
-            expected_result = json_tokener_parse(supposed_result[session][i]);
-            fprintf(stderr, "    '%s'", json_object_to_json_string(result));
-            if(i<7) fprintf(stderr, ",");
-            fprintf(stderr, "\n");
-            ck_assert_int_eq(rp_jsonc_equal(expected_result, result), 1);
-        }
-        fprintf(stderr, "},\n");
-    }
+	// Compare generated result to expected result
+	for (session=0; session<8; session++){
+		fprintf(stderr, "%s{ /* session = %d */\n", prefix, (int)session);
+		for(i=0; i<=7; i++){
+			auth.type = i;
+			switch(i){
+			case afb_auth_LOA:
+				auth.loa = 2;
+				break;
+			case afb_auth_Permission:
+				auth.text = "urn:test";
+				break;
+			default:
+				auth.first = &first;
+				break;
+			}
+			result = auth2str(&auth, session);
+			expected = expected_results[session][i];
+			fprintf(stderr, "%s    \"%s\"", prefix, result);
+			if(i<7) fprintf(stderr, ",");
+			fprintf(stderr, "\n");
+			ck_assert_str_eq(expected, result);
+		}
+		fprintf(stderr, "%s}", prefix);
+		if(session<7) fprintf(stderr, ",");
+		fprintf(stderr, "\n");
+	}
 }
 END_TEST
 

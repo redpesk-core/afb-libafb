@@ -25,13 +25,56 @@
 
 #include "../libafb-config.h"
 
-#if !WITHOUT_JSON_C
-
-#include <stdint.h>
-
 struct afb_auth;
-struct json_object;
 
-extern struct json_object *afb_auth_json_x2(const struct afb_auth *auth, uint32_t session);
+/**
+ * Compute if auth is valid
+ *
+ * @param auth the auth structure to be validated
+ *
+ * @return 0 if invalid or 1 if valid
+ */
+extern
+int afb_auth_is_valid(const struct afb_auth *auth);
 
-#endif
+/**
+ * Compute the minimum value of loa
+ *
+ * @param auth the auth to process (must be valid)
+ *
+ * @return the minimal LOA value
+ */
+extern
+unsigned afb_auth_minloa(const struct afb_auth *auth);
+
+/**
+ * Compute if session check is required
+ *
+ * @param auth the auth to process (must be valid)
+ *
+ * @return 0 if if token is not to be check
+ *         or returns AFB_SESSION_CHECK if it has to be checked
+ */
+extern
+unsigned afb_auth_check_token(const struct afb_auth *auth);
+
+/**
+ * Compute the string representation of the couple
+ * auth and session.
+ *
+ * The callback function 'put' is called (generally more than
+ * one time) to output the text representation.
+ * It receives its closure and the text to add to the string
+ * representation.
+ *
+ * @param auth    the auth to process (must be valid)
+ * @param session the session flags
+ * @param put     a function for writing text
+ * @param closure a closure argument for the function put
+ */
+extern
+void afb_auth_put_string(
+	const struct afb_auth *auth,
+	unsigned session,
+	void (*put)(void *closure, const char *text),
+	void *closure);
