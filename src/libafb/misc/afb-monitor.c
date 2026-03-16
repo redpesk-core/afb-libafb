@@ -342,134 +342,8 @@ static struct json_object *get_verbosity(struct json_object *spec)
 }
 
 /******************************************************************************
-**** Manage namelist of api names
-******************************************************************************/
-
-struct namelist {
-	struct namelist *next;
-	char name[];
-};
-
-static struct namelist *reverse_namelist(struct namelist *head)
-{
-	struct namelist *previous, *next;
-
-	previous = NULL;
-	while(head) {
-		next = head->next;
-		head->next = previous;
-		previous = head;
-		head = next;
-	}
-	return previous;
-}
-
-static void add_one_name_to_namelist(struct namelist **head, const char *name)
-{
-	size_t length = strlen(name) + 1;
-	struct namelist *item = malloc(length + sizeof *item);
-	if (!item)
-		RP_ERROR("out of memory");
-	else {
-		item->next = *head;
-		memcpy(item->name, name, length);
-		*head = item;
-	}
-}
-
-static void get_apis_namelist_of_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
-{
-	struct namelist **head = closure;
-	add_one_name_to_namelist(head, name);
-}
-
-/**
- * get apis names as a list accordling to specification in 'spec'
- * @param spec specification of the apis to get
- */
-static struct namelist *get_apis_namelist(struct json_object *spec)
-{
-	int i, n;
-	struct json_object_iterator it, end;
-	struct namelist *head;
-
-	head = NULL;
-	if (json_object_is_type(spec, json_type_object)) {
-		it = json_object_iter_begin(spec);
-		end = json_object_iter_end(spec);
-		while (!json_object_iter_equal(&it, &end)) {
-			if (json_object_get_boolean(json_object_iter_peek_value(&it)))
-				add_one_name_to_namelist(&head, json_object_iter_peek_name(&it));
-			json_object_iter_next(&it);
-		}
-	} else if (json_object_is_type(spec, json_type_array)) {
-		n = (int)json_object_array_length(spec);
-		for (i = 0 ; i < n ; i++)
-			add_one_name_to_namelist(&head,
-						 json_object_get_string(
-							 json_object_array_get_idx(spec, (rp_jsonc_index_t)i)));
-	} else if (json_object_is_type(spec, json_type_string)) {
-		add_one_name_to_namelist(&head, json_object_get_string(spec));
-	} else if (json_object_get_boolean(spec)) {
-		afb_apiset_enum(monitor_api->call_set, 1, get_apis_namelist_of_all_cb, &head);
-	}
-	return reverse_namelist(head);
-}
-
-/******************************************************************************
 **** Monitoring apis
 ******************************************************************************/
-
-struct desc_apis {
-	struct namelist *names;
-	struct json_object *resu;
-	struct json_object *apis;
-	struct afb_req_common *req;
-};
-
-static void describe_first_api(struct desc_apis *desc);
-
-static void on_api_description(void *closure, struct json_object *apidesc)
-{
-	struct desc_apis *desc = closure;
-	struct namelist *head = desc->names;
-
-	if (apidesc || afb_apiset_get_api(monitor_api->call_set, head->name, 1, 0, NULL))
-		json_object_object_add(desc->apis, head->name, apidesc);
-	desc->names = head->next;
-	free(head);
-	describe_first_api(desc);
-}
-
-static void describe_first_api(struct desc_apis *desc)
-{
-	struct namelist *head = desc->names;
-
-	if (head)
-		on_api_description(desc, NULL);
-	else {
-		afb_json_legacy_req_reply_hookable(desc->req, desc->resu, NULL, NULL);
-		afb_req_common_unref(desc->req);
-		free(desc);
-	}
-}
-
-static void describe_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
-{
-	struct desc_apis *desc;
-
-	desc = malloc(sizeof *desc);
-	if (!desc)
-		afb_req_common_reply_out_of_memory_error_hookable(req);
-	else {
-		desc->req = afb_req_common_addref(req);
-		desc->resu = resu;
-		desc->apis = json_object_new_object();
-		json_object_object_add(desc->resu, _apis_, desc->apis);
-		desc->names = get_apis_namelist(spec);
-		describe_first_api(desc);
-	}
-}
 
 static void list_apis_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
@@ -477,21 +351,11 @@ static void list_apis_cb(void *closure, struct afb_apiset *set, const char *name
 	json_object_object_add(apis, name, aliasto ? json_object_new_string(aliasto) : json_object_new_boolean(1));
 }
 
-static void list_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
+static struct json_object *get_apis()
 {
 	struct json_object *apis = json_object_new_object();
-	json_object_object_add(resu, _apis_, apis);
 	afb_apiset_enum(monitor_api->call_set, 1, list_apis_cb, apis);
-	afb_json_legacy_req_reply_hookable(req, resu, NULL, NULL);
-}
-
-static void get_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
-{
-	if ((json_object_get_type(spec) == json_type_boolean && !json_object_get_boolean(spec))
-	 || (json_object_get_type(spec) == json_type_string && !strcmp(json_object_get_string(spec), "*")))
-		list_apis(req, resu, spec);
-	else
-		describe_apis(req, resu, spec);
+	return apis;
 }
 
 /******************************************************************************
@@ -502,28 +366,27 @@ static void get_apis(struct afb_req_common *req, struct json_object *resu, struc
 static void f_get_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
-	struct json_object *r;
+	struct json_object *r = NULL;
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
 
 	rp_jsonc_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
-	if (!verbosity && !apis)
-		afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
-	else {
+	if (verbosity || apis) {
 		r = json_object_new_object();
-		if (!r)
+		if (!r) {
 			afb_req_common_reply_out_of_memory_error_hookable(req);
-		else {
-			if (verbosity) {
-				verbosity = get_verbosity(verbosity);
-				json_object_object_add(r, _verbosity_, verbosity);
-			}
-			if (!apis)
-				afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
-			else
-				get_apis(req, r, apis);
+			return;
+		}
+		if (verbosity) {
+			verbosity = get_verbosity(verbosity);
+			json_object_object_add(r, _verbosity_, verbosity);
+		}
+		if (apis) {
+			apis = get_apis();
+			json_object_object_add(r, _apis_, apis);
 		}
 	}
+	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
 }
 
 static void f_get(struct afb_req_common *req)
