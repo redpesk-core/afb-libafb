@@ -32,16 +32,16 @@
 /************** constants for protocol V3 *************************/
 
 
-#define SZ_PARAM_BASE              (2+2)                            /* paramid, length */
-#define SZ_PARAM_RES_ID            (SZ_PARAM_BASE+2+2)              /* base, kindid, id */
-#define SZ_PARAM_RES_PLAIN_BASE    (SZ_PARAM_BASE+2)                /* base, kindid, data */
-#define SZ_PARAM_RES_PLAIN(sz)     (SZ_PARAM_RES_PLAIN_BASE+(sz))   /* base, kindid, data */
-#define SZ_PARAM_VALUE_BASE        (SZ_PARAM_BASE)                  /* base, data */
-#define SZ_PARAM_VALUE(sz)         (SZ_PARAM_VALUE_BASE+(sz))       /* base, data */
-#define SZ_PARAM_VALUE_TYPED_BASE  (SZ_PARAM_BASE+2)                /* base, typeid, data */
-#define SZ_PARAM_VALUE_TYPED(sz)   (SZ_PARAM_VALUE_TYPED_BASE+(sz)) /* base, typeid, data */
-#define SZ_PARAM_VALUE_DATA        (SZ_PARAM_BASE+2)                /* base, dataid */
-#define SZ_PARAM_TIMEOUT           (SZ_PARAM_BASE+4)                /* base, timeout */
+#define SZ_PARAM_BASE              (2+2)                            /* 4:    base = (paramid, length) */
+#define SZ_PARAM_RES_ID            (SZ_PARAM_BASE+2+2)              /* 8:    base, kindid, id */
+#define SZ_PARAM_RES_PLAIN_BASE    (SZ_PARAM_BASE+2)                /* 6:    base, kindid */
+#define SZ_PARAM_RES_PLAIN(sz)     (SZ_PARAM_RES_PLAIN_BASE+(sz))   /* 6+sz: base, kindid, data=sz */
+#define SZ_PARAM_VALUE_BASE        (SZ_PARAM_BASE)                  /* 4:    base */
+#define SZ_PARAM_VALUE(sz)         (SZ_PARAM_VALUE_BASE+(sz))       /* 4+sz: base, data=sz */
+#define SZ_PARAM_VALUE_TYPED_BASE  (SZ_PARAM_BASE+2)                /* 6:    base, typeid */
+#define SZ_PARAM_VALUE_TYPED(sz)   (SZ_PARAM_VALUE_TYPED_BASE+(sz)) /* 6+sz: base, typeid, data=sz */
+#define SZ_PARAM_VALUE_DATA        (SZ_PARAM_BASE+2)                /* 6:    base, dataid */
+#define SZ_PARAM_TIMEOUT           (SZ_PARAM_BASE+4)                /* 8:    base, timeout */
 
 /** internal structure for reading parameters */
 struct param
