@@ -369,6 +369,7 @@ static void f_get_cb(void *closure, struct json_object *args)
 	struct json_object *r = NULL;
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
+	struct afb_data *data;
 
 	rp_jsonc_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
 	if (verbosity || apis) {
@@ -386,7 +387,8 @@ static void f_get_cb(void *closure, struct json_object *args)
 			json_object_object_add(r, _apis_, apis);
 		}
 	}
-	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
+	afb_json_legacy_make_data_json_c(&data, r);
+	afb_req_common_reply_hookable(req, 0, 1, &data);
 }
 
 static void f_get(struct afb_req_common *req)
@@ -411,7 +413,7 @@ static void f_set_cb(void *closure, struct json_object *args)
 	if (subscribe)
 		set_sub_unsub(req, subscribe, afb_req_common_subscribe_hookable);
 
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_set(struct afb_req_common *req)
@@ -425,7 +427,7 @@ static void f_subscribe_cb(void *closure, struct json_object *args)
 	struct afb_req_common *req = closure;
 
 	set_sub_unsub(req, args, afb_req_common_subscribe_hookable);
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_subscribe(struct afb_req_common *req)
@@ -439,7 +441,7 @@ static void f_unsubscribe_cb(void *closure, struct json_object *args)
 	struct afb_req_common *req = closure;
 
 	set_sub_unsub(req, args, afb_req_common_unsubscribe_hookable);
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_unsubscribe(struct afb_req_common *req)
@@ -451,13 +453,15 @@ static void f_unsubscribe(struct afb_req_common *req)
 static void f_session(struct afb_req_common *req)
 {
 	struct json_object *r = NULL;
+	struct afb_data *data;
 
 	/* make the result */
 	rp_jsonc_pack(&r, "{s:s,s:i,s:i}",
 			"uuid", afb_session_uuid(req->session),
 			"timeout", afb_session_timeout(req->session),
 			"remain", afb_session_what_remains(req->session));
-	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
+	afb_json_legacy_make_data_json_c(&data, r);
+	afb_req_common_reply_hookable(req, 0, 1, &data);
 }
 #else
 /*** WITHOUT JSON-C **********************************************************/
@@ -581,7 +585,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 		if (rc)
 			goto end;
 	}
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 end:
 	afb_apiset_update_hooks(monitor_api->call_set, NULL);
 	afb_evt_update_hooks();
