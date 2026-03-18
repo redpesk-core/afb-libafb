@@ -31,10 +31,7 @@
 
 #include <rp-utils/rp-verbose.h>
 
-#if WITHOUT_JSON_C
-#undef WITH_RPC_V1
-#define WITH_RPC_V1 0
-#else
+#if !WITHOUT_JSON_C
 #include <json-c/json.h>
 
 #if !defined(JSON_C_TO_STRING_NOSLASHESCAPE)
@@ -81,18 +78,11 @@ json_object_to_json_string_length(
 #include "rpc/afb-rpc-coder.h"
 #include "rpc/afb-rpc-decoder.h"
 
-#if !defined(WITH_RPC_V1)
-# define WITH_RPC_V1  1
-#endif
 #if !defined(WITH_RPC_V3)
 # define WITH_RPC_V3  1
 #endif
 
 #include "rpc/afb-rpc-v0.h"
-#if WITH_RPC_V1
-# include "core/afb-error-text.h"
-# include "rpc/afb-rpc-v1.h"
-#endif
 #if WITH_RPC_V3
 # include "rpc/afb-rpc-v3.h"
 #endif
@@ -360,9 +350,6 @@ static int offer_version(struct afb_stub_rpc *stub)
 #if WITH_RPC_V3
 		AFBRPC_PROTO_VERSION_3,
 #endif
-#if WITH_RPC_V1
-		AFBRPC_PROTO_VERSION_1,
-#endif
 	};
 
 	stub->version_offer_pending = 1;
@@ -468,16 +455,6 @@ static int wait_version(struct afb_stub_rpc *stub)
 }
 
 /******************* memory *****************/
-
-#if WITH_RPC_V1
-/**
- * callback for releasing (put) a json objet
- */
-static void json_put_cb(void *closure)
-{
-	json_object_put((struct json_object *)closure);
-}
-#endif
 
 /******************* inblocks *****************/
 
@@ -675,190 +652,6 @@ static int incall_get(struct afb_stub_rpc *stub, struct incall **ocall)
 	return rc;
 }
 
-#if WITH_RPC_V1
-/**************************************************************************
-* PART - SENDING FOR V1
-**************************************************************************/
-
-static int send_session_create_v1(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return afb_rpc_v1_code_session_create(&stub->coder, id, value);
-}
-
-static int send_token_create_v1(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return afb_rpc_v1_code_token_create(&stub->coder, id, value);
-}
-
-static int send_event_create_v1(struct afb_stub_rpc *stub, uint16_t id, const char *value)
-{
-	return afb_rpc_v1_code_event_create(&stub->coder, id, value);
-}
-
-static int send_event_destroy_v1(struct afb_stub_rpc *stub, uint16_t id)
-{
-	return afb_rpc_v1_code_event_remove(&stub->coder, id);
-}
-
-static int send_event_unexpected_v1(struct afb_stub_rpc *stub, uint16_t id)
-{
-	return afb_rpc_v1_code_event_unexpected(&stub->coder, id);
-}
-
-struct send_v1_cb_data_event_push {
-	struct afb_stub_rpc *stub;
-	uint16_t eventid;
-	int rc;
-};
-
-static void send_event_push_v1_cb(void *closure1, struct json_object *object, const void *closure2)
-{
-	struct send_v1_cb_data_event_push *rd = closure1;
-	struct afb_stub_rpc *stub = rd->stub;
-	rd->rc = afb_rpc_v1_code_event_push(&stub->coder, rd->eventid, json_object_to_json_string(object));
-	if (rd->rc >= 0)
-		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
-}
-
-static int send_event_push_v1(struct afb_stub_rpc *stub, uint16_t eventid, unsigned nparams, struct afb_data * const params[])
-{
-	struct send_v1_cb_data_event_push rd;
-	int rc;
-
-	rd.stub = stub;
-	rd.eventid = eventid;
-	rd.rc = X_ECANCELED;
-	rc = afb_json_legacy_do2_single_json_c(nparams, params, send_event_push_v1_cb, &rd, 0);
-	return rc < 0 ? rc : rd.rc;
-}
-
-struct send_v1_cb_data_event_broadcast {
-	struct afb_stub_rpc *stub;
-	const char *eventname;
-	const unsigned char *uuid;
-	uint8_t hop;
-	int rc;
-};
-
-static void send_event_broadcast_v1_cb(void *closure1, struct json_object *object, const void *closure2)
-{
-	struct send_v1_cb_data_event_broadcast *rd = closure1;
-	struct afb_stub_rpc *stub = rd->stub;
-	rd->rc = afb_rpc_v1_code_event_broadcast(&stub->coder, rd->eventname, json_object_to_json_string(object), rd->uuid, rd->hop);
-	if (rd->rc >= 0)
-		rd->rc = afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
-}
-
-static int send_event_broadcast_v1(struct afb_stub_rpc *stub, const char *eventname, unsigned nparams, struct afb_data * const params[], const unsigned char uuid[16], uint8_t hop)
-{
-	struct send_v1_cb_data_event_broadcast rd;
-	int rc;
-
-	rd.stub = stub;
-	rd.eventname = eventname;
-	rd.uuid = uuid;
-	rd.hop = hop;
-	rd.rc = X_ECANCELED;
-	rc = afb_json_legacy_do2_single_json_c(
-			nparams, params,
-			send_event_broadcast_v1_cb, &rd, 0);
-	return rc < 0 ? rc : rd.rc;
-}
-
-static int send_event_subscribe_v1(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
-{
-	return afb_rpc_v1_code_subscribe(&stub->coder, callid, eventid);
-}
-
-static int send_event_unsubscribe_v1(struct afb_stub_rpc *stub, uint16_t callid, uint16_t eventid)
-{
-	return afb_rpc_v1_code_unsubscribe(&stub->coder, callid, eventid);
-}
-
-struct send_v1_cb_data_call_reply {
-	struct afb_stub_rpc *stub;
-	uint16_t callid;
-	int rc;
-};
-
-static void send_call_reply_v1_cb(void *closure, struct json_object *object, const char *error, const char *info)
-{
-	struct send_v1_cb_data_call_reply *rd = closure;
-	struct afb_stub_rpc *stub = rd->stub;
-	const char *jstr;
-	size_t length;
-
-	jstr = json_object_to_json_string_length(object, 0, &length);
-	rd->rc = afb_rpc_v1_code_reply(&stub->coder,  rd->callid, jstr, (uint32_t)(length + 1), error, info);
-	if (rd->rc >= 0)
-		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
-}
-
-static int send_call_reply_v1(struct afb_stub_rpc *stub, int status, unsigned nreplies, struct afb_data * const replies[], uint16_t callid)
-{
-	struct send_v1_cb_data_call_reply rd;
-	int rc;
-
-	rd.stub = stub;
-	rd.callid = callid;
-	rd.rc = X_ECANCELED;
-	rc = afb_json_legacy_do_reply_json_c(&rd, status, nreplies, replies, send_call_reply_v1_cb);
-	return rc < 0 ? rc : rd.rc;
-}
-
-struct send_v1_cb_data_call_request {
-	struct afb_stub_rpc *stub;
-	uint16_t callid;
-	uint16_t sessionid;
-	uint16_t tokenid;
-	const char *verbname;
-	const char *usrcreds;
-	int rc;
-};
-
-static void send_call_request_v1_cb(void *closure1, struct json_object *object, const void *closure2)
-{
-	struct send_v1_cb_data_call_request *rd = closure1;
-	struct afb_stub_rpc *stub = rd->stub;
-	const char *jstr;
-	size_t length;
-
-	jstr = json_object_to_json_string_length(object, 0, &length);
-	rd->rc = afb_rpc_v1_code_call(&stub->coder, rd->callid, rd->verbname, jstr, (uint32_t)(length + 1), rd->sessionid, rd->tokenid, rd->usrcreds);
-	if (rd->rc >= 0)
-		afb_rpc_coder_on_dispose_output(&stub->coder, json_put_cb, json_object_get(object));
-}
-
-static int send_call_request_v1(
-	struct afb_stub_rpc *stub,
-	uint16_t callid,
-	uint16_t sessionid,
-	uint16_t tokenid,
-	const char *verbname,
-	const char *usrcreds,
-	unsigned nparams,
-	struct afb_data * const params[])
-{
-	struct send_v1_cb_data_call_request rd;
-	int rc;
-
-	rd.stub = stub;
-	rd.callid = callid;
-	rd.sessionid = sessionid;
-	rd.tokenid = tokenid;
-	rd.verbname = verbname;
-	rd.usrcreds = usrcreds;
-	rd.rc = X_ECANCELED;
-	rc = afb_json_legacy_do2_single_json_c(nparams, params, send_call_request_v1_cb, &rd, 0);
-	return rc < 0 ? rc : rd.rc;
-}
-
-static int send_describe_reply_v1(struct afb_stub_rpc *stub, uint16_t callid, const char *description)
-{
-	return afb_rpc_v1_code_description(&stub->coder, callid, description);
-}
-
-#endif
 #if WITH_RPC_V3
 /**************************************************************************
 * PART - SENDING FOR V3
@@ -1155,10 +948,6 @@ static int send_session_create(struct afb_stub_rpc *stub, uint16_t id, const cha
 	RP_DEBUG("RPC send_session_create(%p, %d, %s)", stub, (int)id, value);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_session_create_v1(stub, id, value);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_session_create_v3(stub, id, value);
@@ -1176,10 +965,6 @@ static int send_token_create(struct afb_stub_rpc *stub, uint16_t id, const char 
 	RP_DEBUG("RPC send_token_create(%p, %d, %s)", stub, (int)id, value);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_token_create_v1(stub, id, value);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_token_create_v3(stub, id, value);
@@ -1197,10 +982,6 @@ static int send_event_create(struct afb_stub_rpc *stub, uint16_t eventid, const 
 	RP_DEBUG("RPC send_event_create(%p, %d, %s)", stub, (int)eventid, value);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_create_v1(stub, eventid, value);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_create_v3(stub, eventid, value);
@@ -1218,10 +999,6 @@ static int send_event_destroy(struct afb_stub_rpc *stub, uint16_t eventid)
 	RP_DEBUG("RPC send_event_destroy(%p, %d)", stub, (int)eventid);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_destroy_v1(stub, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_destroy_v3(stub, eventid);
@@ -1239,10 +1016,6 @@ static int send_event_unexpected(struct afb_stub_rpc *stub, uint16_t eventid)
 	RP_DEBUG("RPC send_event_unexpected(%p, %d)", stub, (int)eventid);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_unexpected_v1(stub, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unexpected_v3(stub, eventid);
@@ -1260,10 +1033,6 @@ static int send_event_push(struct afb_stub_rpc *stub, uint16_t eventid, unsigned
 	RP_DEBUG("RPC send_event_push(%p, %d, %d, ...)", stub, (int)eventid, (int)nparams);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_push_v1(stub, eventid, nparams, params);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_push_v3(stub, eventid, nparams, params);
@@ -1283,10 +1052,6 @@ static int send_event_broadcast(struct afb_stub_rpc *stub, const char *eventname
 	RP_DEBUG("RPC send_event_broadcast(%p, %s, %d, ..., %s, %d)", stub, eventname, (int)nparams, uuid, (int)hop);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_broadcast_v1(stub, eventname, nparams, params, uuid, hop);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_broadcast_v3(stub, eventname, nparams, params, uuid, hop);
@@ -1304,10 +1069,6 @@ static int send_event_subscribe(struct afb_stub_rpc *stub, uint16_t callid, uint
 	RP_DEBUG("RPC send_event_subscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_subscribe_v1(stub, callid, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_subscribe_v3(stub, callid, eventid);
@@ -1325,10 +1086,6 @@ static int send_event_unsubscribe(struct afb_stub_rpc *stub, uint16_t callid, ui
 	RP_DEBUG("RPC send_event_unsubscribe(%p, %d, %d)", stub, (int)callid, (int)eventid);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_event_unsubscribe_v1(stub, callid, eventid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_event_unsubscribe_v3(stub, callid, eventid);
@@ -1346,10 +1103,6 @@ static int send_call_reply(struct afb_stub_rpc *stub, int status, unsigned nrepl
 	RP_DEBUG("RPC send_call_reply(%p, %d, %d, ..., %d)", stub, (int)status, (int)nreplies, (int)callid);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_call_reply_v1(stub, status, nreplies, replies, callid);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_call_reply_v3(stub, status, nreplies, replies, callid);
@@ -1376,10 +1129,6 @@ static int send_call_request(
 	RP_DEBUG("RPC send_call_request(%p, %d, %d, %d, %s, %s, %d, ...)", stub, (int)callid, (int)sessionid, (int)tokenid, verbname, usrcreds, (int)nparams);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_call_request_v1(stub, callid, sessionid, tokenid, verbname, usrcreds, nparams, params);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_call_request_v3(stub, callid, sessionid, tokenid, apiname, verbname, usrcreds, nparams, params);
@@ -1397,10 +1146,6 @@ static int send_describe_reply(struct afb_stub_rpc *stub, uint16_t callid, const
 	RP_DEBUG("RPC send_describe_reply(%p, %d, %-30s)", stub, (int)callid, description);
 #endif
 	switch (stub->version) {
-#if WITH_RPC_V1
-	case AFBRPC_PROTO_VERSION_1:
-		return send_describe_reply_v1(stub, callid, description);
-#endif
 #if WITH_RPC_V3
 	case AFBRPC_PROTO_VERSION_3:
 		return send_describe_reply_v3(stub, callid, description);
@@ -2024,186 +1769,6 @@ static int receive_describe_request(struct afb_stub_rpc *stub, uint16_t callid)
 	return send_describe_reply(stub, callid, NULL);
 }
 
-#if WITH_RPC_V1
-/**************************************************************************
-* PART - PROCESS INCOMING MESSAGES V1
-**************************************************************************/
-
-static int decode_call_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_call_t *msg)
-{
-	struct afb_data *arg;
-	int rc = afb_data_create_raw(&arg, &afb_type_predefined_json, msg->data, msg->data_len, inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-	if (rc >= 0)
-		rc = receive_call_request(stub, msg->callid, NULL, msg->verb, 1, &arg, msg->sessionid, msg->tokenid, msg->user_creds);
-	return rc;
-}
-
-static int decode_reply_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_reply_t *msg)
-{
-	struct afb_data *datas[4];
-	unsigned ndata = 4;
-	int rc, rc2;
-	int status = afb_error_code(msg->error);
-
-	rc = afb_json_legacy_make_reply_json_string(datas, /* TODO improve that decoding to handle V4 wrapped on rpcv1 */
-			msg->data, inblock_unref_cb, inblock_addref(stub->receive.current_inblock),
-			msg->error, inblock_unref_cb, inblock_addref(stub->receive.current_inblock),
-			msg->info, inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-	if (rc < 0) {
-		ndata = 0;
-		status = status ? status : AFB_ERRNO_OUT_OF_MEMORY;
-	}
-	rc2 = receive_call_reply(stub, msg->callid, status, ndata, datas);
-	return rc ? rc : rc2;
-}
-
-static int decode_event_create_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_create_t *msg)
-{
-	return receive_event_create(stub, msg->eventid, msg->eventname);
-}
-
-static int decode_event_remove_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_remove_t *msg)
-{
-	return receive_event_destroy(stub, msg->eventid);
-}
-
-static int decode_event_subscribe_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_subscribe_t *msg)
-{
-	return receive_event_subscribe(stub, msg->callid, msg->eventid);
-}
-
-static int decode_event_unsubscribe_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_unsubscribe_t *msg)
-{
-	return receive_event_unsubscribe(stub, msg->callid, msg->eventid);
-}
-
-static int decode_event_push_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_push_t *msg)
-{
-	int rc;
-	unsigned count;
-	struct afb_data *arg;
-	if (msg->data) {
-		count = 1;
-		rc = afb_data_create_raw(&arg, &afb_type_predefined_json, msg->data, 1 + strlen(msg->data),
-					inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-	}
-	else {
-		count = 0;
-		rc = 0;
-	}
-	if (rc >= 0)
-		rc = receive_event_push(stub, msg->eventid, count, &arg);
-	return rc;
-}
-
-static int decode_event_broadcast_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_broadcast_t *msg)
-{
-	int rc;
-	unsigned count;
-	struct afb_data *arg;
-	if (msg->data) {
-		count = 1;
-		rc = afb_data_create_raw(&arg, &afb_type_predefined_json, msg->data, 1 + strlen(msg->data),
-					inblock_unref_cb, inblock_addref(stub->receive.current_inblock));
-	}
-	else {
-		count = 0;
-		rc = 0;
-	}
-	if (rc >= 0)
-		rc = receive_event_broadcast(stub, msg->name, count, &arg, *msg->uuid, msg->hop);
-	return rc;
-}
-
-static int decode_event_unexpected_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_event_unexpected_t *msg)
-{
-	return receive_event_unexpected(stub, msg->eventid);
-}
-
-static int decode_session_create_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_session_create_t *msg)
-{
-	return receive_session_create(stub, msg->sessionid, msg->sessionname);
-}
-
-static int decode_session_remove_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_session_remove_t *msg)
-{
-	return receive_session_destroy(stub, msg->sessionid);
-}
-
-static int decode_token_create_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_token_create_t *msg)
-{
-	return receive_token_create(stub, msg->tokenid, msg->tokenname);
-}
-
-static int decode_token_remove_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_token_remove_t *msg)
-{
-	return receive_token_destroy(stub, msg->tokenid);
-}
-
-static int decode_describe_v1(struct afb_stub_rpc *stub, afb_rpc_v1_msg_describe_t *msg)
-{
-	return receive_describe_request(stub, msg->descid);
-}
-
-static int decode_v1(struct afb_stub_rpc *stub)
-{
-	afb_rpc_v1_msg_t msg;
-	int rc;
-
-	rc = afb_rpc_v1_decode(&stub->decoder, &msg);
-	if (rc >= 0) {
-		switch(msg.type) {
-		case afb_rpc_v1_msg_type_call:
-			rc = decode_call_v1(stub, &msg.call);
-			break;
-		case afb_rpc_v1_msg_type_reply:
-			rc = decode_reply_v1(stub, &msg.reply);
-			break;
-		case afb_rpc_v1_msg_type_event_create:
-			rc = decode_event_create_v1(stub, &msg.event_create);
-			break;
-		case afb_rpc_v1_msg_type_event_remove:
-			rc = decode_event_remove_v1(stub, &msg.event_remove);
-			break;
-		case afb_rpc_v1_msg_type_event_subscribe:
-			rc = decode_event_subscribe_v1(stub, &msg.event_subscribe);
-			break;
-		case afb_rpc_v1_msg_type_event_unsubscribe:
-			rc = decode_event_unsubscribe_v1(stub, &msg.event_unsubscribe);
-			break;
-		case afb_rpc_v1_msg_type_event_push:
-			rc = decode_event_push_v1(stub, &msg.event_push);
-			break;
-		case afb_rpc_v1_msg_type_event_broadcast:
-			rc = decode_event_broadcast_v1(stub, &msg.event_broadcast);
-			break;
-		case afb_rpc_v1_msg_type_event_unexpected:
-			rc = decode_event_unexpected_v1(stub, &msg.event_unexpected);
-			break;
-		case afb_rpc_v1_msg_type_session_create:
-			rc = decode_session_create_v1(stub, &msg.session_create);
-			break;
-		case afb_rpc_v1_msg_type_session_remove:
-			rc = decode_session_remove_v1(stub, &msg.session_remove);
-			break;
-		case afb_rpc_v1_msg_type_token_create:
-			rc = decode_token_create_v1(stub, &msg.token_create);
-			break;
-		case afb_rpc_v1_msg_type_token_remove:
-			rc = decode_token_remove_v1(stub, &msg.token_remove);
-			break;
-		case afb_rpc_v1_msg_type_describe:
-			rc = decode_describe_v1(stub, &msg.describe);
-			break;
-		default:
-			rc = X_EPROTO;
-			break;
-		}
-	}
-	return rc;
-}
-
-#endif
 #if WITH_RPC_V3
 /**************************************************************************
 * PART - PROCESS INCOMING MESSAGES V3
@@ -2632,9 +2197,6 @@ static int decode_v0(struct afb_stub_rpc *stub)
 			for (rc = 0 ; rc < (int)m0.version_offer.count ; rc++) {
 				uint8_t offer = m0.version_offer.versions[rc];
 				switch(offer) {
-#if WITH_RPC_V1
-				case AFBRPC_PROTO_VERSION_1:
-#endif
 #if WITH_RPC_V3
 				case AFBRPC_PROTO_VERSION_3:
 #endif
@@ -2696,11 +2258,6 @@ static ssize_t decode_block(struct afb_stub_rpc *stub, struct inblock *inblock)
 		case AFBRPC_PROTO_VERSION_UNSET:
 			rc = decode_v0(stub);
 			break;
-#if WITH_RPC_V1
-		case AFBRPC_PROTO_VERSION_1:
-			rc = decode_v1(stub);
-			break;
-#endif
 #if WITH_RPC_V3
 		case AFBRPC_PROTO_VERSION_3:
 			rc = decode_v3(stub);
