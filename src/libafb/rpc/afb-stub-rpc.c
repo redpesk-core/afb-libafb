@@ -335,8 +335,7 @@ static int emit(struct afb_stub_rpc *stub)
 	int rc = X_ECANCELED;
 	if (stub->callbacks.notify)
 		rc = stub->callbacks.notify(stub->callbacks.closure, &stub->coder);
-	if (rc < 0)
-		afb_rpc_coder_output_dispose(&stub->coder);
+	afb_rpc_coder_output_dispose(&stub->coder);
 	return rc;
 }
 

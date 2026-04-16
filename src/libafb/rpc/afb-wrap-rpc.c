@@ -364,7 +364,6 @@ static int notify_fd(void *closure, struct afb_rpc_coder *coder)
 					hangup(wrap);
 				rc = X_EPIPE;
 			}
-			afb_rpc_coder_output_dispose(coder);
 		}
 	}
 	return rc;
@@ -421,13 +420,10 @@ static int notify_tls(void *closure, struct afb_rpc_coder *coder)
 						(uint32_t)sizeof buffer, off);
 		for (wrt = 0 ; wrt < sz ; wrt += (uint32_t)ssz) {
 			ssz = tls_send(&wrap->tls_session, &buffer[wrt], sz - wrt);
-			if (ssz <= 0) {
-				afb_rpc_coder_output_dispose(coder);
+			if (ssz <= 0)
 				return -1;
-			}
 		}
 	}
-	afb_rpc_coder_output_dispose(coder);
 	return 0;
 }
 
@@ -451,10 +447,8 @@ static int notify_ws(void *closure, struct afb_rpc_coder *coder)
 	else {
 		struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
 		rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-		if (rc > 0) {
+		if (rc > 0)
 			afb_ws_binary_v(wrap->ws, iovs, rc);
-			afb_rpc_coder_output_dispose(coder);
-		}
 	}
 	return rc;
 }
@@ -888,7 +882,6 @@ static int notify_vcomm(void *closure, struct afb_rpc_coder *coder)
 			RP_ERROR("Failed to send a buffer of %u bytes", (unsigned)size);
 			afb_vcomm_drop_tx_buffer(vcomm, buffer);
 		}
-		afb_rpc_coder_output_dispose(coder);
 	}
 	return rc;
 }

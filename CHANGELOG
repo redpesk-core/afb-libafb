@@ -3,6 +3,7 @@ version 5.x
 
   fix
    - use after disconnection in notify_ws
+   - releasing of rpc coder memory
 
 Version 5.7.1
 -------------
