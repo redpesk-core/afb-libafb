@@ -444,12 +444,17 @@ static void disposews(void *closure, void *buffer, size_t size)
 
 static int notify_ws(void *closure, struct afb_rpc_coder *coder)
 {
+	int rc;
 	struct afb_wrap_rpc *wrap = closure;
-	struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
-	int rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
-	if (rc > 0) {
-		afb_ws_binary_v(wrap->ws, iovs, rc);
-		afb_rpc_coder_output_dispose(coder);
+	if (wrap->ws == NULL)
+		rc = X_ECONNABORTED;
+	else {
+		struct iovec iovs[AFB_RPC_OUTPUT_BUFFER_COUNT_MAX];
+		rc = afb_rpc_coder_output_get_iovec(coder, iovs, AFB_RPC_OUTPUT_BUFFER_COUNT_MAX);
+		if (rc > 0) {
+			afb_ws_binary_v(wrap->ws, iovs, rc);
+			afb_rpc_coder_output_dispose(coder);
+		}
 	}
 	return rc;
 }
