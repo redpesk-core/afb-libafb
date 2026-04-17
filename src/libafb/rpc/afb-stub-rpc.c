@@ -142,17 +142,6 @@ struct incall
 };
 
 /**
- * Type of out going call
- */
-enum outcall_type
-{
-	/** unset */
-	outcall_type_unset,
-	/** standard call */
-	outcall_type_call,
-};
-
-/**
  * structure for a request: requests on client side, the call went out
  */
 struct outcall
@@ -162,9 +151,6 @@ struct outcall
 
 	/** id of the request */
 	uint16_t id;
-
-	/** type of the call (a outcall_type value) */
-	uint8_t type;
 
 	/** related request */
 	struct afb_req_common *comreq;
@@ -608,7 +594,6 @@ static int outcall_get(struct afb_stub_rpc *stub, struct outcall **ocall)
 				id++;
 			} while(!id || outcall_search(stub, id));
 			call->id = stub->idlast = id;
-			call->type = outcall_type_unset;
 			call->next = stub->outcalls;
 			stub->outcalls = call;
 			rc = 0;
@@ -1392,7 +1377,6 @@ static void api_process_cb(void * closure, struct afb_req_common *comreq)
 	if (rc >= 0)
 		rc = outcall_get(stub, &call);
 	if (rc >= 0) {
-		call->type = outcall_type_call;
 		call->comreq = afb_req_common_addref(comreq);
 		rc = client_make_ids(stub, comreq, &sessionid, &tokenid);
 		if (rc >= 0) {
@@ -1545,12 +1529,8 @@ static int receive_call_reply(
 		rc = X_EPROTO;
 	}
 	else {
-		switch(outcall->type) {
-		case outcall_type_call:
-			afb_req_common_reply_hookable(outcall->comreq, status, ndata, data);
-			afb_req_common_unref(outcall->comreq);
-			break;
-		}
+		afb_req_common_reply_hookable(outcall->comreq, status, ndata, data);
+		afb_req_common_unref(outcall->comreq);
 		outcall_free(stub, outcall);
 		rc = 0;
 	}
@@ -1697,7 +1677,7 @@ static int receive_event_subscription(struct afb_stub_rpc *stub, uint16_t callid
 	int rc;
 
 	outcall = outcall_at(stub, callid);
-	if (outcall == NULL || outcall->type != outcall_type_call) {
+	if (outcall == NULL) {
 		RP_ERROR("can't %s, no call of id %d", _unsubscribe_+sub, (int)callid);
 		rc = X_EPROTO;
 	}
@@ -2496,12 +2476,8 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 		iter = iter->next;
 		ocall->next = NULL;
 
-		switch(ocall->type) {
-		case outcall_type_call:
-			afb_req_common_reply_hookable(ocall->comreq, AFB_ERRNO_DISCONNECTED, 0, NULL);
-			afb_req_common_unref(ocall->comreq);
-			break;
-		}
+		afb_req_common_reply_hookable(ocall->comreq, AFB_ERRNO_DISCONNECTED, 0, NULL);
+		afb_req_common_unref(ocall->comreq);
 		outcall_free(stub, ocall);
 	}
 }
