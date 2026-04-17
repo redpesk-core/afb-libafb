@@ -646,30 +646,6 @@ static void do_unwatch(struct afb_evt_listener *listener, struct afb_evt *evt)
 	}
 }
 
-static void evt_unwatch(struct afb_evt *evt, struct afb_evt_listener *listener, struct afb_evt_watch *watch, int notify)
-{
-	struct afb_evt_watch **prv;
-
-	/* unlink the watch for its event */
-	x_rwlock_wrlock(&listener->rwlock);
-	prv = &listener->watchs;
-	while(*prv) {
-		if (*prv == watch) {
-			*prv = watch->next_by_listener;
-			break;
-		}
-		prv = &(*prv)->next_by_listener;
-	}
-	x_rwlock_unlock(&listener->rwlock);
-
-	/* recycle memory */
-	free(watch);
-
-	/* notify listener if needed */
-	if (notify)
-		do_unwatch(listener, evt);
-}
-
 static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *evt, struct afb_evt_watch *watch, int notify)
 {
 	struct afb_evt_watch **prv;
@@ -692,6 +668,65 @@ static void listener_unwatch(struct afb_evt_listener *listener, struct afb_evt *
 	/* notify listener if needed */
 	if (notify)
 		do_unwatch(listener, evt);
+}
+
+static void evt_finalize_destroy(struct afb_evt *evt, struct afb_evt_watch *watch);
+static void evt_finalize_destroy_job(int signum, void *closure1, void *closure2)
+{
+	struct afb_evt *evt = closure1;
+	struct afb_evt_watch *watch = closure2;
+	struct afb_evt_watch *next_watch = watch->next_by_evt;
+	struct afb_evt_listener *listener = watch->listener;
+
+	if (signum == 0)
+		listener->itf->remove(listener->closure, evt->fullname, evt->id);
+	listener_internal_unref(listener);
+	/* recycle watch memory */
+	free(watch);
+	/* next watch of the event */
+	evt_finalize_destroy(evt, next_watch);
+}
+
+static void evt_finalize_destroy(struct afb_evt *evt, struct afb_evt_watch *watch)
+{
+	if (watch == NULL) {
+		/* free */
+		x_rwlock_destroy(&evt->rwlock);
+		free(evt);
+	}
+	else {
+		struct afb_evt_watch **prv, *nxt;
+		struct afb_evt_listener *listener = watch->listener;
+
+		/* unlink the watch for the event in the listener */
+		x_rwlock_wrlock(&listener->rwlock);
+		prv = &listener->watchs;
+		while(*prv) {
+			if (*prv == watch) {
+				*prv = watch->next_by_listener;
+				break;
+			}
+			prv = &(*prv)->next_by_listener;
+		}
+		x_rwlock_unlock(&listener->rwlock);
+
+		/* check if asynchronous need */
+		if (listener->itf->remove != NULL && listener->group != NULL) {
+			/* asynchonous notify is needed */
+			listener_internal_addref(listener);
+			afb_sched_post_job2(listener->group, 0, 0, evt_finalize_destroy_job, evt, watch, Afb_Sched_Mode_Normal);
+		}
+		else {
+			/* notify listener if needed */
+			if (listener->itf->remove != NULL)
+				listener->itf->remove(listener->closure, evt->fullname, evt->id);
+			/* recycle watch memory */
+			nxt = watch->next_by_evt;
+			free(watch);
+			/* next watch of the event */
+			evt_finalize_destroy(evt, nxt);
+		}
+	}
 }
 
 /**************************************************************************/
@@ -804,7 +839,7 @@ struct afb_evt *afb_evt_addref(struct afb_evt *evt)
 void afb_evt_unref(struct afb_evt *evt)
 {
 	struct afb_evt **prv, *oev;
-	struct afb_evt_watch *watch, *nwatch;
+	struct afb_evt_watch *watch;
 
 	if (!__atomic_sub_fetch(&evt->refcount, 1, __ATOMIC_RELAXED)) {
 		/* unlinks the event if valid! */
@@ -830,15 +865,7 @@ void afb_evt_unref(struct afb_evt *evt)
 		watch = evt->watchs;
 		evt->watchs = NULL;
 		x_rwlock_unlock(&evt->rwlock);
-		while(watch) {
-			nwatch = watch->next_by_evt;
-			evt_unwatch(evt, watch->listener, watch, 1);
-			watch = nwatch;
-		}
-
-		/* free */
-		x_rwlock_destroy(&evt->rwlock);
-		free(evt);
+		evt_finalize_destroy(evt, watch);
 	}
 }
 
