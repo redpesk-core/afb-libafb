@@ -1,9 +1,16 @@
-version 5.x
+version 5.7.2
 -------------
 
   fix
    - use after disconnection in notify_ws
    - releasing of rpc coder memory
+   - fix use after free in event destruction
+   - fix memory leak when tracing in monitor
+   - fix memory leak when rpc calls internaly fail (#9169)
+
+  change
+   - improvement of websocket close process
+   - improvement of afb-stub-rpc
 
 Version 5.7.1
 -------------
