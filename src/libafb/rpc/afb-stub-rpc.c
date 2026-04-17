@@ -517,6 +517,7 @@ static struct outcall *outcall_alloc(struct afb_stub_rpc *stub)
 /* destroy an outcall */
 static void outcall_free(struct afb_stub_rpc *stub, struct outcall *call)
 {
+	afb_req_common_unref(call->comreq);
 	free(call);
 }
 
@@ -1530,7 +1531,6 @@ static int receive_call_reply(
 	}
 	else {
 		afb_req_common_reply_hookable(outcall->comreq, status, ndata, data);
-		afb_req_common_unref(outcall->comreq);
 		outcall_free(stub, outcall);
 		rc = 0;
 	}
@@ -2477,7 +2477,6 @@ static void release_all_outcalls(struct afb_stub_rpc *stub)
 		ocall->next = NULL;
 
 		afb_req_common_reply_hookable(ocall->comreq, AFB_ERRNO_DISCONNECTED, 0, NULL);
-		afb_req_common_unref(ocall->comreq);
 		outcall_free(stub, ocall);
 	}
 }
