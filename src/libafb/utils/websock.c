@@ -69,7 +69,9 @@
 static size_t default_maxlength = WEBSOCKET_DEFAULT_MAXLENGTH;
 
 struct websock {
-	int state;
+	unsigned rcv_state: 2;
+	unsigned local_close: 1;
+	unsigned remote_close: 1;
 	uint64_t maxlength;
 	int lenhead, szhead;
 	uint64_t length;
@@ -304,6 +306,10 @@ int websock_close(struct websock *ws, uint16_t code, const void *data, size_t le
 	unsigned char buffer[2];
 	struct iovec iov[2];
 
+	if (ws->local_close)
+		return X_ECONNABORTED;
+
+	ws->local_close = 1;
 	if (code == WEBSOCKET_CODE_NOT_SET && length == 0)
 		return websock_send(ws, 1, 0, 0, 0, OPCODE_CLOSE, NULL, 0);
 
@@ -328,6 +334,8 @@ int websock_ping(struct websock *ws, const void *data, size_t length)
 	/* checks the length */
 	if (length > 125)
 		return X_EINVAL;
+	if (ws->local_close)
+		return X_ECONNABORTED;
 
 	return websock_send(ws, 1, 0, 0, 0, OPCODE_PING, data, length);
 }
@@ -337,37 +345,51 @@ int websock_pong(struct websock *ws, const void *data, size_t length)
 	/* checks the length */
 	if (length > 125)
 		return X_EINVAL;
+	if (ws->local_close)
+		return X_ECONNABORTED;
 
 	return websock_send(ws, 1, 0, 0, 0, OPCODE_PONG, data, length);
 }
 
 int websock_text(struct websock *ws, int last, const void *text, size_t length)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send(ws, last, 0, 0, 0, OPCODE_TEXT, text, length);
 }
 
 int websock_text_v(struct websock *ws, int last, const struct iovec *iovec, int count)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send_v(ws, last, 0, 0, 0, OPCODE_TEXT, iovec, count);
 }
 
 int websock_binary(struct websock *ws, int last, const void *data, size_t length)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send(ws, last, 0, 0, 0, OPCODE_BINARY, data, length);
 }
 
 int websock_binary_v(struct websock *ws, int last, const struct iovec *iovec, int count)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send_v(ws, last, 0, 0, 0, OPCODE_BINARY, iovec, count);
 }
 
 int websock_continue(struct websock *ws, int last, const void *data, size_t length)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send(ws, last, 0, 0, 0, OPCODE_CONTINUATION, data, length);
 }
 
 int websock_continue_v(struct websock *ws, int last, const struct iovec *iovec, int count)
 {
+	if (ws->local_close)
+		return X_ECONNABORTED;
 	return websock_send_v(ws, last, 0, 0, 0, OPCODE_CONTINUATION, iovec, count);
 }
 
@@ -425,11 +447,11 @@ int websock_dispatch(struct websock *ws, int loop)
 	int rc;
 	uint16_t code;
 loop:
-	switch (ws->state) {
+	switch (ws->rcv_state) {
 	case STATE_INIT:
 		ws->lenhead = 0;
 		ws->szhead = 2;
-		ws->state = STATE_START;
+		ws->rcv_state = STATE_START;
 		/*@fallthrough@*/
 
 	case STATE_START:
@@ -469,7 +491,7 @@ loop:
 		default:
 			ws->szhead += 4 * FRAME_GET_MASK(ws->header[1]);
 		}
-		ws->state = STATE_LENGTH;
+		ws->rcv_state = STATE_LENGTH;
 		/*@fallthrough@*/
 
 	case STATE_LENGTH:
@@ -515,7 +537,7 @@ loop:
 			ws->mask = 0;
 
 		/* all heading fields are known, process */
-		ws->state = STATE_DATA;
+		ws->rcv_state = STATE_DATA;
 		if (ws->itf->on_extension != NULL) {
 			if (ws->itf->on_extension(ws->closure,
 					FRAME_GET_FIN(ws->header[0]),
@@ -567,6 +589,7 @@ loop:
 				code = (uint16_t)(code << 8);
 				code = (uint16_t)(code | (uint16_t)(ws->header[ws->szhead - 1] & 0xff));
 			}
+			ws->remote_close = 1;
 			ws->itf->on_close(ws->closure, code, (size_t) ws->length);
 			return 0;
 		case OPCODE_PING:
@@ -574,7 +597,7 @@ loop:
 				ws->itf->on_ping(ws->closure, ws->length);
 			else
 				pong(ws);
-			ws->state = STATE_INIT;
+			ws->rcv_state = STATE_INIT;
 			if (!loop)
 				return 0;
 			break;
@@ -583,7 +606,7 @@ loop:
 				ws->itf->on_pong(ws->closure, ws->length);
 			else
 				websock_drop(ws);
-			ws->state = STATE_INIT;
+			ws->rcv_state = STATE_INIT;
 			if (!loop)
 				return 0;
 			break;
@@ -595,7 +618,7 @@ loop:
 	case STATE_DATA:
 		if (ws->length)
 			return 0;
-		ws->state = STATE_INIT;
+		ws->rcv_state = STATE_INIT;
 		break;
 	}
 	goto loop;
@@ -648,7 +671,7 @@ ssize_t websock_read(struct websock * ws, void *buffer, size_t size)
 {
 	ssize_t rc;
 
-	if (ws->state != STATE_DATA)
+	if (ws->rcv_state != STATE_DATA)
 		return 0;
 
 	if (size > ws->length)
@@ -691,6 +714,7 @@ struct websock *websock_create_v13(const struct websock_itf *itf, void *closure)
 
 void websock_destroy(struct websock *ws)
 {
+	websock_close_empty(ws);
 	free(ws);
 }
 
