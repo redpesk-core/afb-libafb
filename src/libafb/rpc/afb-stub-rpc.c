@@ -594,11 +594,15 @@ static int outcall_get(struct afb_stub_rpc *stub, struct outcall **ocall)
 	if (stub->idcount >= ACTIVE_ID_MAX)
 		rc = X_ECANCELED;
 	else {
+		stub->idcount++;
+		x_spin_unlock(&stub->spinner);
 		call = outcall_alloc(stub);
-		if (call == NULL)
+		x_spin_lock(&stub->spinner);
+		if (call == NULL) {
 			rc = X_ENOMEM;
+			stub->idcount--;
+		}
 		else {
-			stub->idcount++;
 			id = stub->idlast;
 			do {
 				id++;
