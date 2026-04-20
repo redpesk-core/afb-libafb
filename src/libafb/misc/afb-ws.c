@@ -138,8 +138,8 @@ static void aws_disconnect(struct afb_ws *ws, int call_on_hangup)
 	struct websock *wsi = ws->ws;
 	if (wsi != NULL) {
 		ws->ws = NULL;
-		ev_fd_unref(ws->efd);
 		websock_destroy(wsi);
+		ev_fd_unref(ws->efd);
 		free(ws->buffer.buffer);
 		ws->state = waiting;
 		if (call_on_hangup && ws->itf->on_hangup)

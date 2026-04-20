@@ -212,7 +212,10 @@ build_memstr(
 
 
 
-/** */
+/**
+ * Searches in str the first specification looking like the regular expression
+ * /[^@,]*(@[^,]*)/ meaning local[@remote]
+ */
 static
 int
 build_get(
@@ -236,25 +239,29 @@ build_get(
 		irem = lloc + 1;
 		for (lrem = 0; str[irem + lrem] != 0 && str[irem + lrem] != ',' ; lrem++);
 	}
+	/* here the local name is str[0 .. lloc] and remote is str[irem .. lrem] */
 
 	/* compute star kind and strings */
 	if (lloc == 1 && str[0] == '*') {
+		/* is it "*" ? */
 		if (irem == 0)
 			recapi->star = STAR_YES;
 		else
 			return -1;
 	}
 	else if (lrem == 1 && str[irem] == '*') {
+		/* is 'local@*' */
 		memstr = build_memstr(memstr, &recapi->local, str, lloc);
 		recapi->star = STAR_AS;
 	}
 	else {
+		/* is 'local@remote' */
 		memstr = build_memstr(memstr, &recapi->local, str, lloc);
 		memstr = build_memstr(memstr, &recapi->remote, &str[irem], lrem);
 		recapi->star = STAR_NO;
 	}
 
-	/* emit the result */
+	/* emit the result, update p_ ... */
 	*p_memstr = memstr;
 	if (str[irem + lrem] != 0)
 		*p_str = &str[irem + lrem + 1];
@@ -352,7 +359,8 @@ build_imports(
 
 struct afb_rpc_spec *afb_rpc_spec_addref(struct afb_rpc_spec *spec)
 {
-	__atomic_add_fetch(&spec->refcount, 1, __ATOMIC_RELAXED);
+	if (spec)
+		__atomic_add_fetch(&spec->refcount, 1, __ATOMIC_RELAXED);
 	return spec;
 }
 
@@ -445,6 +453,21 @@ int afb_rpc_spec_from_uri(struct afb_rpc_spec **spec, const char *uri, bool clie
 	rc = afb_rpc_spec_for_api(spec, apicpy, client);
 	free(apicpy);
 	return rc;
+}
+
+int afb_rpc_spec_make_export_all(struct afb_rpc_spec **spec)
+{
+	struct afb_rpc_spec *s = *spec = malloc(sizeof *s);
+	if (s == NULL)
+		return X_ENOMEM;
+	s->refcount = 1;
+	s->imports.upper = 0;
+	s->imports.star_mode = STAR_NO;
+	s->imports.star_arg = 0;
+	s->exports.upper = 0;
+	s->exports.star_mode = STAR_YES;
+	s->exports.star_arg = 0;
+	return 0;
 }
 
 int afb_rpc_spec_search(

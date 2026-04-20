@@ -41,6 +41,7 @@
 #include "core/afb-global.h"
 #include "core/afb-hook-flags.h"
 #include "core/afb-hook.h"
+#include "core/afb-info.h"
 #include "core/afb-jobs.h"
 #include "core/afb-json-legacy.h"
 #include "core/afb-perm.h"

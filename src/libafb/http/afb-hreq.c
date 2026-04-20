@@ -1045,7 +1045,7 @@ void afb_hreq_call(struct afb_hreq *hreq, struct afb_apiset *apiset, const char 
 	} else {
 		make_params(hreq);
 		afb_req_common_addref(&hreq->comreq);
-		afb_req_common_process(&hreq->comreq, apiset);
+		afb_req_common_process_hookable(&hreq->comreq, apiset);
 	}
 }
 

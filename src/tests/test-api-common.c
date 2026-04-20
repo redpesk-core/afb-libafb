@@ -183,7 +183,6 @@ struct afb_api_itf api_itf_null = {
 #endif
 	.get_logmask = NULL,
 	.set_logmask = NULL,
-	.describe = NULL,
 	.unref = NULL
 };
 

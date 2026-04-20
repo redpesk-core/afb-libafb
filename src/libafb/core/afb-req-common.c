@@ -492,8 +492,15 @@ static inline void req_common_process_api(struct afb_req_common *req, int timeou
 
 #endif
 
-static void req_common_process_internal(struct afb_req_common *req, struct afb_apiset *apiset)
-{
+/**
+ * Enqueue a job for processing the request 'req' using the given 'apiset'.
+ * Errors are reported as request failures.
+ */
+void
+afb_req_common_process(
+	struct afb_req_common *req,
+	struct afb_apiset *apiset
+) {
 	int rc;
 
 	/* lookup at the api */
@@ -510,24 +517,23 @@ static void req_common_process_internal(struct afb_req_common *req, struct afb_a
 	afb_req_common_unref(req);
 }
 
-/**
- * Enqueue a job for processing the request 'req' using the given 'apiset'.
- * Errors are reported as request failures.
- */
 void
-afb_req_common_process(
+afb_req_common_process_hookable(
 	struct afb_req_common *req,
 	struct afb_apiset *apiset
-) {
+)
+#if !WITH_AFB_HOOK
+	__attribute__((alias("afb_req_common_process")));
+#else
+{
 	/* init hooking */
-#if WITH_AFB_HOOK
 	afb_hook_init_req(req);
 	if (req->hookflags)
 		afb_hook_req_begin(req);
-#endif
 
-	req_common_process_internal(req, apiset);
+	afb_req_common_process(req, apiset);
 }
+#endif
 
 #if WITH_CRED
 static
@@ -545,7 +551,7 @@ process_on_behalf_cb(
 
 	if (status > 0) {
 		afb_req_common_set_cred(req, cred);
-		req_common_process_internal(req, apiset);
+		afb_req_common_process(req, apiset);
 	}
 	else {
 		afb_req_common_reply_insufficient_scope_error_hookable(req, NULL);
@@ -569,14 +575,8 @@ afb_req_common_process_on_behalf(
 	int rc;
 	struct afb_cred *cred;
 
-	/* init hooking */
-#if WITH_AFB_HOOK
-	afb_hook_init_req(req);
-	if (req->hookflags)
-		afb_hook_req_begin(req);
-#endif
 	if (import == NULL) {
-		req_common_process_internal(req, apiset);
+		afb_req_common_process(req, apiset);
 		return;
 	}
 
@@ -597,6 +597,24 @@ afb_req_common_process_on_behalf(
 	afb_req_common_unref(req);
 #endif
 }
+
+void
+afb_req_common_process_on_behalf_hookable(
+	struct afb_req_common *req,
+	struct afb_apiset *apiset,
+	const char *import
+)
+#if !WITH_AFB_HOOK
+	__attribute__((alias("afb_req_common_process_on_behalf")));
+#else
+{
+	afb_hook_init_req(req);
+	if (req->hookflags)
+		afb_hook_req_begin(req);
+
+	afb_req_common_process_on_behalf(req, apiset, import);
+}
+#endif
 
 /******************************************************************************/
 

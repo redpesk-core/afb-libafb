@@ -393,15 +393,6 @@ afb_req_common_param_convert(
 /******************************************************************************/
 
 extern
-void
-afb_req_common_reply_hookable(
-	struct afb_req_common *req,
-	int status,
-	unsigned nparams,
-	struct afb_data * const params[]
-);
-
-extern
 struct afb_req_common *
 afb_req_common_addref_hookable(
 	struct afb_req_common *req
@@ -411,6 +402,30 @@ extern
 void
 afb_req_common_unref_hookable(
 	struct afb_req_common *req
+);
+
+extern
+void
+afb_req_common_process_hookable(
+	struct afb_req_common *req,
+	struct afb_apiset *apiset
+);
+
+extern
+void
+afb_req_common_process_on_behalf_hookable(
+	struct afb_req_common *req,
+	struct afb_apiset *apiset,
+	const char *import
+);
+
+extern
+void
+afb_req_common_reply_hookable(
+	struct afb_req_common *req,
+	int status,
+	unsigned nparams,
+	struct afb_data * const params[]
 );
 
 extern

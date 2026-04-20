@@ -38,14 +38,15 @@
 
 #include "core/afb-apiset.h"
 #include "core/afb-api-common.h"
+#include "core/afb-data.h"
 #include "core/afb-evt.h"
+#include "core/afb-info.h"
+#include "core/afb-json-legacy.h"
 #include "core/afb-req-common.h"
+#include "core/afb-session.h"
 #if WITH_AFB_TRACE
 #include "misc/afb-trace.h"
 #endif
-#include "core/afb-session.h"
-#include "core/afb-json-legacy.h"
-#include "core/afb-data.h"
 #include "core/afb-type-predefined.h"
 #include "sys/x-errno.h"
 
@@ -67,6 +68,7 @@
 #define verbosity_get()      verbosity_from_mask(rp_logmask)
 
 
+static const char _apis_[] = "apis";
 static const char _disconnected_[] = "disconnected";
 static const char _get_[] = "get";
 static const char _monitor_[] = "monitor";
@@ -78,7 +80,6 @@ static const char _unsubscribe_[] = "unsubscribe";
 
 #if !WITHOUT_JSON_C
 
-static const char _apis_[] = "apis";
 static const char _verbosity_[] = "verbosity";
 
 static const char _debug_[] = "debug";
@@ -93,12 +94,10 @@ static struct afb_api_common *monitor_api;
 static struct afb_evt *evt_disconnected;
 
 static void monitor_process(void *closure, struct afb_req_common *req);
-static void monitor_describe(void *closure, void (*describecb)(void *, struct json_object *), void *clocb);
 
 static struct afb_api_itf monitor_itf =
 {
-	.process = monitor_process,
-	.describe = monitor_describe
+	.process = monitor_process
 };
 
 int afb_monitor_init(struct afb_apiset *declare_set, struct afb_apiset *call_set)
@@ -270,7 +269,7 @@ static struct json_object *encode_verbosity(int level)
 	case rp_Log_Level_Error:	return json_object_new_string(_error_);
 	case rp_Log_Level_Warning:	return json_object_new_string(_warning_);
 	case rp_Log_Level_Notice:	return json_object_new_string(_notice_);
-	case rp_Log_Level_Info:	return json_object_new_string(_info_);
+	case rp_Log_Level_Info:		return json_object_new_string(_info_);
 	case rp_Log_Level_Debug:	return json_object_new_string(_debug_);
 	default: return json_object_new_int(level);
 	}
@@ -343,134 +342,8 @@ static struct json_object *get_verbosity(struct json_object *spec)
 }
 
 /******************************************************************************
-**** Manage namelist of api names
-******************************************************************************/
-
-struct namelist {
-	struct namelist *next;
-	char name[];
-};
-
-static struct namelist *reverse_namelist(struct namelist *head)
-{
-	struct namelist *previous, *next;
-
-	previous = NULL;
-	while(head) {
-		next = head->next;
-		head->next = previous;
-		previous = head;
-		head = next;
-	}
-	return previous;
-}
-
-static void add_one_name_to_namelist(struct namelist **head, const char *name)
-{
-	size_t length = strlen(name) + 1;
-	struct namelist *item = malloc(length + sizeof *item);
-	if (!item)
-		RP_ERROR("out of memory");
-	else {
-		item->next = *head;
-		memcpy(item->name, name, length);
-		*head = item;
-	}
-}
-
-static void get_apis_namelist_of_all_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
-{
-	struct namelist **head = closure;
-	add_one_name_to_namelist(head, name);
-}
-
-/**
- * get apis names as a list accordling to specification in 'spec'
- * @param spec specification of the apis to get
- */
-static struct namelist *get_apis_namelist(struct json_object *spec)
-{
-	int i, n;
-	struct json_object_iterator it, end;
-	struct namelist *head;
-
-	head = NULL;
-	if (json_object_is_type(spec, json_type_object)) {
-		it = json_object_iter_begin(spec);
-		end = json_object_iter_end(spec);
-		while (!json_object_iter_equal(&it, &end)) {
-			if (json_object_get_boolean(json_object_iter_peek_value(&it)))
-				add_one_name_to_namelist(&head, json_object_iter_peek_name(&it));
-			json_object_iter_next(&it);
-		}
-	} else if (json_object_is_type(spec, json_type_array)) {
-		n = (int)json_object_array_length(spec);
-		for (i = 0 ; i < n ; i++)
-			add_one_name_to_namelist(&head,
-						 json_object_get_string(
-							 json_object_array_get_idx(spec, (rp_jsonc_index_t)i)));
-	} else if (json_object_is_type(spec, json_type_string)) {
-		add_one_name_to_namelist(&head, json_object_get_string(spec));
-	} else if (json_object_get_boolean(spec)) {
-		afb_apiset_enum(monitor_api->call_set, 1, get_apis_namelist_of_all_cb, &head);
-	}
-	return reverse_namelist(head);
-}
-
-/******************************************************************************
 **** Monitoring apis
 ******************************************************************************/
-
-struct desc_apis {
-	struct namelist *names;
-	struct json_object *resu;
-	struct json_object *apis;
-	struct afb_req_common *req;
-};
-
-static void describe_first_api(struct desc_apis *desc);
-
-static void on_api_description(void *closure, struct json_object *apidesc)
-{
-	struct desc_apis *desc = closure;
-	struct namelist *head = desc->names;
-
-	if (apidesc || afb_apiset_get_api(monitor_api->call_set, head->name, 1, 0, NULL))
-		json_object_object_add(desc->apis, head->name, apidesc);
-	desc->names = head->next;
-	free(head);
-	describe_first_api(desc);
-}
-
-static void describe_first_api(struct desc_apis *desc)
-{
-	struct namelist *head = desc->names;
-
-	if (head)
-		afb_apiset_describe(monitor_api->call_set, head->name, on_api_description, desc);
-	else {
-		afb_json_legacy_req_reply_hookable(desc->req, desc->resu, NULL, NULL);
-		afb_req_common_unref(desc->req);
-		free(desc);
-	}
-}
-
-static void describe_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
-{
-	struct desc_apis *desc;
-
-	desc = malloc(sizeof *desc);
-	if (!desc)
-		afb_req_common_reply_out_of_memory_error_hookable(req);
-	else {
-		desc->req = afb_req_common_addref(req);
-		desc->resu = resu;
-		desc->apis = json_object_new_object();
-		json_object_object_add(desc->resu, _apis_, desc->apis);
-		desc->names = get_apis_namelist(spec);
-		describe_first_api(desc);
-	}
-}
 
 static void list_apis_cb(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
 {
@@ -478,52 +351,44 @@ static void list_apis_cb(void *closure, struct afb_apiset *set, const char *name
 	json_object_object_add(apis, name, aliasto ? json_object_new_string(aliasto) : json_object_new_boolean(1));
 }
 
-static void list_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
+static struct json_object *get_apis()
 {
 	struct json_object *apis = json_object_new_object();
-	json_object_object_add(resu, _apis_, apis);
 	afb_apiset_enum(monitor_api->call_set, 1, list_apis_cb, apis);
-	afb_json_legacy_req_reply_hookable(req, resu, NULL, NULL);
-}
-
-static void get_apis(struct afb_req_common *req, struct json_object *resu, struct json_object *spec)
-{
-	if ((json_object_get_type(spec) == json_type_boolean && !json_object_get_boolean(spec))
-	 || (json_object_get_type(spec) == json_type_string && !strcmp(json_object_get_string(spec), "*")))
-		list_apis(req, resu, spec);
-	else
-		describe_apis(req, resu, spec);
+	return apis;
 }
 
 /******************************************************************************
 **** Implementation monitoring verbs
 ******************************************************************************/
 
+/*** GET *********************************************************************/
 static void f_get_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
-	struct json_object *r;
+	struct json_object *r = NULL;
 	struct json_object *apis = NULL;
 	struct json_object *verbosity = NULL;
+	struct afb_data *data;
 
 	rp_jsonc_unpack(args, "{s?:o,s?:o}", _verbosity_, &verbosity, _apis_, &apis);
-	if (!verbosity && !apis)
-		afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
-	else {
+	if (verbosity || apis) {
 		r = json_object_new_object();
-		if (!r)
+		if (!r) {
 			afb_req_common_reply_out_of_memory_error_hookable(req);
-		else {
-			if (verbosity) {
-				verbosity = get_verbosity(verbosity);
-				json_object_object_add(r, _verbosity_, verbosity);
-			}
-			if (!apis)
-				afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
-			else
-				get_apis(req, r, apis);
+			return;
+		}
+		if (verbosity) {
+			verbosity = get_verbosity(verbosity);
+			json_object_object_add(r, _verbosity_, verbosity);
+		}
+		if (apis) {
+			apis = get_apis();
+			json_object_object_add(r, _apis_, apis);
 		}
 	}
+	afb_json_legacy_make_data_json_c(&data, r);
+	afb_req_common_reply_hookable(req, 0, 1, &data);
 }
 
 static void f_get(struct afb_req_common *req)
@@ -531,6 +396,7 @@ static void f_get(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_get_cb, req);
 }
 
+/*** SET *********************************************************************/
 static void f_set_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
@@ -547,7 +413,7 @@ static void f_set_cb(void *closure, struct json_object *args)
 	if (subscribe)
 		set_sub_unsub(req, subscribe, afb_req_common_subscribe_hookable);
 
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_set(struct afb_req_common *req)
@@ -555,12 +421,13 @@ static void f_set(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_set_cb, req);
 }
 
+/*** SUBSCRIBE ***************************************************************/
 static void f_subscribe_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
 
 	set_sub_unsub(req, args, afb_req_common_subscribe_hookable);
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_subscribe(struct afb_req_common *req)
@@ -568,12 +435,13 @@ static void f_subscribe(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_subscribe_cb, req);
 }
 
+/*** UNSUBSCRIBE *************************************************************/
 static void f_unsubscribe_cb(void *closure, struct json_object *args)
 {
 	struct afb_req_common *req = closure;
 
 	set_sub_unsub(req, args, afb_req_common_unsubscribe_hookable);
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 }
 
 static void f_unsubscribe(struct afb_req_common *req)
@@ -581,18 +449,22 @@ static void f_unsubscribe(struct afb_req_common *req)
 	afb_json_legacy_do_single_json_c(req->params.ndata, req->params.data, f_unsubscribe_cb, req);
 }
 
+/*** SESSION *****************************************************************/
 static void f_session(struct afb_req_common *req)
 {
 	struct json_object *r = NULL;
+	struct afb_data *data;
 
 	/* make the result */
 	rp_jsonc_pack(&r, "{s:s,s:i,s:i}",
 			"uuid", afb_session_uuid(req->session),
 			"timeout", afb_session_timeout(req->session),
 			"remain", afb_session_what_remains(req->session));
-	afb_json_legacy_req_reply_hookable(req, r, NULL, NULL);
+	afb_json_legacy_make_data_json_c(&data, r);
+	afb_req_common_reply_hookable(req, 0, 1, &data);
 }
 #else
+/*** WITHOUT JSON-C **********************************************************/
 static void f_set(struct afb_req_common *req)
 {
 	afb_req_common_reply_unavailable_error_hookable(req);
@@ -631,6 +503,48 @@ static void f_unsubscribe(struct afb_req_common *req)
 }
 #endif
 
+/*** NEW GET APIS ************************************************************/
+
+struct apilist
+{
+	size_t pos;
+	char *buffer;
+};
+
+static void get_apilist_size(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
+{
+	struct apilist *al = closure;
+	al->pos += strlen(name) + 1;
+}
+
+static void get_apilist_name(void *closure, struct afb_apiset *set, const char *name, const char *aliasto)
+{
+	struct apilist *al = closure;
+	size_t sz = strlen(name);
+	if (al->pos != 0)
+		al->buffer[al->pos++] = ' ';
+	memcpy(&al->buffer[al->pos], name, sz + 1);
+	al->pos += sz;
+}
+
+static void f_apis(struct afb_req_common *req)
+{
+	struct apilist al;
+	struct afb_data *data;
+
+	al.pos = 0;
+	afb_apiset_enum(monitor_api->call_set, 1, get_apilist_size, &al);
+	if (0 > afb_data_create_alloc(&data, &afb_type_predefined_stringz,
+			(void**)&al.buffer, al.pos))
+		afb_req_common_reply_out_of_memory_error_hookable(req);
+	else {
+		al.pos = 0;
+		afb_apiset_enum(monitor_api->call_set, 1, get_apilist_name, &al);
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+	}
+}
+
+/*** TRACE *******************************************************************/
 #if WITH_AFB_TRACE
 static void context_destroy(void *pointer)
 {
@@ -671,7 +585,7 @@ static void f_trace_cb(void *closure, struct json_object *args)
 		if (rc)
 			goto end;
 	}
-	afb_json_legacy_req_reply_hookable(req, NULL, NULL, NULL);
+	afb_req_common_reply_hookable(req, 0, 0, NULL);
 end:
 	afb_apiset_update_hooks(monitor_api->call_set, NULL);
 	afb_evt_update_hooks();
@@ -689,6 +603,37 @@ static void f_trace(struct afb_req_common *req)
 }
 #endif
 
+/*** INFO ****************************************************************/
+
+static void f_info(struct afb_req_common *req)
+{
+	int rc;
+	struct afb_data *data = NULL;
+	struct afb_info info;
+
+	afb_info_init(&info);
+	do {
+		afb_info_set_api(&info, _monitor_, "Monitoring API", NULL);
+		afb_info_add_verb(&info, _apis_, "List apis", 0, NULL, 0);
+		afb_info_add_verb(&info, _session_, "Get session info", 0, NULL, 0);
+		afb_info_add_verb(&info, _subscribe_, "Subscribe to monitoring events", 0, NULL, 0);
+		afb_info_add_verb(&info, _unsubscribe_, "Unsubscribe from monitoring events", 0, NULL, 0);
+#if !WITHOUT_JSON_C
+		afb_info_add_verb(&info, _get_, "Get apis and/or verbosity", 0, NULL, 0);
+		afb_info_add_verb(&info, _set_, "Set verbosities and/or subscriptions", 0, NULL, 0);
+#endif
+#if WITH_AFB_TRACE
+		afb_info_add_verb(&info, _trace_, "Trace internal activity", 0, NULL, 0);
+#endif
+		rc = afb_info_end(&info, &data);
+	} while(rc > 0);
+	if (rc < 0)
+		afb_req_common_reply_internal_error_hookable(req, rc);
+	else
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+}
+
+/*** DISPATCH ****************************************************************/
 void checkcb(void *closure, int status)
 {
 	struct afb_req_common *req = closure;
@@ -706,6 +651,10 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	struct afb_auth *auth = NULL;
 
 	switch (req->verbname[0]) {
+	case 'a':
+		if (0 == strcmp(req->verbname, _apis_))
+			fun = f_apis;
+		break;
 	case 'g':
 		if (0 == strcmp(req->verbname, _get_))
 			fun = f_get;
@@ -729,6 +678,8 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	default:
 		break;
 	}
+	if (fun == NULL && strcmp(req->verbname, afb_info_verbname) == 0)
+		fun = f_info;
 	if (fun == NULL) {
 		afb_req_common_reply_verb_unknown_error_hookable(req);
 	}
@@ -744,7 +695,3 @@ static void monitor_process(void *closure, struct afb_req_common *req)
 	}
 }
 
-static void monitor_describe(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
-{
-	describecb(clocb, NULL /* TODO */);
-}

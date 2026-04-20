@@ -88,13 +88,19 @@ struct afb_wsj1_msg
 	struct json_object *object_j;
 };
 
+#ifndef WSJ1_SINGLE_JSON_TOKENER
+#define WSJ1_SINGLE_JSON_TOKENER 0
+#endif
+
 struct afb_wsj1
 {
 	int refcount;
 	int genid;
 	struct afb_wsj1_itf *itf;
 	void *closure;
+#if WSJ1_SINGLE_JSON_TOKENER
 	struct json_tokener *tokener;
+#endif
 	struct afb_ws *ws;
 	struct afb_wsj1_msg *messages;
 	struct wsj1_call *calls;
@@ -117,17 +123,21 @@ struct afb_wsj1 *afb_wsj1_create(int fd, int autoclose, struct afb_wsj1_itf *itf
 	result->closure = closure;
 	x_mutex_init(&result->mutex);
 
+#if WSJ1_SINGLE_JSON_TOKENER
 	result->tokener = json_tokener_new();
 	if (result->tokener == NULL)
 		goto error2;
+#endif
 
 	result->ws = afb_ws_create(fd, autoclose, &wsj1_itf, result);
 	if (result->ws != NULL)
 		return result;
 
 	autoclose = 0;
+#if WSJ1_SINGLE_JSON_TOKENER
 	json_tokener_free(result->tokener);
 error2:
+#endif
 	free(result);
 error:
 	if (autoclose)
@@ -145,7 +155,9 @@ void afb_wsj1_unref(struct afb_wsj1 *wsj1)
 {
 	if (wsj1 && !__atomic_sub_fetch(&wsj1->refcount, 1, __ATOMIC_RELAXED)) {
 		afb_ws_destroy(wsj1->ws);
+#if WSJ1_SINGLE_JSON_TOKENER
 		json_tokener_free(wsj1->tokener);
+#endif
 		free(wsj1);
 	}
 }
@@ -478,11 +490,15 @@ struct json_object *afb_wsj1_msg_object_j(struct afb_wsj1_msg *msg)
 	enum json_tokener_error jerr;
 	struct json_object *object = msg->object_j;
 	if (object == NULL) {
+#if WSJ1_SINGLE_JSON_TOKENER
 		x_mutex_lock(&msg->wsj1->mutex);
 		json_tokener_reset(msg->wsj1->tokener);
 		object = json_tokener_parse_ex(msg->wsj1->tokener, msg->object_s, 1 + (int)msg->object_s_length);
 		jerr = json_tokener_get_error(msg->wsj1->tokener);
 		x_mutex_unlock(&msg->wsj1->mutex);
+#else
+		object = json_tokener_parse_verbose(msg->object_s, &jerr);
+#endif
 		if (jerr != json_tokener_success) {
 			/* lazy error detection of json request. Is it to improve? */
 			object = json_object_new_string_len(msg->object_s, (int)msg->object_s_length);

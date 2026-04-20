@@ -266,7 +266,7 @@ process(
 	                                      callback, closure1, closure2, closure3,
 	                                      caller, flags, itf, copynames);
 	if (req != NULL)
-		afb_req_common_process(&req->comreq, afb_api_common_call_set(req->comapi));
+		afb_req_common_process_hookable(&req->comreq, afb_api_common_call_set(req->comapi));
 }
 
 #if WITH_AFB_CALL_SYNC
@@ -323,7 +323,7 @@ static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lo
 			ps->completed = 1;
 		else {
 			afb_req_common_addref(&ps->callreq->comreq);
-			afb_req_common_process(&ps->callreq->comreq, afb_api_common_call_set(ps->comapi));
+			afb_req_common_process_hookable(&ps->callreq->comreq, afb_api_common_call_set(ps->comapi));
 		}
 	}
 	else if (ps->callreq != NULL)

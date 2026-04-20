@@ -57,6 +57,10 @@ int afb_rpc_spec_from_uri(
 	bool client);
 
 extern
+int afb_rpc_spec_make_export_all(
+	struct afb_rpc_spec **spec);
+
+extern
 int afb_rpc_spec_search(
 	const struct afb_rpc_spec *spec,
 	const char *api,

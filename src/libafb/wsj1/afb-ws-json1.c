@@ -270,7 +270,7 @@ static void aws_on_call_cb(void *closure, const char *api, const char *verb, str
 	wsreq->aws = afb_ws_json1_addref(ws);
 
 	/* emits the call */
-	afb_req_common_process(&wsreq->comreq, ws->apiset);
+	afb_req_common_process_hookable(&wsreq->comreq, ws->apiset);
 }
 
 static void aws_on_event(struct afb_ws_json1 *aws, const struct afb_evt_data *event)

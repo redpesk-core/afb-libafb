@@ -39,7 +39,6 @@ struct afb_api_itf
 #endif
 	int (*get_logmask)(void *closure);
 	void (*set_logmask)(void *closure, int level);
-	void (*describe)(void *closure, void (*describecb)(void *, struct json_object *), void *clocb);
 	void (*unref)(void *closure);
 };
 
@@ -89,8 +88,6 @@ extern void afb_apiset_update_hooks(struct afb_apiset *set, const char *name);
 #endif
 extern void afb_apiset_set_logmask(struct afb_apiset *set, const char *name, int mask);
 extern int afb_apiset_get_logmask(struct afb_apiset *set, const char *name);
-
-extern void afb_apiset_describe(struct afb_apiset *set, const char *name, void (*describecb)(void *, struct json_object *), void *closure);
 
 extern const char **afb_apiset_get_names(struct afb_apiset *set, int rec, int type);
 extern void afb_apiset_enum(

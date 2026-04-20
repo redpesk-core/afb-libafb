@@ -666,7 +666,7 @@ void afb_hook_init_req(struct afb_req_common *req)
 	struct afb_hook_req *hook;
 
 	/* scan hook list to get the expected flags */
-	flags = 0;
+	flags = req->hookflags;
 	x_rwlock_rdlock(&rwlock);
 	hook = list_of_req_hooks;
 	while (hook) {
@@ -682,8 +682,10 @@ void afb_hook_init_req(struct afb_req_common *req)
 	x_rwlock_unlock(&rwlock);
 
 	/* store the hooking data */
+	f = req->hookflags;
 	req->hookflags = flags;
-	if (flags) {
+	if (flags != 0 && f == 0) {
+		/* get a request id */
 		do {
 			x = __atomic_load_n(&reqindex, __ATOMIC_RELAXED);
 			req->hookindex = (x + 1) % 1000000 ?: 1;

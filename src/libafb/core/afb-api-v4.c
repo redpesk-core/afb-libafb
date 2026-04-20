@@ -54,6 +54,7 @@
 #include "core/afb-type.h"
 #include "core/afb-calls.h"
 #include "core/afb-string-mode.h"
+#include "core/afb-info.h"
 
 #if WITH_SYSTEMD
 #include "sys/systemd.h"
@@ -97,6 +98,9 @@ struct afb_api_v4
 
 	/** mask of loging */
 	int16_t logmask;
+
+	/* specification */
+	const char *specification;
 
 	/* strings */
 	char strings[];
@@ -274,7 +278,7 @@ static int match_glob_pattern(const struct afb_verb_v4 *verb, const char *name)
 	return fnmatch(verb->verb, name, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|NAME_FOLD_FNM);
 }
 
-static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const char *name)
+static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const char *name, int glob)
 {
 	struct afb_verb_v4 **base, *verb;
 	unsigned low, up, mid;
@@ -290,7 +294,7 @@ static struct afb_verb_v4 *search_dynamic_verb(struct afb_api_v4 *api, const cha
 	while(low < up) {
 		mid = (low + up) >> 1;
 		verb = base[mid];
-		if (verb->glob && match_glob_pattern(verb, name) == 0)
+		if (glob && verb->glob && match_glob_pattern(verb, name) == 0)
 			return verb;
 		cmp = namecmp(verb->verb, name);
 		if (cmp == 0)
@@ -308,20 +312,34 @@ afb_api_v4_verb_matching(
 	struct afb_api_v4 *apiv4,
 	const char *name
 ) {
+	return afb_api_v4_verb_search(apiv4, name, 1);
+}
+
+const struct afb_verb_v4 *
+afb_api_v4_verb_search(
+	struct afb_api_v4 *apiv4,
+	const char *name,
+	int glob
+) {
 	const struct afb_verb_v4 *verb;
 
 	/* look first in dynamic set */
-	verb = search_dynamic_verb(apiv4, name);
-	if (!verb) {
+	verb = search_dynamic_verb(apiv4, name, glob);
+	if (verb == NULL) {
 		/* look then in static set */
-		verb = apiv4->verbs.statics;
-		while (verb) {
-			if (!verb->verb)
-				verb = 0;
-			else if ((verb->glob ? match_glob_pattern(verb, name) : namecmp(verb->verb, name)) == 0)
+		for (verb = apiv4->verbs.statics ; verb != NULL ; verb++) {
+			if (!verb->verb) {
+				verb = NULL;
 				break;
-			else
-				verb++;
+			}
+			if (verb->glob) {
+				if (glob && match_glob_pattern(verb, name) == 0)
+					break;
+			}
+			else {
+				if (namecmp(verb->verb, name) == 0)
+					break;
+			}
 		}
 	}
 	return verb;
@@ -344,6 +362,18 @@ afb_api_v4_verb_at(
 	index -= apiv4->dyn_verb_count;
 	if (apiv4->sta_verb_count > index)
 		return &apiv4->verbs.statics[index];
+	return 0;
+}
+
+int
+afb_api_v4_set_specification(
+	struct afb_api_v4 *apiv4,
+	const char *specification
+) {
+	if (is_sealed(apiv4))
+		return X_EPERM;
+
+	apiv4->specification = specification;
 	return 0;
 }
 
@@ -552,12 +582,6 @@ static int api_get_logmask_cb(void *closure)
 static void api_set_logmask_cb(void *closure, int level)
 	__attribute__((alias("afb_api_v4_logmask_set")));
 
-static void api_describe_cb(void *closure, void (*describecb)(void *, struct json_object *), void *clocb)
-{
-	struct afb_api_v4 *apiv4 = closure;
-	describecb(clocb, afb_api_v4_make_description_openAPIv3(apiv4));
-}
-
 static void api_unref_cb(void *closure)
 {
 	struct afb_api_v4 *apiv4 = closure;
@@ -578,7 +602,6 @@ static struct afb_api_itf export_api_itf =
 #endif
 	.get_logmask = api_get_logmask_cb,
 	.set_logmask = api_set_logmask_cb,
-	.describe = api_describe_cb,
 	.unref = api_unref_cb
 };
 
@@ -611,6 +634,42 @@ afb_api_v4_event_handler_del(
 	return afb_api_common_event_handler_del(&api->comapi, pattern, closure);
 }
 
+static
+void
+auto_info_req(
+	struct afb_api_v4 *api,
+	struct afb_req_common *req
+) {
+	int rc;
+	struct afb_data *data = NULL;
+	struct afb_info info;
+	struct afb_verb_v4 **iter, **end;
+	const struct afb_verb_v4 *verb;
+
+	afb_info_init(&info);
+	do {
+		rc = afb_info_set_api(&info, api->comapi.name, api->comapi.info, api->specification);
+		iter = api->verbs.dynamics;
+		end = iter + api->dyn_verb_count;
+		while (rc >= 0 && iter != end) {
+			verb = *iter++;
+			if (verb == afb_api_v4_verb_search(api, verb->verb, 0))
+				rc = afb_info_add_verb(&info, verb->verb, verb->info,
+						verb->session, verb->auth, verb->glob);
+		}
+		for (verb = api->verbs.statics ; rc >= 0 && verb && verb->verb ; verb++) {
+			if (verb == afb_api_v4_verb_search(api, verb->verb, 0))
+				rc = afb_info_add_verb(&info, verb->verb, verb->info,
+						verb->session, verb->auth, verb->glob);
+		}
+		rc = afb_info_end(&info, &data);
+	} while(rc > 0);
+	if (rc < 0)
+		afb_req_common_reply_internal_error_hookable(req, rc);
+	else
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+}
+
 void
 afb_api_v4_process_call(
 	struct afb_api_v4 *api,
@@ -622,121 +681,12 @@ afb_api_v4_process_call(
 	if (verb)
 		/* verb found */
 		afb_req_v4_process(req, api, verb);
+	else if (strcmp(req->verbname, afb_info_verbname) == 0)
+		auto_info_req(api, req);
 	else
 		/* error no verb found */
 		afb_req_common_reply_verb_unknown_error_hookable(req);
 }
-
-#if WITHOUT_JSON_C
-struct json_object *
-afb_api_v4_make_description_openAPIv3(
-	struct afb_api_v4 *api
-) {
-	return NULL;
-}
-#else
-static
-struct json_object *
-describe_verb_v4(
-	const struct afb_verb_v4 *verb,
-	struct json_tokener *tok
-) {
-	struct json_object *f, *a, *g, *d;
-
-	f = json_object_new_object();
-
-	g = json_object_new_object();
-	json_object_object_add(f, "get", g);
-
-	a = afb_auth_json_x2(verb->auth, verb->session);
-	if (a)
-		json_object_object_add(g, "x-permissions", a);
-
-	a = json_object_new_object();
-	json_object_object_add(g, "responses", a);
-	g = json_object_new_object();
-	json_object_object_add(a, "200", g);
-	if (!verb->info)
-		d = json_object_new_string(verb->verb);
-	else {
-		json_tokener_reset(tok);
-		d = json_tokener_parse_ex(tok, verb->info, -1);
-		if (json_tokener_get_error(tok) != json_tokener_success) {
-			json_object_put(d);
-			d = json_object_new_string(verb->info);
-		}
-	}
-	json_object_object_add(g, "description", d);
-
-	return f;
-}
-
-struct json_object *
-afb_api_v4_make_description_openAPIv3(
-	struct afb_api_v4 *api
-) {
-	char buffer[256];
-	struct afb_verb_v4 **iter, **end;
-	const struct afb_verb_v4 *verb;
-	struct json_object *r, *i, *p;
-	struct json_tokener *tok;
-	struct json_object_iterator jit, jend;
-
-	tok = json_tokener_new();
-	r = json_object_new_object();
-	json_object_object_add(r, "openapi", json_object_new_string("3.0.0"));
-
-	i = json_object_new_object();
-	json_object_object_add(r, "info", i);
-	json_object_object_add(i, "version", json_object_new_string("0.0.0"));
-	if (api->comapi.info) {
-		json_tokener_reset(tok);
-		p = json_tokener_parse_ex(tok, api->comapi.info, -1);
-		if (json_tokener_get_error(tok) != json_tokener_success) {
-			json_object_put(p);
-			p = json_object_new_string(api->comapi.info);
-			json_object_object_add(i, "description", p);
-		}
-		else if (!json_object_is_type(p, json_type_object)) {
-			json_object_object_add(i, "description", p);
-		}
-		else {
-			jit = json_object_iter_begin(p);
-			jend = json_object_iter_end(p);
-			while (!json_object_iter_equal(&jit, &jend)) {
-				json_object_object_add(i,
-					json_object_iter_peek_name(&jit),
-					json_object_get(json_object_iter_peek_value(&jit)));
-				json_object_iter_next(&jit);
-			}
-			json_object_put(p);
-		}
-	}
-	json_object_object_add(i, "title", json_object_new_string(api->comapi.name));
-
-	buffer[0] = '/';
-	buffer[sizeof buffer - 1] = 0;
-
-	p = json_object_new_object();
-	json_object_object_add(r, "paths", p);
-	iter = api->verbs.dynamics;
-	end = iter + api->dyn_verb_count;
-	while (iter != end) {
-		verb = *iter++;
-		strncpy(buffer + 1, verb->verb, sizeof buffer - 2);
-		json_object_object_add(p, buffer, describe_verb_v4(verb, tok));
-	}
-	verb = api->verbs.statics;
-	if (verb)
-		while(verb->verb) {
-			strncpy(buffer + 1, verb->verb, sizeof buffer - 2);
-			json_object_object_add(p, buffer, describe_verb_v4(verb, tok));
-			verb++;
-		}
-	json_tokener_free(tok);
-	return r;
-}
-#endif
 
 
 /******************************************************************************

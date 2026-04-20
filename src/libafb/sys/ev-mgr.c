@@ -362,9 +362,6 @@ struct ev_mgr
 	/** flag indicating that a cleanup of efds is needed */
 	uint16_t efds_cleanup: 1;
 
-	/** flag indicating that a cleanup of timers is needed */
-	uint16_t timers_cleanup: 1;
-
 	/** flag indicating that a cleanup of preparers is needed */
 	uint16_t preparers_cleanup: 1;
 };
@@ -552,7 +549,10 @@ void ev_fd_set_handler(struct ev_fd *efd, ev_fd_cb_t handler, void *closure)
 
 static void fd_dispatch(struct ev_fd *efd, uint32_t events)
 {
-	efd->handler(efd, efd->fd, events, efd->closure);
+	if (efd->is_deleted)
+		return;
+	if (efd->is_active)
+		efd->handler(efd, efd->fd, events, efd->closure);
 	if (events & EV_FD_HUP) {
 		if (efd->fd >= 0) {
 #if WITH_EPOLL
@@ -658,27 +658,6 @@ static void efds_cleanup(struct ev_mgr *mgr)
 /******************************************************************************/
 
 /**
- * Remove deleted timers
- */
-static void timers_cleanup(struct ev_mgr *mgr)
-{
-	struct ev_timer *timer, **prvtim;
-
-	if (mgr->timers_cleanup) {
-		mgr->timers_cleanup = 0;
-		prvtim = &mgr->timers;
-		while ((timer = *prvtim)) {
-			if (!timer->is_deleted)
-				prvtim = &timer->next;
-			else {
-				*prvtim = timer->next;
-				free(timer);
-			}
-		}
-	}
-}
-
-/**
  * returns the current value of the time in ms
  */
 static time_unit_t now_ut()
@@ -731,32 +710,36 @@ static int timer_arm(struct ev_mgr *mgr, time_unit_t when)
  */
 static int timer_set(struct ev_mgr *mgr, time_unit_t upper)
 {
-	struct ev_timer *timer;
+	struct ev_timer *timer, **prvtim;
 	time_unit_t lower, lo, up;
-
-	timers_cleanup(mgr);
 
 	/* get the next slice */
 	lower = 0;
-	timer = mgr->timers;
-	while (timer) {
-		if (timer->is_active) {
-			lo = timer->next_ut;
-			if (lo <= upper) {
-				up = lo + timer->accuracy_ut;
-				if (up <= lower) {
-					lower = lo;
-					upper = up;
-				}
-				else {
-					if (lower < lo)
+	prvtim = &mgr->timers;
+	while ((timer = *prvtim)) {
+		if (timer->is_deleted) {
+			*prvtim = timer->next;
+			free(timer);
+		}
+		else {
+			if (timer->is_active) {
+				lo = timer->next_ut;
+				if (lo <= upper) {
+					up = lo + timer->accuracy_ut;
+					if (up <= lower) {
 						lower = lo;
-					if (up < upper)
 						upper = up;
+					}
+					else {
+						if (lower < lo)
+							lower = lo;
+						if (up < upper)
+							upper = up;
+					}
 				}
 			}
+			prvtim = &timer->next;
 		}
-		timer = timer->next;
 	}
 
 	/* activate the timer */
@@ -884,7 +867,6 @@ void ev_timer_unref(struct ev_timer *timer)
 	if (timer && !__atomic_sub_fetch(&timer->refcount, 1, __ATOMIC_RELAXED)) {
 		timer->is_active = 0;
 		timer->is_deleted = 1;
-		timer->mgr->timers_cleanup = 1;
 	}
 }
 
@@ -984,7 +966,6 @@ static void preparers_prepare(struct ev_mgr *mgr)
 static void do_cleanup(struct ev_mgr *mgr)
 {
 	efds_cleanup(mgr);
-	timers_cleanup(mgr);
 	preparers_cleanup(mgr);
 }
 

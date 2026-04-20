@@ -1,5 +1,38 @@
+version 5.7.2
+-------------
+
+  fix
+   - use after disconnection in notify_ws
+   - releasing of rpc coder memory
+   - fix use after free in event destruction
+   - fix memory leak when tracing in monitor
+   - fix memory leak when rpc calls internaly fail (#9169)
+
+  change
+   - improvement of websocket close process
+   - improvement of afb-stub-rpc
+
+Version 5.7.1
+-------------
+
+  change
+   - supervision disabled by default
+
+Version 5.7.0
+-------------
+
+  change
+   - improved afb-ev-mgr (use spinlock)
+   - removal of single json_tokener in afb-wsj1
+   - removal of legacy describe
+   - handling of the new info verb
+   - remove RPC v1 compatibility
+   - afb-monitor deals with afb_data
+   - allows afb_hook_init_req to be called more than once
+   - implement api_set_specification (v4 interface revision 9)
+
 Version 5.6.2
-------------
+-------------
 
   fix
    - understand POST data encoding
