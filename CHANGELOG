@@ -1,3 +1,9 @@
+version 5.7.3
+-------------
+
+  fix
+   - fix deadlock introduced in 5.7.0
+
 version 5.7.2
 -------------
 

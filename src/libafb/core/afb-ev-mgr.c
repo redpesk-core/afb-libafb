@@ -180,10 +180,12 @@ int afb_ev_mgr_release(x_thread_t tid)
 		return 0;
 	}
 
-	if (awaiters == NULL)
-		x_spin_unlock(&spin);
-	else
+	if (awaiters != NULL)
 		wakeup_spinlocked();
+	else {
+		holder = INVALID_THREAD_ID;
+		x_spin_unlock(&spin);
+	}
 
 	return 1;
 }
