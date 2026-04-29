@@ -1,3 +1,9 @@
+version xxxxx
+-------------
+
+  change
+   - unsuscribing doesn't return error if subscription isn't existing
+
 version 5.7.3
 -------------
 

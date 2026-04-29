@@ -1279,8 +1279,6 @@ static int incall_unsubscribe_cb(struct afb_req_common *comreq, struct afb_evt *
 	rc2 = stub->listener == NULL ? 0 : afb_evt_listener_remove(stub->listener, evt, 0, 0);
 	if (rc2 > 0)
 		rc2 = remove_event(stub, afb_evt_fullname(evt), afb_evt_id(evt));
-	if (rc >= 0 && rc2 < 0)
-		rc = rc2;
 	if (rc >= 0)
 		rc = emit(stub);
 	if (rc < 0)

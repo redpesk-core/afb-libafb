@@ -728,8 +728,7 @@ afb_api_common_unsubscribe(
 	struct afb_api_common *comapi,
 	struct afb_evt *evt
 ) {
-	int rc = ensure_listener(comapi);
-	return rc < 0 ? rc : evt ? afb_evt_listener_unwatch_evt(comapi->listener, evt) : X_EINVAL;
+	return evt == NULL ? X_EINVAL : comapi->listener == NULL ? 0 : afb_evt_listener_unwatch_evt(comapi->listener, evt);
 }
 
 int

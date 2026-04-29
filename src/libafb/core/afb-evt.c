@@ -1154,14 +1154,14 @@ int afb_evt_listener_remove(struct afb_evt_listener *listener, struct afb_evt *e
 		watch = *pwatch;
 		if (!watch) {
 			x_rwlock_unlock(&listener->rwlock);
-			return X_ENOENT;
+			return 0;
 		}
 		wev = watch->evt;
 		if (evt != NULL ? (evt == wev) : (wev->id == eventid)) {
 			*pwatch = watch->next_by_listener;
 			x_rwlock_unlock(&listener->rwlock);
 			listener_unwatch(listener, wev, watch, notify);
-			return 0;
+			return 1;
 		}
 		pwatch = &watch->next_by_listener;
 	}
@@ -1169,22 +1169,20 @@ int afb_evt_listener_remove(struct afb_evt_listener *listener, struct afb_evt *e
 
 /*
  * Avoids the 'listener' to watch 'evt'
- * Returns 0 in case of success or else -1.
+ * Returns 0 if already removed or 1 if removed.
  */
 int afb_evt_listener_unwatch_evt(struct afb_evt_listener *listener, struct afb_evt *evt)
 {
-	int rc = afb_evt_listener_remove(listener, evt, 0, 1);
-	return rc < 0 ? rc : 0;
+	return afb_evt_listener_remove(listener, evt, 0, 1);
 }
 
 /*
  * Avoids the 'listener' to watch 'eventid'
- * Returns 0 in case of success or else -1.
+ * Returns 0 if already removed or 1 if removed.
  */
 int afb_evt_listener_unwatch_id(struct afb_evt_listener *listener, uint16_t eventid)
 {
-	int rc = afb_evt_listener_remove(listener, NULL, eventid, 1);
-	return rc < 0 ? rc : 0;
+	return afb_evt_listener_remove(listener, NULL, eventid, 1);
 }
 
 /*
