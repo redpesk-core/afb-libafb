@@ -39,6 +39,7 @@ static const char text_no_item[]            = "no-item";
 static const char text_not_available[]      = "not-available";
 static const char text_no_reply[]           = "no-reply";
 static const char text_out_of_memory[]      = "out-of-memory";
+static const char text_timeout[]            = "timeout";
 static const char text_unauthorized[]       = "unauthorized";
 static const char text_unknown_api[]        = "unknown-api";
 static const char text_unknown_verb[]       = "unknown-verb";
@@ -87,6 +88,8 @@ const char *afb_error_text(int code)
 		return text_bad_state;
 	case AFB_ERRNO_DISCONNECTED:
 		return text_disconnected;
+	case AFB_ERRNO_TIMEOUT:
+		return text_timeout;
 	default:
 		return text_internal_error;
 	}
@@ -127,6 +130,8 @@ int afb_error_code(const char *error)
 		return AFB_ERRNO_BAD_STATE;
 	if (!strcmp(error, text_disconnected))
 		return AFB_ERRNO_DISCONNECTED;
+	if (!strcmp(error, text_timeout))
+		return AFB_ERRNO_TIMEOUT;
 #if ALSO_SOME_LEGACY
 	if (!strcmp(error, text_not_replied))
 		return AFB_ERRNO_NO_REPLY;
