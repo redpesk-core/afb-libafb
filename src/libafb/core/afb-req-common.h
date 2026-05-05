@@ -41,6 +41,10 @@ struct afb_session;
 struct afb_auth;
 struct afb_event_x2;
 
+#if WITH_AFB_CALL_SYNC
+struct afb_sched_lock;
+#endif
+
 /**
  * Interface of the requests
  */
@@ -157,7 +161,25 @@ struct afb_req_common
 	/** the parameters (arguments) of the request */
 	struct afb_req_common_arg params;
 
+#if WITH_AFB_CALL_SYNC
+	struct {
+		/** the locker */
+		struct afb_sched_lock *lock;
+
+		/** the status */
+		int *status;
+
+		/** the replies count */
+		unsigned *nreplies;
+
+		/** the replies */
+		struct afb_data **replies;
+	}
+		sync;
+#endif
+
 #if WITH_REPLY_JOB
+
 	/** the reply status */
 	int status;
 
@@ -217,6 +239,19 @@ afb_req_common_prepare_forwarding(
 	unsigned nparams,
 	struct afb_data * const params[]
 );
+
+#if WITH_AFB_CALL_SYNC
+extern
+int
+afb_req_common_enter_sync(
+	struct afb_req_common *req,
+	int *status,
+	unsigned *nreplies,
+	struct afb_data *replies[],
+	void (*callback)(void *closure, struct afb_req_common *req),
+	void *closure
+);
+#endif
 
 extern
 void

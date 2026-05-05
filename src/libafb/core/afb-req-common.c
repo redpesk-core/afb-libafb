@@ -616,6 +616,45 @@ afb_req_common_process_on_behalf_hookable(
 }
 #endif
 
+#if WITH_AFB_CALL_SYNC
+struct enter_sync
+{
+	struct afb_req_common *req;
+	void (*callback)(void *closure, struct afb_req_common *req);
+	void *closure;
+};
+
+
+static
+void enter_sync_cb(
+	int signum,
+	void* closure,
+	struct afb_sched_lock *lock
+) {
+	struct enter_sync *es = closure;
+	if (signum == 0) {
+		es->req->sync.lock = lock;
+		es->callback(es->closure, es->req);
+	}
+}
+
+int
+afb_req_common_enter_sync(
+	struct afb_req_common *req,
+	int *status,
+	unsigned *nreplies,
+	struct afb_data *replies[],
+	void (*callback)(void *closure, struct afb_req_common *req),
+	void *closure
+) {
+	struct enter_sync es = { req, callback, closure };
+	req->sync.status = status;
+	req->sync.nreplies = nreplies;
+	req->sync.replies = replies;
+	return afb_sched_sync(0, enter_sync_cb, &es);
+}
+#endif
+
 /******************************************************************************/
 
 static
@@ -978,6 +1017,34 @@ do_reply(
 
 #endif
 
+#if WITH_AFB_CALL_SYNC
+static inline
+void
+do_reply_sync(
+	struct afb_req_common *req,
+	int status,
+	unsigned nreplies,
+	struct afb_data * const replies[]
+) {
+	if (req->sync.lock == NULL)
+		do_reply(req, status, nreplies, replies);
+	else {
+		if (req->sync.nreplies) {
+			if (req->sync.replies) {
+				unsigned n = *req->sync.nreplies;
+				while (nreplies > n)
+					afb_data_unref(replies[--nreplies]);
+				afb_data_array_copy(nreplies, replies, req->sync.replies);
+			}
+			*req->sync.nreplies = nreplies;
+		}
+		if (req->sync.status)
+			*req->sync.status = status;
+		afb_sched_leave(req->sync.lock);
+	}
+}
+#endif
+
 /**
  * Emits the reply to the request
  *
@@ -1001,7 +1068,11 @@ afb_req_common_reply(
 	else {
 		/* first reply, so emit it */
 		req->replied = 1;
+#if WITH_AFB_CALL_SYNC
+		do_reply_sync(req, status, nreplies, replies);
+#else
 		do_reply(req, status, nreplies, replies);
+#endif
 	}
 }
 

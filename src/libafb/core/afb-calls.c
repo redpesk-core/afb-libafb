@@ -270,64 +270,16 @@ process(
 }
 
 #if WITH_AFB_CALL_SYNC
-struct psync
-{
-	struct afb_api_common *comapi;
-	const char *apiname;
-	const char *verbname;
-	unsigned nparams;
-	struct afb_data * const *params;
-	int *status;
-	unsigned *nreplies;
-	struct afb_data **replies;
-	struct afb_req_common *caller;
-	int flags;
-	int completed;
-	struct req_calls *callreq;
-};
-
-static void call_sync_reply(struct psync *ps, int status, unsigned nreplies, struct afb_data * const replies[])
-{
-	if (!ps->completed) {
-		if (ps->nreplies) {
-			if (ps->replies) {
-				if (nreplies > *ps->nreplies)
-					nreplies = *ps->nreplies;
-				afb_data_array_copy_addref(nreplies, replies, ps->replies);
-			}
-			*ps->nreplies = nreplies;
-		}
-		if (ps->status)
-			*ps->status = status;
-		ps->completed = 1;
-	}
-}
-
-static void call_sync_leave(void *closure1, void *closure2, void *closure3, int status, unsigned nreplies, struct afb_data * const replies[])
-{
-	struct afb_sched_lock *lock = closure1;
-	struct psync *ps = closure2;
-
-	call_sync_reply(ps, status, nreplies, replies);
-	afb_sched_leave(lock);
-}
-
-static void process_sync_enter_cb(int signum, void *closure, struct afb_sched_lock *lock)
-{
-	struct psync *ps = closure;
-	if (signum == 0) {
-		ps->callreq = make_call_req(ps->comapi, ps->apiname, ps->verbname, ps->nparams, ps->params,
-		                            call_sync_leave, lock, ps, 0,
-		                            ps->caller, ps->flags, &req_call_itf, 1);
-		if (ps->callreq == NULL)
-			ps->completed = 1;
-		else {
-			afb_req_common_addref(&ps->callreq->comreq);
-			afb_req_common_process_hookable(&ps->callreq->comreq, afb_api_common_call_set(ps->comapi));
-		}
-	}
-	else if (ps->callreq != NULL)
-		ps->callreq->callback = NULL;
+static
+void
+call_sync(
+	void *closure,
+	struct afb_req_common *comreq
+) {
+	struct req_calls *req = closure;
+	/* because afb_req_process unref the request, taking one ref is needed */
+	afb_req_common_addref(&req->comreq);
+	afb_req_common_process_hookable(&req->comreq, afb_api_common_call_set(req->comapi));
 }
 
 static
@@ -344,29 +296,22 @@ process_sync(
 	struct afb_req_common *caller,
 	int flags
 ) {
-	int rc;
-	struct psync ps;
+	int rc = X_ENOMEM;
+	struct req_calls *req = make_call_req(comapi, apiname, verbname, nparams, params,
+	                                      NULL, NULL, NULL, NULL,
+	                                      caller, flags, &req_call_itf, 1);
+	if (req != NULL) {
+		rc = afb_req_common_enter_sync(&req->comreq, status, nreplies, replies, call_sync, req);
+		afb_req_common_unref(&req->comreq);
 
-	ps.comapi = comapi;
-	ps.apiname = apiname;
-	ps.verbname = verbname;
-	ps.nparams = nparams;
-	ps.params = params;
-	ps.status = status;
-	ps.nreplies = nreplies;
-	ps.replies = replies;
-	ps.caller = caller;
-	ps.flags = flags;
-	ps.callreq = NULL;
-
-	ps.completed = 0;
-
-	rc = afb_sched_sync(0, process_sync_enter_cb, &ps);
-	if (ps.callreq != NULL) {
-		ps.callreq->callback = NULL;
-		afb_req_common_unref(&ps.callreq->comreq);
 	}
-	call_sync_reply(&ps, AFB_ERRNO_NO_REPLY, 0, NULL);
+
+	if (rc < 0) {
+		if (status != NULL)
+			*status = rc;
+		if (nreplies != NULL)
+			*nreplies = 0;
+	}
 	return rc;
 }
 #else
