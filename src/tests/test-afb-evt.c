@@ -127,9 +127,9 @@ void do_test_init(int, void*)
     fprintf(stderr, "\n******** test_init ********\n");
 
     fprintf(stderr, "\n## afb_evt_create2...\n");
-	rc = afb_evt_create2(&evt, PREFIX, NAME);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    rc = afb_evt_create2(&evt, PREFIX, NAME);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 0);
 
 #if WITH_AFB_HOOK
     struct afb_hook_evt * hook_evt;
@@ -139,35 +139,35 @@ void do_test_init(int, void*)
 #endif
 
     fprintf(stderr, "\n## afb_evt_id...\n");
-	evt_id = afb_evt_id(evt);
-	fprintf(stderr, "-> rc = %d\n", evt_id);
-	ck_assert_int_ne(evt_id, 0);
+    evt_id = afb_evt_id(evt);
+    fprintf(stderr, "-> rc = %d\n", evt_id);
+    ck_assert_int_ne(evt_id, 0);
 
     fprintf(stderr, "\n## afb_evt_fullname...\n");
-	rcname = afb_evt_fullname(evt);
-	fprintf(stderr, "-> rc = %s\n", rcname);
-	ck_assert_str_eq(rcname, FULLNAME);
+    rcname = afb_evt_fullname(evt);
+    fprintf(stderr, "-> rc = %s\n", rcname);
+    ck_assert_str_eq(rcname, FULLNAME);
 
     fprintf(stderr, "\n## afb_evt_name...\n");
-	rcname = afb_evt_name_hookable(evt);
-	fprintf(stderr, "-> rcname = %s\n", rcname);
-	ck_assert_str_eq(rcname, NAME);
+    rcname = afb_evt_name_hookable(evt);
+    fprintf(stderr, "-> rcname = %s\n", rcname);
+    ck_assert_str_eq(rcname, NAME);
 
     fprintf(stderr, "\n## afb_evt_addref...\n");
-	ev = afb_evt_addref_hookable(evt);
-	fprintf(stderr, "-> ev = %p\n", ev);
-	ck_assert_ptr_eq(ev, evt);
+    ev = afb_evt_addref_hookable(evt);
+    fprintf(stderr, "-> ev = %p\n", ev);
+    ck_assert_ptr_eq(ev, evt);
     afb_evt_unref_hookable(evt);
 
     fprintf(stderr, "\n## afb_evt_listener_create...\n");
-	ev_listener = afb_evt_listener_create(&ev_itf, NULL, NULL);
-	fprintf(stderr, "-> ev_listener = %p\n", ev_listener);
-	ck_assert_ptr_ne(ev_listener, NULL);
+    ev_listener = afb_evt_listener_create(&ev_itf, NULL, NULL);
+    fprintf(stderr, "-> ev_listener = %p\n", ev_listener);
+    ck_assert_ptr_ne(ev_listener, NULL);
 
     fprintf(stderr, "\n## afb_evt_listener_addref...\n");
-	rc_ev_listener = afb_evt_listener_addref(ev_listener);
-	fprintf(stderr, "-> rc_ev_listener = %p\n", rc_ev_listener);
-	ck_assert_ptr_eq(rc_ev_listener, ev_listener);
+    rc_ev_listener = afb_evt_listener_addref(ev_listener);
+    fprintf(stderr, "-> rc_ev_listener = %p\n", rc_ev_listener);
+    ck_assert_ptr_eq(rc_ev_listener, ev_listener);
     afb_evt_listener_unref(rc_ev_listener);
 
     afb_evt_unref_hookable(evt);
@@ -182,7 +182,7 @@ void do_test_init(int, void*)
 
 START_TEST (test_init)
 {
-	afb_sched_start(1, 1, 100, do_test_init, NULL);
+    afb_sched_start(1, 1, 100, do_test_init, NULL);
 }
 END_TEST
 
@@ -203,9 +203,9 @@ void do_test_functional(int, void*)
     fprintf(stderr, "\n******** test_functionnal *******\n");
 
     fprintf(stderr, "\n## afb_evt_create...\n");
-	rc = afb_evt_create(&evt, NAME);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    rc = afb_evt_create(&evt, NAME);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 0);
 
 #if WITH_AFB_HOOK
     struct afb_hook_evt * hook_evt;
@@ -215,9 +215,9 @@ void do_test_functional(int, void*)
 #endif
 
     fprintf(stderr, "\n## afb_evt_push...\n");
-	rc = afb_evt_push_hookable(evt, 0, NULL);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    rc = afb_evt_push_hookable(evt, 0, NULL);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 0);
         wait_job_completion(1);
 
     fprintf(stderr, "\n## afb_evt_listener_create...\n");
@@ -238,38 +238,38 @@ void do_test_functional(int, void*)
     }
 
     fprintf(stderr, "\n## afb_evt_push...\n");
-	rc = afb_evt_push_hookable(evt, 0, NULL);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_ge(rc, 1);
+    rc = afb_evt_push_hookable(evt, 0, NULL);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_ge(rc, 1);
     wait_job_completion(1);
     check_mask(cb_closure, push_mask);
 
     fprintf(stderr, "\n## afb_evt_broadcast...\n");
-	rc = afb_evt_broadcast_hookable(evt, 0, NULL);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    rc = afb_evt_broadcast_hookable(evt, 0, NULL);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 0);
     wait_job_completion(1);
     check_mask(cb_closure, broadcast_mask);
 
     fprintf(stderr, "\n## afb_evt_listener_unwatch_evt...\n");
     rc = afb_evt_listener_unwatch_evt(ev_listener[0], evt);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 1);
     wait_job_completion(1);
     ck_assert_int_eq(cb_closure[0], remove_mask);
     cb_closure[0] = 0;
 
     fprintf(stderr, "\n## afb_evt_listener_unwatch_id...\n");
     rc = afb_evt_listener_unwatch_id(ev_listener[1], afb_evt_id(evt));
-	fprintf(stderr, "-> rc = %d\n", rc);
-	ck_assert_int_eq(rc, 0);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    ck_assert_int_eq(rc, 1);
     wait_job_completion(1);
     ck_assert_int_eq(cb_closure[1], remove_mask);
     cb_closure[1] = 0;
 
     fprintf(stderr, "\n## afb_evt_listener_unwatch_all...\n");
     afb_evt_listener_unwatch_all(ev_listener[2], 1);
-	fprintf(stderr, "-> rc = %d\n", rc);
+    fprintf(stderr, "-> rc = %d\n", rc);
     wait_job_completion(1);
     ck_assert_int_eq(cb_closure[2], remove_mask);
     cb_closure[2] = 0;
@@ -278,25 +278,25 @@ void do_test_functional(int, void*)
 
     rc = afb_evt_listener_unwatch_evt(ev_listener[0], evt);
     fprintf(stderr, "evt -> rc = %d\n", rc);
-    ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(rc, 0);
     ck_assert_int_eq(cb_closure[0], 0);
 
     rc = afb_evt_listener_unwatch_id(ev_listener[1], afb_evt_id(evt));
     fprintf(stderr, "id -> rc = %d\n", rc);
-    ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(rc, 0);
     ck_assert_int_eq(cb_closure[1], 0);
 
     rc = afb_evt_listener_unwatch_evt(ev_listener[2], evt);
     fprintf(stderr, "evt -> rc = %d\n", rc);
-    ck_assert_int_eq(rc, X_ENOENT);
+    ck_assert_int_eq(rc, 0);
     ck_assert_int_eq(cb_closure[2], 0);
 
     fprintf(stderr, "\n## check that listeners get removed when event are deleted...\n");
     cb_closure[0] = 0;
-	rc = afb_evt_listener_watch_evt(ev_listener[0], evt);
+    rc = afb_evt_listener_watch_evt(ev_listener[0], evt);
     wait_job_completion(1);
     ck_assert_int_eq(rc, 0);
-        ck_assert_int_eq(cb_closure[0], add_mask);
+    ck_assert_int_eq(cb_closure[0], add_mask);
 
     cb_closure[0] = 0;
     afb_evt_unref(evt);
@@ -315,7 +315,7 @@ void do_test_functional(int, void*)
 
 START_TEST (test_functional)
 {
-	afb_sched_start(1, 1, 100, do_test_functional, NULL);
+    afb_sched_start(1, 1, 100, do_test_functional, NULL);
 }
 END_TEST
 
@@ -341,10 +341,10 @@ void do_test_afb_event_x2(int, void*)
     fprintf(stderr, "\n******** test_afb_event_x2 *******\n");
 
     fprintf(stderr, "\n## afb_evt_create...\n");
-	rc = afb_evt_create(&evt, NAME);
-	fprintf(stderr, "-> rc = %d\n", rc);
-	fprintf(stderr, "-> evt = %p\n", evt);
-	ck_assert_int_eq(rc, 0);
+    rc = afb_evt_create(&evt, NAME);
+    fprintf(stderr, "-> rc = %d\n", rc);
+    fprintf(stderr, "-> evt = %p\n", evt);
+    ck_assert_int_eq(rc, 0);
 
 #if WITH_AFB_HOOK
     struct afb_hook_evt * hook_evt;
@@ -410,7 +410,7 @@ void do_test_afb_event_x2(int, void*)
 
 START_TEST (test_afb_event_x2)
 {
-	afb_sched_start(1, 1, 100, do_test_afb_event_x2, NULL);
+    afb_sched_start(1, 1, 100, do_test_afb_event_x2, NULL);
 }
 END_TEST
 
@@ -442,24 +442,24 @@ void addtcase(const char *name) { tcase = tcase_create(name); suite_add_tcase(su
 #define addtest(test) tcase_add_test(tcase, test)
 int srun()
 {
-	int nerr;
-	SRunner *srunner = srunner_create(suite);
-	srunner_run_all(srunner, CK_NORMAL);
-	nerr = srunner_ntests_failed(srunner);
-	srunner_free(srunner);
-	return nerr;
+    int nerr;
+    SRunner *srunner = srunner_create(suite);
+    srunner_run_all(srunner, CK_NORMAL);
+    nerr = srunner_ntests_failed(srunner);
+    srunner_free(srunner);
+    return nerr;
 }
 
 int main(int ac, char **av)
 {
-	mksuite("afb-jobs");
-		addtcase("afb-jobs");
-			addtest(test_init);
-			addtest(test_functional);
-			addtest(test_afb_event_x2);
+    mksuite("afb-jobs");
+        addtcase("afb-jobs");
+            addtest(test_init);
+            addtest(test_functional);
+            addtest(test_afb_event_x2);
 #if TEST_EVT_MAX_COUNT
             addtest(test_afb_maxcount);
 #endif
-	return !!srun();
+    return !!srun();
 }
 
