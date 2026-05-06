@@ -633,6 +633,7 @@ void enter_sync_cb(
 ) {
 	struct enter_sync *es = closure;
 	if (signum == 0) {
+		es->req->synched = 1;
 		es->req->sync.lock = lock;
 		es->callback(es->closure, es->req);
 	}
@@ -1026,7 +1027,7 @@ do_reply_sync(
 	unsigned nreplies,
 	struct afb_data * const replies[]
 ) {
-	if (req->sync.lock == NULL)
+	if (!req->synched)
 		do_reply(req, status, nreplies, replies);
 	else {
 		if (req->sync.nreplies) {

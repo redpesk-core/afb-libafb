@@ -122,6 +122,9 @@ struct afb_req_common
 	         invalidated: 1,        /**< invalidated token */
 	         closing: 1,            /**< closing the session */
 	         closed: 1,             /**< session closed */
+#if WITH_AFB_CALL_SYNC
+		 synched: 1,            /**< synchronous call */
+#endif
 	         asyncount: 4;          /**< count of async items */
 
 #if WITH_AFB_HOOK
