@@ -164,6 +164,9 @@ struct afb_req_common
 	/** the parameters (arguments) of the request */
 	struct afb_req_common_arg params;
 
+#if WITH_AFB_CALL_SYNC && WITH_REPLY_JOB
+	union {
+#endif
 #if WITH_AFB_CALL_SYNC
 	struct {
 		/** the locker */
@@ -190,6 +193,9 @@ struct afb_req_common
 		struct afb_req_common_arg replies;
 	}
 		reply_job;
+#endif
+#if WITH_AFB_CALL_SYNC && WITH_REPLY_JOB
+	};
 #endif
 };
 
