@@ -179,12 +179,14 @@ struct afb_req_common
 #endif
 
 #if WITH_REPLY_JOB
+	struct {
+		/** the reply status */
+		int status;
 
-	/** the reply status */
-	int status;
-
-	/** the reply data */
-	struct afb_req_common_arg replies;
+		/** the reply data */
+		struct afb_req_common_arg replies;
+	}
+		reply_job;
 #endif
 };
 

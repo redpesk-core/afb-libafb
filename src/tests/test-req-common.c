@@ -665,7 +665,7 @@ START_TEST(reply)
 	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NDATA_DEF + NB_DATA, data);
 
 #if WITH_REPLY_JOB
-	ck_assert_ptr_ne(req->replies.data, req->replies.local);
+	ck_assert_ptr_ne(req->reply_job.replies.data, req->reply_job.replies.local);
 #endif
 
 	gval = 0;
@@ -689,7 +689,7 @@ START_TEST(reply)
 	afb_req_common_reply_hookable(req, 0, REQ_COMMON_NDATA_DEF, data);
 
 #if WITH_REPLY_JOB
-	ck_assert_ptr_eq(req->replies.data, req->replies.local);
+	ck_assert_ptr_eq(req->reply_job.replies.data, req->reply_job.replies.local);
 #endif
 
 	gval = 0;

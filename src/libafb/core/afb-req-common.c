@@ -980,8 +980,8 @@ reply_job(
 	struct afb_req_common *req = closure;
 
 	if (!signum)
-		req->queryitf->reply(req, req->status, req->replies.ndata, req->replies.data);
-	clean_args(&req->replies);
+		req->queryitf->reply(req, req->reply_job.status, req->reply_job.replies.ndata, req->reply_job.replies.data);
+	clean_args(&req->reply_job.replies);
 	afb_req_common_unref(req);
 }
 
@@ -993,8 +993,8 @@ do_reply(
 	unsigned nreplies,
 	struct afb_data * const replies[]
 ) {
-	req->status = status;
-	set_args(nreplies, replies, &req->replies);
+	req->reply_job.status = status;
+	set_args(nreplies, replies, &req->reply_job.replies);
 
 	afb_req_common_addref(req);
 	if (afb_sched_post_job(req->group, 0, 0, reply_job, req, Afb_Sched_Mode_Normal) < 0)
