@@ -53,8 +53,8 @@ struct afb_v4_dynlib_info
 	/** revision of the interface (0 if no interface found) */
 	short itfrev;
 
-	/** the revision */
-	short revision;
+	/** upper supported interface revision */
+	short itfrev_max;
 };
 
 #if WITH_DYNAMIC_BINDING || WITH_ZEPHYR_LLEXT

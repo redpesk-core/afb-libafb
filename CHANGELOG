@@ -1,3 +1,9 @@
+version 5.7.5
+-------------
+
+  fix
+   - fix check of the supported interface revision (#9221)
+
 version 5.7.4
 -------------
 

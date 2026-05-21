@@ -271,6 +271,7 @@ static const struct afb_binding_x4r1_itf afb_v4_itf = {
 
 #endif
 /*-- END -----------------------------------*/
+#define ITF_REVISION_MAX 9
 };
 
 #include "sys/x-dynlib.h"
@@ -316,6 +317,8 @@ void afb_v4_connect_dynlib(x_dynlib_t *dynlib, struct afb_v4_dynlib_info *info, 
 	x_dynlib_symbol(dynlib, afb_api_so_v4_entry, (void**)&info->mainctl);
 
 	/* retrieves interfaces */
+	info->itfrev_max = AFB_BINDING_X4R1_ITF_FULL_REVISION < ITF_REVISION_MAX
+				? AFB_BINDING_X4R1_ITF_FULL_REVISION : ITF_REVISION_MAX;
 	info->itfrev = 0;
 	x_dynlib_symbol(dynlib, afb_api_so_v4r1_itfptr, (void**)&itfptr1);
 	if (itfptr1) {
