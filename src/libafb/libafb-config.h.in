@@ -44,6 +44,7 @@
 #cmakedefine01 WITH_AFB_HOOK
 #cmakedefine01 WITH_AFB_TRACE
 #cmakedefine01 WITH_SUPERVISION
+#cmakedefine01 WITH_SUPERVISION_DO
 #cmakedefine01 WITH_DYNAMIC_BINDING
 #cmakedefine01 WITH_REPLY_JOB
 #cmakedefine01 WITH_SYSTEMD

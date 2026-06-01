@@ -36,15 +36,14 @@
 #include <rp-utils/rp-jsonc.h>
 #include <rp-utils/rp-verbose.h>
 
-#define AFB_BINDING_VERSION 3
-#define AFB_BINDING_NO_ROOT
-#include <afb/afb-binding.h>
+#define AFB_BINDING_VERSION 0
+#include <afb/afb-binding-v4.h>
 
 #include "core/afb-apiset.h"
 #include "core/afb-req-common.h"
-#include "core/afb-json-legacy.h"
 #include "misc/afb-trace.h"
 #include "core/afb-data-array.h"
+#include "core/afb-type-predefined.h"
 #include "core/afb-session.h"
 #include "misc/afb-supervision.h"
 #include "misc/afb-supervisor.h"
@@ -292,9 +291,95 @@ int afb_supervision_init(struct afb_apiset *apiset, struct json_object *config)
 }
 
 /******************************************************************************
-**** Implementation monitoring verbs
+****
 ******************************************************************************/
-static void slist(void *closure, struct afb_session *session)
+
+#if WITH_SUPERVISION_DO
+struct call_s {
+	struct afb_req_common comreq;
+	struct afb_req_common *req;
+};
+
+static void call_unref(struct afb_req_common *comreq)
+{
+	struct call_s *cs = (struct call_s *)comreq;
+	afb_req_common_unref(cs->req);
+	free(cs);
+}
+
+static void call_reply(struct afb_req_common *comreq, int status, unsigned nreplies, struct afb_data * const replies[])
+{
+	struct call_s *cs = (struct call_s *)comreq;
+	afb_data_array_addref(nreplies, replies);
+	afb_req_common_reply_hookable(cs->req, status, nreplies, replies);
+}
+
+static int call_subscribe(struct afb_req_common *comreq, struct afb_evt *event)
+{
+	struct call_s *cs = (struct call_s *)comreq;
+	return afb_req_common_subscribe_hookable(cs->req, event);
+}
+
+static int call_unsubscribe(struct afb_req_common *comreq, struct afb_evt *event)
+{
+	struct call_s *cs = (struct call_s *)comreq;
+	return afb_req_common_unsubscribe_hookable(cs->req, event);
+}
+
+static struct afb_req_common_query_itf call_itf = {
+	.reply = call_reply,
+	.unref = call_unref,
+	.subscribe = call_subscribe,
+	.unsubscribe = call_unsubscribe
+};
+
+static void call_json(
+		struct afb_req_common *req,
+		const char *apiname,
+		const char *verbname,
+		struct json_object *obj
+) {
+	struct afb_data *data;
+	int rc;
+	struct call_s *cs;
+
+	cs = malloc(sizeof *cs);
+	if (cs == NULL)
+		goto oom;
+
+	rc = afb_data_create_raw(&data, &afb_type_predefined_json_c, obj, 0, (void*)json_object_put, obj);
+	if (rc < 0)
+		goto oom2;
+
+	afb_req_common_init(&cs->comreq, &call_itf, apiname, verbname, 1, &data, NULL);
+	cs->req = afb_req_common_addref(req);
+	afb_req_common_process(&cs->comreq, global.apiset);
+	return;
+
+oom2:
+	free(cs);
+oom:
+	afb_req_common_reply_out_of_memory_error_hookable(req);
+}
+#endif
+
+/******************************************************************************
+****
+******************************************************************************/
+static void reply_json(struct afb_req_common *req, struct json_object *obj)
+{
+	struct afb_data *data;
+	int rc = afb_data_create_raw(&data, &afb_type_predefined_json_c, obj, 0, (void*)json_object_put, obj);
+	if (rc < 0)
+		afb_req_common_reply_out_of_memory_error_hookable(req);
+	else
+		afb_req_common_reply_hookable(req, 0, 1, &data);
+}
+
+/******************************************************************************
+****
+******************************************************************************/
+static void build_session_list_cb(void *closure, struct afb_session *session)
 {
 	struct json_object *list = closure;
 
@@ -309,34 +394,65 @@ static const char *verbs[] = {
 	"break", "config", "do", "exit", "sclose", "slist", "trace", "wait" };
 enum  {  Break ,  Config ,  Do ,  Exit ,  Sclose ,  Slist ,  Trace ,  Wait  };
 
-static void process_cb(void *closure, struct json_object *args)
+static void process(struct afb_req_common *req, struct json_object *args)
 {
 	int i;
-	struct afb_req_common *comreq = closure;
-	struct json_object *sub, *list;
-	const char *api, *verb, *uuid;
+	struct json_object *list;
+	const char *uuid;
 	struct afb_session *session;
-	const struct afb_api_item *xapi;
-	struct afb_data *data;
 	int rc;
+#if WITH_SUPERVISION_DO
+	struct json_object *sub;
+	const char *api, *verb;
+#endif
 #if WITH_AFB_TRACE
 	struct json_object *drop, *add;
 #endif
 
 	/* search the verb */
 	i = (int)(sizeof verbs / sizeof *verbs);
-	while(--i >= 0 && namecmp(verbs[i], comreq->verbname));
+	while(--i >= 0 && namecmp(verbs[i], req->verbname));
 	if (i < 0) {
-		afb_req_common_reply_verb_unknown_error_hookable(comreq);
+		afb_req_common_reply_verb_unknown_error_hookable(req);
 		return;
 	}
 
 	/* process */
 	switch(i) {
+	case Slist:
+		list = json_object_new_object();
+		afb_session_foreach(build_session_list_cb, list);
+		reply_json(req, list);
+		break;
+	case Config:
+		reply_json(req, json_object_get(global.config));
+		break;
+#if WITH_AFB_TRACE
+	case Trace:
+		if (!trace)
+			trace = afb_trace_create(supervisor_apiname, NULL /* not bound to any session */);
+
+		add = drop = NULL;
+		rp_jsonc_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
+		if (add) {
+			rc = afb_trace_add(req, add, trace);
+			if (rc)
+				return;
+		}
+		if (drop) {
+			rc = afb_trace_drop(req, drop, trace);
+			if (rc)
+				return;
+		}
+		afb_req_common_reply_hookable(req, 0, 0, NULL);
+		break;
+#endif
+#if WITH_SUPERVISION_DO
 	case Exit:
 		i = 0;
 		if (rp_jsonc_unpack(args, "i", &i))
 			rp_jsonc_unpack(args, "{si}", "code", &i);
+		afb_req_common_reply_hookable(req, 0, 0, NULL);
 		RP_ERROR("exiting from supervision with code %d -> %d", i, i & 127);
 		exit(i & 127);
 		break;
@@ -345,98 +461,55 @@ static void process_cb(void *closure, struct json_object *args)
 		if (rp_jsonc_unpack(args, "s", &uuid))
 			rp_jsonc_unpack(args, "{ss}", "uuid", &uuid);
 		if (!uuid)
-			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
+			afb_req_common_reply_hookable(req, AFB_ERRNO_INVALID_REQUEST, 0, NULL);
 		else {
 			session = afb_session_search(uuid);
 			if (!session)
-				afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_NO_ITEM), NULL);
+				afb_req_common_reply_hookable(req, AFB_ERRNO_NO_ITEM, 0, NULL);
 			else {
 				afb_session_close(session);
 				afb_session_unref(session);
 				afb_session_purge();
-				afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
+				afb_req_common_reply_hookable(req, 0, 0, NULL);
 			}
 		}
-		break;
-	case Slist:
-		list = json_object_new_object();
-		afb_session_foreach(slist, list);
-		afb_json_legacy_req_reply_hookable(comreq, list, NULL, NULL);
-		break;
-	case Config:
-		afb_json_legacy_req_reply_hookable(comreq, json_object_get(global.config), NULL, NULL);
-		break;
-	case Trace:
-#if WITH_AFB_TRACE
-		if (!trace)
-			trace = afb_trace_create(supervisor_apiname, NULL /* not bound to any session */);
-
-		add = drop = NULL;
-		rp_jsonc_unpack(args, "{s?o s?o}", "add", &add, "drop", &drop);
-		if (add) {
-			rc = afb_trace_add(comreq, add, trace);
-			if (rc)
-				return;
-		}
-		if (drop) {
-			rc = afb_trace_drop(comreq, drop, trace);
-			if (rc)
-				return;
-		}
-		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
-#else
-		afb_req_common_reply_unavailable_error_hookable(comreq);
-#endif
 		break;
 	case Do:
+		{
 		sub = NULL;
 		if (rp_jsonc_unpack(args, "{ss ss s?o*}", "api", &api, "verb", &verb, "args", &sub))
-			afb_json_legacy_req_reply_hookable(comreq, NULL, afb_error_text(AFB_ERRNO_INVALID_REQUEST), NULL);
-		else {
-			rc = afb_apiset_get_api(global.apiset, api, 1, 1, &xapi);
-			if (rc < 0)
-				afb_req_common_reply_api_unknown_error_hookable(comreq);
-			else {
-				rc = afb_json_legacy_make_data_json_c(&data, json_object_get(sub));
-				if (rc < 0)
-					afb_req_common_reply_internal_error_hookable(comreq, rc);
-				else {
-#if WITH_CRED
-					afb_req_common_set_cred(comreq, NULL);
-#endif
-					json_object_get(args);
-					comreq->apiname = api;
-					comreq->verbname = verb;
-					afb_data_array_unref(comreq->params.ndata, comreq->params.data);
-					comreq->params.data[0] = data;
-					comreq->params.ndata = 1;
-					xapi->itf->process(xapi->closure, comreq);
-					json_object_put(args);
-				}
-			}
+			afb_req_common_reply_hookable(req, AFB_ERRNO_INVALID_REQUEST, 0, NULL);
+		else
+			call_json(req, api, verb, json_object_get(sub));
 		}
 		break;
 #if WITH_AFB_DEBUG
 	case Wait:
-		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
+		afb_req_common_reply_hookable(req, 0, 0, NULL);
 		afb_debug_wait("supervisor");
 		break;
 	case Break:
-		afb_json_legacy_req_reply_hookable(comreq, NULL, NULL, NULL);
+		afb_req_common_reply_hookable(req, 0, 0, NULL);
 		afb_debug_break("supervisor");
 		break;
-#else
-	case Wait:
-	case Break:
-		afb_req_common_reply_unavailable_error_hookable(comreq);
-		break;
 #endif
+#endif
+	default:
+		afb_req_common_reply_unavailable_error_hookable(req);
+		break;
 	}
 }
 
-static void on_supervision_process(void *closure, struct afb_req_common *comreq)
+static void on_supervision_process(void *closure, struct afb_req_common *req)
 {
-	afb_json_legacy_do_single_json_c(comreq->params.ndata, comreq->params.data, process_cb, comreq);
+	struct afb_data *data;
+	int rc = afb_req_common_param_convert(req, 0, &afb_type_predefined_json_c, &data);
+	if (rc < 0)
+		afb_req_common_reply_hookable(req, AFB_ERRNO_INVALID_REQUEST, 0, NULL);
+	else {
+		struct json_object *args = afb_data_ro_pointer(data);
+		process(req, args);
+	}
 }
 
 #endif
